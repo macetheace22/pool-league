@@ -1,0 +1,27 @@
+name: Keep Supabase Active
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Supabase
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/app_heartbeat?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Supabase heartbeat failed with HTTP status $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "Supabase heartbeat successful."
