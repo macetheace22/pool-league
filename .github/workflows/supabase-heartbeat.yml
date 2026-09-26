@@ -10,17 +10,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping Supabase
+      - name: Update Supabase heartbeat
         run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/app_heartbeat?select=id&limit=1" \
+          echo "Updating Supabase heartbeat..."
+
+          HTTP_CODE=$(curl -s -o response.txt -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/app_heartbeat?id=eq.1" \
+            -X PATCH \
             -H "apikey: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}")
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            --data "{\"last_ping\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}")
 
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "HTTP status: $HTTP_CODE"
+          cat response.txt
 
-          if [ "$HTTP_CODE" -ne 200 ]; then
-            echo "Supabase heartbeat failed with HTTP status $HTTP_CODE"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Supabase heartbeat failed."
             exit 1
           fi
 
