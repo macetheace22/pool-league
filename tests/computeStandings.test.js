@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStandings } from "../db.js";
+import { computeStandings } from "../src/db.js";
 
 describe("computeStandings", () => {
   it("computes wins/losses/sets/points for both teams from a single match", () => {

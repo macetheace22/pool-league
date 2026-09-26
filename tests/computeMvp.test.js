@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeMvp } from "../db.js";
+import { computeMvp } from "../src/db.js";
 
 describe("computeMvp", () => {
   it("masters format: winner's mvpRanking = points + 200, loser's = 0 - 200", () => {

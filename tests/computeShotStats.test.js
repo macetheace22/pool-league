@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeShotStats } from "../db.js";
+import { computeShotStats } from "../src/db.js";
 
 const shot = (outcome, extra = {}) => ({ category: "shot", outcome, tags: [], is_scratch: false, is_foul: false, is_miscue: false, ...extra });
 
