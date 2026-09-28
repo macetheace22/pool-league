@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation, useNavigationType } from "react-router-
 import {
   Menu, X, ChevronLeft, LogOut, UserCircle, Calendar, Settings2, Upload,
   Trophy, Eye, Users, Search, ClipboardList, Key, Building2,
-  Home, Dumbbell, Award, TrendingUp,
+  Home, Dumbbell, Award, TrendingUp, Wrench, BarChart3,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 
@@ -74,24 +74,48 @@ export function confirmAndLogout(logout) {
 }
 
 // ─── Bottom tab bar ─────────────────────────────────────────────────────────
-// Primary navigation between the app's four top-level areas. Stays visible
-// (and highlights the right tab) even while deep inside nested pages -- e.g.
-// any League Office page still shows "Leagues" active, so switching areas
-// is always one tap regardless of how far in you've drilled.
-const TABS = [
+// Primary navigation between the app's top-level areas. Stays visible (and
+// highlights the right tab) even while deep inside nested pages -- e.g. any
+// League Office page still shows "Leagues" active, so switching areas is
+// always one tap regardless of how far in you've drilled.
+//
+// The League Office LANDING page itself (/league-office) was never actually
+// included in that "any League Office page" match below -- only its child
+// items (LEAGUE_OFFICE_ITEMS' own paths) were. That meant visiting the
+// office list page directly left every tab unhighlighted. Managers now get
+// a dedicated fifth tab straight to it, so their case is handled by an exact
+// match on their own tab; everyone else still reaches League Office via the
+// Leagues tab's office-card link, so /league-office is added to Leagues'
+// own match for them.
+const BASE_TABS = [
   { key: "home",        label: "Home",        path: "/",            icon: Home,     match: (p) => p === "/" },
-  { key: "leagues",     label: "Leagues",      path: "/leagues",     icon: Trophy,   match: (p) => p.startsWith("/leagues") || LEAGUE_OFFICE_ITEMS.some(it => p.startsWith(it.path)) },
   { key: "practice",    label: "Practice",     path: "/practice",    icon: Dumbbell, match: (p) => p.startsWith("/practice") },
   { key: "tournaments", label: "Tournaments",  path: "/tournaments", icon: Award,    match: (p) => p.startsWith("/tournaments") },
 ];
 
+function tabsForRole(role) {
+  const isManager = role === "manager";
+  const leagues = {
+    key: "leagues", label: "Leagues", path: "/leagues", icon: Trophy,
+    match: (p) => p.startsWith("/leagues")
+      || LEAGUE_OFFICE_ITEMS.some(it => p.startsWith(it.path))
+      || (!isManager && p === "/league-office"),
+  };
+  const office = { key: "office", label: "Office", path: "/league-office", icon: Wrench, match: (p) => p === "/league-office" };
+  return isManager
+    ? [BASE_TABS[0], leagues, BASE_TABS[1], BASE_TABS[2], office]
+    : [BASE_TABS[0], leagues, BASE_TABS[1], BASE_TABS[2]];
+}
+
 export function TabBar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const path = location.pathname;
+  const tabs = tabsForRole(profile?.role);
   return (
     <div className="tab-bar-nav">
-      {TABS.map(t => {
+      {tabs.map(t => {
         const Icon = t.icon;
         const active = t.match(path);
         return (
@@ -106,11 +130,23 @@ export function TabBar() {
 }
 
 // ─── Hamburger drawer ───────────────────────────────────────────────────────
-// Scaled back to app-wide utility only now that the tab bar handles primary
-// navigation -- just the account-level actions that don't belong on any one
-// tab.
+// Mirrors the same top-level hierarchy as the Home tile grid (My Stats,
+// Leagues, Practice, Tournaments, plus League Office for whichever roles
+// have any League Office pages at all) -- League Office is the one parent
+// with real sub-pages, so its items render indented underneath it, same
+// shape as the old pre-tab-bar drawer had, just nested instead of flat.
+const PRIMARY_NAV_ITEMS = [
+  { key: "stats",       label: "My Stats",    path: "/my-stats",   icon: BarChart3 },
+  { key: "leagues",     label: "Leagues",     path: "/leagues",    icon: Trophy },
+  { key: "practice",    label: "Practice",    path: "/practice",   icon: Dumbbell },
+  { key: "tournaments", label: "Tournaments", path: "/tournaments", icon: Award },
+];
+
 export function NavDrawer({ open, onClose, profile, onLogout }) {
   const location = useLocation();
+  const officeItems = navItemsForRole(profile.role);
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + "/");
+
   return (
     <>
       {open && <div className="drawer-scrim" onClick={onClose} />}
@@ -122,6 +158,34 @@ export function NavDrawer({ open, onClose, profile, onLogout }) {
         <div className="drawer__who">
           <RoleTag role={profile.role} />
           <span className="drawer__username">@{profile.username}</span>
+        </div>
+        <div className="drawer__items">
+          {PRIMARY_NAV_ITEMS.map(item => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.key} to={item.path} onClick={onClose}
+                className={`drawer__item ${isActive(item.path) ? "drawer__item--active" : ""}`}>
+                <Icon size={16} /><span>{item.label}</span>
+              </Link>
+            );
+          })}
+          {officeItems.length > 0 && (
+            <>
+              <Link to="/league-office" onClick={onClose}
+                className={`drawer__item ${location.pathname === "/league-office" ? "drawer__item--active" : ""}`}>
+                <Wrench size={16} /><span>League Office</span>
+              </Link>
+              {officeItems.map(item => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.key} to={item.path} onClick={onClose}
+                    className={`drawer__item drawer__item--sub ${isActive(item.path) ? "drawer__item--active" : ""}`}>
+                    <Icon size={14} /><span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </div>
         <div className="drawer__bottom">
           <Link to="/me" onClick={onClose} className={`drawer__item ${location.pathname === "/me" ? "drawer__item--active" : ""}`}>
@@ -205,6 +269,8 @@ export const shellCss = `
 .drawer__item{display:flex;align-items:center;gap:10px;padding:11px 14px;color:#E0E0E0;text-decoration:none;font-size:12.5px;font-weight:600;border:none;background:none;text-align:left;cursor:pointer;}
 .drawer__item:hover{background:#1C1C1C;}
 .drawer__item--active{background:#0F2D1F;color:#5FCF9E;border-left:3px solid #5FCF9E;padding-left:11px;}
+.drawer__item--sub{padding-left:34px;font-size:11.5px;font-weight:500;color:#B0B0B0;}
+.drawer__item--sub.drawer__item--active{padding-left:31px;}
 .drawer__bottom{border-top:1.5px solid #2A2A2A;padding-top:8px;margin-top:8px;}
 .drawer__item--logout{color:#F87171;}
 

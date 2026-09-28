@@ -291,3 +291,16 @@ if the manual click-through process starts actually missing things.
   real exports, every file delivery, no exceptions — same discipline as prior
   sessions, just applied across a much larger set of interdependent files this time
   (nine app files touched across the session, several edited across multiple turns).
+
+## New in this build — automated IBA schedule import
+
+The season workflow now treats the IBA schedule page as the initial season-structure source.
+
+- `api/iba-schedules.js` server endpoint retrieves `https://ibapool.com/League/Schedules/m8-pool-league` server-side, discovers the Format/Night/Division controls, submits the selected season context, and parses the returned team table plus weekly schedule table.
+- `src/IbaScheduleImportPanel.jsx` is shown on the expanded season card. It discovers available divisions for the season's format/night, lets the manager preview them, then imports divisions, teams, weeks, pairings, holidays, and playoff rows.
+- `src/db.js` adds `findDivisionInSeason()` and `importIbaScheduleDivision()` so team numbers are scoped to the selected season/division rather than searched globally across active seasons.
+- Existing manual schedule paste/import remains unchanged under Manage Season Data → Schedule and is the fallback if IBA's page structure/retrieval changes.
+- Automatic schedule import intentionally refuses to replace a division's existing schedule. This avoids deleting schedule rows that may already be referenced by live scoring, lineup planning, or history. Change detection/update should be a separate follow-up.
+- The automatic report importer remains separate: DIV/MVP are treated as later/weekly data sources, not required for initial season setup.
+
+The schedule endpoint includes several request fallbacks because the IBA page's selection controls are dynamic. If IBA changes its form/AJAX mechanism, the endpoint may need one targeted adjustment; the manual importer remains available.

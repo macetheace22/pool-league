@@ -425,6 +425,58 @@ export async function removeDivision(divisionId) {
   const { error } = await supabase.from("divisions").delete().eq("id", divisionId);
   return !error;
 }
+
+// Finds a division within a specific season. Team numbers are intentionally
+// scoped to this division/season; never route an IBA schedule by a globally
+// unique team number.
+export async function findDivisionInSeason(seasonId, num, name) {
+  let query = supabase.from("divisions").select("*").eq("season_id", seasonId);
+  if (num) query = query.eq("num", String(num));
+  const { data } = await query.maybeSingle();
+  if (data) return data;
+  if (!name) return null;
+  const { data: rows } = await supabase.from("divisions").select("*").eq("season_id", seasonId).eq("name", name).limit(1);
+  return rows?.[0] ?? null;
+}
+
+// Idempotent season-rooted import for one IBA schedule. The caller supplies
+// the already-parsed division/team/schedule structure from the IBA website.
+// This is deliberately separate from the old manual paste path so both paths
+// can converge on the same persistence functions without changing existing
+// scoring/history data.
+export async function importIbaScheduleDivision(seasonId, division) {
+  if (!seasonId || !division) return { ok: false, error: "Missing season or division." };
+  let target = await findDivisionInSeason(seasonId, division.num, division.name);
+  if (!target) target = await addDivision(seasonId, division.num, division.name || "");
+  if (!target) return { ok: false, error: "Could not create the division." };
+
+  const { data: existingWeeks } = await supabase.from("schedule_weeks").select("id").eq("division_id", target.id).limit(1);
+  if (existingWeeks?.length) {
+    return { ok: false, error: "A schedule already exists for this division. Use the existing manual re-import flow until schedule change detection is added.", divisionId: target.id, existingSchedule: true };
+  }
+  const incomingTeams = (division.teams ?? []).map(t => ({
+    teamNum: String(t.teamNum ?? "").trim(),
+    name: String(t.name ?? "").trim(),
+    venue: String(t.venue ?? "").trim(),
+    isBye: !!t.isBye,
+  })).filter(t => t.teamNum && t.name);
+  if (incomingTeams.length) {
+    const ok = await saveTeams(target.id, incomingTeams);
+    if (!ok) return { ok: false, error: "Division was found, but teams could not be saved.", divisionId: target.id };
+  }
+  const teams = await listTeams(target.id);
+  const ordered = [...teams].sort((a,b) => {
+    const an = Number(a.teamNum), bn = Number(b.teamNum);
+    return (Number.isFinite(an) && Number.isFinite(bn)) ? an - bn : String(a.teamNum).localeCompare(String(b.teamNum));
+  });
+  const weeks = (division.weeks ?? []).map(w => ({
+    week: w.week ?? null, date: w.date ?? "", special: w.special ?? null,
+    pairings: (w.pairings ?? []).map(p => ({ home: Number(p.home), away: Number(p.away) })).filter(p => Number.isFinite(p.home) && Number.isFinite(p.away)),
+  }));
+  if (weeks.length) await replaceSchedule(target.id, weeks, ordered);
+  const playoffWeeks = weeks.filter(w => `${w.special ?? ""}`.toLowerCase().includes("playoff"));
+  return { ok: true, divisionId: target.id, divisionNum: target.num, divisionName: target.name, teamCount: ordered.length, weekCount: weeks.length, playoffWeeks: playoffWeeks.length };
+}
 export async function updateDivision(divisionId, num, name) {
   const { error } = await supabase.from("divisions").update({ num, name }).eq("id", divisionId);
   return !error;
@@ -437,6 +489,25 @@ export async function countTeamsByDivisions(divisionIds) {
   const counts = {};
   (data ?? []).forEach(t => { counts[t.division_id] = (counts[t.division_id] ?? 0) + 1; });
   return counts;
+}
+
+export async function listActiveTeamsByNumbers(teamNums) {
+  const nums = [...new Set((teamNums ?? []).filter(Boolean))];
+  if (!nums.length) return { byNum: {}, ambiguous: [] };
+  const { data } = await supabase
+    .from("teams")
+    .select("id, division_id, team_num, name, venue, is_bye, divisions(seasons(is_active))")
+    .in("team_num", nums);
+  const byNum = {};
+  const ambiguous = [];
+  for (const row of data ?? []) {
+    if (!row.divisions?.seasons?.is_active) continue;
+    (byNum[row.team_num] ??= []).push({
+      id: row.id, divisionId: row.division_id, teamNum: row.team_num, name: row.name, venue: row.venue ?? "", isBye: !!row.is_bye,
+    });
+  }
+  for (const [num, rows] of Object.entries(byNum)) if (rows.length > 1) ambiguous.push(num);
+  return { byNum, ambiguous };
 }
 
 export async function listAllTeamsWithContext() {
@@ -1823,5 +1894,67 @@ export async function getTeamStandingsRow(teamId, divisionId) {
   const idx = standings.findIndex(s => s.teamId === teamId);
   if (idx === -1) return null;
   return { ...standings[idx], rank: idx + 1, totalTeams: standings.length };
+}
+
+// One player's MVP rank within a single division's real MVP standings --
+// same pattern as getTeamStandingsRow above, just individuals instead of
+// teams, and reusing computeMvp() (the exact formula the real MVP tab
+// ranks by) rather than a separate calculation.
+export async function getPlayerMvpRankRow(playerNum, divisionId) {
+  const [matches, adjustments] = await Promise.all([listCompletedMatches(divisionId), listMvpAdjustments(divisionId)]);
+  const ranked = computeMvp(matches, adjustments);
+  const idx = ranked.findIndex(p => p.num === playerNum);
+  if (idx === -1) return null;
+  return { ...ranked[idx], rank: idx + 1, totalPlayers: ranked.length };
+}
+
+// ─── Playoff eligibility (section 41 — Division Playoffs Roster & Handicap
+// Report import) ─────────────────────────────────────────────────────────
+// One player's most recent imported eligibility row for a division (E/T/A/S
+// code) -- null if that report has never been imported for this division or
+// this player never resolved to a real player_num in it.
+export async function getPlayerPlayoffEligibility(playerNum, divisionId) {
+  const { data } = await supabase.from("player_playoff_eligibility_current")
+    .select("*").eq("division_id", divisionId).eq("player_num", playerNum).maybeSingle();
+  return data;
+}
+// Every player's latest eligibility row for a division at once -- powers a
+// team roster view without one query per player. Rows with no resolved
+// player_num (an unmatched name from the import) are still included; callers
+// that key off player_num should filter those out themselves.
+export async function listPlayoffEligibilityForDivision(divisionId) {
+  const { data } = await supabase.from("player_playoff_eligibility_current").select("*").eq("division_id", divisionId);
+  return data ?? [];
+}
+
+// ─── Team-vs-team head-to-head ─────────────────────────────────────────────
+// Pure aggregation over a list of completed_matches rows (typically a
+// team's own getTeamScheduleOverview().myCompleted, already fetched) --
+// groups by opponent and tallies wins/losses/points. Teams are never reused
+// across seasons in this schema (a fresh uuid every season), so a team's own
+// match history is already scoped to exactly one season/division -- this
+// never needs a season/division parameter of its own.
+export function computeTeamHeadToHead(matches, teamId) {
+  const byOpp = {};
+  for (const m of matches) {
+    if (m.team_home_id !== teamId && m.team_away_id !== teamId) continue;
+    if (m.is_makeup_pending) continue; // not finished -- doesn't count toward the record yet
+    const isHome = m.team_home_id === teamId;
+    const oppId = isHome ? m.team_away_id : m.team_home_id;
+    if (!oppId) continue;
+    const oppName = isHome ? m.team_away_name : m.team_home_name;
+    const myTotal = isHome ? m.team_home_total : m.team_away_total;
+    const oppTotal = isHome ? m.team_away_total : m.team_home_total;
+    const myPts = isHome ? m.team_home_points : m.team_away_points;
+    const oppPts = isHome ? m.team_away_points : m.team_home_points;
+    if (!byOpp[oppId]) byOpp[oppId] = { teamId: oppId, name: oppName, wins: 0, losses: 0, matchesPlayed: 0, myPoints: 0, oppPoints: 0 };
+    const row = byOpp[oppId];
+    row.matchesPlayed++;
+    row.myPoints += myPts ?? 0;
+    row.oppPoints += oppPts ?? 0;
+    if ((myTotal ?? 0) > (oppTotal ?? 0)) row.wins++;
+    else if ((oppTotal ?? 0) > (myTotal ?? 0)) row.losses++;
+  }
+  return Object.values(byOpp).sort((a, b) => b.matchesPlayed - a.matchesPlayed);
 }
 

@@ -76,3 +76,26 @@ Every `git push` after that redeploys automatically.
 - Player ratings keep full week-by-week history (`player_ratings` table), not just a
   single current number — visible by tapping a player in the Rosters & Ratings card.
 
+
+## Automatic IBA Report Sync
+
+The admin Weekly League Data page now includes an **Automatic IBA Report Sync** panel. It generates the IBA report URLs from the selected season's format/day, retrieves the roster, division standings, and MVP PDFs server-side, treats missing reports as normal, extracts their text, and sends that text through the same parsers used by the manual paste workflow.
+
+### New pieces
+- `api/iba-reports.js` — Vercel serverless endpoint that retrieves and extracts IBA PDFs.
+- `src/ibaParsers.js` — shared roster/standings/MVP parser module used by both manual and automatic imports.
+- `src/ibaAutoSync.js` — automatic retrieval, preview, routing, and import orchestration.
+- `src/IbaAutoSyncPanel.jsx` — manager-facing automatic sync UI.
+- `src/db.js` — active-team routing helper for cross-division standings/MVP imports.
+
+### First install after pulling this version
+
+Because `pdf-parse` is a new dependency, run:
+
+```bash
+npm install
+```
+
+This refreshes `package-lock.json` for the environment before deploying to Vercel.
+
+The manual PDF paste workflow remains available as the fallback.

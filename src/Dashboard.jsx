@@ -53,6 +53,9 @@ export function Home() {
     { key: "leagues", label: "Leagues", desc: "Matches, standings & more", icon: Trophy, path: "/leagues" },
     { key: "practice", label: "Practice", desc: "Play & track practice games", icon: Dumbbell, path: "/practice" },
     { key: "tournaments", label: "Tournaments", desc: "Brackets & tournament play", icon: Award, path: "/tournaments" },
+    ...(profile?.role === "manager"
+      ? [{ key: "office", label: "League Office", desc: "Full league administration", icon: Wrench, path: "/league-office" }]
+      : []),
   ];
 
   return (
