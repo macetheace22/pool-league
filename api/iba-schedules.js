@@ -1,336 +1,780 @@
-const BASE_URL = "https://ibapool.com/League/Schedules/m8-pool-league";
+const IBA_BASE = "https://ibapool.com";
+const LEAGUE_ID = "m8-pool-league";
+
 const FORMATS = ["Open", "Advanced", "Masters"];
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
 const TIMEOUT_MS = 15000;
 
-function norm(v = "") {
-  return String(v).replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&#39;|&apos;/gi, "'").replace(/&quot;/gi, '"').replace(/&#x2F;/gi, "/").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+function norm(value = "") {
+  return String(value)
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x2F;/gi, "/")
+    .replace(/&#(\d+);/g, (_, n) => {
+      try {
+        return String.fromCharCode(Number(n));
+      } catch {
+        return _;
+      }
+    })
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
-function attr(tag, name) {
-  const m = tag.match(new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, "i"));
-  return m ? m[1] : "";
+
+function attr(tag = "", name = "") {
+  const escapedName = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`${escapedName}\\s*=\\s*["']([^"']*)["']`, "i");
+  const match = String(tag).match(re);
+  return match ? match[1] : "";
 }
-function parseSelects(html) {
-  const out = [];
-  const re = /<select\b([^>]*)>([\s\S]*?)<\/select>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const head = m[1], body = m[2];
-    const name = attr(head, "name") || attr(head, "id");
-    if (!name) continue;
-    const options = [];
-    const ore = /<option\b([^>]*)>([\s\S]*?)<\/option>/gi;
-    let o;
-    while ((o = ore.exec(body))) {
-      const oh = o[1];
-      options.push({ value: attr(oh, "value"), label: norm(o[2]), selected: /\bselected\b/i.test(oh) });
-    }
-    out.push({ name, id: attr(head, "id"), options });
-  }
-  return out;
+
+function stripScripts(html = "") {
+  return String(html)
+    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, "");
 }
-function parseHiddenInputs(html) {
-  const out = {};
-  const re = /<input\b([^>]*)>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const type = (attr(m[1], "type") || "text").toLowerCase();
-    if (type !== "hidden") continue;
-    const name = attr(m[1], "name");
-    if (name) out[name] = attr(m[1], "value");
-  }
-  return out;
-}
-function formInfo(html) {
-  const m = html.match(/<form\b([^>]*)>/i);
-  if (!m) return { action: BASE_URL, method: "GET", hidden: {} };
-  return { action: attr(m[1], "action") || BASE_URL, method: (attr(m[1], "method") || "GET").toUpperCase(), hidden: parseHiddenInputs(html) };
-}
-function absoluteUrl(base, action) {
-  try { return new URL(action, base).toString(); } catch { return base; }
-}
-function findSelect(selects, labels) {
-  const wanted = labels.map(x => x.toLowerCase());
-  return selects.find(s => {
-    const hits = s.options.filter(o => wanted.includes(o.label.toLowerCase()));
-    return hits.length >= Math.min(2, wanted.length);
-  }) || null;
-}
-function findDivisionSelect(selects, formatSelect, daySelect) {
-  const excluded = new Set([formatSelect?.name, daySelect?.name]);
-  return selects
-    .filter(s => !excluded.has(s.name))
-    .map(s => ({ s, options: s.options.filter(o => o.value || o.label) }))
-    .sort((a,b) => b.options.length - a.options.length)[0]?.s || null;
-}
-function optionFor(select, wanted) {
-  if (!select) return null;
-  const n = String(wanted || "").toLowerCase();
-  return select.options.find(o => o.label.toLowerCase() === n)
-    || select.options.find(o => o.value.toLowerCase() === n)
-    || select.options.find(o => o.label.toLowerCase().includes(n));
-}
-async function fetchHtml(url, init = {}) {
+
+async function fetchText(url, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
   try {
-    const r = await fetch(url, { ...init, signal: controller.signal, headers: { "User-Agent": "MacesPoolLeague/IBA-Schedule-Sync", ...(init.headers || {}) } });
-    const html = await r.text();
-    return { status: r.status, html, url: r.url };
-  } finally { clearTimeout(timer); }
-}
-function directCandidates(format, day, division = null) {
-  const candidates = [];
-  const combos = [
-    ["Format", "Night", "Division"],
-    ["format", "night", "division"],
-    ["leagueFormat", "leagueDay", "division"],
-    ["leagueType", "day", "division"],
-  ];
-  for (const [f,d,v] of combos) {
-    const u = new URL(BASE_URL);
-    u.searchParams.set(f, format); u.searchParams.set(d, day);
-    if (division != null) u.searchParams.set(v, division);
-    candidates.push(u.toString());
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+        Referer: `${IBA_BASE}/League/Schedules/${LEAGUE_ID}`,
+        "X-Requested-With": "XMLHttpRequest",
+        ...extraHeaders,
+      },
+    });
+
+    const text = await response.text();
+    return { status: response.status, text, url: response.url, headers: response.headers };
+  } finally {
+    clearTimeout(timer);
   }
-  return candidates;
 }
 
-function requestForSelection(page, format, day, division, formHtml = page.html) {
-  const selects = parseSelects(formHtml);
-  const fs = findSelect(selects, FORMATS);
-  const ds = findSelect(selects, DAYS);
-  const vs = findDivisionSelect(selects, fs, ds);
-  const info = formInfo(formHtml);
-  const values = { ...info.hidden };
-  if (fs) { const o = optionFor(fs, format); if (o) values[fs.name] = o.value; }
-  if (ds) { const o = optionFor(ds, day); if (o) values[ds.name] = o.value; }
-  if (vs && division != null) { const o = optionFor(vs, division); if (o) values[vs.name] = o.value; }
-  const target = absoluteUrl(BASE_URL, info.action);
-  if (info.method === "POST") {
-    return { url: target, init: { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(values).toString() } };
-  }
-  const u = new URL(target);
-  Object.entries(values).forEach(([k,v]) => u.searchParams.set(k, v));
-  return { url: u.toString(), init: { method: "GET" } };
-}
-function stripScripts(html) { return html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, ""); }
-function cellsFromRow(rowHtml) {
-  return [...rowHtml.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(m => norm(m[1]));
-}
-function parseTables(html) {
-  const tables = [];
-  const tre = /<table\b[^>]*>([\s\S]*?)<\/table>/gi;
-  let tm;
-  while ((tm = tre.exec(html))) {
-    const rows = [];
-    const rre = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
-    let rm;
-    while ((rm = rre.exec(tm[1]))) { const cells = cellsFromRow(rm[1]); if (cells.length) rows.push(cells); }
-    if (rows.length) tables.push(rows);
-  }
-  return tables;
-}
-function parseScheduleHtml(html) {
-  const clean = stripScripts(html);
-  const tables = parseTables(clean);
-  let teamTable = null, scheduleTable = null;
-  for (const rows of tables) {
-    const header = rows[0].map(norm).join(" | ").toLowerCase();
-    if (/team\s*#/.test(header) && /name/.test(header)) teamTable = rows;
-    if (/week/.test(header) && /date/.test(header) && /pairings/.test(header)) scheduleTable = rows;
-  }
-  const teams = [];
-  if (teamTable) {
-    for (const row of teamTable.slice(1)) {
-      const [teamNum, name, venue] = row;
-      if (/^\d{3,6}$/.test(teamNum || "") && name && !/^name$/i.test(name)) teams.push({ teamNum, name, venue: venue || "", isBye: /\bbye\b/i.test(name) });
+function getSetCookie(headers) {
+  try {
+    if (typeof headers?.getSetCookie === "function") {
+      return headers.getSetCookie().map(x => x.split(";", 1)[0]).filter(Boolean).join("; ");
     }
-  }
-  const weeks = [];
-  if (scheduleTable) {
-    for (const row of scheduleTable.slice(1)) {
-      if (!row.length) continue;
-      const week = /^\d+$/.test(row[0]) ? Number(row[0]) : null;
-      const date = row[1] || "";
-      const pairText = row.slice(2).join(" ");
-      const special = pairText && !/\d+\s*vs\s*\d+/i.test(pairText) ? pairText : "";
-      const pairings = [];
-      for (const m of pairText.matchAll(/(\d+)\s*vs\s*(\d+)/gi)) pairings.push({ home: Number(m[1]), away: Number(m[2]) });
-      if (week != null || date || special) weeks.push({ week, date, pairings, ...(special ? { special } : {}) });
-    }
-  }
-  if (!teams.length || !weeks.length) {
-    // Fallback to visible text. This also makes the importer resilient if IBA
-    // changes table markup while retaining the same text layout.
-    const text = clean.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-    const teamMatches = [...text.matchAll(/(\d{5})\s+([^|]{2,60}?)(?=\s+\d{5}\s+|$)/g)];
-    for (const m of teamMatches.slice(0, 100)) {
-      const name = m[2].trim();
-      if (name && !/^(Team|Name|Location)$/i.test(name) && !teams.some(t => t.teamNum === m[1])) teams.push({ teamNum: m[1], name, venue: "", isBye: /\bbye\b/i.test(name) });
-    }
-  }
-  return { teams, weeks, hasSchedule: teams.length > 0 && weeks.length > 0 };
+  } catch { /* older Node/runtime */ }
+  const raw = headers?.get?.("set-cookie") || "";
+  return raw.split(/,(?=[^;,]+=)/).map(x => x.split(";", 1)[0]).filter(Boolean).join("; ");
 }
 
-function parseSelectDiagnostics(html) {
-  const out = [];
-  const re = /<select\b([^>]*)>([\s\S]*?)<\/select>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const head = m[1], body = m[2];
-    const options = [];
-    const ore = /<option\b([^>]*)>([\s\S]*?)<\/option>/gi;
-    let o;
-    while ((o = ore.exec(body))) {
-      options.push({
-        value: attr(o[1], "value"),
-        label: norm(o[2]),
-        selected: /\bselected\b/i.test(o[1])
+async function fetchJson(url, options = {}) {
+  const result = await fetchText(url, options.headers || {});
+  if (result.status < 200 || result.status >= 400) {
+    throw new Error(`IBA returned HTTP ${result.status}.`);
+  }
+
+  let data;
+  try { data = JSON.parse(result.text); }
+  catch { data = result.text; }
+
+  return { ...result, data };
+}
+
+function parseDivisionOptions(html = "") {
+  const source = String(html || "");
+  const divisions = [];
+
+  const optionRegex =
+    /<option\b([^>]*)>([\s\S]*?)<\/option>/gi;
+
+  let match;
+
+  while ((match = optionRegex.exec(source)) !== null) {
+    const attributes = match[1] || "";
+    const label = norm(match[2] || "");
+
+    const valueMatch = attributes.match(
+      /\bvalue\s*=\s*["']([^"']+)["']/i
+    );
+
+    const value = valueMatch
+      ? valueMatch[1].trim()
+      : "";
+
+    if (!value || !label) continue;
+
+    if (/^(division|select|choose)/i.test(label)) {
+      continue;
+    }
+
+    if (
+      !/^\d+!\d+$/.test(value) &&
+      !/^\d+$/.test(value)
+    ) {
+      continue;
+    }
+
+    if (!divisions.some((division) => division.value === value)) {
+      divisions.push({
+        value,
+        label,
+        selected: /\bselected\b/i.test(attributes),
       });
     }
-    out.push({
-      name: attr(head, "name"),
-      id: attr(head, "id"),
-      className: attr(head, "class"),
-      onchange: attr(head, "onchange"),
-      dataUrl: attr(head, "data-url"),
-      dataAction: attr(head, "data-action"),
-      dataTarget: attr(head, "data-target"),
-      options
-    });
   }
-  return out;
+
+  return divisions;
 }
 
-function parseFormsDiagnostics(html) {
-  const forms = [];
-  const re = /<form\b([^>]*)>([\s\S]*?)<\/form>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const head = m[1];
-    forms.push({
-      action: attr(head, "action") || BASE_URL,
-      method: (attr(head, "method") || "GET").toUpperCase(),
-      id: attr(head, "id"),
-      name: attr(head, "name"),
-      className: attr(head, "class")
-    });
-  }
-  return forms;
-}
+/**
+ * Return table fragments while correctly accounting for nested tables.
+ * IBA's Pairings column contains nested tables.
+ */
+function extractTables(html = "") {
+  const source = stripScripts(html);
+  const tables = [];
+  const tokenRegex = /<\/?table\b[^>]*>/gi;
+  const stack = [];
+  let match;
 
-function parseScriptDiagnostics(html) {
-  const scripts = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const head = m[1];
-    const src = attr(head, "src");
-    const body = (m[2] || "").replace(/\s+/g, " ").trim();
-    const interesting = /ajax|fetch\s*\(|\.get\s*\(|\.post\s*\(|XMLHttpRequest|onchange|schedule|division|league/i.test(body);
-    if (src || interesting) scripts.push({ src, inlinePreview: body.slice(0, 1200), interesting });
-  }
-  return scripts;
-}
-
-function parseInputDiagnostics(html) {
-  const inputs = [];
-  const re = /<input\b([^>]*)>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const head = m[1];
-    inputs.push({
-      type: attr(head, "type") || "text",
-      name: attr(head, "name"),
-      id: attr(head, "id"),
-      value: attr(head, "value"),
-      onchange: attr(head, "onchange")
-    });
-  }
-  return inputs;
-}
-
-async function loadSelected(format, day, division) {
-  const first = await fetchHtml(BASE_URL);
-  let page = first;
-  const attempts = [];
-  const request = requestForSelection(first, format, day, division);
-  attempts.push(request);
-  for (const url of directCandidates(format, day, division)) attempts.push({ url, init: { method: "GET" } });
-  for (const attempt of attempts) {
-    const selected = await fetchHtml(attempt.url, attempt.init);
-    if (selected.status >= 200 && selected.status < 400) {
-      const parsed = parseScheduleHtml(selected.html);
-      if (parsed.hasSchedule) return { ...selected, parsed };
-      page = selected;
+  while ((match = tokenRegex.exec(source))) {
+    if (/^<table\b/i.test(match[0])) {
+      stack.push({ start: match.index, depth: stack.length });
+    } else if (stack.length) {
+      const table = stack.pop();
+      tables.push({ depth: table.depth, html: source.slice(table.start, tokenRegex.lastIndex) });
     }
   }
-  return { ...page, parsed: parseScheduleHtml(page.html) };
+
+  return tables.sort((a, b) => a.depth - b.depth);
+}
+
+function parseTableRows(tableHtml = "") {
+  let html = String(tableHtml)
+    .replace(/^\s*<table\b[^>]*>/i, "")
+    .replace(/<\/table>\s*$/i, "");
+
+  // Flatten nested tables into their visible contents before looking for
+  // outer rows. Without this step a nested <tr> can prematurely terminate
+  // the regex that identifies the parent schedule row.
+  let previous;
+  do {
+    previous = html;
+    html = html.replace(
+      /<table\b[^>]*>((?:(?!<table\b)[\s\S])*?)<\/table>/gi,
+      (_, inner) => norm(inner)
+    );
+  } while (html !== previous);
+
+  const rows = [];
+  const rowRegex = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+
+  while ((rowMatch = rowRegex.exec(html))) {
+    const cells = [];
+    const cellRegex = /<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+
+    while ((cellMatch = cellRegex.exec(rowMatch[1]))) {
+      cells.push(norm(cellMatch[1]));
+    }
+
+    if (cells.length) rows.push(cells);
+  }
+
+  return rows;
+}
+
+function parseTeams(html = "") {
+  const tables = extractTables(html);
+  const teams = [];
+
+  for (const table of tables) {
+    const rows = parseTableRows(table.html);
+    if (!rows.length) continue;
+
+    const header = rows[0].map(norm).join(" | ").toLowerCase();
+    if (!/team\s*#/.test(header) || !/name/.test(header)) continue;
+
+    for (const row of rows.slice(1)) {
+      const teamNum = norm(row[0] || "");
+      const name = norm(row[1] || "");
+      const venue = norm(row[2] || "");
+
+      if (!/^\d{3,8}$/.test(teamNum) || !name || /^name$/i.test(name)) continue;
+      if (teams.some(team => team.teamNum === teamNum)) continue;
+
+      teams.push({
+        teamNum,
+        name,
+        venue,
+        isBye: /\bbye\b/i.test(name),
+      });
+    }
+  }
+
+  // Defensive fallback for a markup change: find visible "Team # Name Venue"
+  // rows without inventing teams from ordinary schedule text.
+  if (!teams.length) {
+    const text = stripScripts(html)
+      .replace(/<br\s*\/?>(?=\S)/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const re = /\b(\d{5,8})\s+([A-Za-z][^|\n]{1,70}?)(?=\s+\d{5,8}\s+|\s+Team\s*#|$)/g;
+    let match;
+    while ((match = re.exec(text))) {
+      const name = norm(match[2]);
+      if (!name || /^(team|name|location)$/i.test(name)) continue;
+      if (!teams.some(team => team.teamNum === match[1])) {
+        teams.push({ teamNum: match[1], name, venue: "", isBye: /\bbye\b/i.test(name) });
+      }
+    }
+  }
+
+  return teams;
+}
+
+function parsePairings(text = "") {
+  const pairings = [];
+  const regex = /(\d+)\s*(?:vs\.?|versus)\s*(\d+|TBD)/gi;
+  let match;
+
+  while ((match = regex.exec(text))) {
+    pairings.push({
+      home: Number(match[1]),
+      away: /^tbd$/i.test(match[2]) ? null : Number(match[2]),
+    });
+  }
+
+  return pairings;
+}
+
+function parseScheduleRows(html = "") {
+  const tables = extractTables(html);
+  const weeks = [];
+
+  for (const table of tables) {
+    const rows = parseTableRows(table.html);
+    if (!rows.length) continue;
+
+    const header = rows[0].map(norm).join(" | ").toLowerCase();
+    if (!/week/.test(header) || !/date/.test(header) || !/pairings/.test(header)) continue;
+
+    for (const row of rows.slice(1)) {
+      if (!row.length) continue;
+
+      const weekValue = norm(row[0] || "");
+      const date = norm(row[1] || "");
+      const week = /^\d+$/.test(weekValue) ? Number(weekValue) : null;
+      const pairText = row.slice(2).join(" ");
+      const pairings = parsePairings(pairText);
+      const special = pairings.length === 0 && pairText ? pairText : "";
+
+      if (week !== null || date || pairings.length || special) {
+        weeks.push({
+          week,
+          date,
+          pairings,
+          ...(special ? { special } : {}),
+        });
+      }
+    }
+  }
+
+  return weeks;
+}
+
+function parseWeeksFallback(html = "") {
+  const text = stripScripts(html)
+    .replace(/<br\s*\/?>(?=\S)/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const weeks = [];
+  const weekRegex = /(?:Week\s+)?(\d+)\s+(\d{1,2}\/\d{1,2}\/\d{4})([\s\S]*?)(?=(?:Week\s+)?\d+\s+\d{1,2}\/\d{1,2}\/\d{4}|$)/gi;
+  let match;
+
+  while ((match = weekRegex.exec(text))) {
+    const week = Number(match[1]);
+    const date = match[2];
+    const content = norm(match[3]);
+    const pairings = parsePairings(content);
+    const special = pairings.length === 0 && content ? content : "";
+
+    weeks.push({
+      week,
+      date,
+      pairings,
+      ...(special ? { special } : {}),
+    });
+  }
+
+  return weeks;
+}
+
+function parseScheduleHtml(html = "") {
+  const clean = stripScripts(html);
+  const teams = parseTeams(clean);
+  let weeks = parseScheduleRows(clean);
+  if (!weeks.length) weeks = parseWeeksFallback(clean);
+
+  // Remove accidental duplicate week rows while preserving order.
+  const seen = new Set();
+  weeks = weeks.filter(week => {
+    const key = `${week.week ?? ""}|${week.date}|${week.special ?? ""}|${JSON.stringify(week.pairings)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return {
+    teams,
+    weeks,
+    hasSchedule: teams.length > 0 && weeks.length > 0,
+  };
+}
+
+async function getDivisions(format, day) {
+  if (!FORMATS.includes(format)) {
+    throw new Error(`Invalid IBA format: ${format}`);
+  }
+
+  if (!DAYS.includes(day)) {
+    throw new Error(`Invalid IBA day: ${day}`);
+  }
+
+  const url = new URL(`${IBA_BASE}/League/GetDivisions`);
+  url.searchParams.set("id", LEAGUE_ID);
+  url.searchParams.set("format", format);
+  url.searchParams.set("day", day);
+  url.searchParams.set("_", Date.now().toString());
+
+  // First attempt: direct AJAX request.
+  let result = await fetchJson(url.toString());
+  let response = result.data;
+
+  // Unwrap JSON strings until we reach an object or raw HTML.
+  for (let i = 0; i < 3 && typeof response === "string"; i += 1) {
+    const trimmed = response.trim();
+
+    if (!trimmed) {
+      break;
+    }
+
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        response = JSON.parse(trimmed);
+        continue;
+      } catch {
+        // Treat it as raw HTML.
+      }
+    }
+
+    break;
+  }
+
+  let divisionHtml = "";
+
+  if (response && typeof response === "object") {
+    divisionHtml =
+      response.html ??
+      response.data ??
+      response.schedule ??
+      "";
+  } else if (typeof response === "string") {
+    divisionHtml = response;
+  }
+
+  if (typeof divisionHtml !== "string") {
+    divisionHtml = String(divisionHtml || "");
+  }
+
+  let divisions = parseDivisionOptions(divisionHtml).map(
+    ({ value, label }) => ({ value, label })
+  );
+
+  // ------------------------------------------------------------
+  // SECOND ATTEMPT: plain request
+  // ------------------------------------------------------------
+  if (!divisions.length) {
+    try {
+      const plain = await fetchText(url.toString(), {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "",
+        Referer: "",
+      });
+
+      let plainResponse = plain.text;
+
+      if (typeof plainResponse === "string") {
+        try {
+          plainResponse = JSON.parse(plainResponse);
+        } catch {
+          // Raw HTML.
+        }
+      }
+
+      if (typeof plainResponse === "string") {
+        try {
+          plainResponse = JSON.parse(plainResponse);
+        } catch {
+          // Still raw HTML.
+        }
+      }
+
+      const plainHtml =
+        plainResponse && typeof plainResponse === "object"
+          ? (
+              plainResponse.html ??
+              plainResponse.data ??
+              plainResponse.schedule ??
+              ""
+            )
+          : typeof plainResponse === "string"
+            ? plainResponse
+            : "";
+
+      const plainDivisions = parseDivisionOptions(plainHtml).map(
+        ({ value, label }) => ({ value, label })
+      );
+
+      if (plainDivisions.length) {
+        result = plain;
+        response = plainResponse;
+        divisionHtml =
+          typeof plainHtml === "string"
+            ? plainHtml
+            : String(plainHtml || "");
+
+        divisions = plainDivisions;
+      }
+    } catch {
+      // Continue to session bootstrap.
+    }
+  }
+
+  // ------------------------------------------------------------
+  // THIRD ATTEMPT: establish an IBA schedule-page session
+  // ------------------------------------------------------------
+  if (!divisions.length) {
+    try {
+      const page = await fetchText(
+        `${IBA_BASE}/League/Schedules/${LEAGUE_ID}`,
+        {
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "X-Requested-With": "",
+        }
+      );
+
+      const cookie = getSetCookie(page.headers);
+
+      if (page.status >= 200 && page.status < 400 && cookie) {
+        result = await fetchJson(url.toString(), {
+          headers: {
+            Cookie: cookie,
+          },
+        });
+
+        response = result.data;
+
+        for (
+          let i = 0;
+          i < 3 && typeof response === "string";
+          i += 1
+        ) {
+          const trimmed = response.trim();
+
+          if (
+            trimmed.startsWith("{") ||
+            trimmed.startsWith("[")
+          ) {
+            try {
+              response = JSON.parse(trimmed);
+              continue;
+            } catch {
+              // Raw HTML.
+            }
+          }
+
+          break;
+        }
+
+        divisionHtml =
+          response && typeof response === "object"
+            ? (
+                response.html ??
+                response.data ??
+                response.schedule ??
+                ""
+              )
+            : typeof response === "string"
+              ? response
+              : "";
+
+        if (typeof divisionHtml !== "string") {
+          divisionHtml = String(divisionHtml || "");
+        }
+
+        divisions = parseDivisionOptions(divisionHtml).map(
+          ({ value, label }) => ({ value, label })
+        );
+      }
+    } catch {
+      // Final raw-body fallback below.
+    }
+  }
+
+  // ------------------------------------------------------------
+  // FINAL ATTEMPT: parse the complete raw response body
+  // ------------------------------------------------------------
+  if (!divisions.length) {
+    divisions = parseDivisionOptions(result.text).map(
+      ({ value, label }) => ({ value, label })
+    );
+  }
+
+  // ------------------------------------------------------------
+  // DIAGNOSTICS
+  // ------------------------------------------------------------
+  const contentType =
+    result.headers.get("content-type") || "";
+
+  const rawText = String(result.text || "");
+
+  const rawPreview = rawText
+    .replace(/\s+/g, " ")
+    .slice(0, 2000);
+
+  const optionMatches = [
+  ...divisionHtml.matchAll(
+    /<option\b([^>]*)>([\s\S]*?)<\/option>/gi
+  ),
+]
+  .slice(0, 20)
+  .map((match) => {
+    const attributes = match[1] || "";
+    const label = norm(match[2] || "");
+
+    const valueMatch = attributes.match(
+      /\bvalue\s*=\s*["']([^"']+)["']/i
+    );
+
+    return {
+      value: valueMatch ? valueMatch[1] : "",
+      label,
+    };
+  });
+
+  const diagnostic = {
+    httpStatus: result.status,
+    finalUrl: result.url,
+    contentType,
+    responseBytes: rawText.length,
+
+    responseType: typeof result.data,
+
+    responseKeys:
+      result.data &&
+      typeof result.data === "object"
+        ? Object.keys(result.data)
+        : [],
+
+    hasDivisionsSelect:
+      /<select\b[^>]*id=["']Divisions["']/i.test(
+        divisionHtml
+      ),
+
+    hasDivisionOption:
+      /<option\b[^>]*value=["'][^"']+![0-9]+["']/i.test(
+        divisionHtml
+      ),
+
+    preview: rawPreview,
+
+    divisionHtmlPreview: String(divisionHtml || "")
+      .replace(/\s+/g, " ")
+      .slice(0, 5000),
+
+    optionMatches,
+
+    request: {
+      format,
+      day,
+      leagueId: LEAGUE_ID,
+    },
+
+    parserFoundDivisions: divisions.length,
+  };
+
+  return {
+    format,
+    day,
+    divisions,
+    url: result.url,
+    diagnostic,
+  };
+}
+
+async function getDivisionSchedule(division) {
+  if (!division) throw new Error("A division value is required.");
+
+  const url = new URL(`${IBA_BASE}/League/GetSchedule`);
+  url.searchParams.set("id", LEAGUE_ID);
+  url.searchParams.set("divId", division);
+  url.searchParams.set("_", Date.now().toString());
+
+  const result = await fetchJson(url.toString());
+  let response = result.data;
+  let scheduleHtml = "";
+
+  if (typeof response === "string") {
+    scheduleHtml = response;
+  } else if (response && typeof response === "object") {
+    scheduleHtml = response.html || response.schedule || response.data || "";
+  }
+
+  // Be tolerant if the endpoint wraps the HTML in another JSON string/object.
+  if (typeof scheduleHtml === "string") {
+    const trimmed = scheduleHtml.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || trimmed.startsWith("{")) {
+      try {
+        const decoded = JSON.parse(trimmed);
+        if (typeof decoded === "string") scheduleHtml = decoded;
+        else if (decoded) scheduleHtml = decoded.html || decoded.schedule || decoded.data || scheduleHtml;
+      } catch { /* ordinary HTML */ }
+    }
+  }
+
+  const parsed = parseScheduleHtml(scheduleHtml);
+  return {
+    division,
+    url: result.url,
+    htmlBytes: scheduleHtml.length,
+    ...parsed,
+  };
+}
+
+async function getAllDivisionSchedules(format, day, divisions) {
+  const results = [];
+  const errors = [];
+
+  for (const division of divisions) {
+    try {
+      const schedule = await getDivisionSchedule(division.value);
+      results.push({ division, ...schedule });
+    } catch (error) {
+      errors.push({
+        division,
+        error: error?.message || "Unable to retrieve division schedule.",
+      });
+    }
+  }
+
+  return {
+    format,
+    day,
+    results,
+    errors,
+    totals: {
+      divisions: results.length,
+      teams: results.reduce((sum, result) => sum + result.teams.length, 0),
+      weeks: results.reduce((sum, result) => sum + result.weeks.length, 0),
+      matchups: results.reduce(
+        (sum, result) => sum + result.weeks.reduce((weekSum, week) => weekSum + week.pairings.length, 0),
+        0
+      ),
+    },
+  };
+}
+
+function parseRequestBody(req) {
+  if (!req || req.body == null) return {};
+  if (typeof req.body === "object") return req.body;
+  if (typeof req.body === "string") {
+    try { return JSON.parse(req.body); } catch { return {}; }
+  }
+  return {};
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") { res.setHeader("Allow", "POST"); return res.status(405).json({ error: "POST required" }); }
-  const body = req.body || {};
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "POST required" });
+  }
+
   try {
-    const first = await fetchHtml(BASE_URL);
-    if (first.status >= 400) return res.status(502).json({ error: `IBA schedule page returned HTTP ${first.status}.` });
-    const selects = parseSelects(first.html);
-    const formatSelect = findSelect(selects, FORMATS);
-    const daySelect = findSelect(selects, DAYS);
-    const divisionSelect = findDivisionSelect(selects, formatSelect, daySelect);
+    const body = parseRequestBody(req);
+    const action = body.action || "discover";
     const format = body.format || "Masters";
     const day = body.day || "Wednesday";
 
-    if (body.action === "discover") {
-      const attempts = [requestForSelection(first, format, day, null), ...directCandidates(format, day).map(url => ({ url, init: { method: "GET" } }))];
-      let page = first;
-      const attemptResults = [];
-      for (const attempt of attempts) {
-        try {
-          const filtered = await fetchHtml(attempt.url, attempt.init);
-          const maybe = parseSelects(filtered.html);
-          const dv = findDivisionSelect(maybe, findSelect(maybe, FORMATS), findSelect(maybe, DAYS));
-          attemptResults.push({ url: filtered.url, status: filtered.status, htmlBytes: filtered.html.length, selectCount: maybe.length, divisionOptionCount: dv?.options?.length || 0 });
-          if (filtered.status < 400) {
-            page = filtered;
-            if (dv?.options?.length) break;
-          }
-        } catch (err) {
-          attemptResults.push({ url: attempt.url, error: err?.message || String(err) });
-        }
-      }
-      const pageSelects = parseSelects(page.html);
-      const fs = findSelect(pageSelects, FORMATS);
-      const ds = findSelect(pageSelects, DAYS);
-      const vs = findDivisionSelect(pageSelects, fs, ds) || divisionSelect;
-      const divisions = (vs?.options || []).filter(o => o.value || o.label).filter(o => !/^(select|choose|division)$/i.test(o.label)).map(o => ({ value: o.value, label: o.label }));
+    if (action === "discover") {
+      const data = await getDivisions(format, day);
       return res.status(200).json({
         format,
         day,
-        divisions,
-        form: { formatName: fs?.name || null, dayName: ds?.name || null, divisionName: vs?.name || null, method: formInfo(page.html).method },
-        diagnostic: {
-          selectCount: pageSelects.length,
-          htmlBytes: page.html.length,
-          finalUrl: page.url,
-          attempts: attemptResults,
-          selects: parseSelectDiagnostics(page.html),
-          forms: parseFormsDiagnostics(page.html),
-          inputs: parseInputDiagnostics(page.html),
-          scripts: parseScriptDiagnostics(page.html)
-        }
+        divisions: data.divisions,
+        count: data.divisions.length,
+        diagnostic: data.diagnostic,
       });
     }
 
-    if (body.action === "fetch") {
-      if (!body.division) return res.status(400).json({ error: "A division value is required." });
-      const loaded = await loadSelected(format, day, body.division);
-      return res.status(200).json({ format, day, division: body.division, url: loaded.url, ...loaded.parsed });
+    if (action === "fetch") {
+      if (!body.division) {
+        return res.status(400).json({ error: "A division value is required." });
+      }
+
+      const data = await getDivisionSchedule(body.division);
+      return res.status(200).json({
+        format,
+        day,
+        division: body.division,
+        url: data.url,
+        teams: data.teams,
+        weeks: data.weeks,
+        hasSchedule: data.hasSchedule,
+        htmlBytes: data.htmlBytes,
+      });
     }
 
-    return res.status(400).json({ error: "Unknown action. Use discover or fetch." });
-  } catch (e) {
-    return res.status(502).json({ error: e?.name === "AbortError" ? "IBA schedule request timed out." : (e?.message || "Unable to retrieve IBA schedule data.") });
+    if (action === "fetch-all") {
+      const discovered = await getDivisions(format, day);
+      const all = await getAllDivisionSchedules(format, day, discovered.divisions);
+      return res.status(200).json({ ...all, divisions: discovered.divisions });
+    }
+
+    return res.status(400).json({
+      error: "Unknown action. Use discover, fetch, or fetch-all.",
+    });
+  } catch (error) {
+    console.error("IBA schedule API error:", error);
+    return res.status(502).json({
+      error: error?.name === "AbortError"
+        ? "IBA schedule request timed out after 15 seconds."
+        : error?.message || "Unable to retrieve IBA schedule data.",
+      name: error?.name || "Error",
+      action: "unknown",
+      format: "unknown",
+      day: "unknown",
+    });
   }
 }
+
+export { parseDivisionOptions, parsePairings, parseScheduleHtml };

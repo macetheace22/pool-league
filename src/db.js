@@ -425,58 +425,6 @@ export async function removeDivision(divisionId) {
   const { error } = await supabase.from("divisions").delete().eq("id", divisionId);
   return !error;
 }
-
-// Finds a division within a specific season. Team numbers are intentionally
-// scoped to this division/season; never route an IBA schedule by a globally
-// unique team number.
-export async function findDivisionInSeason(seasonId, num, name) {
-  let query = supabase.from("divisions").select("*").eq("season_id", seasonId);
-  if (num) query = query.eq("num", String(num));
-  const { data } = await query.maybeSingle();
-  if (data) return data;
-  if (!name) return null;
-  const { data: rows } = await supabase.from("divisions").select("*").eq("season_id", seasonId).eq("name", name).limit(1);
-  return rows?.[0] ?? null;
-}
-
-// Idempotent season-rooted import for one IBA schedule. The caller supplies
-// the already-parsed division/team/schedule structure from the IBA website.
-// This is deliberately separate from the old manual paste path so both paths
-// can converge on the same persistence functions without changing existing
-// scoring/history data.
-export async function importIbaScheduleDivision(seasonId, division) {
-  if (!seasonId || !division) return { ok: false, error: "Missing season or division." };
-  let target = await findDivisionInSeason(seasonId, division.num, division.name);
-  if (!target) target = await addDivision(seasonId, division.num, division.name || "");
-  if (!target) return { ok: false, error: "Could not create the division." };
-
-  const { data: existingWeeks } = await supabase.from("schedule_weeks").select("id").eq("division_id", target.id).limit(1);
-  if (existingWeeks?.length) {
-    return { ok: false, error: "A schedule already exists for this division. Use the existing manual re-import flow until schedule change detection is added.", divisionId: target.id, existingSchedule: true };
-  }
-  const incomingTeams = (division.teams ?? []).map(t => ({
-    teamNum: String(t.teamNum ?? "").trim(),
-    name: String(t.name ?? "").trim(),
-    venue: String(t.venue ?? "").trim(),
-    isBye: !!t.isBye,
-  })).filter(t => t.teamNum && t.name);
-  if (incomingTeams.length) {
-    const ok = await saveTeams(target.id, incomingTeams);
-    if (!ok) return { ok: false, error: "Division was found, but teams could not be saved.", divisionId: target.id };
-  }
-  const teams = await listTeams(target.id);
-  const ordered = [...teams].sort((a,b) => {
-    const an = Number(a.teamNum), bn = Number(b.teamNum);
-    return (Number.isFinite(an) && Number.isFinite(bn)) ? an - bn : String(a.teamNum).localeCompare(String(b.teamNum));
-  });
-  const weeks = (division.weeks ?? []).map(w => ({
-    week: w.week ?? null, date: w.date ?? "", special: w.special ?? null,
-    pairings: (w.pairings ?? []).map(p => ({ home: Number(p.home), away: Number(p.away) })).filter(p => Number.isFinite(p.home) && Number.isFinite(p.away)),
-  }));
-  if (weeks.length) await replaceSchedule(target.id, weeks, ordered);
-  const playoffWeeks = weeks.filter(w => `${w.special ?? ""}`.toLowerCase().includes("playoff"));
-  return { ok: true, divisionId: target.id, divisionNum: target.num, divisionName: target.name, teamCount: ordered.length, weekCount: weeks.length, playoffWeeks: playoffWeeks.length };
-}
 export async function updateDivision(divisionId, num, name) {
   const { error } = await supabase.from("divisions").update({ num, name }).eq("id", divisionId);
   return !error;
@@ -491,25 +439,6 @@ export async function countTeamsByDivisions(divisionIds) {
   return counts;
 }
 
-export async function listActiveTeamsByNumbers(teamNums) {
-  const nums = [...new Set((teamNums ?? []).filter(Boolean))];
-  if (!nums.length) return { byNum: {}, ambiguous: [] };
-  const { data } = await supabase
-    .from("teams")
-    .select("id, division_id, team_num, name, venue, is_bye, divisions(seasons(is_active))")
-    .in("team_num", nums);
-  const byNum = {};
-  const ambiguous = [];
-  for (const row of data ?? []) {
-    if (!row.divisions?.seasons?.is_active) continue;
-    (byNum[row.team_num] ??= []).push({
-      id: row.id, divisionId: row.division_id, teamNum: row.team_num, name: row.name, venue: row.venue ?? "", isBye: !!row.is_bye,
-    });
-  }
-  for (const [num, rows] of Object.entries(byNum)) if (rows.length > 1) ambiguous.push(num);
-  return { byNum, ambiguous };
-}
-
 export async function listAllTeamsWithContext() {
   const { data } = await supabase
     .from("teams")
@@ -521,6 +450,39 @@ export async function listAllTeamsWithContext() {
     isActiveSeason: !!t.divisions?.seasons?.is_active,
     rosterSubmittedAt: t.roster_submitted_at, rosterSubmittedBy: t.profiles?.username ?? null,
   }));
+}
+
+// Resolve IBA report team numbers to the currently-active league teams.
+// Team numbers are only unique within a division, so the result intentionally
+// keeps an array for each number; callers can treat a number with multiple
+// active matches as ambiguous instead of guessing which division it belongs to.
+export async function listActiveTeamsByNumbers(teamNums = []) {
+  const nums = [...new Set((teamNums ?? []).map(n => String(n ?? '').trim()).filter(Boolean))];
+  if (!nums.length) return { byNum: {} };
+
+  const { data, error } = await supabase
+    .from('teams')
+    .select('id, name, team_num, division_id, divisions(num, name, seasons(is_active))')
+    .in('team_num', nums);
+
+  if (error) throw new Error(error.message);
+
+  const byNum = {};
+  for (const row of data ?? []) {
+    if (!row.divisions?.seasons?.is_active) continue;
+    const teamNum = String(row.team_num ?? '').trim();
+    if (!teamNum) continue;
+    (byNum[teamNum] ??= []).push({
+      id: row.id,
+      name: row.name,
+      teamNum,
+      divisionId: row.division_id,
+      divisionNum: row.divisions?.num ?? null,
+      divisionName: row.divisions?.name ?? null,
+    });
+  }
+
+  return { byNum };
 }
 
 // ─── Teams ──────────────────────────────────────────────────────────────────
@@ -583,6 +545,161 @@ export async function deleteLocation(id) {
   return !error;
 }
 
+// ─── IBA Schedule Import ───────────────────────────────────────────────────
+// Imports one division discovered from IBA's GetDivisions/GetSchedule flow.
+// IBA division values look like "287!8538257". The portion after "!" is the
+// unique division number we store in divisions.num; the full compound value
+// remains the value sent back to IBA by the API and is never reconstructed.
+export async function importIbaScheduleDivision(seasonId, payload = {}) {
+  const { num, name, teams: importedTeams = [], weeks: importedWeeks = [] } = payload;
+  const divisionNum = String(num ?? "").trim();
+  const divisionName = String(name ?? "").trim();
+
+  if (!seasonId) return { ok: false, error: "A season is required." };
+  if (!divisionNum) return { ok: false, error: "An IBA division number is required." };
+  if (!divisionName) return { ok: false, error: "An IBA division name is required." };
+  if (!importedTeams.length) return { ok: false, error: "IBA returned no teams for this division." };
+  if (!importedWeeks.length) return { ok: false, error: "IBA returned no schedule weeks for this division." };
+
+  try {
+    let { data: division, error: divisionLookupError } = await supabase
+      .from("divisions")
+      .select("id, num, name, season_id")
+      .eq("season_id", seasonId)
+      .eq("num", divisionNum)
+      .maybeSingle();
+
+    if (divisionLookupError) {
+      return { ok: false, error: divisionLookupError.message };
+    }
+
+    if (division) {
+      const { data: updated, error } = await supabase
+        .from("divisions")
+        .update({ name: divisionName })
+        .eq("id", division.id)
+        .select()
+        .single();
+      if (error) return { ok: false, error: error.message };
+      division = updated;
+    } else {
+      const { data: created, error } = await supabase
+        .from("divisions")
+        .insert({ season_id: seasonId, num: divisionNum, name: divisionName })
+        .select()
+        .single();
+
+      if (error || !created) {
+        // If another import created the same division between our lookup and
+        // insert, re-read it rather than leaving the import half-complete.
+        const { data: existing } = await supabase
+          .from("divisions")
+          .select("id, num, name, season_id")
+          .eq("season_id", seasonId)
+          .eq("num", divisionNum)
+          .maybeSingle();
+        if (!existing) return { ok: false, error: error?.message || "Could not create the division." };
+        division = existing;
+      } else {
+        division = created;
+      }
+    }
+
+    const normalizedTeams = importedTeams
+      .map(team => ({
+        teamNum: String(team.teamNum ?? "").trim(),
+        name: String(team.name ?? "").trim(),
+        venue: String(team.venue ?? "").trim(),
+        isBye: !!team.isBye,
+      }))
+      .filter(team => /^\d{3,8}$/.test(team.teamNum) && team.name);
+
+    if (!normalizedTeams.length) {
+      return { ok: false, error: `${divisionName}: no valid teams were parsed.` };
+    }
+
+    // Upsert the current IBA team rows, preserving existing UUIDs, captains,
+    // rosters and other app-owned data on a re-import.
+    const { error: teamError } = await supabase
+      .from("teams")
+      .upsert(
+        normalizedTeams.map(team => ({
+          division_id: division.id,
+          team_num: team.teamNum,
+          name: team.name,
+          venue: team.venue,
+          is_bye: team.isBye,
+        })),
+        { onConflict: "division_id,team_num" }
+      );
+
+    if (teamError) return { ok: false, error: teamError.message };
+
+    // Read the saved rows back so the schedule can resolve IBA's positional
+    // pairings (1 vs 2, 3 vs 4, etc.) to real Supabase team UUIDs.
+    const savedTeams = await listTeams(division.id);
+    const teamByNum = new Map(savedTeams.map(team => [String(team.teamNum), team]));
+
+    // IBA's schedule positions are 1-based and correspond to teams ordered by
+    // team number. Keep that contract explicit here rather than assuming the
+    // IBA team number itself is the pairing position.
+    const orderedTeams = [...savedTeams].sort((a, b) => String(a.teamNum).localeCompare(String(b.teamNum), undefined, { numeric: true }));
+    const positionToTeam = new Map(orderedTeams.map((team, index) => [index + 1, team]));
+
+    const normalizedWeeks = importedWeeks.map(week => ({
+      week: week.week == null ? null : Number(week.week),
+      date: String(week.date ?? "").trim(),
+      special: week.special ? String(week.special).trim() : null,
+      pairings: (week.pairings ?? [])
+        .map(pairing => ({
+          home: Number(pairing.home),
+          away: pairing.away == null ? null : Number(pairing.away),
+        }))
+        .filter(pairing => Number.isInteger(pairing.home) && pairing.home > 0),
+    }));
+
+    // Replace only after teams and weeks have both parsed successfully. This
+    // makes a re-import deterministic and avoids duplicate schedule rows.
+    await replaceSchedule(division.id, normalizedWeeks, orderedTeams);
+
+    const savedSchedule = await listSchedule(division.id, orderedTeams);
+    const schedulePairingCount = savedSchedule.reduce((sum, week) => sum + (week.pairings?.length ?? 0), 0);
+
+    // If IBA exposes a playoff week, keep the season-level playoff date in sync.
+    const playoffDates = normalizedWeeks
+      .filter(week => /playoff/i.test(week.special || ""))
+      .map(week => week.date)
+      .filter(Boolean);
+    if (playoffDates.length) {
+      const parsed = playoffDates
+        .map(date => {
+          const m = String(date).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          return m ? `${m[3]}-${String(m[1]).padStart(2, "0")}-${String(m[2]).padStart(2, "0")}` : null;
+        })
+        .filter(Boolean)
+        .sort()[0];
+      if (parsed) {
+        await supabase.from("seasons").update({ playoffs_start_date: parsed }).eq("id", seasonId);
+      }
+    }
+
+    return {
+      ok: true,
+      divisionId: division.id,
+      divisionNum: division.num,
+      divisionName: division.name,
+      teamCount: savedTeams.length,
+      weekCount: savedSchedule.length,
+      pairingCount: schedulePairingCount,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || "IBA division import failed.",
+    };
+  }
+}
+
 // ─── Schedule ───────────────────────────────────────────────────────────────
 export async function listSchedule(divisionId, teams) {
   const { data: weeks } = await supabase
@@ -612,17 +729,48 @@ export async function listSchedule(divisionId, teams) {
 // numbering assumes -- positions are resolved to real team ids here, once,
 // so nothing downstream needs to think about position again.
 export async function replaceSchedule(divisionId, parsedWeeks, teams) {
-  await supabase.from("schedule_weeks").delete().eq("division_id", divisionId);
+  const { error: deleteError } = await supabase
+    .from("schedule_weeks")
+    .delete()
+    .eq("division_id", divisionId);
+  if (deleteError) throw new Error(deleteError.message);
+
   for (const w of parsedWeeks) {
+    const isPlayoff = /playoff/i.test(w.special ?? "");
     const { data: weekRow, error } = await supabase
       .from("schedule_weeks")
-      .insert({ division_id: divisionId, week_num: w.week, date: w.date, special: w.special ?? null })
-      .select().single();
-    if (error || !weekRow) continue;
-    const pairingRows = w.pairings
-      .map(p => ({ week_id: weekRow.id, home_team_id: teams[p.home - 1]?.id, away_team_id: teams[p.away - 1]?.id }))
+      .insert({
+        division_id: divisionId,
+        week_num: w.week,
+        date: w.date,
+        special: w.special ?? null,
+        is_playoff: isPlayoff,
+        playoff_label: isPlayoff ? (w.special ?? null) : null,
+      })
+      .select()
+      .single();
+
+    if (error || !weekRow) {
+      if (error) throw new Error(error.message);
+      throw new Error("Could not create an IBA schedule week.");
+    }
+
+    const pairingRows = (w.pairings ?? [])
+      .map(p => ({
+        week_id: weekRow.id,
+        home_team_id: teams[p.home - 1]?.id,
+        away_team_id: p.away == null ? null : teams[p.away - 1]?.id,
+      }))
+      // TBD pairings cannot become a real schedule_pairings row because the
+      // schema requires real team UUIDs. The week/special row is still kept.
       .filter(p => p.home_team_id && p.away_team_id);
-    if (pairingRows.length) await supabase.from("schedule_pairings").insert(pairingRows);
+
+    if (pairingRows.length) {
+      const { error: pairingError } = await supabase
+        .from("schedule_pairings")
+        .insert(pairingRows);
+      if (pairingError) throw new Error(pairingError.message);
+    }
   }
 }
 
@@ -1956,5 +2104,37 @@ export function computeTeamHeadToHead(matches, teamId) {
     else if ((oppTotal ?? 0) > (myTotal ?? 0)) row.losses++;
   }
   return Object.values(byOpp).sort((a, b) => b.matchesPlayed - a.matchesPlayed);
+}
+
+// ─── Home dashboard: multi-team aggregation ────────────────────────────────
+// profile.team_id only ever points at ONE "home" team, but a player can be
+// genuinely rostered on more than one currently-active team at once -- the
+// app explicitly supports concurrent active seasons/divisions. Built from
+// two sources: every ACTIVE-season team the player's own player_num is
+// actually rostered on (via listPlayerTeamHistory, which already reads the
+// rosters table), plus profile.team_id itself as a fallback -- a manager
+// who self-assigned to a team via setOwnTeamId never needs a player_num or
+// a roster row at all, so that path alone wouldn't surface their team.
+// Returns one getTeamScheduleOverview()-shaped object per team, so Home can
+// reuse the exact same schedule/roster/match data every other page does.
+export async function getMyTeamsOverview(profile) {
+  const teamIds = new Set();
+  if (profile?.player_num) {
+    const history = await listPlayerTeamHistory(profile.player_num);
+    history.filter(t => t.isActive).forEach(t => teamIds.add(t.teamId));
+  }
+  if (profile?.team_id) teamIds.add(profile.team_id);
+  if (teamIds.size === 0) return [];
+  const overviews = await Promise.all([...teamIds].map(id => getTeamScheduleOverview(id)));
+  return overviews.filter(Boolean);
+}
+
+// Pure -- the single most recent completed match across every team from
+// getMyTeamsOverview(), tagged with which team it belongs to (a multi-team
+// player's matches are otherwise indistinguishable once flattened together).
+export function mostRecentCompletedMatch(teamOverviews) {
+  const all = (teamOverviews ?? []).flatMap(o => (o.myCompleted ?? []).map(m => ({ ...m, _teamId: o.team.id, _teamName: o.team.name })));
+  if (!all.length) return null;
+  return all.slice().sort((a, b) => new Date(b.confirmed_at || 0) - new Date(a.confirmed_at || 0))[0];
 }
 

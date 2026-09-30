@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart3, Trophy, Dumbbell, Award, ChevronRight, MapPin, Calendar,
-  Newspaper, Wrench, AlertCircle, Users, Check,
+  Newspaper, Wrench, AlertCircle, Users, Check, TrendingUp,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, navItemsForRole, shellCss } from "./Shell";
@@ -23,30 +23,75 @@ function opponentName(pairing, teamId, teams) {
   const oppId = pairing.homeTeamId === teamId ? pairing.awayTeamId : pairing.homeTeamId;
   return teams.find(t => t.id === oppId)?.name ?? "TBD";
 }
+// Same win/loss/points-string logic MatchRow uses below, generalized to a
+// match tagged with _teamId (see db.mostRecentCompletedMatch) instead of
+// always reading it off a single overview.team.id.
+function matchResultLabel(m) {
+  const isHome = m.team_home_id === m._teamId;
+  const myPts = isHome ? m.team_home_points : m.team_away_points;
+  const oppPts = isHome ? m.team_away_points : m.team_home_points;
+  return m.is_makeup_pending ? "Makeup Pending" : (myPts != null && oppPts != null ? `${myPts} – ${oppPts}` : "—");
+}
+function matchOpponentName(m) {
+  const isHome = m.team_home_id === m._teamId;
+  return isHome ? m.team_away_name : m.team_home_name;
+}
 
 // ─── Home ───────────────────────────────────────────────────────────────────
 export function Home() {
   const { profile } = useAuth();
-  const [nextMatch, setNextMatch] = useState(undefined); // undefined = loading, null = none
+  // undefined = loading, [] = not linked to any current team. One entry per
+  // ACTIVE team the player is on right now -- see db.getMyTeamsOverview for
+  // why this can genuinely be more than one.
+  const [teamOverviews, setTeamOverviews] = useState(undefined);
+  const [snapshotStats, setSnapshotStats] = useState(undefined); // undefined = loading/n-a, null = no player_num linked
+  const [recentPractice, setRecentPractice] = useState(undefined); // undefined = loading, null = none
 
   useEffect(() => {
-    if (!profile?.team_id) { setNextMatch(null); return; }
-    db.getTeamScheduleOverview(profile.team_id).then(overview => {
-      if (!overview) { setNextMatch(null); return; }
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const upcoming = overview.myWeeks
-        .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
-        .filter(w => w._date && w._date >= today)
-        .sort((a, b) => a._date - b._date);
-      const nextWeek = upcoming[0];
-      if (!nextWeek) { setNextMatch(null); return; }
-      const p = nextWeek.pairings[0];
-      setNextMatch({
-        date: nextWeek.date, week: nextWeek.week, venue: overview.team.venue,
-        opponent: opponentName(p, profile.team_id, overview.teams),
-      });
-    });
-  }, [profile?.team_id]);
+    if (!profile) return;
+    setTeamOverviews(undefined);
+    db.getMyTeamsOverview(profile).then(setTeamOverviews);
+  }, [profile?.team_id, profile?.player_num]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    db.listMyPracticeGames(profile.id).then(games => setRecentPractice(games[0] ?? null));
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (teamOverviews === undefined) return;
+    if (!profile?.player_num || teamOverviews.length === 0) { setSnapshotStats(null); return; }
+    setSnapshotStats(undefined);
+    Promise.all(teamOverviews.map(async (o) => {
+      const [teamRank, mvpRank] = await Promise.all([
+        db.getTeamStandingsRow(o.team.id, o.team.division_id),
+        db.getPlayerMvpRankRow(profile.player_num, o.team.division_id),
+      ]);
+      return { teamId: o.team.id, teamName: o.team.name, teamRank, mvpRank };
+    })).then(setSnapshotStats);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamOverviews, profile?.player_num]);
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  // One nearest-upcoming-match entry per team, soonest first -- collapses to
+  // the single card it always used to be when there's only one team.
+  const nextMatches = (teamOverviews ?? []).map(o => {
+    const upcoming = o.myWeeks
+      .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
+      .filter(w => w._date && w._date >= today)
+      .sort((a, b) => a._date - b._date);
+    const nextWeek = upcoming[0];
+    if (!nextWeek) return null;
+    const p = nextWeek.pairings[0];
+    return {
+      teamId: o.team.id, teamName: o.team.name, _date: nextWeek._date,
+      date: nextWeek.date, week: nextWeek.week, venue: o.team.venue,
+      opponent: opponentName(p, o.team.id, o.teams),
+    };
+  }).filter(Boolean).sort((a, b) => a._date - b._date);
+  const showTeamLabels = (teamOverviews ?? []).length > 1;
+
+  const recentMatch = teamOverviews ? db.mostRecentCompletedMatch(teamOverviews) : undefined;
 
   const areas = [
     { key: "stats", label: "My Stats", desc: "Your record & stats", icon: BarChart3, path: "/my-stats" },
@@ -65,17 +110,21 @@ export function Home() {
       <style>{dashboardCss}</style>
       <PageHeader title="Home" subtitle={profile ? `Welcome, @${profile.username}` : undefined} hideBack />
       <div className="tab-content">
-        {nextMatch === undefined && profile?.team_id && <Loader />}
-        {nextMatch && (
-          <Link to="/leagues" className="next-match-card">
-            <div className="next-match-card__eyebrow">Next Match{nextMatch.week ? ` · Week ${nextMatch.week}` : ""}</div>
-            <div className="next-match-card__opponent">vs {nextMatch.opponent}</div>
+        {teamOverviews === undefined && profile && (profile.team_id || profile.player_num) && <Loader />}
+
+        {nextMatches.map(nm => (
+          <Link key={nm.teamId} to="/leagues" className="next-match-card">
+            <div className="next-match-card__eyebrow">
+              Next Match{nm.week ? ` · Week ${nm.week}` : ""}{showTeamLabels ? ` · ${nm.teamName}` : ""}
+            </div>
+            <div className="next-match-card__opponent">vs {nm.opponent}</div>
             <div className="next-match-card__meta">
-              <Calendar size={11} /> {nextMatch.date}
-              {nextMatch.venue && <><MapPin size={11} style={{marginLeft:8}} /> {nextMatch.venue}</>}
+              <Calendar size={11} /> {nm.date}
+              {nm.venue && <><MapPin size={11} style={{marginLeft:8}} /> {nm.venue}</>}
             </div>
           </Link>
-        )}
+        ))}
+
         <div className="area-grid">
           {areas.map(a => {
             const Icon = a.icon;
@@ -88,6 +137,52 @@ export function Home() {
             );
           })}
         </div>
+
+        {(profile?.team_id || profile?.player_num) && (
+          <DashCard icon={TrendingUp} title="Your Standing">
+            {snapshotStats === undefined && <Loader />}
+            {snapshotStats === null && (
+              <div className="dash-empty">Link your player number in My Profile to see your rank here.</div>
+            )}
+            {snapshotStats && snapshotStats.length === 0 && (
+              <div className="dash-empty">No standings yet for your team's division.</div>
+            )}
+            {snapshotStats && snapshotStats.map(s => (
+              <div key={s.teamId} className="match-row">
+                <div className="match-row__opponent">{s.teamName}</div>
+                <div className="match-row__meta">
+                  {s.teamRank ? `Team: ${s.teamRank.rank} of ${s.teamRank.totalTeams}` : "Team: not yet ranked"}
+                  {s.mvpRank ? ` · You: #${s.mvpRank.rank} of ${s.mvpRank.totalPlayers}` : ""}
+                </div>
+              </div>
+            ))}
+          </DashCard>
+        )}
+
+        {(profile?.team_id || profile?.player_num) && (
+          <DashCard icon={Calendar} title="Recent Activity">
+            {(recentMatch === undefined || recentPractice === undefined) && <Loader />}
+            {recentMatch === null && recentPractice === null && (
+              <div className="dash-empty">No recent league or practice activity yet.</div>
+            )}
+            {recentMatch && (
+              <div className="match-row">
+                <div className="match-row__opponent">
+                  {showTeamLabels ? `${recentMatch._teamName} — ` : ""}vs {matchOpponentName(recentMatch)}
+                </div>
+                <div className="match-row__meta"><Calendar size={10} /> {recentMatch.week_date || ""} · {matchResultLabel(recentMatch)}</div>
+              </div>
+            )}
+            {recentPractice && (
+              <div className="match-row">
+                <div className="match-row__opponent">Practice vs {recentPractice.opponent_name}</div>
+                <div className="match-row__meta">
+                  <Calendar size={10} /> {new Date(recentPractice.played_at).toLocaleDateString()} · {recentPractice.winner === "me" ? "Won" : recentPractice.winner === "opponent" ? "Lost" : "—"}
+                </div>
+              </div>
+            )}
+          </DashCard>
+        )}
       </div>
       <TabBar />
     </div>
