@@ -73,7 +73,7 @@ export async function setOwnPlayerNumber(playerNum) {
 // alone governs). Captains/players get team_id through invite codes or
 // setProfileRole instead -- this RPC is manager-only. See section 42.
 export async function addOwnTeamMembership(teamId) {
-  const { data, error } = await supabase.rpc("set_own_team_id", { p_team_id: teamId || null });
+  const { data, error } = await supabase.rpc("add_own_team_membership", { p_team_id: teamId });
   if (error) return { ok: false, reason: "ERROR" };
   const row = data?.[0];
   return row ?? { ok: false, reason: "ERROR" };
