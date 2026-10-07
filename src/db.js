@@ -415,8 +415,10 @@ export async function createSeason(season) {
   return error ? null : data;
 }
 export async function deleteSeason(seasonId) {
-  const { error } = await supabase.from("seasons").delete().eq("id", seasonId);
-  return !error;
+  const { data, error } = await supabase.rpc("delete_season_safely", {
+    p_season_id: seasonId,
+  });
+  return !error && data === true;
 }
 export async function setSeasonActive(seasonId, isActive) {
   const { error } = await supabase.from("seasons").update({ is_active: isActive }).eq("id", seasonId);
