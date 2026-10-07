@@ -43,7 +43,14 @@ export async function claimInviteCode(code) {
 // ─── Auth / Profile ─────────────────────────────────────────────────────────
 export async function getProfile(userId) {
   const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
-  return data;
+  if (!data) return data;
+  const { data: memberships } = await supabase
+    .from("profile_team_memberships")
+    .select("id, team_id, joined_at, ended_at, teams(id, name, team_num, division_id, venue, is_bye, divisions(id, num, name, season_id, seasons(id, type, year, format, day, is_active)))")
+    .eq("profile_id", userId)
+    .is("ended_at", null)
+    .order("joined_at", { ascending: true });
+  return { ...data, team_memberships: memberships ?? [], team_ids: (memberships ?? []).map(m => m.team_id) };
 }
 export async function updateOwnUsername(userId, username) {
   const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);
@@ -65,7 +72,7 @@ export async function setOwnPlayerNumber(playerNum) {
 // team they personally play on, separate from admin scope, which role
 // alone governs). Captains/players get team_id through invite codes or
 // setProfileRole instead -- this RPC is manager-only. See section 42.
-export async function setOwnTeamId(teamId) {
+export async function addOwnTeamMembership(teamId) {
   const { data, error } = await supabase.rpc("set_own_team_id", { p_team_id: teamId || null });
   if (error) return { ok: false, reason: "ERROR" };
   const row = data?.[0];
@@ -344,7 +351,11 @@ export async function setProfileActive(userId, isActive) {
   return !error;
 }
 export async function setProfileRole(userId, role, teamId) {
-  const { error } = await supabase.from("profiles").update({ role, team_id: role === "captain" ? (teamId || null) : null, is_claimed: true }).eq("id", userId);
+  const { error } = await supabase.rpc("set_profile_role", {
+    p_profile_id: userId,
+    p_role: role,
+    p_team_id: role === "captain" ? (teamId || null) : null,
+  });
   return !error;
 }
 export async function listUserLastSignIns() {
@@ -2118,14 +2129,14 @@ export function computeTeamHeadToHead(matches, teamId) {
 // Returns one getTeamScheduleOverview()-shaped object per team, so Home can
 // reuse the exact same schedule/roster/match data every other page does.
 export async function getMyTeamsOverview(profile) {
-  const teamIds = new Set();
+  let teamIds = [...new Set((profile?.team_ids ?? []).filter(Boolean))];
   if (profile?.player_num) {
     const history = await listPlayerTeamHistory(profile.player_num);
-    history.filter(t => t.isActive).forEach(t => teamIds.add(t.teamId));
+    for (const row of history.filter(t => t.isActive)) teamIds.push(row.teamId);
   }
-  if (profile?.team_id) teamIds.add(profile.team_id);
-  if (teamIds.size === 0) return [];
-  const overviews = await Promise.all([...teamIds].map(id => getTeamScheduleOverview(id)));
+  teamIds = [...new Set(teamIds)];
+  if (teamIds.length === 0) return [];
+  const overviews = await Promise.all(teamIds.map(id => getTeamScheduleOverview(id)));
   return overviews.filter(Boolean);
 }
 
