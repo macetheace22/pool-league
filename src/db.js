@@ -860,11 +860,26 @@ export async function listRosterHistory(playerNum) {
     .order("week_key", { ascending: false });
   return data ?? [];
 }
+async function resolveSeasonIdForWeek(weekKey) {
+  if (!weekKey) return null;
+  const { data } = await supabase
+    .from("schedule_weeks")
+    .select("divisions!inner(season_id)")
+    .eq("date", weekKey)
+    .limit(1)
+    .maybeSingle();
+  return data?.divisions?.season_id ?? null;
+}
+
 export async function setPlayerRating(playerNum, weekKey, label, rating, source) {
+  const seasonId = await resolveSeasonIdForWeek(weekKey);
+  if (!seasonId) return false;
   const { error } = await supabase
     .from("player_ratings")
-    .upsert({ player_num: playerNum, week_key: weekKey, label, rating, source, updated_at: new Date().toISOString() },
-      { onConflict: "player_num,week_key" });
+    .upsert({
+      season_id: seasonId, player_num: playerNum, week_key: weekKey, label,
+      rating, source, updated_at: new Date().toISOString()
+    }, { onConflict: "season_id,player_num,week_key" });
   return !error;
 }
 export async function moveRosterPlayer(playerNum, fromTeamId, toTeamId) {
@@ -1609,17 +1624,21 @@ export async function listStandingsAdjustments(divisionId) {
 // more reliable than fuzzy name matching, and it's what the report actually
 // gives us.
 export async function importStandingsForWeek(divisionId, rows, teams, weekTag) {
+  const { data: division } = await supabase.from("divisions").select("season_id").eq("id", divisionId).maybeSingle();
+  const seasonId = division?.season_id;
+  if (!seasonId) return false;
   const teamByNum = new Map((teams ?? []).map(t => [t.teamNum, t.id]));
   const inserted = rows.map(r => ({
     division_id: divisionId,
     team_id: teamByNum.get(r.teamNum) ?? null,
     team_num: r.teamNum,
     team_name: r.teamName,
+    season_id: seasonId,
     points_last_wk: r.pointsLastWk, total_points: r.totalPoints, sets_played: r.setsPlayed,
     week_key: weekTag.weekKey, label: weekTag.label,
   }));
   if (inserted.length === 0) return true;
-  const { error } = await supabase.from("standings_adjustments").upsert(inserted, { onConflict: "division_id,team_name,week_key" });
+  const { error } = await supabase.from("standings_adjustments").upsert(inserted, { onConflict: "season_id,division_id,team_id,week_key" });
   return !error;
 }
 
@@ -1632,6 +1651,9 @@ export async function listMvpAdjustments(divisionId) {
 // player number, no guessing required. Unrecognized numbers still import
 // (falls back to the name-keyed "manual:" row) rather than being dropped.
 export async function importMvpForWeek(divisionId, rows, weekTag) {
+  const { data: division } = await supabase.from("divisions").select("season_id").eq("id", divisionId).maybeSingle();
+  const seasonId = division?.season_id;
+  if (!seasonId) return false;
   const nums = rows.map(r => r.playerNum).filter(Boolean);
   const { data: knownPlayers } = nums.length ? await supabase.from("players").select("num").in("num", nums) : { data: [] };
   const knownNums = new Set((knownPlayers ?? []).map(p => p.num));
@@ -1641,10 +1663,10 @@ export async function importMvpForWeek(divisionId, rows, weekTag) {
     player_name: r.playerName,
     team_num: r.teamNum,
     wins: r.wins, losses: r.losses, total_points: r.pointsScored, mvp_ranking_points: r.mvpRankingPoints,
-    week_key: weekTag.weekKey, label: weekTag.label,
+    season_id: seasonId, week_key: weekTag.weekKey, label: weekTag.label,
   }));
   if (inserted.length === 0) return true;
-  const { error } = await supabase.from("mvp_adjustments").upsert(inserted, { onConflict: "division_id,player_name,week_key" });
+  const { error } = await supabase.from("mvp_adjustments").upsert(inserted, { onConflict: "season_id,division_id,player_num,week_key" });
   return !error;
 }
 
@@ -1665,11 +1687,15 @@ export const ELIGIBILITY_REASONS = {
 };
 
 export async function importPlayoffEligibilityForWeek(divisionId, rows, weekTag) {
+  const { data: division } = await supabase.from("divisions").select("season_id").eq("id", divisionId).maybeSingle();
+  const seasonId = division?.season_id;
+  if (!seasonId) return { ok: false, unmatchedCount: 0 };
   const nums = rows.map(r => r.num).filter(Boolean);
   const { data: knownPlayers } = nums.length ? await supabase.from("players").select("num").in("num", nums) : { data: [] };
   const knownNums = new Set((knownPlayers ?? []).map(p => p.num));
   const inserted = rows.map(r => ({
     division_id: divisionId,
+    season_id: seasonId,
     player_num: knownNums.has(r.num) ? r.num : null,
     player_name: r.name,
     team_num: r.teamNum,
@@ -1678,7 +1704,7 @@ export async function importPlayoffEligibilityForWeek(divisionId, rows, weekTag)
   }));
   const unmatchedCount = rows.filter(r => r.num && !knownNums.has(r.num)).length;
   if (inserted.length === 0) return { ok: true, unmatchedCount: 0 };
-  const { error } = await supabase.from("player_playoff_eligibility").upsert(inserted, { onConflict: "division_id,player_name,week_key" });
+  const { error } = await supabase.from("player_playoff_eligibility").upsert(inserted, { onConflict: "season_id,division_id,player_num,week_key" });
   return { ok: !error, unmatchedCount };
 }
 
