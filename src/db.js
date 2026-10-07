@@ -1788,7 +1788,9 @@ export async function markSideUnavailable(pairingId, side) {
 // picked-from-search opponent, and for the signed-in player's own rating.
 export async function getPlayerRating(playerNum) {
   if (!playerNum) return null;
-  const { data } = await supabase.from("player_current_ratings").select("rating").eq("player_num", playerNum).maybeSingle();
+  const { data: activeSeason } = await supabase.from("seasons").select("id").eq("is_active", true).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (!activeSeason?.id) return null;
+  const { data } = await supabase.from("player_current_ratings").select("rating").eq("season_id", activeSeason.id).eq("player_num", playerNum).maybeSingle();
   return data?.rating ?? null;
 }
 
