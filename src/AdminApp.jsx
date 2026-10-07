@@ -3119,39 +3119,25 @@ function AccountSettings({ profile, onProfileRefresh }) {
   const [claimCode, setClaimCode] = useState("");
   const [claiming, setClaiming]   = useState(false);
 
-  // Manager-only: self-assignment to a team they personally play on,
-  // separate from admin scope (role alone governs that). allTeamsForManager
-  // is the FULL unfiltered list (any season, active or not) so a manager's
-  // already-set team still displays correctly and can be flagged if its
-  // season has since gone inactive -- the picker itself (pickableTeams)
-  // only offers active-season teams to pick NEW, matching the captain-
-  // assignment picker's convention.
   const [allTeamsForManager, setAllTeamsForManager] = useState(null);
-  const [teamInput, setTeamInput] = useState("");
   const [savingTeam, setSavingTeam] = useState(false);
 
   useEffect(() => {
     if (profile.role === "manager") db.listAllTeamsWithContext().then(setAllTeamsForManager);
   }, [profile.role]);
 
-  const currentTeam = (profile.team_id && allTeamsForManager)
-    ? allTeamsForManager.find(t => t.id === profile.team_id) ?? null
-    : null;
-  const currentTeamInactive = !!(currentTeam && !currentTeam.isActiveSeason);
+  const activeMemberships = profile.team_memberships ?? [];
   const pickableTeams = (allTeamsForManager ?? [])
-    .filter(t => !t.isBye && t.isActiveSeason)
+    .filter(t => !t.isBye && t.isActiveSeason && !activeMemberships.some(m => m.team_id === t.id))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  useEffect(() => {
-    setTeamInput(currentTeam ? `${currentTeam.name}${currentTeam.context ? ` — ${currentTeam.context}` : ""}` : "");
-  }, [profile.team_id, allTeamsForManager]);
-
   const saveOwnTeam = async (teamId) => {
+    if (!teamId) return;
     setSavingTeam(true);
     const result = await db.addOwnTeamMembership(teamId);
     setSavingTeam(false);
-    if (!result.ok) { setError("Could not update your team."); return; }
-    setError(""); setSuccess(teamId ? "Team updated." : "Team cleared."); setTimeout(() => setSuccess(""), 2500);
+    if (!result.ok) { setError("Could not add that team to your profile."); return; }
+    setError(""); setSuccess("Team added to your profile."); setTimeout(() => setSuccess(""), 2500);
     if (onProfileRefresh) await onProfileRefresh();
   };
 
@@ -3220,34 +3206,44 @@ function AccountSettings({ profile, onProfileRefresh }) {
         <div className="field"><input className="input" value={playerNum} onChange={e=>setPlayerNum(e.target.value)} placeholder="If you already play in the league"/></div>
         <button className="btn-secondary" onClick={savePlayerNum} disabled={savingPlayerNum||playerNum.trim()===(profile.player_num ?? "")}>{savingPlayerNum?"Saving…":"Save Player Number"}</button>
       </div>
-      {profile.role === "manager" && (
-        <div className="card">
-          <div className="card__title">My Team (if you also play)</div>
-          <div style={{fontSize:10.5,color:"#6A6A6A",marginBottom:6}}>
-            Managers aren't scoped to a team for admin purposes, but if you also play in the league, set your team here for your Home dashboard, My Stats, and Live Entry.
-          </div>
-          {currentTeamInactive && (
-            <div className="readonly-bar" style={{marginBottom:8}}>
-              Your team's season is no longer active — it still works everywhere in the app, but won't appear in the picker below unless its season is reactivated. Clear it or pick a new active-season team if you'd like to change it.
-            </div>
-          )}
-          <div className="field">
-            <input className="input" list="manager-team-options" value={teamInput} autoComplete="off"
-              placeholder="Start typing a team name…"
-              onChange={e=>{
-                const val = e.target.value; setTeamInput(val);
-                const match = pickableTeams.find(t => `${t.name}${t.context ? ` — ${t.context}` : ""}` === val);
-                if (match) saveOwnTeam(match.id);
-              }}/>
-            <datalist id="manager-team-options">
-              {pickableTeams.map(t=><option key={t.id} value={`${t.name}${t.context ? ` — ${t.context}` : ""}`} />)}
-            </datalist>
-          </div>
-          {profile.team_id && (
-            <button className="btn-secondary" onClick={()=>saveOwnTeam(null)} disabled={savingTeam}>Clear My Team</button>
-          )}
+      <div className="card">
+        <div className="card__title">My Teams</div>
+        <div style={{fontSize:10.5,color:"#6A6A6A",marginBottom:8}}>
+          Your league access is no longer tied to one team. You can belong to multiple teams at the same time, including teams in different divisions or nights.
         </div>
-      )}
+        {activeMemberships.length === 0 ? (
+          <div className="readonly-bar" style={{marginBottom:8}}>No active team memberships are linked to your profile.</div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:10}}>
+            {activeMemberships.map(m => {
+              const team = m.teams;
+              const division = team?.divisions;
+              const season = division?.seasons;
+              return (
+                <div key={m.id} style={{background:"#141414",border:"1px solid #2A2A2A",borderRadius:9,padding:"9px 10px"}}>
+                  <div style={{fontWeight:700,fontSize:12,color:"#E0E0E0"}}>{team?.name ?? "Team"}</div>
+                  <div style={{fontSize:10.5,color:"#8A8A8A",marginTop:3}}>
+                    {division?.name ? `${division.name} · ` : ""}{season ? `${season.format} · ${season.day} · ${season.year}` : "Season unavailable"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {profile.role === "manager" && pickableTeams.length > 0 && (
+          <>
+            <div className="field">
+              <Label>Add Team Membership</Label>
+              <select className="input" value="" onChange={e => e.target.value && saveOwnTeam(e.target.value)} disabled={savingTeam}>
+                <option value="">Select an active team…</option>
+                {pickableTeams.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+      </div>
       <div className="card">
         <div className="card__title">Change Password</div>
         <div className="field"><Label>New Password</Label>
