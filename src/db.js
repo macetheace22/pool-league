@@ -808,10 +808,14 @@ export async function listRostersForTeams(teamIds) {
     .select("team_id, player_num, players(num, name, nickname)")
     .in("team_id", teamIds);
   const nums = [...new Set((rosterRows ?? []).map(r => r.player_num))];
-  let ratingByNum = {};
+  let ratingByKey = {};
+  let seasonByTeam = {};
   if (nums.length) {
-    const { data: ratingRows } = await supabase.from("player_current_ratings").select("player_num, rating").in("player_num", nums);
-    ratingByNum = Object.fromEntries((ratingRows ?? []).map(r => [r.player_num, r.rating]));
+    const { data: teamRows } = await supabase.from("teams").select("id, division_id, divisions(season_id)").in("id", teamIds);
+    seasonByTeam = Object.fromEntries((teamRows ?? []).map(t => [t.id, t.divisions?.season_id]));
+    const seasonIds = [...new Set(Object.values(seasonByTeam).filter(Boolean))];
+    const { data: ratingRows } = await supabase.from("player_current_ratings").select("season_id, player_num, rating").in("season_id", seasonIds).in("player_num", nums);
+    for (const r of ratingRows ?? []) ratingByKey[r.season_id + ":" + r.player_num] = r.rating;
   }
   const byTeam = {};
   for (const teamId of teamIds) byTeam[teamId] = [];
@@ -821,7 +825,7 @@ export async function listRostersForTeams(teamIds) {
       num: r.player_num,
       name: r.players?.name ?? "",
       nickname: r.players?.nickname ?? "",
-      rating: ratingByNum[r.player_num] ?? null,
+      rating: ratingByKey[seasonByTeam[r.team_id] + ":" + r.player_num] ?? null,
     });
   }
   return byTeam; // { teamId: [{num,name,nickname,rating}, ...] }
