@@ -4504,9 +4504,9 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
                     {locations?.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
                   </select>
                   {!team.isBye && onAssignCaptain && (
-                    <CaptainField team={team} allProfiles={allProfiles}
+                    <CaptainField team={team} allProfiles={allProfiles} captainsByTeam={captainsByTeam}
                       onAssign={(newId, prevId)=>onAssignCaptain(team.id, newId, prevId)}
-                      onRemove={onRemoveCaptain}
+                      onRemove={(profileId)=>onRemoveCaptain(profileId, team.id)}
                       onGenerateInvite={(name)=>onGenerateCaptainInvite(team.id, name)}
                       onRefreshProfiles={()=>db.listProfiles().then(setAllProfiles)} />
                   )}
@@ -4565,7 +4565,7 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
 // directly. Assigning a new captain over an existing one hands off in one
 // action (demotes the outgoing captain) so a team never ends up with two
 // captains because a manager forgot a manual cleanup step.
-function CaptainField({ team, allProfiles, onAssign, onRemove, onGenerateInvite, onRefreshProfiles }) {
+function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, onGenerateInvite, onRefreshProfiles }) {
   const [mode, setMode] = useState("existing"); // "existing" | "invite"
   const [search, setSearch] = useState("");
   const [pickedId, setPickedId] = useState("");
@@ -4577,7 +4577,8 @@ function CaptainField({ team, allProfiles, onAssign, onRemove, onGenerateInvite,
 
   if (!allProfiles) return <div style={{fontSize:11,color:"#6A6A6A"}}>Loading captain options…</div>;
 
-  const currentCaptain = allProfiles.find(p => p.role === "captain" && p.team_id === team.id) ?? null;
+  const currentCaptainId = captainsByTeam?.[team.id]?.profileId ?? null;
+  const currentCaptain = allProfiles.find(p => p.id === currentCaptainId) ?? null;
   const candidates = allProfiles
     .filter(p => p.is_active !== false && p.id !== currentCaptain?.id)
     .sort((a,b) => (a.username||"").localeCompare(b.username||""));
@@ -4586,8 +4587,8 @@ function CaptainField({ team, allProfiles, onAssign, onRemove, onGenerateInvite,
   const assignExisting = async () => {
     const picked = candidates.find(p => p.id === pickedId);
     if (!picked) { setErr("Pick a valid account from the list."); return; }
-    if (picked.role === "captain" && picked.team_id && picked.team_id !== team.id) {
-      if (!confirm(`@${picked.username} already captains another team. Reassign them to ${team.name}?`)) return;
+    if (picked.role === "captain") {
+      if (!confirm(`@${picked.username} already has captain access. Assign them as captain of ${team.name} too?`)) return;
     }
     setSaving(true); setErr("");
     const ok = await onAssign(picked.id, currentCaptain?.id ?? null);
