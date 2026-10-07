@@ -425,8 +425,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     if (ok) await refreshCaptains();
     return ok;
   };
-  const handleRemoveCaptain = async (profileId) => {
-    const ok = await db.setProfileRole(profileId, "player", null);
+  const handleRemoveCaptain = async (profileId, teamId) => {
+    const ok = await db.setProfileRole(profileId, "player", teamId);
     if (ok) await refreshCaptains();
     return ok;
   };
@@ -3148,7 +3148,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
 
   const saveOwnTeam = async (teamId) => {
     setSavingTeam(true);
-    const result = await db.setOwnTeamId(teamId);
+    const result = await db.addOwnTeamMembership(teamId);
     setSavingTeam(false);
     if (!result.ok) { setError("Could not update your team."); return; }
     setError(""); setSuccess(teamId ? "Team updated." : "Team cleared."); setTimeout(() => setSuccess(""), 2500);
@@ -3966,7 +3966,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const saveEditRole = async (userId) => {
     if (editRole === "captain" && !editTeamId) { setRoleErr("Pick a team for this captain."); return; }
     setRoleSaving(true);
-    const ok = await db.setProfileRole(userId, editRole, editRole==="captain" ? editTeamId : null);
+    const ok = await db.setProfileRole(userId, editRole, editRole==="captain" ? editTeamId : editTeamId || null);
     setRoleSaving(false);
     if (!ok) { setRoleErr("Could not update role."); return; }
     setEditRoleId(null); await refresh();
