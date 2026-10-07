@@ -837,10 +837,14 @@ export async function listRosterForTeam(teamId) {
   // player_current_ratings is a view, not a real FK-linked table, so it can't be
   // embedded in the query above via PostgREST's automatic relationship inference --
   // fetch it separately and merge client-side instead.
-  const [{ data: ratingRows }, { data: linkedRows }] = await Promise.all([
-    supabase.from("player_current_ratings").select("player_num, rating").in("player_num", nums),
+  const [{ data: teamRow }, { data: linkedRows }] = await Promise.all([
+    supabase.from("teams").select("id, division_id, divisions(season_id)").eq("id", teamId).maybeSingle(),
     supabase.rpc("list_linked_player_nums", { p_nums: nums }),
   ]);
+  const seasonId = teamRow?.divisions?.season_id;
+  const { data: ratingRows } = seasonId
+    ? await supabase.from("player_current_ratings").select("player_num, rating").eq("season_id", seasonId).in("player_num", nums)
+    : { data: [] };
   const ratingByNum = Object.fromEntries((ratingRows ?? []).map(r => [r.player_num, r.rating]));
   const linkedSet = new Set((linkedRows ?? []).map(r => r.player_num));
   return rosterRows.map(r => ({
