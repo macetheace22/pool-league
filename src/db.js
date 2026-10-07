@@ -343,7 +343,7 @@ export async function listTeamCaptains() {
   const { data, error } = await supabase.rpc("list_team_captains");
   if (error || !data) return {};
   const map = {};
-  for (const row of data) map[row.team_id] = { username: row.username, phone: row.phone_number };
+  for (const row of data) map[row.team_id] = { profileId: row.profile_id, username: row.username, phone: row.phone_number };
   return map;
 }
 export async function setProfileActive(userId, isActive) {
