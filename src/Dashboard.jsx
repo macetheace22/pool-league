@@ -195,6 +195,11 @@ export function LeaguesDashboard() {
   const navigate = useNavigate();
   const isManager = profile?.role === "manager";
   const isCaptain = profile?.role === "captain";
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const selectedTeamIds = profile?.team_ids ?? [];
+  const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
+    ? selectedTeamId
+    : selectedTeamIds[0] ?? null;
   const [overview, setOverview] = useState(undefined); // undefined = loading, null = no team
   const [lineupPlans, setLineupPlans] = useState([]); // captain's planned lineups for this team, if any -- read-only here
   const [unavailability, setUnavailability] = useState([]); // every team member's marked weeks -- filtered to "mine" below for the self-service card
@@ -202,15 +207,16 @@ export function LeaguesDashboard() {
   const [reasonInput, setReasonInput] = useState("");
   const [view, setView] = useState("main"); // "main" | "upcoming" | "previous"
 
-  const refreshUnavailability = () => { if (profile?.team_id) db.listTeamUnavailability(profile.team_id).then(setUnavailability); };
+  const refreshUnavailability = () => { if (effectiveTeamId) db.listTeamUnavailability(effectiveTeamId).then(setUnavailability); };
 
   useEffect(() => {
-    if (!profile?.team_id) { setOverview(null); return; }
-    db.getTeamScheduleOverview(profile.team_id).then(o => setOverview(o ?? null));
-    db.listTeamLineupPlans(profile.team_id).then(setLineupPlans);
+    if (!effectiveTeamId) { setOverview(null); return; }
+    setOverview(undefined);
+    db.getTeamScheduleOverview(effectiveTeamId).then(o => setOverview(o ?? null));
+    db.listTeamLineupPlans(effectiveTeamId).then(setLineupPlans);
     refreshUnavailability();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.team_id]);
+  }, [effectiveTeamId]);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcomingAll = overview ? overview.myWeeks
@@ -225,12 +231,12 @@ export function LeaguesDashboard() {
     unavailability.filter(u => u.playerNum === profile?.player_num).map(u => [u.scheduleWeekId, u])
   );
   const markUnavailable = async (weekId) => {
-    await db.setUnavailability(profile.team_id, weekId, profile.player_num, reasonInput, profile.id);
+    await db.setUnavailability(effectiveTeamId, weekId, profile.player_num, reasonInput, profile.id);
     setReasonInput(""); setMarkingWeekId(null);
     refreshUnavailability();
   };
   const markAvailableAgain = async (weekId) => {
-    await db.clearUnavailability(profile.team_id, weekId, profile.player_num);
+    await db.clearUnavailability(effectiveTeamId, weekId, profile.player_num);
     refreshUnavailability();
   };
 
@@ -288,7 +294,7 @@ export function LeaguesDashboard() {
               </DashCard>
             )}
 
-            {profile?.team_id && upcomingAll.length > 0 && (
+            {effectiveTeamId && upcomingAll.length > 0 && (
               <DashCard icon={AlertCircle} title="My Availability">
                 {!profile.player_num ? (
                   <div className="dash-empty">Link your player number in My Profile to set your availability for upcoming weeks.</div>
@@ -350,7 +356,7 @@ export function LeaguesDashboard() {
           </>
         )}
 
-        {!overview && overview !== undefined && (
+        {!overview && overview !== undefined && selectedTeamIds.length === 0 && (
           <div className="empty-state">No team linked to your account yet — match cards will show once you're linked to a team.</div>
         )}
 
@@ -492,5 +498,8 @@ export const dashboardCss = `
 .office-card__desc{font-size:10.5px;color:#9A9A9A;}
 .office-list-item{display:flex;align-items:center;gap:10px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:12px;padding:13px 14px;text-decoration:none;color:#E0E0E0;font-size:12.5px;font-weight:600;}
 
+.team-selector-wrap{padding:0 0 8px;display:flex;flex-direction:column;gap:4px;}
+.team-selector-label{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8A8A8A;}
+.team-selector{width:100%;background:#1C1C1C;color:#E0E0E0;border:1.5px solid #2E2E2E;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:700;}
 .link-btn{background:none;border:none;color:#5FCF9E;font-size:11px;font-weight:700;text-decoration:underline;cursor:pointer;padding:0;margin-left:6px;}
 `;
