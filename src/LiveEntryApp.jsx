@@ -239,7 +239,7 @@ export default function LiveEntryApp() {
     setSyncing(true);
     const result = await db.setLiveMatch(pairingId, updated);
     if (result?.ok) {
-      const saved = { ...updated, _revision: (Number.isInteger(updated?._revision) ? updated._revision : 0) + 1 };
+      const saved = { ...updated, _revision: Number.isInteger(updated?._revision) ? updated._revision + 1 : 0 };
       setSyncErr(false);
       setSyncing(false);
       setLastSync(Date.now());
@@ -255,7 +255,7 @@ export default function LiveEntryApp() {
         const merged = mergeLiveMatchState(match, updated, remote);
         const retry = await db.setLiveMatch(pairingId, merged);
         if (retry?.ok) {
-          const saved = { ...merged, _revision: (Number.isInteger(merged?._revision) ? merged._revision : 0) + 1 };
+          const saved = { ...merged, _revision: Number.isInteger(merged?._revision) ? merged._revision + 1 : 0 };
           setSyncErr(false);
           setSyncing(false);
           setLastSync(Date.now());
