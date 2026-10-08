@@ -139,7 +139,7 @@ export function Home() {
           })}
         </div>
 
-        {(getActiveTeamIds(profile)[0] ?? null || profile?.player_num) && (
+        {(getActiveTeamIds(profile).length > 0 || profile?.player_num) && (
           <DashCard icon={TrendingUp} title="Your Standing">
             {snapshotStats === undefined && <Loader />}
             {snapshotStats === null && (
@@ -160,7 +160,7 @@ export function Home() {
           </DashCard>
         )}
 
-        {(getActiveTeamIds(profile)[0] ?? null || profile?.player_num) && (
+        {(getActiveTeamIds(profile).length > 0 || profile?.player_num) && (
           <DashCard icon={Calendar} title="Recent Activity">
             {(recentMatch === undefined || recentPractice === undefined) && <Loader />}
             {recentMatch === null && recentPractice === null && (
