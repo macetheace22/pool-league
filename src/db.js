@@ -1002,8 +1002,11 @@ export async function addPlayerToTeam(teamId, { name, nickname }) {
 // Adds an EXISTING player (already in the registry, from a search result or
 // a past roster) to a team -- no new players row, just the roster link.
 export async function addExistingPlayerToRoster(teamId, playerNum) {
-  const { error } = await supabase.from("rosters").insert({ team_id: teamId, player_num: playerNum });
-  return !error;
+  const { data, error } = await supabase.rpc("add_player_to_team", {
+    p_team_id: teamId,
+    p_player_num: playerNum,
+  });
+  return !error && data === true;
 }
 // League-wide player name search, for a captain looking up someone who
 // isn't already on their roster (e.g. picked up from another team).
