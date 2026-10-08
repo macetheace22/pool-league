@@ -1833,8 +1833,9 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
   // Which of tonight's matches (if any) belong to the signed-in captain or
   // player's own team -- either a direct account-to-team link, or a
   // roster-number link.
+  const activeTeamId = getActiveTeamIds(myProfile)[0] ?? null;
   const myMatches = (!isManager && myProfile) ? matches.filter(m => !m.isBye && m.homeTeam && m.awayTeam && (
-    getActiveTeamIds(myProfile)[0] ?? null === m.homeTeam.id || getActiveTeamIds(myProfile)[0] ?? null === m.awayTeam.id
+    activeTeamId === m.homeTeam.id || activeTeamId === m.awayTeam.id
     || (myProfile.player_num && (m.homeRoster.some(p=>p.num===myProfile.player_num) || m.awayRoster.some(p=>p.num===myProfile.player_num)))
   )) : [];
 
