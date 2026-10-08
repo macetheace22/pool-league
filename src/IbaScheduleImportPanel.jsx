@@ -194,28 +194,47 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         <div style={{
           position: "fixed",
           inset: 0,
-          zIndex: 1000,
-          background: "rgba(0, 0, 0, 0.45)",
+          zIndex: 9999,
+          background: "rgba(0, 0, 0, 0.62)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           padding: 24,
         }}>
           <div style={{
-            width: "min(420px, 100%)",
-            background: "var(--card-bg, #fff)",
+            width: "min(430px, 100%)",
+            background: "#1C1C1C",
+            color: "#FFFFFF",
+            border: "1.5px solid #3A3A3A",
             borderRadius: 16,
             padding: 28,
             textAlign: "center",
-            boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+            boxShadow: "0 20px 60px rgba(0,0,0,.5)",
           }}>
-            <RefreshCw size={30} style={{ animation: "iba-spin 1s linear infinite", marginBottom: 12 }} />
-            <h3 style={{ margin: "0 0 8px" }}>Retrieving IBA Schedule Data</h3>
-            <p style={{ margin: "0 0 16px", opacity: 0.75 }}>
+            <RefreshCw size={30} color="#5FCF9E" style={{ animation: "spin 1s linear infinite", marginBottom: 12 }} />
+            <div style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 800, color: "#FFFFFF" }}>
+              Retrieving IBA Schedule Data
+            </div>
+            <div style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "#BDBDBD" }}>
               Retrieving schedule information from IBA. Please wait.
-            </p>
-            <div style={{ fontWeight: 600 }}>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF", marginBottom: 10 }}>
               {retrieveProgress.current} of {retrieveProgress.total} divisions retrieved
+            </div>
+            <div style={{
+              width: "100%",
+              height: 8,
+              background: "#121212",
+              borderRadius: 99,
+              overflow: "hidden",
+              border: "1px solid #2E2E2E",
+            }}>
+              <div style={{
+                width: `${retrieveProgress.total ? Math.round((retrieveProgress.current / retrieveProgress.total) * 100) : 0}%`,
+                height: "100%",
+                background: "#5FCF9E",
+                transition: "width .2s ease",
+              }} />
             </div>
           </div>
         </div>
