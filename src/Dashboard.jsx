@@ -442,7 +442,7 @@ export function LeagueOffice() {
   return (
     <div className="app">
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
-      <PageHeader title="League Office" subtitle={profile.role === "manager" ? "Full league administration" : profile.role === "captain" ? "Your team & league lookups" : "League lookup tools"} />
+      <PageHeader title="League Office" />
       <div className="tab-content">
         {items.map(item => {
           const Icon = item.icon;
