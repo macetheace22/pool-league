@@ -410,6 +410,67 @@ export async function listSeasons() {
   const { data } = await supabase.from("seasons").select("*, divisions(*)").order("created_at");
   return data ?? [];
 }
+export async function getIbaScheduleImportStatus(seasonId) {
+  if (!seasonId) return { divisions: [], totals: { divisions: 0, teams: 0, weeks: 0, pairings: 0 } };
+
+  const { data: divisions, error: divisionError } = await supabase
+    .from("divisions")
+    .select("id, num, name")
+    .eq("season_id", seasonId)
+    .order("num");
+
+  if (divisionError) return { divisions: [], totals: { divisions: 0, teams: 0, weeks: 0, pairings: 0 }, error: divisionError.message };
+
+  const divRows = divisions ?? [];
+  const divisionIds = divRows.map(d => d.id);
+  if (!divisionIds.length) return { divisions: [], totals: { divisions: 0, teams: 0, weeks: 0, pairings: 0 } };
+
+  const [{ data: teams }, { data: weeks }] = await Promise.all([
+    supabase.from("teams").select("id, division_id").in("division_id", divisionIds),
+    supabase.from("schedule_weeks").select("id, division_id").in("division_id", divisionIds),
+  ]);
+
+  const weekRows = weeks ?? [];
+  const weekIds = weekRows.map(w => w.id);
+  const { data: pairings } = weekIds.length
+    ? await supabase.from("schedule_pairings").select("id, week_id").in("week_id", weekIds)
+    : { data: [] };
+
+  const teamCounts = {};
+  for (const row of teams ?? []) teamCounts[row.division_id] = (teamCounts[row.division_id] ?? 0) + 1;
+
+  const weekCounts = {};
+  for (const row of weekRows) weekCounts[row.division_id] = (weekCounts[row.division_id] ?? 0) + 1;
+
+  const weekToDivision = Object.fromEntries(weekRows.map(w => [w.id, w.division_id]));
+  const pairingCounts = {};
+  for (const row of pairings ?? []) {
+    const divisionId = weekToDivision[row.week_id];
+    if (divisionId) pairingCounts[divisionId] = (pairingCounts[divisionId] ?? 0) + 1;
+  }
+
+  const importedDivisions = divRows
+    .map(d => ({
+      id: d.id,
+      num: d.num,
+      name: d.name,
+      teamCount: teamCounts[d.id] ?? 0,
+      weekCount: weekCounts[d.id] ?? 0,
+      pairingCount: pairingCounts[d.id] ?? 0,
+    }))
+    .filter(d => d.teamCount > 0 || d.weekCount > 0);
+
+  return {
+    divisions: importedDivisions,
+    totals: {
+      divisions: importedDivisions.length,
+      teams: importedDivisions.reduce((n, d) => n + d.teamCount, 0),
+      weeks: importedDivisions.reduce((n, d) => n + d.weekCount, 0),
+      pairings: importedDivisions.reduce((n, d) => n + d.pairingCount, 0),
+    },
+  };
+}
+
 export async function createSeason(season) {
   const { data, error } = await supabase.from("seasons").insert(season).select().single();
   return error ? null : data;
