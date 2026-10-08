@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useContext, createContext } from "react";
+import { useState, useEffect, useRef, useContext, createContext, Fragment } from "react";
 import { Link, useNavigate, useLocation, useNavigationType } from "react-router-dom";
 import {
   Menu, X, ChevronLeft, LogOut, UserCircle, Calendar, Settings2, Upload,
@@ -169,25 +169,23 @@ export function NavDrawer({ open, onClose, profile, onLogout }) {
           {PRIMARY_NAV_ITEMS.map(item => {
             const Icon = item.icon;
             return (
-              <Link key={item.key} to={item.path} onClick={onClose}
-                className={`drawer__item ${isActive(item.path) ? "drawer__item--active" : ""}`}>
-                <Icon size={16} /><span>{item.label}</span>
-              </Link>
+              <Fragment key={item.key}>
+                <Link to={item.path} onClick={onClose}
+                  className={`drawer__item ${isActive(item.path) ? "drawer__item--active" : ""}`}>
+                  <Icon size={16} /><span>{item.label}</span>
+                </Link>
+                {item.key === "leagues" && leagueItems.map(leagueItem => {
+                  const LeagueIcon = leagueItem.icon;
+                  return (
+                    <Link key={leagueItem.key} to={leagueItem.path} onClick={onClose}
+                      className={`drawer__item drawer__item--sub ${isActive(leagueItem.path) ? "drawer__item--active" : ""}`}>
+                      <LeagueIcon size={14} /><span>{leagueItem.label}</span>
+                    </Link>
+                  );
+                })}
+              </Fragment>
             );
           })}
-          {leagueItems.length > 0 && (
-            <>
-              {leagueItems.map(item => {
-                const Icon = item.icon;
-                return (
-                  <Link key={item.key} to={item.path} onClick={onClose}
-                    className={`drawer__item drawer__item--sub ${isActive(item.path) ? "drawer__item--active" : ""}`}>
-                    <Icon size={14} /><span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </>
-          )}
           {officeItems.length > 0 && (
             <>
               <Link to="/league-office" onClick={onClose}
