@@ -3,35 +3,37 @@ import { Calendar, ChevronDown, MapPin, RefreshCw, Trophy } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import * as db from "./db";
 import { PageHeader, TabBar, shellCss } from "./Shell.jsx";
+import { css as adminCss } from "./AdminApp.jsx";
+import { dashboardCss } from "./Dashboard.jsx";
 
 const css = `
 .schedules-page{padding-bottom:86px;}
-.schedules-controls{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;}
-.schedule-select{width:100%;box-sizing:border-box;background:#1C1C1C;border:1.5px solid #333;border-radius:9px;color:#E8E8E8;padding:10px 34px 10px 11px;font-size:12px;font-weight:700;appearance:none;}
+.schedules-controls{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
+.schedule-control{display:flex;flex-direction:column;gap:4px;}
+.schedule-control__label{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8A8A8A;}
+.schedule-select{width:100%;box-sizing:border-box;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:10px;color:#E0E0E0;padding:10px 36px 10px 12px;font-size:12px;font-weight:700;appearance:none;}
 .schedule-select-wrap{position:relative;}
-.schedule-select-wrap svg{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:#7A7A7A;}
-.schedule-summary{background:#101010;border:1px solid #282828;border-radius:10px;padding:11px 12px;margin-bottom:10px;}
-.schedule-summary__title{font-size:14px;font-weight:800;color:#F0F0F0;}
+.schedule-select-wrap svg{position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:#6A6A6A;}
+.schedule-summary{background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;padding:14px;margin-bottom:10px;}
+.schedule-summary__title{font-family:'Archivo Black',sans-serif;font-size:14px;font-weight:800;color:#FFF;}
 .schedule-summary__meta{font-size:10.5px;color:#8A8A8A;margin-top:3px;}
-.schedule-week-nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:10px;}
-.schedule-week-btn{flex:0 0 auto;border:1px solid #333;background:#181818;color:#A8A8A8;border-radius:8px;padding:7px 9px;font-size:10.5px;font-weight:700;cursor:pointer;}
-.schedule-week-btn--active{background:#0F2D1F;border-color:#1F6B4A;color:#5FCF9E;}
-.schedule-week-btn--next{box-shadow:inset 0 0 0 1px #5FCF9E;}
-.schedule-week{background:#171717;border:1px solid #2A2A2A;border-radius:12px;overflow:hidden;margin-bottom:9px;}
-.schedule-week__head{padding:10px 11px;background:#1B1B1B;border-bottom:1px solid #292929;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.schedule-week__label{font-size:12px;font-weight:800;color:#E8E8E8;}
-.schedule-week__date{font-size:10px;color:#7F7F7F;margin-top:2px;}
-.schedule-badge{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:4px 6px;border-radius:5px;background:#242424;color:#9A9A9A;white-space:nowrap;}
-.schedule-badge--next{background:#0F2D1F;color:#5FCF9E;}
-.schedule-match{padding:11px;border-bottom:1px solid #262626;}
+.schedule-week{background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;overflow:hidden;margin-bottom:10px;}
+.schedule-week--current{border-color:#1F6B4A;}
+.schedule-week__head{padding:12px 14px;background:#1C1C1C;border-bottom:1px solid #2A2A2A;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.schedule-week__label{font-size:12px;font-weight:800;color:#E0E0E0;}
+.schedule-week__date{font-size:10px;color:#8A8A8A;margin-top:2px;}
+.schedule-badge{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:4px 6px;border-radius:5px;background:#2A2A2A;color:#9A9A9A;white-space:nowrap;}
+.schedule-badge--current{background:#0F2D1F;color:#5FCF9E;}
+.schedule-match{padding:11px 14px;border-bottom:1px solid #2A2A2A;}
 .schedule-match:last-child{border-bottom:none;}
 .schedule-match__teams{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;}
-.schedule-team{font-size:12px;font-weight:800;color:#E5E5E5;line-height:1.25;}
+.schedule-team{font-size:12px;font-weight:700;color:#E0E0E0;line-height:1.25;}
 .schedule-team--away{text-align:right;}
 .schedule-team__venue{font-size:9.5px;font-weight:600;color:#6F6F6F;margin-top:3px;}
 .schedule-vs{font-size:9px;font-weight:800;color:#555;text-transform:uppercase;}
 .schedule-match__venue{display:flex;align-items:center;gap:4px;font-size:9.5px;color:#777;margin-top:7px;}
-.schedule-empty{padding:22px 10px;text-align:center;color:#777;font-size:11px;}
+.schedule-empty{padding:22px 10px;text-align:center;color:#6A6A6A;font-size:11px;}
+.schedule-note{margin-top:10px;font-size:10px;color:#666;display:flex;align-items:center;gap:5px;}
 @media(min-width:640px){.schedules-controls{grid-template-columns:1fr 1fr}.schedule-match__teams{grid-template-columns:1fr 70px 1fr;}}
 `;
 
@@ -137,7 +139,7 @@ export default function Schedules() {
   const teamsById = useMemo(() => Object.fromEntries(teams.map(t => [t.id, t])), [teams]);
 
   const selectedWeek = schedule.find(w => w.id === selectedWeekId) || null;
-  const nextWeekId = useMemo(() => {
+  const currentWeekId = useMemo(() => {
     const today = new Date(); today.setHours(0,0,0,0);
     const dated = schedule.map(w => ({...w, _date: parseScheduleDate(w.date)}));
     return (dated.find(w => w._date && w._date >= today) || dated.find(w => w.pairings?.length))?.id || null;
@@ -152,6 +154,8 @@ export default function Schedules() {
     setParams(p => { p.set("season", seasonId); p.set("division", id); return p; }, { replace: true });
   };
 
+  const displayWeeks = selectedWeekId === "all" ? schedule : (selectedWeek ? [selectedWeek] : []);
+
   const pairingRows = (selectedWeek?.pairings ?? []).map(p => ({
     ...p,
     home: teamsById[p.homeTeamId],
@@ -160,23 +164,29 @@ export default function Schedules() {
 
   return (
     <div className="app">
-      <style>{css}</style><style>{shellCss}</style>
+      <style>{adminCss}</style><style>{dashboardCss}</style><style>{css}</style><style>{shellCss}</style>
       <PageHeader title="Schedules" subtitle="IBA league schedules" />
       <div className="tab-content schedules-page">
         <div className="schedules-controls">
-          <div className="schedule-select-wrap">
-            <select className="schedule-select" value={seasonId} onChange={e => setSeason(e.target.value)} disabled={loading}>
-              {!seasons.length && <option value="">Loading seasons…</option>}
-              {seasons.map(s => <option key={s.id} value={s.id}>{seasonLabel(s)}{s.is_active ? " · Active" : ""}</option>)}
-            </select>
-            <ChevronDown size={14}/>
+          <div className="schedule-control">
+            <div className="schedule-control__label">Season</div>
+            <div className="schedule-select-wrap">
+              <select className="schedule-select" value={seasonId} onChange={e => setSeason(e.target.value)} disabled={loading}>
+                {!seasons.length && <option value="">Loading seasons…</option>}
+                {seasons.map(s => <option key={s.id} value={s.id}>{seasonLabel(s)}{s.is_active ? " · Active" : ""}</option>)}
+              </select>
+              <ChevronDown size={14}/>
+            </div>
           </div>
-          <div className="schedule-select-wrap">
-            <select className="schedule-select" value={divisionId} onChange={e => setDivision(e.target.value)} disabled={!status?.divisions?.length}>
-              {!status?.divisions?.length && <option value="">No imported divisions</option>}
-              {(status?.divisions ?? []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-            <ChevronDown size={14}/>
+          <div className="schedule-control">
+            <div className="schedule-control__label">Division</div>
+            <div className="schedule-select-wrap">
+              <select className="schedule-select" value={divisionId} onChange={e => setDivision(e.target.value)} disabled={!status?.divisions?.length}>
+                {!status?.divisions?.length && <option value="">No imported divisions</option>}
+                {(status?.divisions ?? []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              <ChevronDown size={14}/>
+            </div>
           </div>
         </div>
 
@@ -193,53 +203,69 @@ export default function Schedules() {
               <div className="schedule-summary__meta">{teams.length} teams · {schedule.length} weeks · {schedule.reduce((n,w)=>n+(w.pairings?.length||0),0)} matchups</div>
             </div>
 
-            <div className="schedule-week-nav" aria-label="Schedule weeks">
-              {schedule.map(w => {
-                const active = w.id === selectedWeekId;
-                const next = w.id === nextWeekId;
-                return (
-                  <button key={w.id} className={`schedule-week-btn ${active ? "schedule-week-btn--active" : ""} ${next ? "schedule-week-btn--next" : ""}`} onClick={() => setSelectedWeekId(w.id)}>
-                    {w.week ? `Week ${w.week}` : w.special || "Week"}
-                  </button>
-                );
-              })}
+            <div className="schedule-control" style={{ marginBottom: 10 }}>
+              <div className="schedule-control__label">Week</div>
+              <div className="schedule-select-wrap">
+                <select
+                  className="schedule-select"
+                  value={selectedWeekId || ""}
+                  onChange={e => setSelectedWeekId(e.target.value)}
+                >
+                  <option value="all">All Weeks</option>
+                  {schedule.map(w => (
+                    <option key={w.id} value={w.id}>
+                      {w.week ? `Week ${w.week}` : (w.special || "Schedule")}
+                      {w.id === currentWeekId ? " · Current" : ""}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14}/>
+              </div>
             </div>
 
-            {selectedWeek ? (
-              <div className="schedule-week">
-                <div className="schedule-week__head">
-                  <div>
-                    <div className="schedule-week__label">{selectedWeek.week ? `Week ${selectedWeek.week}` : "Schedule"}</div>
-                    <div className="schedule-week__date">{selectedWeek.date || selectedWeek.special || "Date not listed"}</div>
-                  </div>
-                  <span className={`schedule-badge ${selectedWeek.id === nextWeekId ? "schedule-badge--next" : ""}`}>
-                    {selectedWeek.id === nextWeekId ? "Next" : selectedWeek.isPlayoff ? (selectedWeek.playoffLabel || "Playoff") : "Scheduled"}
-                  </span>
-                </div>
-                {pairingRows.length ? pairingRows.map(p => (
-                  <div className="schedule-match" key={p.id}>
-                    <div className="schedule-match__teams">
-                      <div className="schedule-team">
-                        {p.home?.name || "Home TBD"}
-                        {p.home?.venue && <div className="schedule-team__venue">{p.home.venue}</div>}
-                      </div>
-                      <div className="schedule-vs">vs</div>
-                      <div className="schedule-team schedule-team--away">
-                        {p.away?.name || "Away TBD"}
-                        {p.away?.venue && <div className="schedule-team__venue">{p.away.venue}</div>}
-                      </div>
+            {displayWeeks.length ? displayWeeks.map(week => {
+              const rows = (week.pairings ?? []).map(p => ({
+                ...p,
+                home: teamsById[p.homeTeamId],
+                away: teamsById[p.awayTeamId],
+              }));
+              const isCurrent = week.id === currentWeekId;
+              return (
+                <div className={`schedule-week ${isCurrent ? "schedule-week--current" : ""}`} key={week.id}>
+                  <div className="schedule-week__head">
+                    <div>
+                      <div className="schedule-week__label">{week.week ? `Week ${week.week}` : "Schedule"}</div>
+                      <div className="schedule-week__date">{week.date || week.special || "Date not listed"}</div>
                     </div>
-                    {p.home?.venue && <div className="schedule-match__venue"><MapPin size={10}/> {p.home.venue}</div>}
+                    <span className={`schedule-badge ${isCurrent ? "schedule-badge--current" : ""}`}>
+                      {isCurrent ? "Current" : week.isPlayoff ? (week.playoffLabel || "Playoff") : "Scheduled"}
+                    </span>
                   </div>
-                )) : <div className="schedule-empty">No matchups listed for this week.</div>}
-              </div>
-            ) : (
+                  {rows.length ? rows.map(p => (
+                    <div className="schedule-match" key={p.id}>
+                      <div className="schedule-match__teams">
+                        <div className="schedule-team">
+                          {p.home?.name || "Home TBD"}
+                          {p.home?.venue && <div className="schedule-team__venue">{p.home.venue}</div>}
+                        </div>
+                        <div className="schedule-vs">vs</div>
+                        <div className="schedule-team schedule-team--away">
+                          {p.away?.name || "Away TBD"}
+                          {p.away?.venue && <div className="schedule-team__venue">{p.away.venue}</div>}
+                        </div>
+                      </div>
+                      {p.home?.venue && <div className="schedule-match__venue"><MapPin size={10}/> {p.home.venue}</div>}
+                    </div>
+                  )) : <div className="schedule-empty">No matchups listed for this week.</div>}
+                </div>
+              );
+            }) : (
               <div className="schedule-empty">No schedule week is available.</div>
             )}
           </>
         )}
 
-        <div style={{marginTop:10,fontSize:10,color:"#666",display:"flex",alignItems:"center",gap:5}}>
+        <div className="schedule-note">
           <Trophy size={11}/> Schedules are imported from IBA and can be refreshed by league management.
         </div>
       </div>
