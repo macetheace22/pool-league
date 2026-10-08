@@ -39,22 +39,47 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setPreviews({});
 
     try {
+      // Fetch the division list and each published schedule in one pass.
+      // The API already supports fetch-all, so the manager should not have
+      // to open Preview on every division just to retrieve its schedule.
       const data = await postSchedule({
-        action: "discover",
+        action: "fetch-all",
         format: season.format,
         day: season.day,
       });
 
       const found = data.divisions || [];
+      const fetched = Object.fromEntries(
+        (data.results || []).map((item) => [
+          item.division?.value || item.division?.label,
+          {
+            format: data.format,
+            day: data.day,
+            division: item.division?.value,
+            url: item.url,
+            teams: item.teams || [],
+            weeks: item.weeks || [],
+            hasSchedule: item.hasSchedule,
+            htmlBytes: item.htmlBytes,
+          },
+        ])
+      );
 
       setDiagnostic(data.diagnostic || null);
       setDivisions(found);
+      setPreviews(fetched);
 
       setSelected(
         Object.fromEntries(
           found.map((d) => [d.value || d.label, true])
         )
       );
+
+      if (data.errors?.length) {
+        setError(
+          data.errors.map((x) => (x.division?.label || "Division") + ": " + x.error).join(" · ")
+        );
+      }
 
       if (!found.length) {
         setError(
@@ -180,7 +205,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       {divisions && !result && (
         <>
           <div style={{ marginTop: 10, padding: "8px 9px", background: "#101010", border: "1px solid #242424", borderRadius: 8, fontSize: 11, color: "#BDBDBD" }}>
-            <strong style={{ color: "#E0E0E0" }}>{divisions.length}</strong> IBA division{divisions.length === 1 ? "" : "s"} discovered. All are selected for import.
+            <strong style={{ color: "#E0E0E0" }}>{divisions.length}</strong> IBA division{divisions.length === 1 ? "" : "s"} discovered and schedule data retrieved. All are selected for import.
           </div>
 
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
@@ -200,7 +225,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                     <div className="list-row__body" style={{ flex: 1 }}>
                       <span className="list-row__name">{d.label}</span>
                       <span className="list-row__sub">
-                        {data ? `${data.teams?.length ?? 0} teams · ${data.weeks?.length ?? 0} weeks · ${data.weeks?.reduce((n, w) => n + (w.pairings?.length || 0), 0) ?? 0} matchups` : "Schedule not retrieved yet"}
+                        {data ? `${data.teams?.length ?? 0} teams · ${data.weeks?.length ?? 0} weeks · ${data.weeks?.reduce((n, w) => n + (w.pairings?.length || 0), 0) ?? 0} matchups` : "Schedule unavailable"}
                       </span>
                     </div>
                     <button className="btn-sm" onClick={() => data ? setExpanded(open ? null : key) : fetchPreview(d)} disabled={loading || importing}>
@@ -217,7 +242,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             <button className="btn-primary" onClick={importSelected} disabled={importing || selectedCount === 0}>
               {importing ? "Importing all selected divisions…" : `Import ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
             </button>
-            <button className="btn-sm" onClick={discover} disabled={loading || importing}>Refresh</button>
+            <button className="btn-sm" onClick={discover} disabled={loading || importing}>Refresh IBA Schedules</button>
           </div>
         </>
       )}
