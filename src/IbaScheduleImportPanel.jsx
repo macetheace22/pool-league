@@ -236,7 +236,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           }}>
             <RefreshCw size={30} color="#5FCF9E" style={{ animation: "spin 1s linear infinite", marginBottom: 12 }} />
             <div style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 800, color: "#FFFFFF" }}>
-              {importingSchedules ? "Importing IBA Schedule" : "Retrieving IBA Schedule Data"}
+              {importingSchedules ? "Syncing IBA Schedule" : "Retrieving IBA Schedule Data"}
             </div>
             <div style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "#BDBDBD" }}>
               {importingSchedules ? "Saving the selected divisions to this season. Please wait." : "Retrieving schedule information from IBA. Please wait."}
@@ -265,7 +265,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
     <div className="card" style={{ marginTop: 10, borderColor: "#3A235F" }}>
       <div className="card__title" style={{ display: "flex", alignItems: "center", gap: 7 }}>
-        <Calendar size={14}/> IBA Schedule Import
+        <Calendar size={14}/> IBA Schedule Sync
       </div>
 
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>
@@ -291,7 +291,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
       {!divisions && !result && (
         <button className="btn-primary" onClick={discover} disabled={loading} style={{ marginTop: 9 }}>
-          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Discover IBA Schedules"}
+          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
         </button>
       )}
 
@@ -345,9 +345,9 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
           <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
             <button className="btn-primary" onClick={importSelected} disabled={importing || selectedCount === 0}>
-              {importing ? "Importing all selected divisions…" : `Import ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
+              {importing ? "Syncing all selected divisions…" : `Sync ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
             </button>
-            <button className="btn-sm" onClick={discover} disabled={loading || importing}>Refresh IBA Schedules</button>
+            <button className="btn-sm" onClick={discover} disabled={loading || importing}>Refresh IBA Data</button>
           </div>
         </>
       )}
@@ -355,7 +355,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       {result && (
         <div className="import-warning-block" style={{ background: "#0F2D1F", borderColor: "#1F6B4A", marginTop: 10 }}>
           <div className="import-warning-block__title" style={{ color: "#5FCF9E" }}>
-            <Check size={12}/> IBA schedule import complete
+            <Check size={12}/> IBA schedule sync complete
           </div>
           <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>
             {result.imported.length} division{result.imported.length === 1 ? "" : "s"} imported · {totalTeams} teams · {totalWeeks} schedule weeks · {totalPairings} matchups
