@@ -782,10 +782,28 @@ export async function listSchedule(divisionId, teams) {
   const { data: weeks } = await supabase
     .from("schedule_weeks")
     .select("*, schedule_pairings(*)")
-    .eq("division_id", divisionId)
-    .order("week_num", { ascending: true, nullsFirst: false });
+    .eq("division_id", divisionId);
+
+  const parseScheduleDate = value => {
+    if (!value) return null;
+    const m = String(value).match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{2,4})/);
+    if (!m) return null;
+    const year = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
+    const date = new Date(year, Number(m[1]) - 1, Number(m[2]));
+    return Number.isNaN(date.getTime()) ? null : date.getTime();
+  };
+
+  const sortedWeeks = [...(weeks ?? [])].sort((a, b) => {
+    const dateA = parseScheduleDate(a.date);
+    const dateB = parseScheduleDate(b.date);
+    if (dateA != null && dateB != null) return dateA - dateB;
+    if (dateA != null) return -1;
+    if (dateB != null) return 1;
+    return (a.week_num ?? Number.MAX_SAFE_INTEGER) - (b.week_num ?? Number.MAX_SAFE_INTEGER);
+  });
+
   const idxOf = teamId => teams.findIndex(t => t.id === teamId) + 1;
-  return (weeks ?? []).map(w => ({
+  return sortedWeeks.map(w => ({
     id: w.id,
     week: w.week_num,
     date: w.date,
