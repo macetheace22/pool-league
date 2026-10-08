@@ -1849,17 +1849,23 @@ export function eligibilityByPlayerNum(rows) {
 // matches be scored concurrently instead of sharing one global slot.
 export async function getLiveMatch(pairingId) {
   if (!pairingId) return null;
-  const { data } = await supabase.from("live_match").select("state").eq("id", pairingId).maybeSingle();
-  return data?.state ?? null;
+  const { data } = await supabase.from("live_match").select("state, revision").eq("id", pairingId).maybeSingle();
+  if (!data?.state) return null;
+  return { ...data.state, _revision: data.revision ?? 0 };
 }
 // Writes go through a security-definer RPC, not a direct table write -- it's
 // the single real enforcement point for "can this person touch this match
 // right now" (manager, holds either side's claim, or the row doesn't exist
 // yet). See section 33 migration.
 export async function setLiveMatch(pairingId, state) {
-  if (!pairingId) return false;
-  const { data, error } = await supabase.rpc("write_live_match_state", { p_pairing_id: pairingId, p_state: state });
-  return !error && data === true;
+  if (!pairingId) return { ok: false, conflict: false };
+  const expectedRevision = Number.isInteger(state?._revision) ? state._revision : null;
+  const { data, error } = await supabase.rpc("write_live_match_state", {
+    p_pairing_id: pairingId,
+    p_state: state,
+    p_expected_revision: expectedRevision,
+  });
+  return { ok: !error && data === true, conflict: !error && data === false };
 }
 
 // Which side (if any) a profile is eligible to score for on this match --
