@@ -30,6 +30,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const [expanded, setExpanded] = useState(null);
   const [result, setResult] = useState(null);
   const [diagnostic, setDiagnostic] = useState(null);
+  const [retrieveProgress, setRetrieveProgress] = useState({ current: 0, total: 0 });
 
   const discover = async () => {
     setLoading(true);
@@ -37,6 +38,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setResult(null);
     setDiagnostic(null);
     setPreviews({});
+    setRetrieveProgress({ current: 0, total: 0 });
 
     try {
       // First discover the published divisions, then use the same individual
@@ -51,7 +53,6 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
       const found = discovered.divisions || [];
       setDiagnostic(discovered.diagnostic || null);
-      setDivisions(found);
 
       setSelected(
         Object.fromEntries(
@@ -67,6 +68,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       }
 
       // Use the same proven request as Preview, one division at a time.
+      setRetrieveProgress({ current: 0, total: found.length });
       // IBA may throttle or reject concurrent schedule requests even though
       // individual Preview requests succeed.
       const fetched = {};
@@ -83,11 +85,15 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             division: division.value || division.label,
           });
           fetched[key] = data;
-          setPreviews({ ...fetched });
+          setRetrieveProgress(p => ({ ...p, current: p.current + 1 }));
         } catch (e) {
+          setRetrieveProgress(p => ({ ...p, current: p.current + 1 }));
           errors.push(`${division.label}: ${e?.message || "Unable to retrieve division schedule."}`);
         }
       }
+
+      setDivisions(found);
+      setPreviews(fetched);
 
       if (errors.length) {
         setError(errors.join(" · "));
@@ -180,7 +186,41 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const totalWeeks = result?.imported?.reduce((n, x) => n + (x.weekCount || 0), 0) || 0;
   const totalPairings = result?.imported?.reduce((n, x) => n + (x.pairingCount || 0), 0) || 0;
 
+  const retrieving = loading && retrieveProgress.total > 0;
+
   return (
+    <>
+      {retrieving && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 1000,
+          background: "rgba(0, 0, 0, 0.45)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}>
+          <div style={{
+            width: "min(420px, 100%)",
+            background: "var(--card-bg, #fff)",
+            borderRadius: 16,
+            padding: 28,
+            textAlign: "center",
+            boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+          }}>
+            <RefreshCw size={30} style={{ animation: "iba-spin 1s linear infinite", marginBottom: 12 }} />
+            <h3 style={{ margin: "0 0 8px" }}>Retrieving IBA Schedule Data</h3>
+            <p style={{ margin: "0 0 16px", opacity: 0.75 }}>
+              Retrieving schedule information from IBA. Please wait.
+            </p>
+            <div style={{ fontWeight: 600 }}>
+              {retrieveProgress.current} of {retrieveProgress.total} divisions retrieved
+            </div>
+          </div>
+        </div>
+      )}
+
     <div className="card" style={{ marginTop: 10, borderColor: "#3A235F" }}>
       <div className="card__title" style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <Calendar size={14}/> IBA Schedule Import
