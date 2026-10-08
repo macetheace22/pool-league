@@ -2778,7 +2778,8 @@ function SetCorrectionForm({ match, set, isManager, myProfile, onCancel, onDone 
     if (isManager) {
       ok = await db.applySetCorrectionDirect(match.id, updatedSet, "");
     } else {
-      const mySlot = getActiveTeamIds(myProfile)[0] ?? null === match.team_home_id ? "home" : "away";
+      const myTeamIds = getActiveTeamIds(myProfile);
+      const mySlot = myTeamIds.includes(match.team_home_id) ? "home" : myTeamIds.includes(match.team_away_id) ? "away" : null;
       ok = await db.proposeSetCorrection(match.id, updatedSet, myProfile.id, mySlot);
     }
     setSaving(false);
