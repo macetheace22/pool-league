@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Calendar, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import * as db from "./db";
-import { useNavigate } from "react-router-dom";
 
 async function postSchedule(body) {
   const r = await fetch("/api/iba-schedules", {
@@ -35,7 +34,6 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [existingStatus, setExistingStatus] = useState(null);
   const [statusLoading, setStatusLoading] = useState(true);
-  const navigate = useNavigate();
 
   const refreshImportStatus = async () => {
     if (!season?.id) return;
@@ -61,10 +59,6 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setRetrieveProgress({ current: 0, total: 0 });
 
     try {
-      // First discover the published divisions, then use the same individual
-      // schedule endpoint as Preview for every division concurrently. This is
-      // the proven IBA path and avoids depending on a server-side aggregation
-      // response for the UI.
       const discovered = await postSchedule({
         action: "discover",
         format: season.format,
@@ -87,10 +81,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         return;
       }
 
-      // Use the same proven request as Preview, one division at a time.
       setRetrieveProgress({ current: 0, total: found.length });
-      // IBA may throttle or reject concurrent schedule requests even though
-      // individual Preview requests succeed.
       const fetched = {};
       const errors = [];
 
@@ -280,16 +271,13 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>
             {existingStatus.totals.divisions} divisions · {existingStatus.totals.teams} teams · {existingStatus.totals.weeks} schedule weeks · {existingStatus.totals.pairings} matchups
           </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-            <button className="btn-primary" onClick={() => navigate(`/manage?season=${season.id}`)}>
-              Open Season Data
-            </button>
-            <button className="btn-sm" onClick={discover} disabled={loading || importing}>Check IBA Again</button>
-          </div>
+          <button className="btn-primary" onClick={discover} disabled={loading || importing} style={{ marginTop: 8 }}>
+            {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
+          </button>
         </div>
       )}
 
-      {!divisions && !result && (
+      {!divisions && !result && !statusReady && (
         <button className="btn-primary" onClick={discover} disabled={loading} style={{ marginTop: 9 }}>
           {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
         </button>
@@ -378,8 +366,6 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 function extractDivisionNum(option) {
   const value = String(option?.value || "").trim();
 
-  // IBA values are compound IDs such as "287!8538257". The first portion
-  // identifies the league; the second portion identifies the actual division.
   const compound = value.match(/!([0-9]+)$/);
   if (compound) return compound[1];
 
