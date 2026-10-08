@@ -277,7 +277,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             <button className="btn-primary" onClick={() => navigate(`/schedules?season=${encodeURIComponent(season.id)}`)}>
               View Schedules
             </button>
-            <button className="btn-sm" onClick={discover} disabled={loading || importing}>
+            <button className="btn-primary" onClick={discover} disabled={loading || importing}>
               {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
             </button>
           </div>
