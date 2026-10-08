@@ -1823,8 +1823,8 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
       if (currentWeek.isPlayoff && viewingDiv) {
         eligByNum = db.eligibilityByPlayerNum(await db.listPlayoffEligibility(viewingDiv.id));
       }
-      const ok = await db.setLiveMatch(match.pairing.id, buildSeed(match, eligByNum));
-      if (!ok) { setLaunching(null); alert("Could not start this match — please try again."); return; }
+      const result = await db.setLiveMatch(match.pairing.id, buildSeed(match, eligByNum));
+      if (!result?.ok) { setLaunching(null); alert("Could not start this match — please try again."); return; }
     }
     setLaunching(null);
     navigate(`/live?pairing=${match.pairing.id}`);
@@ -2114,9 +2114,9 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
 
   const resumeMakeup = async (m) => {
     setResuming(m.id);
-    const ok = await db.resumeMakeupMatch(m);
+    const result = await db.resumeMakeupMatch(m);
     setResuming(null);
-    if (ok) navigate(`/live?pairing=${m.state?.schedulePairingId}`);
+    if (result?.ok) navigate(`/live?pairing=${m.state?.schedulePairingId}`);
     else alert("Could not resume this match — it may be missing its original schedule link.");
   };
 
