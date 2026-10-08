@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  Users, Calendar, ChevronDown, ChevronUp, Plus, Trash2,
+  Users, ChevronDown, ChevronUp, Plus, Trash2,
   Check, AlertCircle, Edit2, X, Settings, LogOut,
   Key, Eye, EyeOff, Copy, ChevronRight, Star, ArrowLeftRight
 } from "lucide-react";
@@ -12,7 +12,6 @@ import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { parseStandingsImport, parseMvpImport, parseLeagueRoster } from "./ibaParsers";
 import IbaAutoSyncPanel from "./IbaAutoSyncPanel";
-import IbaScheduleImportPanel from "./IbaScheduleImportPanel";
 // SetEntry is the exact same rack-by-rack (innings, safeties, timeouts)
 // entry component live scoring uses -- reused here (not re-implemented) so
 // manual match entry stays byte-for-byte consistent with live scoring math,
@@ -1695,9 +1694,6 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                             Import Teams <ChevronRight size={11}/>
                           </button>
                         )}
-                        <button className="btn-sm" onClick={e=>{e.stopPropagation();setExpandedSeason(s.id);}}>
-                          IBA Schedule Sync <Calendar size={11}/>
-                        </button>
                         <button className={`btn-sm ${isAct?"btn-sm--warn":"btn-sm--accent"}`}
                           onClick={e=>{e.stopPropagation();onToggleActive(s);if(!isAct)setExpandedSeason(s.id);}}>
                           {isAct?"Deactivate":"Set Active"}
@@ -1733,7 +1729,6 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           <input className="edit-input" style={{flex:1}} placeholder="Name (e.g. North)" value={divName} onChange={e=>setDivName(e.target.value)}/>
                           <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim()}><Plus size={13}/></button>
                         </div>
-                        <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
                         <div className="field" style={{marginTop:10}}>
                           <Label>Playoffs Start Date</Label>
                           <div style={{fontSize:12.5,color:s.playoffs_start_date?"#E0E0E0":"#6A6A6A",fontWeight:600}}>
