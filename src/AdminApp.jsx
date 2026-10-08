@@ -422,7 +422,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     // Captain handoff is atomic in the database. The RPC ends the prior
     // captaincy history and only demotes the outgoing captain if they captain
     // no other team.
-    const ok = await db.setProfileRole(newProfileId, "captain", teamId);
+    const ok = await db.assignTeamCaptain(teamId, newProfileId);
     if (ok) {
       await refreshCaptains();
       if (newProfileId === profile.id) await onProfileRefresh();
@@ -430,7 +430,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     return ok;
   };
   const handleRemoveCaptain = async (profileId, teamId) => {
-    const ok = await db.setProfileRole(profileId, "player", teamId);
+    const ok = await db.removeTeamCaptain(teamId, profileId);
     if (ok) await refreshCaptains();
     return ok;
   };
