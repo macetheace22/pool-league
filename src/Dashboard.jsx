@@ -360,6 +360,10 @@ export function LeaguesDashboard() {
           <div className="empty-state">No team linked to your account yet — match cards will show once you're linked to a team.</div>
         )}
 
+        <DashCard icon={Calendar} title="League Schedule">
+          <button className="btn-secondary" onClick={() => navigate("/schedules")}>View Full Schedule →</button>
+        </DashCard>
+
         <DashCard icon={BarChart3} title="League Stats">
           <button className="btn-secondary" onClick={()=>navigate("/match-lookup")}>View Standings & MVP →</button>
         </DashCard>
