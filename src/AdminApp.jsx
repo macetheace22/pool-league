@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
+import { getActiveTeamIds } from "./teamMembership";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
 import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from "./Shell";
@@ -268,6 +269,8 @@ export default function AdminApp({ page }) {
 function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const isManager = profile.role === "manager";
   const isCaptain = profile.role === "captain";
+  const activeTeamIds = getActiveTeamIds(profile);
+  const primaryTeamId = activeTeamIds[0] ?? null;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -681,9 +684,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SubTabBtn active={myTeamSubTab==="stats"} onClick={()=>setMyTeamSubTab("stats")}>Team Stats</SubTabBtn>
         </SubTabBar>
         <div className="tab-content">
-          {myTeamSubTab === "roster" && <ManageMyTeamPage teamId={profile.team_id} profileId={profile.id} />}
-          {myTeamSubTab === "lineup" && <LineupPlannerPanel teamId={profile.team_id} profileId={profile.id} />}
-          {myTeamSubTab === "stats" && <TeamStatsPanel teamId={profile.team_id} />}
+          {myTeamSubTab === "roster" && <ManageMyTeamPage teamId={primaryTeamId} profileId={profile.id} />}
+          {myTeamSubTab === "lineup" && <LineupPlannerPanel teamId={primaryTeamId} profileId={profile.id} />}
+          {myTeamSubTab === "stats" && <TeamStatsPanel teamId={primaryTeamId} />}
         </div>
       </>
     );
@@ -1132,7 +1135,7 @@ function MyStatsPage({ profile }) {
     <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
-        <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={profile.team_id} />
+        <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} />
       </div>
     </>
   );
@@ -1830,7 +1833,7 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
   // player's own team -- either a direct account-to-team link, or a
   // roster-number link.
   const myMatches = (!isManager && myProfile) ? matches.filter(m => !m.isBye && m.homeTeam && m.awayTeam && (
-    myProfile.team_id === m.homeTeam.id || myProfile.team_id === m.awayTeam.id
+    getActiveTeamIds(myProfile)[0] ?? null === m.homeTeam.id || getActiveTeamIds(myProfile)[0] ?? null === m.awayTeam.id
     || (myProfile.player_num && (m.homeRoster.some(p=>p.num===myProfile.player_num) || m.awayRoster.some(p=>p.num===myProfile.player_num)))
   )) : [];
 
@@ -2774,7 +2777,7 @@ function SetCorrectionForm({ match, set, isManager, myProfile, onCancel, onDone 
     if (isManager) {
       ok = await db.applySetCorrectionDirect(match.id, updatedSet, "");
     } else {
-      const mySlot = myProfile.team_id === match.team_home_id ? "home" : "away";
+      const mySlot = getActiveTeamIds(myProfile)[0] ?? null === match.team_home_id ? "home" : "away";
       ok = await db.proposeSetCorrection(match.id, updatedSet, myProfile.id, mySlot);
     }
     setSaving(false);
@@ -4554,8 +4557,8 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
 // Lets a manager either assign an existing account as a team's captain, or
 // generate an invite code for someone who doesn't have one yet. There's no
 // separate "captains" table -- a captain IS just a profile with
-// role='captain' and team_id pointing here, so this reads/writes profiles
-// directly. Assigning a new captain over an existing one hands off in one
+// role='captain' with an active profile_team_memberships row for the team.
+// Assigning a new captain over an existing one hands off in one
 // action (demotes the outgoing captain) so a team never ends up with two
 // captains because a manager forgot a manual cleanup step.
 function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, onGenerateInvite, onRefreshProfiles }) {
