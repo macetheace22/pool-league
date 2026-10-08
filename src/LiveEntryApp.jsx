@@ -304,12 +304,12 @@ export default function LiveEntryApp() {
       (async () => {
         const marked = { ...match, archiving: true };
         await saveMatch(pairingId, marked);
-        await db.archiveMatch(marked, marked.divisionId ?? null);
+        const archiveResult = await db.archiveMatch(marked, marked.divisionId ?? null);
 
-        // Playoff advancement: only when the match has a clear, final winner
-        // (not a partial makeup-pending archive with tables still outstanding).
-        const isPartialMakeup = marked.makeup?.confirmedHome && marked.makeup?.confirmedAway && !marked.sets.every(s => s.complete);
-        if (marked.schedulePairingId && !isPartialMakeup) {
+        // Only the caller that created the archive (or completed a pending
+        // makeup row) may advance the bracket. A duplicate concurrent submit
+        // returns the existing row with _shouldAdvanceBracket=false.
+        if (archiveResult?._shouldAdvanceBracket && marked.schedulePairingId) {
           const homeSets = marked.sets.filter(s => s.winnerSlot === "home").length;
           const awaySets = marked.sets.filter(s => s.winnerSlot === "away").length;
           const winnerId = homeSets > awaySets ? marked.teamHome?.id : awaySets > homeSets ? marked.teamAway?.id : null;
