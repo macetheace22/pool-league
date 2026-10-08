@@ -418,14 +418,15 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   // ── Captains (assigned from the Teams tab's edit row) ──
   const refreshCaptains = () => db.listTeamCaptains().then(setCaptainsByTeam);
-  const handleAssignCaptain = async (teamId, newProfileId, previousCaptainId) => {
-    // Hand off first, so a team never briefly ends up with two captains at
-    // once if the promote step below fails partway through.
-    if (previousCaptainId && previousCaptainId !== newProfileId) {
-      await db.setProfileRole(previousCaptainId, "player", null);
-    }
+  const handleAssignCaptain = async (teamId, newProfileId) => {
+    // Captain handoff is atomic in the database. The RPC ends the prior
+    // captaincy history and only demotes the outgoing captain if they captain
+    // no other team.
     const ok = await db.setProfileRole(newProfileId, "captain", teamId);
-    if (ok) await refreshCaptains();
+    if (ok) {
+      await refreshCaptains();
+      if (newProfileId === profile.id) await onProfileRefresh();
+    }
     return ok;
   };
   const handleRemoveCaptain = async (profileId, teamId) => {
@@ -4501,7 +4502,7 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
                   </select>
                   {!team.isBye && onAssignCaptain && (
                     <CaptainField team={team} allProfiles={allProfiles} captainsByTeam={captainsByTeam}
-                      onAssign={(newId, prevId)=>onAssignCaptain(team.id, newId, prevId)}
+                      onAssign={(newId)=>onAssignCaptain(team.id, newId)}
                       onRemove={(profileId)=>onRemoveCaptain(profileId, team.id)}
                       onGenerateInvite={(name)=>onGenerateCaptainInvite(team.id, name)}
                       onRefreshProfiles={()=>db.listProfiles().then(setAllProfiles)} />
