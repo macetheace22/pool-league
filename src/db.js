@@ -1168,6 +1168,7 @@ export async function archiveMatch(state, divisionId) {
   const { homePoints, awayPoints } = computeMatchPoints(state);
   const row = {
     division_id: divisionId ?? null,
+    season_id: state.seasonId ?? null,
     season_label: state.seasonLabel ?? null,
     week_num: state.weekNum ?? null,
     week_date: state.weekDate ?? null,
