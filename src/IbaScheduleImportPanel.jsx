@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Calendar, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import * as db from "./db";
+import { useNavigate } from "react-router-dom";
 
 async function postSchedule(body) {
   const r = await fetch("/api/iba-schedules", {
@@ -31,6 +32,25 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const [result, setResult] = useState(null);
   const [diagnostic, setDiagnostic] = useState(null);
   const [retrieveProgress, setRetrieveProgress] = useState({ current: 0, total: 0 });
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [existingStatus, setExistingStatus] = useState(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const refreshImportStatus = async () => {
+    if (!season?.id) return;
+    setStatusLoading(true);
+    try { setExistingStatus(await db.getIbaScheduleImportStatus(season.id)); }
+    finally { setStatusLoading(false); }
+  };
+
+  useEffect(() => {
+    setDivisions(null); setSelected({}); setPreviews({}); setExpanded(null); setResult(null);
+    setError(""); setDiagnostic(null); setRetrieveProgress({ current: 0, total: 0 });
+    setImportProgress({ current: 0, total: 0 });
+    refreshImportStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [season?.id]);
 
   const discover = async () => {
     setLoading(true);
@@ -133,6 +153,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setImporting(true);
     setError("");
     setResult(null);
+    setImportProgress({ current: 0, total: chosen.length });
 
     try {
       const imported = [];
@@ -154,6 +175,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
         if (!data.hasSchedule || !data.teams?.length || !data.weeks?.length) {
           skipped.push(`${d.label}: no schedule data returned`);
+          setImportProgress(p => ({ ...p, current: p.current + 1 }));
           continue;
         }
 
@@ -165,14 +187,13 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           weeks: data.weeks,
         });
 
-        if (importedDivision.ok) {
-          imported.push(importedDivision);
-        } else {
-          skipped.push(`${d.label}: ${importedDivision.error || "import failed"}`);
-        }
+        if (importedDivision.ok) imported.push(importedDivision);
+        else skipped.push(`${d.label}: ${importedDivision.error || "import failed"}`);
+        setImportProgress(p => ({ ...p, current: p.current + 1 }));
       }
 
       setResult({ imported, skipped });
+      await refreshImportStatus();
       if (onImported) await onImported();
     } catch (e) {
       setError(e?.message || "Unable to import the selected schedules.");
@@ -187,10 +208,12 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const totalPairings = result?.imported?.reduce((n, x) => n + (x.pairingCount || 0), 0) || 0;
 
   const retrieving = loading && retrieveProgress.total > 0;
+  const importingSchedules = importing && importProgress.total > 0;
+  const statusReady = !statusLoading && existingStatus?.hasSchedule;
 
   return (
     <>
-      {retrieving && (
+      {(retrieving || importingSchedules) && (
         <div style={{
           position: "fixed",
           inset: 0,
@@ -213,13 +236,13 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           }}>
             <RefreshCw size={30} color="#5FCF9E" style={{ animation: "spin 1s linear infinite", marginBottom: 12 }} />
             <div style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 800, color: "#FFFFFF" }}>
-              Retrieving IBA Schedule Data
+              {importingSchedules ? "Importing IBA Schedule" : "Retrieving IBA Schedule Data"}
             </div>
             <div style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "#BDBDBD" }}>
-              Retrieving schedule information from IBA. Please wait.
+              {importingSchedules ? "Saving the selected divisions to this season. Please wait." : "Retrieving schedule information from IBA. Please wait."}
             </div>
             <div style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF", marginBottom: 10 }}>
-              {retrieveProgress.current} of {retrieveProgress.total} divisions retrieved
+              {importingSchedules ? `${importProgress.current} of ${importProgress.total} divisions imported` : `${retrieveProgress.current} of ${retrieveProgress.total} divisions retrieved`}
             </div>
             <div style={{
               width: "100%",
@@ -230,7 +253,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
               border: "1px solid #2E2E2E",
             }}>
               <div style={{
-                width: `${retrieveProgress.total ? Math.round((retrieveProgress.current / retrieveProgress.total) * 100) : 0}%`,
+                width: `${(importingSchedules ? importProgress.total : retrieveProgress.total) ? Math.round(((importingSchedules ? importProgress.current : retrieveProgress.current) / (importingSchedules ? importProgress.total : retrieveProgress.total)) * 100) : 0}%`,
                 height: "100%",
                 background: "#5FCF9E",
                 transition: "width .2s ease",
@@ -248,6 +271,23 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>
         Automatically checks the IBA schedule for <strong style={{ color: "#E0E0E0" }}>{season.format}</strong> on <strong style={{ color: "#E0E0E0" }}>{season.day}</strong>, discovers every published division, retrieves each division's teams and complete schedule, and imports them into this season.
       </div>
+
+      {!divisions && !result && statusReady && (
+        <div className="import-warning-block" style={{ background: "#0F2D1F", borderColor: "#1F6B4A", marginTop: 10 }}>
+          <div className="import-warning-block__title" style={{ color: "#5FCF9E" }}>
+            <Check size={12}/> IBA schedule already imported
+          </div>
+          <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>
+            {existingStatus.divisions} divisions · {existingStatus.teams} teams · {existingStatus.weeks} schedule weeks · {existingStatus.pairings} matchups
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            <button className="btn-primary" onClick={() => navigate(`/manage?season=${season.id}`)}>
+              Open Season Data
+            </button>
+            <button className="btn-sm" onClick={discover} disabled={loading || importing}>Check IBA Again</button>
+          </div>
+        </div>
+      )}
 
       {!divisions && !result && (
         <button className="btn-primary" onClick={discover} disabled={loading} style={{ marginTop: 9 }}>
