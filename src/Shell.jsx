@@ -54,6 +54,7 @@ export const LEAGUE_OFFICE_ITEMS = [
   { key: "weekly",   label: "Update Weekly League Data",    path: "/weekly-data",  roles: ["manager"],                     icon: Upload },
   { key: "access",   label: "Manage App Access",            path: "/access",       roles: ["manager"],                     icon: Key },
   { key: "myteam",   label: "Manage My Team",               path: "/my-team",      roles: ["captain"],                     icon: Users },
+  { key: "schedules", label: "Schedules",                    path: "/schedules",      roles: ["manager", "captain", "player"], icon: Calendar },
   { key: "matches",  label: "Current League Matches",       path: "/matches",      roles: ["manager", "captain", "player"], icon: Trophy },
   { key: "teaminfo", label: "Team & Player Information",    path: "/team-info",    roles: ["manager", "captain", "player"], icon: Eye },
   { key: "players",  label: "Player Lookup / History",      path: "/player-lookup", roles: ["manager", "captain", "player"], icon: Search },
