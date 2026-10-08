@@ -39,35 +39,19 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setPreviews({});
 
     try {
-      // Fetch the division list and each published schedule in one pass.
-      // The API already supports fetch-all, so the manager should not have
-      // to open Preview on every division just to retrieve its schedule.
-      const data = await postSchedule({
-        action: "fetch-all",
+      // First discover the published divisions, then use the same individual
+      // schedule endpoint as Preview for every division concurrently. This is
+      // the proven IBA path and avoids depending on a server-side aggregation
+      // response for the UI.
+      const discovered = await postSchedule({
+        action: "discover",
         format: season.format,
         day: season.day,
       });
 
-      const found = data.divisions || [];
-      const fetched = Object.fromEntries(
-        (data.results || []).map((item) => [
-          item.division?.value || item.division?.label,
-          {
-            format: data.format,
-            day: data.day,
-            division: item.division?.value,
-            url: item.url,
-            teams: item.teams || [],
-            weeks: item.weeks || [],
-            hasSchedule: item.hasSchedule,
-            htmlBytes: item.htmlBytes,
-          },
-        ])
-      );
-
-      setDiagnostic(data.diagnostic || null);
+      const found = discovered.divisions || [];
+      setDiagnostic(discovered.diagnostic || null);
       setDivisions(found);
-      setPreviews(fetched);
 
       setSelected(
         Object.fromEntries(
@@ -75,16 +59,45 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         )
       );
 
-      if (data.errors?.length) {
-        setError(
-          data.errors.map((x) => (x.division?.label || "Division") + ": " + x.error).join(" · ")
-        );
-      }
-
       if (!found.length) {
         setError(
           "IBA returned zero divisions for this format and night. Review the IBA response diagnostics below."
         );
+        return;
+      }
+
+      const settled = await Promise.allSettled(
+        found.map(async (division) => {
+          const key = division.value || division.label;
+          const data = await postSchedule({
+            action: "fetch",
+            format: season.format,
+            day: season.day,
+            division: division.value || division.label,
+          });
+          return [key, data];
+        })
+      );
+
+      const fetched = {};
+      const errors = [];
+
+      settled.forEach((item, index) => {
+        const division = found[index];
+        if (item.status === "fulfilled") {
+          const [key, data] = item.value;
+          fetched[key] = data;
+        } else {
+          errors.push(
+            `${division.label}: ${item.reason?.message || "Unable to retrieve division schedule."}`
+          );
+        }
+      });
+
+      setPreviews(fetched);
+
+      if (errors.length) {
+        setError(errors.join(" · "));
       }
     } catch (e) {
       setError(e?.message || "Unable to discover IBA divisions.");
