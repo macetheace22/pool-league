@@ -460,14 +460,17 @@ export async function getIbaScheduleImportStatus(seasonId) {
     }))
     .filter(d => d.teamCount > 0 || d.weekCount > 0);
 
+  const totals = {
+    divisions: importedDivisions.length,
+    teams: importedDivisions.reduce((n, d) => n + d.teamCount, 0),
+    weeks: importedDivisions.reduce((n, d) => n + d.weekCount, 0),
+    pairings: importedDivisions.reduce((n, d) => n + d.pairingCount, 0),
+  };
+
   return {
     divisions: importedDivisions,
-    totals: {
-      divisions: importedDivisions.length,
-      teams: importedDivisions.reduce((n, d) => n + d.teamCount, 0),
-      weeks: importedDivisions.reduce((n, d) => n + d.weekCount, 0),
-      pairings: importedDivisions.reduce((n, d) => n + d.pairingCount, 0),
-    },
+    totals,
+    hasSchedule: totals.weeks > 0 && totals.pairings > 0,
   };
 }
 
