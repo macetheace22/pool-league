@@ -209,7 +209,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
   const retrieving = loading && retrieveProgress.total > 0;
   const importingSchedules = importing && importProgress.total > 0;
-  const statusReady = !statusLoading && existingStatus?.hasSchedule;
+  const statusReady = !statusLoading && (existingStatus?.hasSchedule === true || (existingStatus?.totals?.weeks > 0 && existingStatus?.totals?.pairings > 0));
 
   return (
     <>
@@ -278,7 +278,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             <Check size={12}/> IBA schedule already imported
           </div>
           <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>
-            {existingStatus.divisions} divisions · {existingStatus.teams} teams · {existingStatus.weeks} schedule weeks · {existingStatus.pairings} matchups
+            {existingStatus.totals.divisions} divisions · {existingStatus.totals.teams} teams · {existingStatus.totals.weeks} schedule weeks · {existingStatus.totals.pairings} matchups
           </div>
           <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
             <button className="btn-primary" onClick={() => navigate(`/manage?season=${season.id}`)}>
@@ -352,7 +352,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         </>
       )}
 
-      {result && (
+      {result && !statusReady && (
         <div className="import-warning-block" style={{ background: "#0F2D1F", borderColor: "#1F6B4A", marginTop: 10 }}>
           <div className="import-warning-block__title" style={{ color: "#5FCF9E" }}>
             <Check size={12}/> IBA schedule sync complete
