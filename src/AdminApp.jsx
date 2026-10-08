@@ -1696,7 +1696,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           </button>
                         )}
                         <button className="btn-sm" onClick={e=>{e.stopPropagation();setExpandedSeason(s.id);}}>
-                          IBA Schedule <Calendar size={11}/>
+                          IBA Schedule Sync <Calendar size={11}/>
                         </button>
                         <button className={`btn-sm ${isAct?"btn-sm--warn":"btn-sm--accent"}`}
                           onClick={e=>{e.stopPropagation();onToggleActive(s);if(!isAct)setExpandedSeason(s.id);}}>
