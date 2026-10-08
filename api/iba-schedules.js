@@ -672,17 +672,29 @@ async function getDivisionSchedule(division) {
 }
 
 async function getAllDivisionSchedules(format, day, divisions) {
+  // Retrieve divisions concurrently. IBA can serve the individual schedules
+  // independently, and sequential requests can exceed a serverless function's
+  // execution window even when each individual Preview request succeeds.
+  const settled = await Promise.allSettled(
+    divisions.map(async (division) => ({
+      division,
+      ...(await getDivisionSchedule(division.value)),
+    }))
+  );
+
   const results = [];
   const errors = [];
 
-  for (const division of divisions) {
-    try {
-      const schedule = await getDivisionSchedule(division.value);
-      results.push({ division, ...schedule });
-    } catch (error) {
+  for (let i = 0; i < settled.length; i += 1) {
+    const item = settled[i];
+    const division = divisions[i];
+
+    if (item.status === "fulfilled") {
+      results.push(item.value);
+    } else {
       errors.push({
         division,
-        error: error?.message || "Unable to retrieve division schedule.",
+        error: item.reason?.message || "Unable to retrieve division schedule.",
       });
     }
   }
