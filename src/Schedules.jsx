@@ -3,6 +3,7 @@ import { Calendar, ChevronDown, MapPin, RefreshCw, Trophy } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import * as db from "./db";
 import { PageHeader, TabBar, shellCss } from "./Shell.jsx";
+import { useAuth } from "./AuthContext";
 import { css as adminCss } from "./AdminApp.jsx";
 import { dashboardCss } from "./Dashboard.jsx";
 
@@ -54,6 +55,7 @@ function seasonLabel(s) {
 }
 
 export default function Schedules() {
+  const { profile } = useAuth();
   const [params, setParams] = useSearchParams();
   const requestedSeasonId = params.get("season");
   const requestedDivisionId = params.get("division");
@@ -76,18 +78,39 @@ export default function Schedules() {
       .then(rows => {
         if (cancelled) return;
         setSeasons(rows);
+
+        const memberships = (profile?.team_memberships ?? [])
+          .map(m => m.teams)
+          .filter(Boolean);
+        const preferredMembership = memberships.find(
+          team => team.divisions?.seasons?.is_active
+        ) || memberships[0];
+        const preferredDivisionId = preferredMembership?.divisions?.id || "";
+        const preferredSeasonId = preferredMembership?.divisions?.seasons?.id || "";
+
         const preferred = rows.find(s => s.id === requestedSeasonId)
+          || rows.find(s => s.id === preferredSeasonId)
           || rows.find(s => s.is_active)
           || rows[0];
-        if (preferred && !requestedSeasonId) {
+
+        if (preferred) {
           setSeasonId(preferred.id);
-          setParams(p => { p.set("season", preferred.id); p.delete("division"); return p; }, { replace: true });
+          setParams(p => {
+            p.set("season", preferred.id);
+            const divisionStillValid = requestedDivisionId
+              && preferred.divisions?.some(d => d.id === requestedDivisionId);
+            const userDivisionValid = preferred.divisions?.some(d => d.id === preferredDivisionId);
+            if (divisionStillValid) p.set("division", requestedDivisionId);
+            else if (userDivisionValid) p.set("division", preferredDivisionId);
+            else p.delete("division");
+            return p;
+          }, { replace: true });
         }
       })
       .catch(e => !cancelled && setError(e?.message || "Unable to load seasons."))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
     if (!seasonId) return;
@@ -154,12 +177,23 @@ export default function Schedules() {
     setParams(p => { p.set("season", seasonId); p.set("division", id); return p; }, { replace: true });
   };
 
-  const displayWeeks = selectedWeekId === "all" ? schedule : (selectedWeek ? [selectedWeek] : []);
+  const sortedSchedule = useMemo(() => [...schedule].sort((a, b) => {
+    const dateA = parseScheduleDate(a.date);
+    const dateB = parseScheduleDate(b.date);
+    if (dateA && dateB) return dateA - dateB;
+    if (dateA) return -1;
+    if (dateB) return 1;
+    return (a.week ?? Number.MAX_SAFE_INTEGER) - (b.week ?? Number.MAX_SAFE_INTEGER);
+  }), [schedule]);
+
+  const displayWeeks = selectedWeekId === "all"
+    ? sortedSchedule
+    : (selectedWeek ? [selectedWeek] : []);
 
   return (
     <div className="app">
       <style>{adminCss}</style><style>{dashboardCss}</style><style>{css}</style><style>{shellCss}</style>
-      <PageHeader title="Schedules" subtitle="IBA league schedules" />
+      <PageHeader title="Schedules" />
       <div className="tab-content schedules-page">
         <div className="schedules-controls">
           <div className="schedule-control">
@@ -219,7 +253,7 @@ export default function Schedules() {
                   onChange={e => setSelectedWeekId(e.target.value)}
                 >
                   <option value="all">All Weeks</option>
-                  {schedule.map(w => (
+                  {sortedSchedule.map(w => (
                     <option key={w.id} value={w.id}>
                       {w.week ? `Week ${w.week}` : (w.special || "Schedule")}
                       {w.id === currentWeekId ? " · Current" : ""}
