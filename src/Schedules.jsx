@@ -156,12 +156,6 @@ export default function Schedules() {
 
   const displayWeeks = selectedWeekId === "all" ? schedule : (selectedWeek ? [selectedWeek] : []);
 
-  const pairingRows = (selectedWeek?.pairings ?? []).map(p => ({
-    ...p,
-    home: teamsById[p.homeTeamId],
-    away: teamsById[p.awayTeamId],
-  }));
-
   return (
     <div className="app">
       <style>{adminCss}</style><style>{dashboardCss}</style><style>{css}</style><style>{shellCss}</style>
@@ -173,7 +167,20 @@ export default function Schedules() {
             <div className="schedule-select-wrap">
               <select className="schedule-select" value={seasonId} onChange={e => setSeason(e.target.value)} disabled={loading}>
                 {!seasons.length && <option value="">Loading seasons…</option>}
-                {seasons.map(s => <option key={s.id} value={s.id}>{seasonLabel(s)}{s.is_active ? " · Active" : ""}</option>)}
+                {seasons.some(s => s.is_active) && (
+                  <optgroup label="Active Seasons">
+                    {seasons.filter(s => s.is_active).map(s => (
+                      <option key={s.id} value={s.id}>{seasonLabel(s)} · Active</option>
+                    ))}
+                  </optgroup>
+                )}
+                {seasons.some(s => !s.is_active) && (
+                  <optgroup label="Past Seasons">
+                    {seasons.filter(s => !s.is_active).map(s => (
+                      <option key={s.id} value={s.id}>{seasonLabel(s)}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <ChevronDown size={14}/>
             </div>
