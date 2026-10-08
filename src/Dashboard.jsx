@@ -8,6 +8,7 @@ import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, navItemsForRole, shellCss } from "./Shell";
 import { css, Loader } from "./AdminApp";
 import * as db from "./db";
+import { getActiveTeamIds } from "./teamMembership";
 
 // Free-text schedule dates are typically M/D/YYYY (same format used
 // throughout the rest of the app) -- an unparseable value is treated as
@@ -51,7 +52,7 @@ export function Home() {
     if (!profile) return;
     setTeamOverviews(undefined);
     db.getMyTeamsOverview(profile).then(setTeamOverviews);
-  }, [profile?.team_id, profile?.player_num]);
+  }, [profile?.team_memberships, profile?.player_num]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -138,7 +139,7 @@ export function Home() {
           })}
         </div>
 
-        {(profile?.team_id || profile?.player_num) && (
+        {(getActiveTeamIds(profile)[0] ?? null || profile?.player_num) && (
           <DashCard icon={TrendingUp} title="Your Standing">
             {snapshotStats === undefined && <Loader />}
             {snapshotStats === null && (
@@ -159,7 +160,7 @@ export function Home() {
           </DashCard>
         )}
 
-        {(profile?.team_id || profile?.player_num) && (
+        {(getActiveTeamIds(profile)[0] ?? null || profile?.player_num) && (
           <DashCard icon={Calendar} title="Recent Activity">
             {(recentMatch === undefined || recentPractice === undefined) && <Loader />}
             {recentMatch === null && recentPractice === null && (
@@ -196,7 +197,7 @@ export function LeaguesDashboard() {
   const isManager = profile?.role === "manager";
   const isCaptain = profile?.role === "captain";
   const [selectedTeamId, setSelectedTeamId] = useState(null);
-  const selectedTeamIds = profile?.team_ids ?? [];
+  const selectedTeamIds = getActiveTeamIds(profile)[0] ?? nulls ?? [];
   const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
     ? selectedTeamId
     : selectedTeamIds[0] ?? null;
