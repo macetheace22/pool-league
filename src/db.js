@@ -34,6 +34,14 @@ export function buildCompletedMatchRow(state, divisionId) {
   };
 }
 
+// Only a first successful archive or a pending-makeup -> final transition
+// may trigger bracket advancement. Duplicate submissions are explicitly inert.
+export function shouldAdvanceBracketOnArchive({ outcome, priorPending = false, isPending = false } = {}) {
+  if (outcome === "created") return !isPending;
+  if (outcome === "updated") return priorPending && !isPending;
+  return false;
+}
+
 // Builds and persists a completed_matches row from a finished live_match state.
 // Called once both sides have confirmed in Live Entry.
 export async function archiveMatch(state, divisionId) {
@@ -46,12 +54,12 @@ export async function archiveMatch(state, divisionId) {
     const updateRow = { ...row, reopened_at: null, reopened_by: null };
     const { data, error } = await supabase.from("completed_matches").update(updateRow).eq("id", state.resumingMatchId).select().single();
     if (error || !data) return null;
-    return { ...data, _archiveOutcome: "updated", _shouldAdvanceBracket: !!prior?.is_makeup_pending && !data.is_makeup_pending };
+    return { ...data, _archiveOutcome: "updated", _shouldAdvanceBracket: shouldAdvanceBracketOnArchive({ outcome: "updated", priorPending: !!prior?.is_makeup_pending, isPending: data.is_makeup_pending }) };
   }
 
   const { data, error } = await supabase.from("completed_matches").insert(row).select().single();
   if (!error && data) {
-    return { ...data, _archiveOutcome: "created", _shouldAdvanceBracket: !data.is_makeup_pending };
+    return { ...data, _archiveOutcome: "created", _shouldAdvanceBracket: shouldAdvanceBracketOnArchive({ outcome: "created", isPending: data.is_makeup_pending }) };
   }
 
   // A unique partial index makes concurrent submissions for the same
@@ -62,7 +70,7 @@ export async function archiveMatch(state, divisionId) {
       .select("*").eq("source", "live")
       .filter("state->>schedulePairingId", "eq", String(state.schedulePairingId))
       .maybeSingle();
-    if (existing) return { ...existing, _archiveOutcome: "existing", _shouldAdvanceBracket: false };
+    if (existing) return { ...existing, _archiveOutcome: "existing", _shouldAdvanceBracket: shouldAdvanceBracketOnArchive({ outcome: "existing", isPending: existing.is_makeup_pending }) };
   }
   return null;
 }
