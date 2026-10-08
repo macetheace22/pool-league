@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Check, Calendar, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import * as db from "./db";
 
@@ -21,6 +22,7 @@ async function postSchedule(body) {
 }
 
 export default function IbaScheduleImportPanel({ season, onImported, compact = false }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
@@ -271,9 +273,14 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>
             {existingStatus.totals.divisions} divisions · {existingStatus.totals.teams} teams · {existingStatus.totals.weeks} schedule weeks · {existingStatus.totals.pairings} matchups
           </div>
-          <button className="btn-primary" onClick={discover} disabled={loading || importing} style={{ marginTop: 8 }}>
-            {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
-          </button>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+            <button className="btn-primary" onClick={() => navigate(`/schedules?season=${encodeURIComponent(season.id)}`)}>
+              View Schedules
+            </button>
+            <button className="btn-sm" onClick={discover} disabled={loading || importing}>
+              {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
+            </button>
+          </div>
         </div>
       )}
 
