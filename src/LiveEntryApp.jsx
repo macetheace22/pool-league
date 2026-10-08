@@ -6,6 +6,7 @@ import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import { useAuth } from "./AuthContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
+import { mergeLiveMatchState } from "./liveMatchSync";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 3000;
@@ -236,12 +237,40 @@ export default function LiveEntryApp() {
 
   const persist = useCallback(async (updated) => {
     setSyncing(true);
-    const ok = await saveMatch(pairingId, updated);
-    setSyncErr(!ok);
+    const result = await db.setLiveMatch(pairingId, updated);
+    if (result?.ok) {
+      const saved = { ...updated, _revision: (Number.isInteger(updated?._revision) ? updated._revision : 0) + 1 };
+      setSyncErr(false);
+      setSyncing(false);
+      setLastSync(Date.now());
+      setMatch(saved);
+      return true;
+    }
+
+    // Another scorer saved after this screen last read. Merge the user's
+    // change with the newer server state, then retry against that revision.
+    if (result?.conflict) {
+      const remote = await loadMatch(pairingId);
+      if (remote) {
+        const merged = mergeLiveMatchState(match, updated, remote);
+        const retry = await db.setLiveMatch(pairingId, merged);
+        if (retry?.ok) {
+          const saved = { ...merged, _revision: (Number.isInteger(merged?._revision) ? merged._revision : 0) + 1 };
+          setSyncErr(false);
+          setSyncing(false);
+          setLastSync(Date.now());
+          setMatch(saved);
+          return true;
+        }
+      }
+    }
+
+    setSyncErr(true);
     setSyncing(false);
     setLastSync(Date.now());
     setMatch(updated);
-  }, [pairingId]);
+    return false;
+  }, [pairingId, match]);
 
   const refreshFromServer = useCallback(async () => {
     const fresh = await loadMatch(pairingId);
