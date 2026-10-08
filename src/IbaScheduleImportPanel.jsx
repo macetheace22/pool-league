@@ -66,35 +66,28 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         return;
       }
 
-      const settled = await Promise.allSettled(
-        found.map(async (division) => {
-          const key = division.value || division.label;
+      // Use the same proven request as Preview, one division at a time.
+      // IBA may throttle or reject concurrent schedule requests even though
+      // individual Preview requests succeed.
+      const fetched = {};
+      const errors = [];
+
+      for (const division of found) {
+        const key = division.value || division.label;
+
+        try {
           const data = await postSchedule({
             action: "fetch",
             format: season.format,
             day: season.day,
             division: division.value || division.label,
           });
-          return [key, data];
-        })
-      );
-
-      const fetched = {};
-      const errors = [];
-
-      settled.forEach((item, index) => {
-        const division = found[index];
-        if (item.status === "fulfilled") {
-          const [key, data] = item.value;
           fetched[key] = data;
-        } else {
-          errors.push(
-            `${division.label}: ${item.reason?.message || "Unable to retrieve division schedule."}`
-          );
+          setPreviews({ ...fetched });
+        } catch (e) {
+          errors.push(`${division.label}: ${e?.message || "Unable to retrieve division schedule."}`);
         }
-      });
-
-      setPreviews(fetched);
+      }
 
       if (errors.length) {
         setError(errors.join(" · "));
