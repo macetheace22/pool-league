@@ -1779,6 +1779,7 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
   const buildSeed = (match, eligByNum = {}) => ({
     matchId: `match-w${currentWeek.week}-${match.pairing.home}v${match.pairing.away}-${Date.now()}`,
     schedulePairingId: match.pairing.id ?? null,
+    seasonId: activeSeason?.id ?? null,
     format: activeSeason?.format?.toLowerCase() ?? "masters",
     venue: match.homeTeam.venue || "",
     seasonLabel: activeSeason ? seasonLabel(activeSeason) : null,
