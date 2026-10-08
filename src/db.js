@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { getActiveTeamIds } from "./teamMembership";
 
 // Legacy compatibility helpers retained from the prior version.
 export function normalizeUSDate(str) {
@@ -1034,8 +1035,11 @@ export async function submitTeamRoster(teamId, profileId) {
   return !error;
 }
 export async function removePlayerFromTeam(teamId, playerNum) {
-  const { error } = await supabase.from("rosters").delete().eq("team_id", teamId).eq("player_num", playerNum);
-  return !error;
+  const { data, error } = await supabase.rpc("remove_player_from_team", {
+    p_team_id: teamId,
+    p_player_num: playerNum,
+  });
+  return !error && data === true;
 }
 
 // Bulk import: parsed = output of parseLeagueRoster() -- { registry, rosters, teams, needsRating, ambiguousRoster }.
@@ -1689,8 +1693,9 @@ export function computeMvp(matches, adjustments = []) {
 // ever played in would need a broader query; noted as a natural next step,
 // not built here).
 export async function getMyStats(profile) {
-  if (!profile?.team_id || !profile?.player_num) return null;
-  const { data: teamRow } = await supabase.from("teams").select("division_id").eq("id", profile.team_id).maybeSingle();
+  const teamId = getActiveTeamIds(profile)[0] ?? null;
+  if (!teamId || !profile?.player_num) return null;
+  const { data: teamRow } = await supabase.from("teams").select("division_id").eq("id", teamId).maybeSingle();
   if (!teamRow) return null;
   const [matches, adjustments] = await Promise.all([
     listCompletedMatches(teamRow.division_id),
@@ -1845,8 +1850,9 @@ export async function setLiveMatch(pairingId, state) {
 // system.
 export function eligibleSide(match, profile) {
   if (!profile) return null;
-  if (profile.team_id === match.teamHome?.id) return "home";
-  if (profile.team_id === match.teamAway?.id) return "away";
+  const teamIds = getActiveTeamIds(profile);
+  if (teamIds.includes(match.teamHome?.id)) return "home";
+  if (teamIds.includes(match.teamAway?.id)) return "away";
   if (profile.player_num) {
     if (match.teamHome?.roster?.some(p => p.num === profile.player_num)) return "home";
     if (match.teamAway?.roster?.some(p => p.num === profile.player_num)) return "away";
@@ -2237,24 +2243,10 @@ export function computeTeamHeadToHead(matches, teamId) {
   return Object.values(byOpp).sort((a, b) => b.matchesPlayed - a.matchesPlayed);
 }
 
-// ─── Home dashboard: multi-team aggregation ────────────────────────────────
-// profile.team_id only ever points at ONE "home" team, but a player can be
-// genuinely rostered on more than one currently-active team at once -- the
-// app explicitly supports concurrent active seasons/divisions. Built from
-// two sources: every ACTIVE-season team the player's own player_num is
-// actually rostered on (via listPlayerTeamHistory, which already reads the
-// rosters table), plus profile.team_id itself as a fallback -- a manager
-// who self-assigned to a team via setOwnTeamId never needs a player_num or
-// a roster row at all, so that path alone wouldn't surface their team.
-// Returns one getTeamScheduleOverview()-shaped object per team, so Home can
-// reuse the exact same schedule/roster/match data every other page does.
+// ─── Home dashboard: membership-driven team aggregation ─────────────────────
+// Current team context comes from active profile_team_memberships rows.
 export async function getMyTeamsOverview(profile) {
-  let teamIds = [...new Set((profile?.team_ids ?? []).filter(Boolean))];
-  if (profile?.player_num) {
-    const history = await listPlayerTeamHistory(profile.player_num);
-    for (const row of history.filter(t => t.isActive)) teamIds.push(row.teamId);
-  }
-  teamIds = [...new Set(teamIds)];
+  const teamIds = getActiveTeamIds(profile);
   if (teamIds.length === 0) return [];
   const overviews = await Promise.all(teamIds.map(id => getTeamScheduleOverview(id)));
   return overviews.filter(Boolean);
