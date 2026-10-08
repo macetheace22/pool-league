@@ -359,6 +359,22 @@ export async function setProfileRole(userId, role, teamId) {
   });
   return !error;
 }
+
+export async function assignTeamCaptain(teamId, profileId) {
+  const { data, error } = await supabase.rpc("assign_team_captain", {
+    p_team_id: teamId,
+    p_profile_id: profileId,
+  });
+  return !error && data === true;
+}
+
+export async function removeTeamCaptain(teamId, profileId) {
+  const { data, error } = await supabase.rpc("remove_team_captain", {
+    p_team_id: teamId,
+    p_profile_id: profileId,
+  });
+  return !error && data === true;
+}
 export async function listUserLastSignIns() {
   const { data, error } = await supabase.rpc("list_user_last_sign_ins");
   if (error || !data) return {};
