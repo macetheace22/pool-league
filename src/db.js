@@ -38,16 +38,33 @@ export function buildCompletedMatchRow(state, divisionId) {
 // Called once both sides have confirmed in Live Entry.
 export async function archiveMatch(state, divisionId) {
   const row = buildCompletedMatchRow(state, divisionId);
-  // Finishing a previously-reported makeup updates that same scoresheet row
-  // in place instead of creating a second, duplicate match for the same
-  // pairing/week.
+  // Resuming a makeup updates its existing archive row. Only advance the
+  // bracket if this update transitions a pending makeup to a final result.
   if (state.resumingMatchId) {
+    const { data: prior } = await supabase.from("completed_matches")
+      .select("is_makeup_pending").eq("id", state.resumingMatchId).maybeSingle();
     const updateRow = { ...row, reopened_at: null, reopened_by: null };
     const { data, error } = await supabase.from("completed_matches").update(updateRow).eq("id", state.resumingMatchId).select().single();
-    return error ? null : data;
+    if (error || !data) return null;
+    return { ...data, _archiveOutcome: "updated", _shouldAdvanceBracket: !!prior?.is_makeup_pending && !data.is_makeup_pending };
   }
+
   const { data, error } = await supabase.from("completed_matches").insert(row).select().single();
-  return error ? null : data;
+  if (!error && data) {
+    return { ...data, _archiveOutcome: "created", _shouldAdvanceBracket: !data.is_makeup_pending };
+  }
+
+  // A unique partial index makes concurrent submissions for the same
+  // schedule pairing converge on one row. Return the winner's row but mark
+  // it as existing so a second scorer never advances the bracket again.
+  if (error?.code === "23505" && state.schedulePairingId) {
+    const { data: existing } = await supabase.from("completed_matches")
+      .select("*").eq("source", "live")
+      .filter("state->>schedulePairingId", "eq", String(state.schedulePairingId))
+      .maybeSingle();
+    if (existing) return { ...existing, _archiveOutcome: "existing", _shouldAdvanceBracket: false };
+  }
+  return null;
 }
 
 // Sets won per side -- the simplest, format-agnostic "who won the match" total.
