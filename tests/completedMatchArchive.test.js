@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCompletedMatchRow } from "../src/db.js";
+import { buildCompletedMatchRow, shouldAdvanceBracketOnArchive } from "../src/db.js";
 
 const baseState = {
   schedulePairingId: "pair-123",
@@ -96,5 +96,27 @@ describe("completed match archive transformation", () => {
     const snapshot = JSON.stringify(state);
     buildCompletedMatchRow(state, "division-1");
     expect(JSON.stringify(state)).toBe(snapshot);
+  });
+});
+
+describe("archive idempotency and playoff advancement decisions", () => {
+  it("advances for a newly archived final match", () => {
+    expect(shouldAdvanceBracketOnArchive({ outcome: "created", isPending: false })).toBe(true);
+  });
+
+  it("does not advance for a newly archived pending makeup", () => {
+    expect(shouldAdvanceBracketOnArchive({ outcome: "created", isPending: true })).toBe(false);
+  });
+
+  it("advances when a resumed makeup transitions from pending to final", () => {
+    expect(shouldAdvanceBracketOnArchive({ outcome: "updated", priorPending: true, isPending: false })).toBe(true);
+  });
+
+  it("does not advance when an already-final match is resubmitted", () => {
+    expect(shouldAdvanceBracketOnArchive({ outcome: "updated", priorPending: false, isPending: false })).toBe(false);
+  });
+
+  it("never advances for a duplicate concurrent archive result", () => {
+    expect(shouldAdvanceBracketOnArchive({ outcome: "existing", isPending: false })).toBe(false);
   });
 });
