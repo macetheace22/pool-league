@@ -312,6 +312,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         </div>
       )}
     </div>
+    </>
   );
 }
 
