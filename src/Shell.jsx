@@ -143,9 +143,14 @@ const PRIMARY_NAV_ITEMS = [
   { key: "tournaments", label: "Tournaments", path: "/tournaments", icon: Award },
 ];
 
+const LEAGUE_NAV_ITEMS = [
+  { key: "schedules", label: "Schedules", path: "/schedules", icon: Calendar, roles: ["manager", "captain", "player"] },
+];
+
 export function NavDrawer({ open, onClose, profile, onLogout }) {
   const location = useLocation();
-  const officeItems = navItemsForRole(profile.role);
+  const officeItems = navItemsForRole(profile.role).filter(item => item.key !== "schedules");
+  const leagueItems = LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + "/");
 
   return (
@@ -170,6 +175,19 @@ export function NavDrawer({ open, onClose, profile, onLogout }) {
               </Link>
             );
           })}
+          {leagueItems.length > 0 && (
+            <>
+              {leagueItems.map(item => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.key} to={item.path} onClick={onClose}
+                    className={`drawer__item drawer__item--sub ${isActive(item.path) ? "drawer__item--active" : ""}`}>
+                    <Icon size={14} /><span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </>
+          )}
           {officeItems.length > 0 && (
             <>
               <Link to="/league-office" onClick={onClose}
