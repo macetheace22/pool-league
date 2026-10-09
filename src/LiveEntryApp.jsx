@@ -304,22 +304,31 @@ export default function LiveEntryApp() {
       (async () => {
         const marked = { ...match, archiving: true };
         await saveMatch(pairingId, marked);
-        const archiveResult = await db.archiveMatch(marked, marked.divisionId ?? null);
+        const homeSets = marked.sets.filter(s => s.winnerSlot === "home").length;
+        const awaySets = marked.sets.filter(s => s.winnerSlot === "away").length;
+        const winnerId = homeSets > awaySets ? marked.teamHome?.id : awaySets > homeSets ? marked.teamAway?.id : null;
 
-        // Only the caller that created the archive (or completed a pending
-        // makeup row) may advance the bracket. A duplicate concurrent submit
-        // returns the existing row with _shouldAdvanceBracket=false.
-        if (archiveResult?._shouldAdvanceBracket && marked.schedulePairingId) {
-          const homeSets = marked.sets.filter(s => s.winnerSlot === "home").length;
-          const awaySets = marked.sets.filter(s => s.winnerSlot === "away").length;
-          const winnerId = homeSets > awaySets ? marked.teamHome?.id : awaySets > homeSets ? marked.teamAway?.id : null;
-          if (winnerId) await db.advancePlayoffBracket(marked.schedulePairingId, winnerId);
+        // Scheduled league matches use one database transaction for archive
+        // plus playoff advancement. Recreational matches have no schedule
+        // pairing and continue through the regular archive path.
+        const archiveResult = marked.schedulePairingId
+          ? await db.completeLiveMatchArchive(marked, marked.divisionId ?? null, winnerId)
+          : await db.archiveMatch(marked, marked.divisionId ?? null);
+
+        if (!archiveResult) {
+          const retryableState = { ...marked, archiving: false };
+          await saveMatch(pairingId, retryableState);
+          setMatch(retryableState);
+          setSyncErr(true);
+          archivingRef.current = false;
+          return;
         }
 
         const finalState = { ...marked, phase: "archived" };
         await saveMatch(pairingId, finalState);
         setMatch(finalState);
         setLastSync(Date.now());
+        setSyncErr(false);
         archivingRef.current = false;
       })();
     }
