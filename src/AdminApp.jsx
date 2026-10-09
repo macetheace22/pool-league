@@ -373,7 +373,11 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     if (created) await refreshSeasons();
     return created;
   };
-  const handleDeleteSeason = async (seasonId) => { await db.deleteSeason(seasonId); await refreshSeasons(); };
+  const handleDeleteSeason = async (seasonId) => {
+    const deleted = await db.deleteSeason(seasonId);
+    if (deleted) await refreshSeasons();
+    return deleted;
+  };
   const handleToggleActive = async (season) => {
     await db.setSeasonActive(season.id, !season.is_active);
     const list = await refreshSeasons();
@@ -1610,7 +1614,15 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
 
   const deleteSeason = async (s) => {
     if (s.is_active) { setError("Deactivate this season before deleting it."); return; }
-    await onDeleteSeason(s.id);
+    const label = `${s.type} ${s.year} ${s.format} (${s.day})`;
+    if (!window.confirm(`Delete ${label} and its season-specific data? This cannot be undone.`)) return;
+    setError("");
+    const deleted = await onDeleteSeason(s.id);
+    if (!deleted) {
+      setError("Season deletion failed. The season was not confirmed deleted; check the database and try again.");
+      return;
+    }
+    if (expandedSeason === s.id) setExpandedSeason(null);
   };
 
   const addDivision = async (s) => {
