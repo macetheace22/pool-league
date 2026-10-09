@@ -1209,6 +1209,20 @@ export async function archiveMatch(state, divisionId) {
   return null;
 }
 
+
+export async function completeLiveMatchArchive(state, divisionId, winnerTeamId = null) {
+  if (!state?.schedulePairingId) return null;
+  const row = buildCompletedMatchRow(state, divisionId);
+  const { data, error } = await supabase.rpc("complete_live_match_archive", {
+    p_archive_row: row,
+    p_resuming_match_id: state.resumingMatchId ?? null,
+    p_schedule_pairing_id: state.schedulePairingId,
+    p_winner_team_id: winnerTeamId ?? null,
+  });
+  if (error || !data?.archive) return null;
+  return { ...data.archive, _archiveOutcome: data.outcome, _shouldAdvanceBracket: !!data.should_advance_bracket };
+}
+
 // Sets won per side -- the simplest, format-agnostic "who won the match" total.
 // (Full point-value scoring with margin/add-on/win-bonus/rating-bonus lives in
 // the scoresheet view itself, computed from the same state at render time.)
