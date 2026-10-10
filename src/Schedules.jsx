@@ -258,8 +258,8 @@ export default function Schedules() {
                 <div className={`schedule-week ${isCurrent ? "schedule-week--current" : ""}`} key={week.id}>
                   <div className="schedule-week__head">
                     <div>
-                      <div className="schedule-week__label">{week.week ? `Week ${week.week}` : "Schedule"}</div>
-                      <div className="schedule-week__date">{week.date || week.special || "Date not listed"}</div>
+                      <div className="schedule-week__label">{week.week ? `Week ${week.week}` : (week.special || "Schedule")}</div>
+                      <div className="schedule-week__date">{week.date || "Date not listed"}</div>
                     </div>
                     <span className={`schedule-badge ${isCurrent ? "schedule-badge--current" : ""}`}>
                       {isCurrent ? "Current" : week.isPlayoff ? (week.playoffLabel || "Playoff") : "Scheduled"}
