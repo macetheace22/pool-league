@@ -1312,7 +1312,7 @@ function TeamDetailView({ team }) {
       {standingsRow === null && <div className="empty-state">No standings yet for this team's division.</div>}
 
       <div className="card">
-        <div className="card__title">Roster ({roster.length}){captain ? ` — Captain @${captain.username}` : ""}</div>
+        <div className="card__title">Roster ({roster.length}){captain ? ` — Captain ${captain.username}` : ""}</div>
         {roster.length === 0 ? <div className="dash-empty">No roster on file.</div> : (
           <div className="list" style={{marginTop:6}}>
             {roster.map(p => {
@@ -3197,7 +3197,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
 
   return (
     <>
-      <div className="settings-who"><RolePill role={profile.role}/><span className="settings-username">@{profile.username}</span></div>
+      <div className="settings-who"><RolePill role={profile.role}/><span className="settings-username">{profile.username}</span></div>
       <div className="card">
         <div className="card__title">Username</div>
         <div className="field"><input className="input" value={username} onChange={e=>setUsername(e.target.value)} autoCapitalize="none"/></div>
@@ -3949,6 +3949,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const [loading, setLoading]   = useState(true);
   const [newRole, setNewRole]   = useState("captain");
   const [newTeamId, setNewTeamId] = useState("");
+  const [inviteTeamSearch, setInviteTeamSearch] = useState("");
 
   const [generated, setGenerated] = useState(null);
   const [copied, setCopied]     = useState(false);
@@ -4004,6 +4005,9 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const usedCodes   = codes.filter(c=> c.used_at);
   const pickableTeams = allTeams.filter(t=>!t.isBye).sort((a,b)=>a.name.localeCompare(b.name));
   const activePickableTeams = pickableTeams.filter(t=>t.isActiveSeason);
+  const filteredInviteTeams = activePickableTeams.filter(t =>
+    `${t.name} ${t.context ?? ""}`.toLowerCase().includes(inviteTeamSearch.trim().toLowerCase())
+  );
 
   return (
     <>
@@ -4018,7 +4022,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                 {editing ? (
                   <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
                     <div style={{display:"flex",alignItems:"center",gap:7}}>
-                      <span className="list-row__name">@{u.username}</span>
+                      <span className="list-row__name">{u.username}</span>
                     </div>
                     <select className="input input--select" value={editRole} onChange={e=>{setEditRole(e.target.value);setRoleErr("");}}>
                       <option value="player">Player</option>
@@ -4044,7 +4048,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                   <>
                     <div className="list-row__body" style={{flexDirection:"column",alignItems:"flex-start",gap:3, opacity: u.is_active?1:0.5}}>
                       <div style={{display:"flex",alignItems:"center",gap:7}}>
-                        <span className="list-row__name">@{u.username}</span>
+                        <span className="list-row__name">{u.username}</span>
                         {isMe && <span className="you-badge">you</span>}
                         {!u.is_active && <span className="you-badge" style={{background:"#1A0E0E",color:"#F87171"}}>deactivated</span>}
                         {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
@@ -4060,11 +4064,28 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                       ); })()}
                     </div>
                     <div className="list-row__actions">
-                      {!isMe && <button className="btn-icon" onClick={()=>startEditRole(u)} title="Change role"><Edit2 size={13}/></button>}
-                      {!isMe && (
-                        u.is_active
-                          ? <button className="btn-icon btn-icon--danger" onClick={()=>deactivateUser(u.id)}><Trash2 size={13}/></button>
-                          : <button className="btn-icon btn-icon--confirm" onClick={()=>reactivateUser(u.id)}><Check size={13}/></button>
+                      <button
+                        className="btn-icon"
+                        onClick={()=>!isMe && startEditRole(u)}
+                        disabled={isMe}
+                        title={isMe ? "You can't change your own role" : "Change role"}
+                        aria-label={isMe ? "Change role unavailable for your own account" : `Change role for ${u.username}`}
+                      ><Edit2 size={13}/></button>
+                      {u.is_active ? (
+                        <button
+                          className="btn-icon btn-icon--danger"
+                          onClick={()=>!isMe && deactivateUser(u.id)}
+                          disabled={isMe}
+                          title={isMe ? "You can't deactivate your own account" : "Deactivate account"}
+                          aria-label={isMe ? "Deactivation unavailable for your own account" : `Deactivate ${u.username}`}
+                        ><Trash2 size={13}/></button>
+                      ) : (
+                        <button
+                          className="btn-icon btn-icon--confirm"
+                          onClick={()=>reactivateUser(u.id)}
+                          title="Reactivate account"
+                          aria-label={`Reactivate ${u.username}`}
+                        ><Check size={13}/></button>
                       )}
                     </div>
                   </>
@@ -4079,19 +4100,31 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
           <div className="card">
             <div className="card__title">Generate Invite Code</div>
             <div className="field"><Label>Role</Label>
-              <select className="input input--select" value={newRole} onChange={e=>{setNewRole(e.target.value);setNewTeamId("");}}>
+              <select className="input input--select" value={newRole} onChange={e=>{setNewRole(e.target.value);setNewTeamId("");setInviteTeamSearch("");}}>
                 <option value="captain">Team Captain</option>
                 <option value="player">Player</option>
                 <option value="manager">League Manager</option>
               </select>
             </div>
             {newRole==="captain" && (
-              <div className="field"><Label>Assign Team</Label>
-                <select className="input input--select" value={newTeamId} onChange={e=>setNewTeamId(e.target.value)}>
-                  <option value="">Select an active team…</option>
-                  {activePickableTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>)}
+              <div className="field">
+                <Label>Assign Team</Label>
+                <input
+                  className="input"
+                  type="search"
+                  value={inviteTeamSearch}
+                  onChange={e=>setInviteTeamSearch(e.target.value)}
+                  placeholder="Type to search teams…"
+                  aria-label="Search teams for invite code"
+                  autoComplete="off"
+                />
+                <select className="input input--select" value={newTeamId} onChange={e=>setNewTeamId(e.target.value)} disabled={filteredInviteTeams.length===0}>
+                  <option value="">{filteredInviteTeams.length ? "Choose a matching team…" : "No matching teams"}</option>
+                  {filteredInviteTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>)}
                 </select>
-                <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Captains are assigned a team here — they no longer pick one at registration.</div>
+                <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>
+                  {inviteTeamSearch.trim() ? `${filteredInviteTeams.length} matching team${filteredInviteTeams.length===1?"":"s"}` : "Captains are assigned a team here — they no longer pick one at registration."}
+                </div>
               </div>
             )}
             <button className="btn-primary" onClick={generateInvite} disabled={newRole==="captain" && !newTeamId}><Key size={13}/> Generate Code</button>
@@ -4542,7 +4575,7 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
                         const cap = captainsByTeam?.[team.id];
                         return (
                           <span className="list-row__sub" style={{color: cap ? "#9A9A9A" : "#6A6A6A", fontStyle: cap ? "normal" : "italic"}}>
-                            {cap ? `Captain: @${cap.username}${cap.phone ? ` · ${cap.phone}` : ""}` : "Captain TBD"}
+                            {cap ? `Captain: ${cap.username}${cap.phone ? ` · ${cap.phone}` : ""}` : "Captain TBD"}
                           </span>
                         );
                       })()}
@@ -4595,13 +4628,13 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
   const candidates = allProfiles
     .filter(p => p.is_active !== false && p.id !== currentCaptain?.id)
     .sort((a,b) => (a.username||"").localeCompare(b.username||""));
-  const labelFor = (p) => `@${p.username}${p.role==="captain" && p.team_id ? " (captain elsewhere)" : p.role==="manager" ? " (manager)" : ""}`;
+  const labelFor = (p) => `${p.username}${p.role==="captain" && p.team_id ? " (captain elsewhere)" : p.role==="manager" ? " (manager)" : ""}`;
 
   const assignExisting = async () => {
     const picked = candidates.find(p => p.id === pickedId);
     if (!picked) { setErr("Pick a valid account from the list."); return; }
     if (picked.role === "captain") {
-      if (!confirm(`@${picked.username} already has captain access. Assign them as captain of ${team.name} too?`)) return;
+      if (!confirm(`${picked.username} already has captain access. Assign them as captain of ${team.name} too?`)) return;
     }
     setSaving(true); setErr("");
     const ok = await onAssign(picked.id, currentCaptain?.id ?? null);
@@ -4611,7 +4644,7 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
   };
   const removeCaptain = async () => {
     if (!currentCaptain) return;
-    if (!confirm(`Remove @${currentCaptain.username} as captain of ${team.name}?`)) return;
+    if (!confirm(`Remove ${currentCaptain.username} as captain of ${team.name}?`)) return;
     setSaving(true); setErr("");
     const ok = await onRemove(currentCaptain.id);
     setSaving(false);
