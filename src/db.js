@@ -823,7 +823,7 @@ export function sortScheduleWeeks(weeks) {
     if (dateA != null && dateB != null && dateA !== dateB) return dateA - dateB;
     if (dateA != null && dateB == null) return -1;
     if (dateA == null && dateB != null) return 1;
-    return (a.week_num ?? Number.MAX_SAFE_INTEGER) - (b.week_num ?? Number.MAX_SAFE_INTEGER);
+    return (a.week_num ?? a.week ?? Number.MAX_SAFE_INTEGER) - (b.week_num ?? b.week ?? Number.MAX_SAFE_INTEGER);
   });
 }
 
