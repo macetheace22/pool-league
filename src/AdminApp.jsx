@@ -47,16 +47,6 @@ const ROLES = {
 
 function generateCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
 
-// ─── Playoff eligibility codes (section 41 import) ─────────────────────────
-// Shared between Team Lookup (per-roster-player badges) and Player Lookup /
-// My Stats (the player's own eligibility card) so the wording never drifts.
-const PLAYOFF_ELIG_LABELS = {
-  E: "Eligible",
-  T: "Ineligible — fewer than 4 sets played with this team",
-  A: "Ineligible — no membership application on file",
-  S: "Ineligible — too few calculated scores in rating history",
-};
-
 // ─── Parsers ──────────────────────────────────────────────────────────────────
 function parseTeams(raw) {
   const teams = [];
@@ -1014,7 +1004,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
         <div className="card">
           <div className="card__title">Playoff Eligibility</div>
           <div style={{fontSize:13,fontWeight:700,color: playoffElig.elig_code==="E" ? "#5FCF9E" : "#F59E0B"}}>
-            {PLAYOFF_ELIG_LABELS[playoffElig.elig_code] ?? playoffElig.elig_code}
+            {db.ELIGIBILITY_REASONS[playoffElig.elig_code] ?? playoffElig.elig_code}
           </div>
           {(scopedSeasonLabel || playoffElig.label) && (
             <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:2}}>
@@ -1284,9 +1274,7 @@ function TeamDetailView({ team }) {
     db.getTeamStandingsRow(team.id, overview.team.division_id).then(row => setStandingsRow(row ?? null));
     db.listPlayoffEligibilityForDivision(overview.team.division_id).then(rows => {
       if (!rows.length) { setEligByPlayerNum(null); return; }
-      const map = {};
-      for (const r of rows) if (r.player_num) map[r.player_num] = r;
-      setEligByPlayerNum(map);
+      setEligByPlayerNum(db.eligibilityByPlayerNum(rows));
     });
   }, [overview, team.id]);
 
@@ -1340,10 +1328,10 @@ function TeamDetailView({ team }) {
                         <div style={{marginTop:3}}>
                           <span className="player-rating-badge" style={{
                             fontSize:9.5, fontWeight:700, padding:"2px 8px",
-                            color: elig.elig_code === "E" ? "#5FCF9E" : "#F59E0B",
-                            background: elig.elig_code === "E" ? "#16332A" : "#2A1F00",
+                            color: elig.code === "E" ? "#5FCF9E" : "#F59E0B",
+                            background: elig.code === "E" ? "#16332A" : "#2A1F00",
                           }}>
-                            {elig.elig_code === "E" ? "Playoff Eligible" : PLAYOFF_ELIG_LABELS[elig.elig_code] ?? "Not Eligible"}
+                            {db.ELIGIBILITY_REASONS[elig.code] ?? "Eligibility status unavailable"}
                           </span>
                         </div>
                       )}
