@@ -109,7 +109,7 @@ export function Home() {
       <style>{css}</style>
       <style>{shellCss}</style>
       <style>{dashboardCss}</style>
-      <PageHeader title="Home" subtitle={profile ? `Welcome, @${profile.username}` : undefined} hideBack />
+      <PageHeader title="Home" subtitle={profile ? `Welcome, ${profile.username}` : undefined} hideBack />
       <div className="tab-content">
         {teamOverviews === undefined && profile && (getActiveTeamIds(profile).length > 0 || profile.player_num) && <Loader />}
 
