@@ -75,3 +75,33 @@ describe("computeStandings", () => {
     expect(standings).toHaveLength(0);
   });
 });
+
+
+import { parseScheduleDate, sortScheduleWeeks } from "../src/db.js";
+
+describe("schedule date parsing and sorting", () => {
+  it("parses US and ISO dates into real calendar dates", () => {
+    expect(new Date(parseScheduleDate("10/7/2026")).toISOString().slice(0, 10)).toBe("2026-10-07");
+    expect(new Date(parseScheduleDate("2026-10-08")).toISOString().slice(0, 10)).toBe("2026-10-08");
+    expect(parseScheduleDate("2/30/2026")).toBeNull();
+    expect(parseScheduleDate("not a date")).toBeNull();
+  });
+
+  it("sorts by actual date even when week numbers conflict", () => {
+    const weeks = [
+      { date: "11/25/2026", week_num: 8, special: "Holiday week" },
+      { date: "10/7/2026", week_num: 12 },
+      { date: "12/2/2026", week_num: null, special: "Playoffs" },
+    ];
+    expect(sortScheduleWeeks(weeks).map(w => w.date)).toEqual(["10/7/2026", "11/25/2026", "12/2/2026"]);
+  });
+
+  it("uses week number for missing or invalid dates and keeps dated weeks first", () => {
+    const weeks = [
+      { date: null, week_num: 2 },
+      { date: "bad date", week_num: 1 },
+      { date: "10/7/2026", week_num: 9 },
+    ];
+    expect(sortScheduleWeeks(weeks).map(w => w.week_num)).toEqual([9, 1, 2]);
+  });
+});
