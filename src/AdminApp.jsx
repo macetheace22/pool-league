@@ -2400,6 +2400,8 @@ function ManualMatchEntry({ divisionId, teams, format, seasonLabelText, playoffs
   const [matchId] = useState(() => crypto.randomUUID());
   const [homeTeamId, setHomeTeamId] = useState("");
   const [awayTeamId, setAwayTeamId] = useState("");
+  const [homeTeamSearch, setHomeTeamSearch] = useState("");
+  const [awayTeamSearch, setAwayTeamSearch] = useState("");
   const [homeRoster, setHomeRoster] = useState([]); // full roster, rated + unrated -- filtering happens at render
   const [awayRoster, setAwayRoster] = useState([]);
   const [venue, setVenue] = useState("");
@@ -2582,16 +2584,10 @@ function ManualMatchEntry({ divisionId, teams, format, seasonLabelText, playoffs
       <div className="card">
         <div className="card__title">Match Details</div>
         <div className="field"><Label>Home Team</Label>
-          <select className="input input--select" value={homeTeamId} onChange={e => setHomeTeamId(e.target.value)}>
-            <option value="">Select…</option>
-            {teams.filter(t => !t.isBye).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <SearchableTeamSelect teams={teams.filter(t => !t.isBye)} value={homeTeamId} onChange={setHomeTeamId} search={homeTeamSearch} onSearch={setHomeTeamSearch} placeholder="Select home team…" ariaLabel="Search home teams" />
         </div>
         <div className="field"><Label>Away Team</Label>
-          <select className="input input--select" value={awayTeamId} onChange={e => setAwayTeamId(e.target.value)}>
-            <option value="">Select…</option>
-            {teams.filter(t => !t.isBye && t.id !== homeTeamId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <SearchableTeamSelect teams={teams.filter(t => !t.isBye && t.id !== homeTeamId)} value={awayTeamId} onChange={setAwayTeamId} search={awayTeamSearch} onSearch={setAwayTeamSearch} placeholder="Select away team…" ariaLabel="Search away teams" />
         </div>
         <div className="field"><Label>Venue</Label>
           <input className="input" value={venue} onChange={e => setVenue(e.target.value)} placeholder="Venue" />
@@ -4031,11 +4027,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     </select>
                     {editRole==="captain" && (
                       <div className="field" style={{margin:0}}>
-                        <select className="input input--select" value={editTeamId} onChange={e=>setEditTeamId(e.target.value)}>
-                          <option value="">Select a team…</option>
-                          {activePickableTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>)}
-                          {editTeamId && !activePickableTeams.some(t=>t.id===editTeamId) && allTeams.filter(t=>t.id===editTeamId).map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""} (current assignment)</option>)}
-                        </select>
+                        <SearchableTeamSelect teams={[...activePickableTeams, ...allTeams.filter(t=>t.id===editTeamId && !activePickableTeams.some(a=>a.id===t.id)).map(t=>({...t, context:`${t.context ? `${t.context} — ` : ""}current assignment`}))]} value={editTeamId} onChange={setEditTeamId} placeholder="Select a team…" ariaLabel="Search teams for captain assignment" />
                       </div>
                     )}
                     {roleErr && <ErrorMsg>{roleErr}</ErrorMsg>}
@@ -4611,10 +4603,26 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
 // Assigning a new captain over an existing one hands off in one
 // action (demotes the outgoing captain) so a team never ends up with two
 // captains because a manager forgot a manual cleanup step.
+function SearchableTeamSelect({ teams, value, onChange, search = "", onSearch, placeholder = "Select a team…", ariaLabel = "Search teams", className = "input input--select", disabled = false }) {
+  const query = search.trim().toLowerCase();
+  const visibleTeams = (teams ?? []).filter(t => t.id === value || `${t.name ?? ""} ${t.context ?? ""} ${t.teamNum ?? ""}`.toLowerCase().includes(query));
+  return (
+    <div style={{minWidth:0}}>
+      <input className="edit-input" style={{width:"100%",boxSizing:"border-box",marginBottom:4}} value={search} onChange={e=>onSearch(e.target.value)} placeholder={placeholder.replace(/[.…]+$/, "") + " — type to search"} aria-label={ariaLabel} disabled={disabled} />
+      <select className={className} style={{width:"100%",minWidth:0}} value={value} onChange={e=>onChange(e.target.value)} disabled={disabled}>
+        <option value="">{placeholder}</option>
+        {visibleTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}{t.isBye ? " (BYE)" : ""}</option>)}
+      </select>
+      {query && <div style={{fontSize:11,color:"#8A8A8A",marginTop:3}}>{visibleTeams.length} matching team{visibleTeams.length===1?"":"s"}</div>}
+    </div>
+  );
+}
+
 function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, onGenerateInvite, onRefreshProfiles }) {
   const [mode, setMode] = useState("existing"); // "existing" | "invite"
 
   const [pickedId, setPickedId] = useState("");
+  const [captainSearch, setCaptainSearch] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [generated, setGenerated] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -4676,10 +4684,11 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
         <button className={`seg-btn ${mode==="invite"?"seg-btn--active":""}`} onClick={()=>{setMode("invite");setErr("");}}>Invite New Captain</button>
       </div>
       {mode==="existing" ? (
-        <div style={{display:"flex",gap:6}}>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          <input className="edit-input" value={captainSearch} onChange={e=>setCaptainSearch(e.target.value)} placeholder="Type to search captains…" aria-label="Search captain accounts" disabled={saving} />
           <select className="edit-input" style={{flex:1,minWidth:0}} value={pickedId} onChange={e=>setPickedId(e.target.value)} disabled={saving}>
             <option value="">Select a captain…</option>
-            {candidates.map(p => <option key={p.id} value={p.id}>{labelFor(p)}</option>)}
+            {candidates.filter(p=>`${labelFor(p)} ${p.phone_number ?? ""}`.toLowerCase().includes(captainSearch.trim().toLowerCase())).map(p => <option key={p.id} value={p.id}>{labelFor(p)}</option>)}
           </select>
           <button className="btn-icon btn-icon--confirm" onClick={assignExisting} disabled={!pickedId||saving}><Check size={13}/></button>
         </div>
@@ -4775,6 +4784,8 @@ function PairingRow({ pairing: p, teamByIndex, sortedTeams, readOnly, onUpdatePa
   const [editing, setEditing] = useState(false);
   const [homeId, setHomeId] = useState(p.homeTeamId ?? "");
   const [awayId, setAwayId] = useState(p.awayTeamId ?? "");
+  const [homeSearch, setHomeSearch] = useState("");
+  const [awaySearch, setAwaySearch] = useState("");
   const home = teamByIndex(p.home), away = teamByIndex(p.away);
   const isBye = !!(home?.isBye || away?.isBye);
 
@@ -4789,14 +4800,8 @@ function PairingRow({ pairing: p, teamByIndex, sortedTeams, readOnly, onUpdatePa
   if (editing) {
     return (
       <div className="pairing-row pairing-row--edit">
-        <select className="input input--select edit-input" value={homeId} onChange={e=>setHomeId(e.target.value)}>
-          <option value="">Home team…</option>
-          {sortedTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.isBye?" (BYE)":""}</option>)}
-        </select>
-        <select className="input input--select edit-input" value={awayId} onChange={e=>setAwayId(e.target.value)}>
-          <option value="">Away team…</option>
-          {sortedTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.isBye?" (BYE)":""}</option>)}
-        </select>
+        <SearchableTeamSelect teams={sortedTeams} value={homeId} onChange={setHomeId} search={homeSearch} onSearch={setHomeSearch} placeholder="Home team…" className="input input--select edit-input" ariaLabel="Search home teams" />
+        <SearchableTeamSelect teams={sortedTeams.filter(t=>t.id===awayId || t.id!==homeId)} value={awayId} onChange={setAwayId} search={awaySearch} onSearch={setAwaySearch} placeholder="Away team…" className="input input--select edit-input" ariaLabel="Search away teams" />
         <div className="list-row__edit-actions">
           <button className="btn-icon btn-icon--confirm" onClick={save} disabled={!homeId||!awayId}><Check size={14}/></button>
           <button className="btn-icon btn-icon--cancel" onClick={()=>setEditing(false)}><X size={14}/></button>
@@ -4841,6 +4846,8 @@ function AddPairingRow({ weekId, sortedTeams, onAddPairing }) {
   const [adding, setAdding] = useState(false);
   const [homeId, setHomeId] = useState("");
   const [awayId, setAwayId] = useState("");
+  const [homeSearch, setHomeSearch] = useState("");
+  const [awaySearch, setAwaySearch] = useState("");
 
   const confirm = async () => {
     if (!homeId || !awayId || !weekId) return;
@@ -4853,14 +4860,8 @@ function AddPairingRow({ weekId, sortedTeams, onAddPairing }) {
   }
   return (
     <div className="pairing-row pairing-row--edit">
-      <select className="input input--select edit-input" value={homeId} onChange={e=>setHomeId(e.target.value)}>
-        <option value="">Home team…</option>
-        {sortedTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.isBye?" (BYE)":""}</option>)}
-      </select>
-      <select className="input input--select edit-input" value={awayId} onChange={e=>setAwayId(e.target.value)}>
-        <option value="">Away team…</option>
-        {sortedTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.isBye?" (BYE)":""}</option>)}
-      </select>
+      <SearchableTeamSelect teams={sortedTeams} value={homeId} onChange={setHomeId} search={homeSearch} onSearch={setHomeSearch} placeholder="Home team…" className="input input--select edit-input" ariaLabel="Search home teams" />
+      <SearchableTeamSelect teams={sortedTeams.filter(t=>t.id===awayId || t.id!==homeId)} value={awayId} onChange={setAwayId} search={awaySearch} onSearch={setAwaySearch} placeholder="Away team…" className="input input--select edit-input" ariaLabel="Search away teams" />
       <div className="list-row__edit-actions">
         <button className="btn-icon btn-icon--confirm" onClick={confirm} disabled={!homeId||!awayId}><Check size={14}/></button>
         <button className="btn-icon btn-icon--cancel" onClick={()=>{setAdding(false);setHomeId("");setAwayId("");}}><X size={14}/></button>
