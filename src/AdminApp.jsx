@@ -1312,7 +1312,7 @@ function TeamDetailView({ team }) {
       {standingsRow === null && <div className="empty-state">No standings yet for this team's division.</div>}
 
       <div className="card">
-        <div className="card__title">Roster ({roster.length}){captain ? ` — Captain @${captain.username}` : ""}</div>
+        <div className="card__title">Roster ({roster.length}){captain ? ` — Captain ${captain.username}` : ""}</div>
         {roster.length === 0 ? <div className="dash-empty">No roster on file.</div> : (
           <div className="list" style={{marginTop:6}}>
             {roster.map(p => {
@@ -4575,7 +4575,7 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
                         const cap = captainsByTeam?.[team.id];
                         return (
                           <span className="list-row__sub" style={{color: cap ? "#9A9A9A" : "#6A6A6A", fontStyle: cap ? "normal" : "italic"}}>
-                            {cap ? `Captain: @${cap.username}${cap.phone ? ` · ${cap.phone}` : ""}` : "Captain TBD"}
+                            {cap ? `Captain: ${cap.username}${cap.phone ? ` · ${cap.phone}` : ""}` : "Captain TBD"}
                           </span>
                         );
                       })()}
@@ -4628,13 +4628,13 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
   const candidates = allProfiles
     .filter(p => p.is_active !== false && p.id !== currentCaptain?.id)
     .sort((a,b) => (a.username||"").localeCompare(b.username||""));
-  const labelFor = (p) => `@${p.username}${p.role==="captain" && p.team_id ? " (captain elsewhere)" : p.role==="manager" ? " (manager)" : ""}`;
+  const labelFor = (p) => `${p.username}${p.role==="captain" && p.team_id ? " (captain elsewhere)" : p.role==="manager" ? " (manager)" : ""}`;
 
   const assignExisting = async () => {
     const picked = candidates.find(p => p.id === pickedId);
     if (!picked) { setErr("Pick a valid account from the list."); return; }
     if (picked.role === "captain") {
-      if (!confirm(`@${picked.username} already has captain access. Assign them as captain of ${team.name} too?`)) return;
+      if (!confirm(`${picked.username} already has captain access. Assign them as captain of ${team.name} too?`)) return;
     }
     setSaving(true); setErr("");
     const ok = await onAssign(picked.id, currentCaptain?.id ?? null);
@@ -4644,7 +4644,7 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
   };
   const removeCaptain = async () => {
     if (!currentCaptain) return;
-    if (!confirm(`Remove @${currentCaptain.username} as captain of ${team.name}?`)) return;
+    if (!confirm(`Remove ${currentCaptain.username} as captain of ${team.name}?`)) return;
     setSaving(true); setErr("");
     const ok = await onRemove(currentCaptain.id);
     setSaving(false);
