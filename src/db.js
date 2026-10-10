@@ -795,29 +795,46 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
 }
 
 // ─── Schedule ───────────────────────────────────────────────────────────────
+// Parse the schedule's stored US dates (M/D/YYYY) and ISO dates into
+// timestamps. Invalid/impossible dates return null so callers can fall back
+// to the published week number instead of inventing a chronological position.
+export function parseScheduleDate(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  let year, month, day;
+  const us = text.match(/^(\\d{1,2})[\\/-](\\d{1,2})[\\/-](\\d{2,4})$/);
+  const iso = text.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
+  if (us) {
+    month = Number(us[1]); day = Number(us[2]); year = Number(us[3]);
+    if (year < 100) year += 2000;
+  } else if (iso) {
+    year = Number(iso[1]); month = Number(iso[2]); day = Number(iso[3]);
+  } else {
+    return null;
+  }
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return date.getTime();
+}
+
+export function sortScheduleWeeks(weeks) {
+  return [...(weeks ?? [])].sort((a, b) => {
+    const dateA = parseScheduleDate(a.date);
+    const dateB = parseScheduleDate(b.date);
+    if (dateA != null && dateB != null && dateA !== dateB) return dateA - dateB;
+    if (dateA != null && dateB == null) return -1;
+    if (dateA == null && dateB != null) return 1;
+    return (a.week_num ?? Number.MAX_SAFE_INTEGER) - (b.week_num ?? Number.MAX_SAFE_INTEGER);
+  });
+}
+
 export async function listSchedule(divisionId, teams) {
   const { data: weeks } = await supabase
     .from("schedule_weeks")
     .select("*, schedule_pairings(*)")
     .eq("division_id", divisionId);
 
-  const parseScheduleDate = value => {
-    if (!value) return null;
-    const m = String(value).match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{2,4})/);
-    if (!m) return null;
-    const year = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
-    const date = new Date(year, Number(m[1]) - 1, Number(m[2]));
-    return Number.isNaN(date.getTime()) ? null : date.getTime();
-  };
-
-  const sortedWeeks = [...(weeks ?? [])].sort((a, b) => {
-    const dateA = parseScheduleDate(a.date);
-    const dateB = parseScheduleDate(b.date);
-    if (dateA != null && dateB != null) return dateA - dateB;
-    if (dateA != null) return -1;
-    if (dateB != null) return 1;
-    return (a.week_num ?? Number.MAX_SAFE_INTEGER) - (b.week_num ?? Number.MAX_SAFE_INTEGER);
-  });
+  const sortedWeeks = sortScheduleWeeks(weeks);
 
   const idxOf = teamId => teams.findIndex(t => t.id === teamId) + 1;
   return sortedWeeks.map(w => ({
