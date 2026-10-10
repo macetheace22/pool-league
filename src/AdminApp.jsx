@@ -4052,7 +4052,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
           <div className="card">
             <div className="card__title">Generate Invite Code</div>
             <div className="field"><Label>Role</Label>
-              <select className="input input--select" value={newRole} onChange={e=>{setNewRole(e.target.value);setNewTeamId("");setTeamInput("");}}>
+              <select className="input input--select" value={newRole} onChange={e=>{setNewRole(e.target.value);setNewTeamId("");}}>
                 <option value="captain">Team Captain</option>
                 <option value="player">Player</option>
                 <option value="manager">League Manager</option>
