@@ -3922,13 +3922,13 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const [loading, setLoading]   = useState(true);
   const [newRole, setNewRole]   = useState("captain");
   const [newTeamId, setNewTeamId] = useState("");
-  const [teamInput, setTeamInput] = useState("");
+
   const [generated, setGenerated] = useState(null);
   const [copied, setCopied]     = useState(false);
   const [editRoleId, setEditRoleId] = useState(null);
   const [editRole, setEditRole]     = useState("player");
   const [editTeamId, setEditTeamId] = useState("");
-  const [editTeamInput, setEditTeamInput] = useState("");
+
   const [roleSaving, setRoleSaving] = useState(false);
   const [roleErr, setRoleErr]       = useState("");
 
@@ -3960,7 +3960,6 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
     setEditRoleId(u.id); setEditRole(u.role); setRoleErr("");
     const team = u.team_id ? allTeams.find(t=>t.id===u.team_id) : null;
     setEditTeamId(u.team_id ?? "");
-    setEditTeamInput(team ? `${team.name}${team.context?` — ${team.context}`:""}` : "");
   };
   const cancelEditRole = () => { setEditRoleId(null); setRoleErr(""); };
   const saveEditRole = async (userId) => {
@@ -4001,17 +4000,11 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     </select>
                     {editRole==="captain" && (
                       <div className="field" style={{margin:0}}>
-                        <input className="input" list="edit-role-team-options" value={editTeamInput} autoComplete="off"
-                          placeholder="Start typing a team name…"
-                          onChange={e=>{
-                            const val = e.target.value;
-                            setEditTeamInput(val);
-                            const match = activePickableTeams.find(t => `${t.name}${t.context?` — ${t.context}`:""}` === val);
-                            setEditTeamId(match ? match.id : "");
-                          }}/>
-                        <datalist id="edit-role-team-options">
-                          {activePickableTeams.map(t=><option key={t.id} value={`${t.name}${t.context?` — ${t.context}`:""}`} />)}
-                        </datalist>
+                        <select className="input input--select" value={editTeamId} onChange={e=>setEditTeamId(e.target.value)}>
+                          <option value="">Select a team…</option>
+                          {activePickableTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>)}
+                          {editTeamId && !activePickableTeams.some(t=>t.id===editTeamId) && allTeams.filter(t=>t.id===editTeamId).map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""} (current assignment)</option>)}
+                        </select>
                       </div>
                     )}
                     {roleErr && <ErrorMsg>{roleErr}</ErrorMsg>}
@@ -4067,17 +4060,10 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             </div>
             {newRole==="captain" && (
               <div className="field"><Label>Assign Team</Label>
-                <input className="input" list="assign-team-options" value={teamInput} autoComplete="off"
-                  placeholder="Start typing a team name…"
-                  onChange={e=>{
-                    const val = e.target.value;
-                    setTeamInput(val);
-                    const match = activePickableTeams.find(t => `${t.name}${t.context?` — ${t.context}`:""}` === val);
-                    setNewTeamId(match ? match.id : "");
-                  }}/>
-                <datalist id="assign-team-options">
-                  {activePickableTeams.map(t=><option key={t.id} value={`${t.name}${t.context?` — ${t.context}`:""}`} />)}
-                </datalist>
+                <select className="input input--select" value={newTeamId} onChange={e=>setNewTeamId(e.target.value)}>
+                  <option value="">Select an active team…</option>
+                  {activePickableTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>)}
+                </select>
                 <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Captains are assigned a team here — they no longer pick one at registration.</div>
               </div>
             )}
@@ -4567,7 +4553,7 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
 // captains because a manager forgot a manual cleanup step.
 function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, onGenerateInvite, onRefreshProfiles }) {
   const [mode, setMode] = useState("existing"); // "existing" | "invite"
-  const [search, setSearch] = useState("");
+
   const [pickedId, setPickedId] = useState("");
   const [inviteName, setInviteName] = useState("");
   const [generated, setGenerated] = useState(null);
@@ -4594,7 +4580,7 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
     const ok = await onAssign(picked.id, currentCaptain?.id ?? null);
     setSaving(false);
     if (!ok) { setErr("Could not assign captain."); return; }
-    setSearch(""); setPickedId(""); onRefreshProfiles();
+    setPickedId(""); onRefreshProfiles();
   };
   const removeCaptain = async () => {
     if (!currentCaptain) return;
@@ -4631,16 +4617,10 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
       </div>
       {mode==="existing" ? (
         <div style={{display:"flex",gap:6}}>
-          <input className="edit-input" style={{flex:1}} list={`captain-options-${team.id}`} value={search} autoComplete="off"
-            placeholder="Start typing a username…"
-            onChange={e=>{
-              const val = e.target.value; setSearch(val);
-              const match = candidates.find(p => labelFor(p) === val);
-              setPickedId(match ? match.id : "");
-            }} />
-          <datalist id={`captain-options-${team.id}`}>
-            {candidates.map(p => <option key={p.id} value={labelFor(p)} />)}
-          </datalist>
+          <select className="edit-input" style={{flex:1,minWidth:0}} value={pickedId} onChange={e=>setPickedId(e.target.value)} disabled={saving}>
+            <option value="">Select a captain…</option>
+            {candidates.map(p => <option key={p.id} value={p.id}>{labelFor(p)}</option>)}
+          </select>
           <button className="btn-icon btn-icon--confirm" onClick={assignExisting} disabled={!pickedId||saving}><Check size={13}/></button>
         </div>
       ) : (
