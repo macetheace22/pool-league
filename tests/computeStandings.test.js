@@ -96,6 +96,15 @@ describe("schedule date parsing and sorting", () => {
     expect(sortScheduleWeeks(weeks).map(w => w.date)).toEqual(["10/7/2026", "11/25/2026", "12/2/2026"]);
   });
 
+  it("keeps Thanksgiving between the surrounding weeks in the app-facing shape", () => {
+    const weeks = [
+      { date: "12/2/2026", week: 12, special: null },
+      { date: "11/25/2026", week: null, special: "Thanksgiving - No Matches" },
+      { date: "11/18/2026", week: 11, special: null },
+    ];
+    expect(sortScheduleWeeks(weeks).map(w => w.date)).toEqual(["11/18/2026", "11/25/2026", "12/2/2026"]);
+  });
+
   it("uses week number for missing or invalid dates and keeps dated weeks first", () => {
     const weeks = [
       { date: null, week_num: 2 },
