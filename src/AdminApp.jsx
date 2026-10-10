@@ -3124,6 +3124,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
   const [claiming, setClaiming]   = useState(false);
 
   const [allTeamsForManager, setAllTeamsForManager] = useState(null);
+  const [teamSearch, setTeamSearch] = useState("");
   const [savingTeam, setSavingTeam] = useState(false);
 
   useEffect(() => {
@@ -3134,6 +3135,9 @@ function AccountSettings({ profile, onProfileRefresh }) {
   const pickableTeams = (allTeamsForManager ?? [])
     .filter(t => !t.isBye && t.isActiveSeason && !activeMemberships.some(m => m.team_id === t.id))
     .sort((a, b) => a.name.localeCompare(b.name));
+  const visiblePickableTeams = pickableTeams.filter(t =>
+    `${t.name} ${t.context ?? ""}`.toLowerCase().includes(teamSearch.trim().toLowerCase())
+  );
 
   const saveOwnTeam = async (teamId) => {
     if (!teamId) return;
@@ -3235,17 +3239,40 @@ function AccountSettings({ profile, onProfileRefresh }) {
           </div>
         )}
         {profile.role === "manager" && pickableTeams.length > 0 && (
-          <>
-            <div className="field">
-              <Label>Add Team Membership</Label>
-              <select className="input" value="" onChange={e => e.target.value && saveOwnTeam(e.target.value)} disabled={savingTeam}>
-                <option value="">Select an active team…</option>
-                {pickableTeams.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>
-                ))}
-              </select>
+          <div className="field">
+            <Label>Add Team Membership</Label>
+            <input
+              className="input"
+              type="search"
+              value={teamSearch}
+              onChange={e => setTeamSearch(e.target.value)}
+              placeholder="Type to search teams…"
+              aria-label="Search active teams"
+              autoComplete="off"
+              disabled={savingTeam}
+            />
+            <select
+              className="input input--select"
+              value=""
+              onChange={e => {
+                const teamId = e.target.value;
+                if (teamId) {
+                  saveOwnTeam(teamId);
+                  setTeamSearch("");
+                }
+              }}
+              disabled={savingTeam || visiblePickableTeams.length === 0}
+              aria-label="Choose a team to add"
+            >
+              <option value="">{visiblePickableTeams.length ? "Choose a matching team…" : "No matching teams"}</option>
+              {visiblePickableTeams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>
+              ))}
+            </select>
+            <div style={{fontSize:10.5,color:"#777",marginTop:4}}>
+              {teamSearch.trim() ? `${visiblePickableTeams.length} matching team${visiblePickableTeams.length === 1 ? "" : "s"}` : `${pickableTeams.length} active teams available`}
             </div>
-          </>
+          </div>
         )}
       </div>
       <div className="card">
