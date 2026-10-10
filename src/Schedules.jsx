@@ -38,16 +38,6 @@ const css = `
 @media(min-width:640px){.schedules-controls{grid-template-columns:1fr 1fr}.schedule-match__teams{grid-template-columns:1fr 70px 1fr;}}
 `;
 
-function parseScheduleDate(value) {
-  if (!value) return null;
-  const m = String(value).match(/^(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{2,4})/);
-  if (!m) return null;
-  const year = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
-  const d = new Date(year, Number(m[1]) - 1, Number(m[2]));
-  d.setHours(0,0,0,0);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
 function seasonLabel(s) {
   const type = s?.type ? String(s.type) : "";
   const year = s?.year ? String(s.year) : "";
@@ -145,7 +135,7 @@ export default function Schedules() {
         setTeams(nextTeams);
         setSchedule(nextSchedule);
         const today = new Date(); today.setHours(0,0,0,0);
-        const dated = nextSchedule.map(w => ({...w, _date: parseScheduleDate(w.date)}));
+        const dated = nextSchedule.map(w => ({...w, _date: db.parseScheduleDate(w.date)}));
         const next = dated.find(w => w._date && w._date >= today) || dated.find(w => w.pairings?.length);
         setSelectedWeekId(next?.id ?? nextSchedule[0]?.id ?? null);
       } catch (e) {
@@ -164,7 +154,7 @@ export default function Schedules() {
   const selectedWeek = schedule.find(w => w.id === selectedWeekId) || null;
   const currentWeekId = useMemo(() => {
     const today = new Date(); today.setHours(0,0,0,0);
-    const dated = schedule.map(w => ({...w, _date: parseScheduleDate(w.date)}));
+    const dated = schedule.map(w => ({...w, _date: db.parseScheduleDate(w.date)}));
     return (dated.find(w => w._date && w._date >= today) || dated.find(w => w.pairings?.length))?.id || null;
   }, [schedule]);
 
@@ -177,14 +167,7 @@ export default function Schedules() {
     setParams(p => { p.set("season", seasonId); p.set("division", id); return p; }, { replace: true });
   };
 
-  const sortedSchedule = useMemo(() => [...schedule].sort((a, b) => {
-    const dateA = parseScheduleDate(a.date);
-    const dateB = parseScheduleDate(b.date);
-    if (dateA && dateB) return dateA - dateB;
-    if (dateA) return -1;
-    if (dateB) return 1;
-    return (a.week ?? Number.MAX_SAFE_INTEGER) - (b.week ?? Number.MAX_SAFE_INTEGER);
-  }), [schedule]);
+  const sortedSchedule = useMemo(() => db.sortScheduleWeeks(schedule), [schedule]);
 
   const displayWeeks = selectedWeekId === "all"
     ? sortedSchedule
