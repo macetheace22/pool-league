@@ -4801,7 +4801,7 @@ function PairingRow({ pairing: p, teamByIndex, sortedTeams, readOnly, onUpdatePa
     return (
       <div className="pairing-row pairing-row--edit">
         <SearchableTeamSelect teams={sortedTeams} value={homeId} onChange={setHomeId} search={homeSearch} onSearch={setHomeSearch} placeholder="Home team…" className="input input--select edit-input" ariaLabel="Search home teams" />
-        <SearchableTeamSelect teams={sortedTeams.filter(t=>t.id===awayId || t.id!==homeId)} value={awayId} onChange={setAwayId} search={awaySearch} onSearch={setAwaySearch} placeholder="Away team…" className="input input--select edit-input" ariaLabel="Search away teams" />
+        <SearchableTeamSelect teams={sortedTeams.filter(t=>t.id!==homeId)} value={awayId} onChange={setAwayId} search={awaySearch} onSearch={setAwaySearch} placeholder="Away team…" className="input input--select edit-input" ariaLabel="Search away teams" />
         <div className="list-row__edit-actions">
           <button className="btn-icon btn-icon--confirm" onClick={save} disabled={!homeId||!awayId}><Check size={14}/></button>
           <button className="btn-icon btn-icon--cancel" onClick={()=>setEditing(false)}><X size={14}/></button>
@@ -4861,7 +4861,7 @@ function AddPairingRow({ weekId, sortedTeams, onAddPairing }) {
   return (
     <div className="pairing-row pairing-row--edit">
       <SearchableTeamSelect teams={sortedTeams} value={homeId} onChange={setHomeId} search={homeSearch} onSearch={setHomeSearch} placeholder="Home team…" className="input input--select edit-input" ariaLabel="Search home teams" />
-      <SearchableTeamSelect teams={sortedTeams.filter(t=>t.id===awayId || t.id!==homeId)} value={awayId} onChange={setAwayId} search={awaySearch} onSearch={setAwaySearch} placeholder="Away team…" className="input input--select edit-input" ariaLabel="Search away teams" />
+      <SearchableTeamSelect teams={sortedTeams.filter(t=>t.id!==homeId)} value={awayId} onChange={setAwayId} search={awaySearch} onSearch={setAwaySearch} placeholder="Away team…" className="input input--select edit-input" ariaLabel="Search away teams" />
       <div className="list-row__edit-actions">
         <button className="btn-icon btn-icon--confirm" onClick={confirm} disabled={!homeId||!awayId}><Check size={14}/></button>
         <button className="btn-icon btn-icon--cancel" onClick={()=>{setAdding(false);setHomeId("");setAwayId("");}}><X size={14}/></button>
