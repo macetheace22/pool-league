@@ -5103,6 +5103,7 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
 function UnmatchedTeamRow({ unmatched, divisionId, existingTeams, onResolved }) {
   const [mode, setMode] = useState(null); // null | "existing"
   const [pickedTeamId, setPickedTeamId] = useState("");
+  const [teamSearch, setTeamSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
@@ -5135,11 +5136,14 @@ function UnmatchedTeamRow({ unmatched, divisionId, existingTeams, onResolved }) 
           <button className="btn-sm" onClick={()=>setMode("existing")} disabled={saving}>Map to Existing Team…</button>
         </div>
       ) : (
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <select className="input input--select edit-input" style={{fontSize:12,padding:"6px 8px",flex:1}} value={pickedTeamId} onChange={e=>setPickedTeamId(e.target.value)}>
-            <option value="">Select a team…</option>
-            {existingTeams.filter(t=>!t.isBye).map(t => <option key={t.id} value={t.id}>{t.name} (#{t.teamNum})</option>)}
-          </select>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{flex:"1 1 220px",minWidth:0}}>
+            <input className="edit-input" style={{width:"100%",boxSizing:"border-box",fontSize:12}} value={teamSearch} onChange={e=>setTeamSearch(e.target.value)} placeholder="Type to search existing teams…" aria-label="Search existing teams to map" disabled={saving} />
+            <select className="input input--select edit-input" style={{fontSize:12,padding:"6px 8px",width:"100%",marginTop:4}} value={pickedTeamId} onChange={e=>setPickedTeamId(e.target.value)} disabled={saving}>
+              <option value="">Select a team…</option>
+              {existingTeams.filter(t=>!t.isBye && `${t.name} ${t.teamNum ?? ""}`.toLowerCase().includes(teamSearch.trim().toLowerCase())).map(t => <option key={t.id} value={t.id}>{t.name} (#{t.teamNum})</option>)}
+            </select>
+          </div>
           <button className="btn-icon btn-icon--confirm" onClick={mapToExisting} disabled={!pickedTeamId||saving}><Check size={13}/></button>
           <button className="btn-icon btn-icon--cancel" onClick={()=>{setMode(null);setPickedTeamId("");}} disabled={saving}><X size={13}/></button>
         </div>
@@ -5199,6 +5203,7 @@ function PlayerRatingRow({ player, weekOptions, defaultTag, onManualRating, curr
   const [history, setHistory] = useState(null);
   const [moving, setMoving] = useState(false);
   const [moveTarget, setMoveTarget] = useState("");
+  const [moveSearch, setMoveSearch] = useState("");
 
   if (!player) return null;
   const options = weekOptions.some(w=>w.weekKey===defaultTag.weekKey) ? weekOptions : [...weekOptions, defaultTag];
@@ -5212,7 +5217,7 @@ function PlayerRatingRow({ player, weekOptions, defaultTag, onManualRating, curr
     await onManualRating(player.num, opt.weekKey, opt.label, val);
     setEditing(false);
   };
-  const startMove = () => { setMoveTarget(moveTargets[0]?.id ?? ""); setMoving(true); };
+  const startMove = () => { setMoveTarget(moveTargets[0]?.id ?? ""); setMoveSearch(""); setMoving(true); };
   const confirmMove = async () => {
     if (!moveTarget) return;
     await onMovePlayer(player.num, currentTeamId, moveTarget);
@@ -5242,10 +5247,13 @@ function PlayerRatingRow({ player, weekOptions, defaultTag, onManualRating, curr
       ) : moving ? (
         <div className="list-row__edit" style={{flexWrap:"wrap"}}>
           <span style={{fontSize:11.5,color:"#9A9A9A",width:"100%"}}>Move {player.name} to:</span>
-          <select className="input input--select edit-input" style={{flex:"1 1 160px"}} value={moveTarget} onChange={e=>setMoveTarget(e.target.value)}>
-            {moveTargets.length === 0 && <option value="">No other teams in this division</option>}
-            {moveTargets.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <div style={{flex:"1 1 180px",minWidth:0}}>
+            <input className="edit-input" style={{width:"100%",boxSizing:"border-box"}} value={moveSearch} onChange={e=>setMoveSearch(e.target.value)} placeholder="Search teams…" aria-label="Search destination teams" />
+            <select className="input input--select edit-input" style={{width:"100%",marginTop:4}} value={moveTarget} onChange={e=>setMoveTarget(e.target.value)}>
+              {moveTargets.length === 0 && <option value="">No other teams in this division</option>}
+              {moveTargets.filter(t=>t.id===moveTarget || t.name.toLowerCase().includes(moveSearch.trim().toLowerCase())).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
           <div className="list-row__edit-actions">
             <button className="btn-icon btn-icon--confirm" onClick={confirmMove} disabled={!moveTarget}><Check size={14}/></button>
             <button className="btn-icon btn-icon--cancel" onClick={()=>setMoving(false)}><X size={14}/></button>
