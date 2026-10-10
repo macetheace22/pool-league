@@ -802,8 +802,8 @@ export function parseScheduleDate(value) {
   if (!value) return null;
   const text = String(value).trim();
   let year, month, day;
-  const us = text.match(/^(\\d{1,2})[\\/-](\\d{1,2})[\\/-](\\d{2,4})$/);
-  const iso = text.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
+  const us = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (us) {
     month = Number(us[1]); day = Number(us[2]); year = Number(us[3]);
     if (year < 100) year += 2000;
@@ -816,7 +816,6 @@ export function parseScheduleDate(value) {
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
   return date.getTime();
 }
-
 export function sortScheduleWeeks(weeks) {
   return [...(weeks ?? [])].sort((a, b) => {
     const dateA = parseScheduleDate(a.date);
