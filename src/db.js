@@ -536,13 +536,13 @@ export async function countTeamsByDivisions(divisionIds) {
 export async function listAllTeamsWithContext() {
   const { data } = await supabase
     .from("teams")
-    .select("id, name, team_num, is_bye, roster_submitted_at, roster_submitted_by, profiles(username), divisions(num, name, seasons(type, year, format, day, is_active))")
+    .select("id, name, team_num, is_bye, roster_submitted_at, roster_submitted_by, rosterSubmitter:profiles!teams_roster_submitted_by_fkey(username), divisions(num, name, seasons(type, year, format, day, is_active))")
     .order("team_num");
   return (data ?? []).map(t => ({
     id: t.id, name: t.name, teamNum: t.team_num, isBye: t.is_bye,
     context: t.divisions ? `Div ${t.divisions.num} · ${t.divisions.seasons?.type ?? ""} ${t.divisions.seasons?.year ?? ""}` : "",
     isActiveSeason: !!t.divisions?.seasons?.is_active,
-    rosterSubmittedAt: t.roster_submitted_at, rosterSubmittedBy: t.profiles?.username ?? null,
+    rosterSubmittedAt: t.roster_submitted_at, rosterSubmittedBy: t.rosterSubmitter?.username ?? null,
   }));
 }
 
