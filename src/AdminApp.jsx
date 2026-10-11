@@ -505,38 +505,67 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     );
   }
 
-  // ── Manage Season Data — manager only, full edit ──
-  if (page === "manage" || page === "manual-import") {
-    if (!isManager) return <><PageHeader title="Manage Season Data"/><div className="tab-content"><AccessDenied/></div></>;
+  // ── Dedicated season-maintenance pages ──
+  if (["playoff-eligibility", "playoffs", "locations"].includes(page)) {
+    const titles = {
+      "playoff-eligibility": "Playoff Eligibility",
+      playoffs: "Playoffs",
+      locations: "Locations",
+    };
+    if (!isManager) return <><PageHeader title={titles[page]}/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
-        <PageHeader title={page === "manual-import" ? "Manual Team & Schedule Import" : "Manage Season Data"} />
-        {page === "manual-import" && viewingSeason && !isViewingActive && (
+        <PageHeader title={titles[page]} />
+        <div className="tab-content">
+          {page !== "locations" && (
+            <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
+              viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
+          )}
+          {page === "playoff-eligibility" && viewingDiv && isViewingActive && (
+            <SeedPlayoffEligibilityImport divisionId={viewingDiv.id} existingCount={Object.keys(playoffEligibility).length} onImported={refreshCurrentDivision} />
+          )}
+          {page === "playoff-eligibility" && !viewingDiv && (
+            <div className="empty-state">Select a season and division to import playoff eligibility.</div>
+          )}
+          {page === "playoff-eligibility" && viewingDiv && !isViewingActive && (
+            <div className="empty-state">Activate this season to import playoff eligibility.</div>
+          )}
+          {page === "playoffs" && viewingDiv && (
+            <PlayoffsTab divisionId={viewingDiv.id} teams={viewTeams} />
+          )}
+          {page === "playoffs" && !viewingDiv && (
+            <div className="empty-state">Select a season and division to manage playoffs.</div>
+          )}
+          {page === "locations" && (
+            <LocationsTab locations={locations} onRefresh={refreshLocations} />
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ── Manual Team & Schedule Import — manager only ──
+  if (page === "manual-import") {
+    if (!isManager) return <><PageHeader title="Manual Team & Schedule Import"/><div className="tab-content"><AccessDenied/></div></>;
+    return (
+      <>
+        <PageHeader title="Manual Team & Schedule Import" />
+        {viewingSeason && !isViewingActive && (
           <div className="card" style={{ margin: "0 12px 12px", padding: 12 }}>
             <div className="card__title">Activate this season to import manually</div>
             <div style={{ fontSize: 12, color: "#BDBDBD", lineHeight: 1.5, marginBottom: 10 }}>
               Inactive seasons are read-only. Activate this season to enable manual team and schedule setup.
             </div>
-            <button className="btn-primary" onClick={() => handleToggleActive(viewingSeason)}>
-              Set Season Active
-            </button>
+            <button className="btn-primary" onClick={() => handleToggleActive(viewingSeason)}>Set Season Active</button>
           </div>
         )}
         <SubTabBar>
           <SubTabBtn active={manageSubTab==="teams"} onClick={()=>setManageSubTab("teams")}>Teams</SubTabBtn>
           <SubTabBtn active={manageSubTab==="schedule"} onClick={()=>setManageSubTab("schedule")}>Schedule</SubTabBtn>
-          {page !== "manual-import" && <>
-            <SubTabBtn active={manageSubTab==="players"} onClick={()=>setManageSubTab("players")}>Players & Ratings</SubTabBtn>
-            <SubTabBtn active={manageSubTab==="eligibility"} onClick={()=>setManageSubTab("eligibility")}>Playoff Eligibility</SubTabBtn>
-            <SubTabBtn active={manageSubTab==="playoffs"} onClick={()=>setManageSubTab("playoffs")}>Playoffs</SubTabBtn>
-            <SubTabBtn active={manageSubTab==="locations"} onClick={()=>setManageSubTab("locations")}>Locations</SubTabBtn>
-          </>}
         </SubTabBar>
         <div className="tab-content">
-          {manageSubTab!=="players" && manageSubTab!=="locations" && manageSubTab!=="playoffs" && (
-            <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
-              viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
-          )}
+          <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
+            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           {manageSubTab==="teams" && (
             <TeamsTab key={viewingDiv?.id ?? "none"} teams={viewTeams}
               onSave={isViewingActive && viewingDiv ? handleSaveTeams : null}
@@ -552,33 +581,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               onAddPairing={isViewingActive && viewingDiv ? handleAddPairing : null}
               onUpdatePairing={isViewingActive && viewingDiv ? handleUpdatePairing : null}
               onDeletePairing={isViewingActive && viewingDiv ? handleDeletePairing : null}
-              readOnly={!isViewingActive} onNext={page === "manual-import" ? null : ()=>setManageSubTab("players")} />
-          )}
-          {manageSubTab==="players" && (
-            <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
-              divisionId={viewingDiv?.id ?? null} onReconciled={refreshCurrentDivision}
-              onBulkImport={isViewingActive && viewingDiv ? handleBulkImport : null}
-              onManualRating={isViewingActive && viewingDiv ? handleManualRating : null}
-              onMovePlayer={isViewingActive && viewingDiv ? handleMovePlayer : null}
-              lockedTeamId={null} readOnly={!isViewingActive} />
-          )}
-          {manageSubTab==="eligibility" && viewingDiv && isViewingActive && (
-            <SeedPlayoffEligibilityImport divisionId={viewingDiv.id} existingCount={Object.keys(playoffEligibility).length} onImported={refreshCurrentDivision} />
-          )}
-          {manageSubTab==="eligibility" && !viewingDiv && (
-            <div className="empty-state">Pick a division from the Season tab first.</div>
-          )}
-          {manageSubTab==="eligibility" && viewingDiv && !isViewingActive && (
-            <div className="empty-state">Activate this season to import playoff eligibility.</div>
-          )}
-          {manageSubTab==="playoffs" && viewingDiv && (
-            <PlayoffsTab divisionId={viewingDiv.id} teams={viewTeams} />
-          )}
-          {manageSubTab==="playoffs" && !viewingDiv && (
-            <div className="empty-state">Pick a division from the Season tab first.</div>
-          )}
-          {manageSubTab==="locations" && (
-            <LocationsTab locations={locations} onRefresh={refreshLocations} />
+              readOnly={!isViewingActive} onNext={null} />
           )}
         </div>
       </>
@@ -1615,6 +1618,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 
 // ─── Seasons Tab ──────────────────────────────────────────────────────────────
 function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSeasonCreated, onImportIbaSchedule }) {
+  const navigate = useNavigate();
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
   const [format, setFormat] = useState("Masters");
@@ -1774,6 +1778,9 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim()}><Plus size={13}/></button>
                         </div>
                         <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
+                        <button className="btn-sm" style={{width:"100%",marginTop:8}} onClick={()=>navigate(`/manual-season-import?season=${encodeURIComponent(s.id)}`)}>
+                          Manual Team & Schedule Import
+                        </button>
                          
                         <div className="field" style={{marginTop:10}}>
                           <Label>Playoffs Start Date</Label>
