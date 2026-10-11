@@ -106,7 +106,8 @@ function isNoiseLine(line) {
 function cleanName(fullName) {
   const cleaned = fullName.replace(/^[\s~_\-=+«»'.O\u2013\u2014]+|[\s~_\-=+«»'.]+$/g, '').trim();
   if (!cleaned) return null;
-  const nickMatch = cleaned.match(/^(.+?)\s+"([^"]+)"?\s*$/);
+  // PDF extraction sometimes removes the space before a nickname and may drop its closing quote.
+  const nickMatch = cleaned.match(/^(.+?)\s*"([^"]+)"?\s*$/);
   const name = nickMatch ? nickMatch[1].trim() : cleaned;
   const nickname = nickMatch ? nickMatch[2].trim() : "";
   return { name, nickname };
