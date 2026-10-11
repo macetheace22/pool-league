@@ -45,4 +45,13 @@ describe("security migration contracts", () => {
       expect(sql).toContain(publicFlow);
     }
   });
+  it("wires profile team removal to the guarded RPC and hides it from non-managers", () => {
+    const admin = read("src/AdminApp.jsx");
+    const db = read("src/db.js");
+    expect(admin).toContain('profile.role === "manager" && (');
+    expect(admin).toContain('onClick={() => removeOwnTeam(m)}');
+    expect(admin).toContain('db.removeOwnTeamMembership(membership.team_id)');
+    expect(admin).toContain('window.confirm');
+    expect(db).toContain('supabase.rpc("remove_own_team_membership", { p_team_id: teamId })');
+  });
 });
