@@ -5398,7 +5398,8 @@ html,body{width:100%;overflow-x:hidden;}
 .tab-btn--active{background:#0B3D2E;color:#5FCF9E;}
 .weekly-import-tabs .tab-bar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;align-items:stretch;}
 .weekly-import-tabs .tab-btn{white-space:normal;line-height:1.2;min-height:38px;padding:8px 5px;text-align:center;}
-@media (min-width:600px){.weekly-import-tabs .tab-bar{grid-template-columns:repeat(3,minmax(0,1fr));}}\n@media (min-width:1000px){.weekly-import-tabs .tab-bar{grid-template-columns:repeat(5,minmax(0,1fr));}}
+@media (min-width:600px){.weekly-import-tabs .tab-bar{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media (min-width:1000px){.weekly-import-tabs .tab-bar{grid-template-columns:repeat(5,minmax(0,1fr));}}
 .sub-tab-bar{display:flex;gap:6px;margin-bottom:4px;}
 .sub-tab{flex:1;padding:8px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:8px;font-family:'Archivo',sans-serif;font-size:11.5px;font-weight:700;color:#6A6A6A;cursor:pointer;}
 .sub-tab--active{background:#0B3D2E;border-color:#0B3D2E;color:#5FCF9E;}
