@@ -280,14 +280,26 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             <button className="btn-primary" onClick={discover} disabled={loading || importing}>
               {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
             </button>
+            {season.is_active && (
+              <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
+                Manually Import Teams & Schedule
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {!divisions && !result && !statusReady && (
-        <button className="btn-primary" onClick={discover} disabled={loading} style={{ marginTop: 9 }}>
-          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
-        </button>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
+          <button className="btn-primary" onClick={discover} disabled={loading || importing}>
+            {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
+          </button>
+          {season.is_active && (
+            <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
+              Manually Import Teams & Schedule
+            </button>
+          )}
+        </div>
       )}
 
       {error && (
@@ -365,10 +377,6 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           </button>
         </div>
       )}
-      <button className="btn-primary" style={{ width: "100%", marginTop: 9 }} onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
-        Manually Import Teams & Schedule
-      </button>
-
     </div>
     </>
   );
