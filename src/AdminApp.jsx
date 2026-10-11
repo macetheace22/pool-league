@@ -3951,6 +3951,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const [editRoleId, setEditRoleId] = useState(null);
   const [editRole, setEditRole]     = useState("player");
   const [editTeamId, setEditTeamId] = useState("");
+  const [editTeamSearch, setEditTeamSearch] = useState("");
 
   const [roleSaving, setRoleSaving] = useState(false);
   const [roleErr, setRoleErr]       = useState("");
@@ -3980,11 +3981,11 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const copyCode = (code) => { navigator.clipboard?.writeText(code).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
   const startEditRole = (u) => {
-    setEditRoleId(u.id); setEditRole(u.role); setRoleErr("");
+    setEditRoleId(u.id); setEditRole(u.role); setRoleErr(""); setEditTeamSearch("");
     const team = u.team_id ? allTeams.find(t=>t.id===u.team_id) : null;
     setEditTeamId(u.team_id ?? "");
   };
-  const cancelEditRole = () => { setEditRoleId(null); setRoleErr(""); };
+  const cancelEditRole = () => { setEditRoleId(null); setRoleErr(""); setEditTeamSearch(""); };
   const saveEditRole = async (userId) => {
     if (editRole === "captain" && !editTeamId) { setRoleErr("Pick a team for this captain."); return; }
     setRoleSaving(true);
@@ -4026,7 +4027,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     </select>
                     {editRole==="captain" && (
                       <div className="field" style={{margin:0}}>
-                        <SearchableTeamSelect teams={[...activePickableTeams, ...allTeams.filter(t=>t.id===editTeamId && !activePickableTeams.some(a=>a.id===t.id)).map(t=>({...t, context:`${t.context ? `${t.context} — ` : ""}current assignment`}))]} value={editTeamId} onChange={setEditTeamId} placeholder="Select a team…" ariaLabel="Search teams for captain assignment" />
+                        <SearchableTeamSelect teams={[...activePickableTeams, ...allTeams.filter(t=>t.id===editTeamId && !activePickableTeams.some(a=>a.id===t.id)).map(t=>({...t, context:`${t.context ? `${t.context} — ` : ""}current assignment`}))]} value={editTeamId} onChange={setEditTeamId} search={editTeamSearch} onSearch={setEditTeamSearch} placeholder="Select a team…" ariaLabel="Search teams for captain assignment" />
                       </div>
                     )}
                     {roleErr && <ErrorMsg>{roleErr}</ErrorMsg>}
