@@ -70,10 +70,14 @@ describe("IBA parsers", () => {
     const result = parseLeagueRoster(raw);
     expect(result.rosters["15101"]).toContain("34240");
     expect(result.rosters["15101"]).toContain("14768");
-    expect(result.registry["34240"]).toMatchObject({ num:"34240", rating:105 });
-    expect(result.registry["14768"]).toMatchObject({ num:"14768", rating:116 });
-    expect(result.registry["25953"]).toMatchObject({ num:"25953", rating:73 });
-    expect(result.registry["01868"]).toMatchObject({ num:"01868", rating:94 });
+    expect(result.teams["15101"]).toMatchObject({ name:"Scotty Doesn't Know", location:"Twin City Billiards" });
+    expect(result.teams["15102"]).toMatchObject({ name:"Damn It", location:"Twin City Billiards" });
+    expect(result.registry["34240"]).toMatchObject({ name:"Marier, Dave", num:"34240", rating:105 });
+    expect(result.registry["14768"]).toMatchObject({ name:"Barrett, Scott", num:"14768", rating:116 });
+    expect(result.registry["22774"]).toMatchObject({ name:"Norberg, Scott", nickname:"304", rating:79 });
+    expect(result.registry["25953"]).toMatchObject({ name:"Stewart, Ryan", rating:73 });
+    expect(result.registry["18529"]).toMatchObject({ name:"Carlson, Doug", nickname:"DamnIt", rating:134 });
+    expect(result.registry["01868"]).toMatchObject({ name:"Wylie, Wayne", num:"01868", rating:94 });
   });
 
   it("parses a simple single-column roster without changing the existing output contract", () => {
