@@ -530,16 +530,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     return (
       <>
         <PageHeader title="Manage Season Data" />
-        <div className="card" style={{margin:"0 12px 12px",padding:12}}>
-          <div style={{fontSize:12,color:"#D0D0D0",lineHeight:1.5}}>
-            This area is for manual maintenance and import fallbacks. To automatically discover and import IBA divisions, teams, and schedules, use Create or Update Seasons.
-          </div>
-          <div style={{marginTop:8}}>
-            <Link to="/seasons" className="btn-sm btn-sm--accent" style={{display:"inline-flex",alignItems:"center",textDecoration:"none"}}>
-              Open Create or Update Seasons <ChevronRight size={12}/>
-            </Link>
-          </div>
-        </div>
         <SubTabBar>
           <SubTabBtn active={manageSubTab==="teams"} onClick={()=>setManageSubTab("teams")}>Teams</SubTabBtn>
           <SubTabBtn active={manageSubTab==="schedule"} onClick={()=>setManageSubTab("schedule")}>Schedule</SubTabBtn>
