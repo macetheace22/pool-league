@@ -43,6 +43,7 @@ describe("IBA parsers", () => {
     expect(result.registry["25953"]).toMatchObject({ name: "Stewart, Ryan", rating: 73 });
     expect(result.registry["13102"]).toMatchObject({ name: "Johnson, Loren", nickname: "Smooth", rating: 88 });
     expect(result.rosters["15201"]).toEqual(["13102", "02256"]);
+    expect(result.registry["02256"]).toMatchObject({ name: "Reyes, Oakley", nickname: "Natural", rating: 89 });
   });
 
   it("parses a simple single-column roster without changing the existing output contract", () => {
