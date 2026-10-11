@@ -474,7 +474,7 @@ export function SeasonManagementHub() {
         {profile.role !== "manager" ? <AccessDenied /> : (
           <>
             <p className="season-hub-intro">
-              Follow these two steps to get a season ready and keep its league data current.
+              Use these three areas to set up a season, update weekly reports, and maintain playoff and location details.
             </p>
             <div className="season-hub-section">
               <div className="season-hub-section__title">1. Set up the season, teams & schedule</div>
