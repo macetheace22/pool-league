@@ -3887,10 +3887,7 @@ function LeaderboardPage() {
                 </select>
               </div>
               <div className="field"><Label>Division / Season</Label>
-                <select className="input input--select" value={divisionFilter} onChange={e => setDivisionFilter(e.target.value)}>
-                  <option value="">All Divisions / Seasons (all-time)</option>
-                  {divisions.map(d => <option key={d.id} value={d.id}>Div {d.num}{d.name ? ` · ${d.name}` : ""} — {d.seasonLabel}{d.isActive ? " · Active" : ""}</option>)}
-                </select>
+                <SearchableOptionSelect options={divisions.map(d=>({value:d.id,label:`Div ${d.num}${d.name ? ` · ${d.name}` : ""} — ${d.seasonLabel}${d.isActive ? " · Active" : ""}`,searchText:`${d.num} ${d.name ?? ""} ${d.seasonLabel}`}))} value={divisionFilter} onChange={setDivisionFilter} placeholder="All Divisions / Seasons (all-time)" ariaLabel="Filter by division or season" />
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
                 <FilterChips options={PLAY_TYPE_FILTERS} value={playTypeFilter} onChange={setPlayTypeFilter} />
