@@ -590,10 +590,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   // ── Weekly league data — manager only ──
   if (page === "weekly") {
-    if (!isManager) return <><PageHeader title="Weekly Import Page" subtitle="AUTOMATIC IBA SYNC + MANUAL IMPORTS"/><div className="tab-content"><AccessDenied/></div></>;
+    if (!isManager) return <><PageHeader title="Weekly Import Page"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
-        <PageHeader title="Weekly Import Page" subtitle="AUTOMATIC IBA SYNC + MANUAL IMPORTS" />
+        <PageHeader title="Weekly Import Page" />
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
@@ -5458,8 +5458,11 @@ html,body{width:100%;overflow-x:hidden;}
 .weekly-data-tile--active{border-color:#28634C;background:#17251F;}
 .weekly-data-tile__title{font-size:13px;font-weight:800;color:#F4F4F4;}
 .weekly-data-tile__desc{font-size:11px;line-height:1.45;color:#9A9A9A;flex:1;}
-.weekly-data-tile__actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
-.weekly-data-tile__actions button{min-width:0;white-space:normal;line-height:1.2;min-height:36px;padding:8px 5px;}
+.weekly-data-tile__actions{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;margin-top:2px;}
+.weekly-data-tile__actions button{width:100%;min-width:0;white-space:nowrap;line-height:1.15;min-height:36px;padding:8px 10px;font-size:11px;}
+.weekly-data-global-action{align-items:center;}
+.weekly-data-global-action button{min-height:38px;padding:9px 12px;white-space:normal;}
+@media (max-width:420px){.weekly-data-global-action{align-items:stretch;flex-direction:column;}.weekly-data-global-action button{max-width:none;width:100%;}}
 .weekly-data-workspace{border:1.5px solid #2E2E2E;border-radius:14px;padding:12px;background:#141414;}
 .weekly-data-workspace__heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .weekly-data-workspace__title{font-size:14px;font-weight:800;color:#F4F4F4;}
