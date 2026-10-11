@@ -560,6 +560,17 @@ export const dashboardCss = `
 .office-card__desc{font-size:10.5px;color:#9A9A9A;}
 .office-list-item{display:flex;align-items:center;gap:10px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:12px;padding:13px 14px;text-decoration:none;color:#E0E0E0;font-size:12.5px;font-weight:600;}
 
+.season-hub-intro{font-size:12.5px;line-height:1.55;color:#B0B0B0;margin:0 0 18px;}
+.season-hub-section{display:flex;flex-direction:column;gap:9px;margin-bottom:20px;}
+.season-hub-section__title{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#9FC4B4;}
+.season-hub-card{display:flex;align-items:center;gap:12px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;padding:14px;text-decoration:none;color:#FFF;min-width:0;}
+.season-hub-card:hover{border-color:#3E6B58;}
+.season-hub-card__icon{width:40px;height:40px;flex:0 0 40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#0F2D1F;color:#5FCF9E;}
+.season-hub-card__body{flex:1;min-width:0;}
+.season-hub-card__title{font-size:13px;font-weight:800;color:#F4F4F4;margin-bottom:5px;}
+.season-hub-card__desc{font-size:11px;line-height:1.45;color:#9A9A9A;}
+.season-hub-card__arrow{flex:0 0 auto;color:#6A6A6A;}
+
 .team-selector-wrap{padding:0 0 8px;display:flex;flex-direction:column;gap:4px;}
 .team-selector-label{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8A8A8A;}
 .team-selector{width:100%;background:#1C1C1C;color:#E0E0E0;border:1.5px solid #2E2E2E;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:700;}
