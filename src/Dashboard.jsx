@@ -483,7 +483,7 @@ export function SeasonManagementHub() {
                 <div className="season-hub-card__icon"><Calendar size={19} /></div>
                 <div className="season-hub-card__body">
                   <div className="season-hub-card__title">Create or update a season</div>
-                  <div className="season-hub-card__desc">Create the season, activate it, and add or maintain divisions. Expand a season card to discover and import its IBA schedule automatically.</div>
+                  <div className="season-hub-card__desc">Create the season, activate it, and add or maintain divisions. Expand a season card to discover and automatically import published IBA divisions, teams, and schedules.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
@@ -493,8 +493,8 @@ export function SeasonManagementHub() {
               <Link to="/manage" className="season-hub-card">
                 <div className="season-hub-card__icon"><Settings2 size={19} /></div>
                 <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Manual import and season maintenance</div>
-                  <div className="season-hub-card__desc">Use the existing paste/import tools to maintain teams, schedules, player rosters and ratings, playoff brackets, and locations.</div>
+                  <div className="season-hub-card__title">Manage season data & manual imports</div>
+                  <div className="season-hub-card__desc">Manually edit or correct teams and schedules, maintain player rosters and ratings, and manage playoff brackets and locations. Use these tools when a manual change or fallback is needed.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
