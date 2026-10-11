@@ -516,7 +516,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
-            seasonIdsNeedingTeams={seasonIdsNeedingTeams} onImportTeams={(seasonId)=>navigate(`/manage?season=${seasonId}`)}
+            seasonIdsNeedingTeams={seasonIdsNeedingTeams} onImportTeams={(seasonId)=>navigate(`/manual-season-import?season=${seasonId}`)}
             onSeasonCreated={()=>setSeasonsSubTab("inactive")}
             onImportIbaSchedule={refreshSeasons} />
         </div>
@@ -525,17 +525,19 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   }
 
   // ── Manage Season Data — manager only, full edit ──
-  if (page === "manage") {
+  if (page === "manage" || page === "manual-import") {
     if (!isManager) return <><PageHeader title="Manage Season Data"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
-        <PageHeader title="Manage Season Data" />
+        <PageHeader title={page === "manual-import" ? "Manual Team & Schedule Import" : "Manage Season Data"} />
         <SubTabBar>
           <SubTabBtn active={manageSubTab==="teams"} onClick={()=>setManageSubTab("teams")}>Teams</SubTabBtn>
           <SubTabBtn active={manageSubTab==="schedule"} onClick={()=>setManageSubTab("schedule")}>Schedule</SubTabBtn>
-          <SubTabBtn active={manageSubTab==="players"} onClick={()=>setManageSubTab("players")}>Players & Ratings</SubTabBtn>
-          <SubTabBtn active={manageSubTab==="playoffs"} onClick={()=>setManageSubTab("playoffs")}>Playoffs</SubTabBtn>
-          <SubTabBtn active={manageSubTab==="locations"} onClick={()=>setManageSubTab("locations")}>Locations</SubTabBtn>
+          {page !== "manual-import" && <>
+            <SubTabBtn active={manageSubTab==="players"} onClick={()=>setManageSubTab("players")}>Players & Ratings</SubTabBtn>
+            <SubTabBtn active={manageSubTab==="playoffs"} onClick={()=>setManageSubTab("playoffs")}>Playoffs</SubTabBtn>
+            <SubTabBtn active={manageSubTab==="locations"} onClick={()=>setManageSubTab("locations")}>Locations</SubTabBtn>
+          </>}
         </SubTabBar>
         <div className="tab-content">
           {manageSubTab!=="players" && manageSubTab!=="locations" && manageSubTab!=="playoffs" && (
@@ -557,7 +559,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               onAddPairing={isViewingActive && viewingDiv ? handleAddPairing : null}
               onUpdatePairing={isViewingActive && viewingDiv ? handleUpdatePairing : null}
               onDeletePairing={isViewingActive && viewingDiv ? handleDeletePairing : null}
-              readOnly={!isViewingActive} onNext={()=>setManageSubTab("players")} />
+              readOnly={!isViewingActive} onNext={page === "manual-import" ? null : ()=>setManageSubTab("players")} />
           )}
           {manageSubTab==="players" && (
             <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
@@ -1736,6 +1738,9 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim()}><Plus size={13}/></button>
                         </div>
                         <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
+                         <button className="btn-primary" style={{width:"100%",marginTop:10}} onClick={()=>onImportTeams(s.id)}>
+                           Manually Import Teams & Schedule <ChevronRight size={13}/>
+                         </button>
                         <div className="field" style={{marginTop:10}}>
                           <Label>Playoffs Start Date</Label>
                           <div style={{fontSize:12.5,color:s.playoffs_start_date?"#E0E0E0":"#6A6A6A",fontWeight:600}}>
