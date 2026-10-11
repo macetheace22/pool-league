@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Download, RefreshCw, AlertCircle } from "lucide-react";
+import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { fetchIbaReports, buildIbaPreview, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
 
 export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null }) {
@@ -8,12 +8,36 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
   const [result, setResult] = useState(null);
+  const [expandedPreview, setExpandedPreview] = useState({ rost: true, div: true, mvp: true });
 
   const codes = ibaCodesForSeason(season);
   const supported = !!codes.leagueType && !!codes.day;
   const reportLabels = { rost: "roster & ratings", div: "team standings", mvp: "MVP standings" };
   const selectedReportLabel = reportLabels[reportType] || "weekly league data";
   const selectedReports = (reports) => reportType ? (reports ?? []).filter(r => r.reportType === reportType) : (reports ?? []);
+  const previewRows = (type) => {
+    if (type === "rost") {
+      const parsed = data?.preview?.roster?.parsed;
+      if (!parsed) return [];
+      return Object.entries(parsed.registry || {}).map(([playerNum, player]) => ({
+        teamNum: Object.entries(parsed.rosters || {}).find(([, nums]) => nums.includes(playerNum))?.[0] || "",
+        playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—",
+      }));
+    }
+    if (type === "div") return data?.preview?.standings?.rows || [];
+    if (type === "mvp") return data?.preview?.mvp?.rows || [];
+    return [];
+  };
+  const hasEmptyParsedReport = (data?.reports ?? []).some(r => r.status === "ok" && (
+    (r.reportType === "rost" && data?.preview?.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
+    (r.reportType === "div" && data?.preview?.standings?.rows.length === 0) ||
+    (r.reportType === "mvp" && data?.preview?.mvp?.rows.length === 0)
+  ));
+  const columnsFor = (type) => type === "rost"
+    ? [{ key:"teamNum", label:"Team" }, { key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"nickname", label:"Nickname" }, { key:"rating", label:"Rating" }]
+    : type === "div"
+      ? [{ key:"teamNum", label:"Team #" }, { key:"teamName", label:"Team" }, { key:"pointsLastWk", label:"Last week" }, { key:"totalPoints", label:"Total points" }, { key:"setsPlayed", label:"Sets played" }]
+      : [{ key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"teamNum", label:"Team #" }, { key:"wins", label:"Sets won" }, { key:"mvpRankingPoints", label:"MVP points" }, { key:"losses", label:"Sets lost" }, { key:"pointsScored", label:"Points scored" }];
 
   const fetchReports = async () => {
     setLoading(true); setError(""); setResult(null);
@@ -62,40 +86,64 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       {data && (
         <>
           <div className="list" style={{marginTop:10}}>
-            {data.reports.map(r => (
-              <div key={r.key} className="list-row">
-                <div className="list-row__body">
-                  <span className="list-row__name">{r.reportType.toUpperCase()}</span>
-                  <span className="list-row__sub">{r.key}.pdf</span>
+            {data.reports.map(r => {
+              const parsedRows = previewRows(r.reportType);
+              const rowCount = r.reportType === "rost"
+                ? (data.preview.roster?.playerCount || 0)
+                : parsedRows.length;
+              return (
+                <div key={r.key} className="list-row" style={{alignItems:"flex-start"}}>
+                  <div className="list-row__body">
+                    <span className="list-row__name">{r.reportType.toUpperCase()}</span>
+                    <span className="list-row__sub">{r.key}.pdf · {r.status === "ok" ? `${rowCount.toLocaleString()} parsed ${r.reportType === "rost" ? "players" : "rows"}` : (r.message || "Report unavailable")}</span>
+                  </div>
+                  <span className="player-rating-badge" style={{color:r.status === "ok" ? "#5FCF9E" : "#9A9A9A"}}>{r.status}</span>
                 </div>
-                <span className="player-rating-badge" style={{color:r.status === "ok" ? "#5FCF9E" : "#9A9A9A"}}>{r.status}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {data.preview.roster && (
-            <div style={{fontSize:11,color:"#5FCF9E",marginTop:8}}>
-              Roster: {data.preview.roster.teamCount} teams · {data.preview.roster.playerCount} players
-              {data.preview.roster.parsed.ambiguousRoster?.length ? ` · ${data.preview.roster.parsed.ambiguousRoster.length} placement review${data.preview.roster.parsed.ambiguousRoster.length===1?"":"s"}` : ""}
+          {data.reports.filter(r => r.status === "ok" && ["rost","div","mvp"].includes(r.reportType)).map(r => {
+            const rows = previewRows(r.reportType);
+            const columns = columnsFor(r.reportType);
+            const count = r.reportType === "rost" ? (data.preview.roster?.playerCount || 0) : rows.length;
+            const empty = r.reportType === "rost"
+              ? !data.preview.roster || (data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0)
+              : rows.length === 0;
+            return (
+              <section key={r.key} style={{marginTop:12,border:"1px solid #353535",borderRadius:9,overflow:"hidden"}}>
+                <button type="button" className="btn-sm" onClick={() => setExpandedPreview(v => ({...v,[r.reportType]:!v[r.reportType]}))} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"10px 12px",borderRadius:0}}>
+                  <span style={{textAlign:"left"}}>{r.reportType.toUpperCase()} parsed preview · {count.toLocaleString()} {r.reportType === "rost" ? "players" : "rows"}{r.reportType === "rost" ? ` across ${data.preview.roster?.teamCount || 0} teams` : ""}</span>
+                  {expandedPreview[r.reportType] ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
+                </button>
+                {expandedPreview[r.reportType] && (
+                  <div style={{padding:10}}>
+                    {empty ? (
+                      <div className="import-warning-block">
+                        <div className="import-warning-block__title"><AlertCircle size={12}/> No parsed records</div>
+                        <div style={{fontSize:11,color:"#D0D0D0"}}>The PDF was retrieved, but this parser returned no records. Import is blocked. Check the extracted text diagnostics below.</div>
+                      </div>
+                    ) : (
+                      <div style={{overflowX:"auto",maxHeight:360,overflowY:"auto",border:"1px solid #2A2A2A",borderRadius:6}}>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,minWidth:r.reportType==="mvp"?650:r.reportType==="rost"?520:480}}>
+                          <thead><tr>{columns.map(col=><th key={col.key} style={{position:"sticky",top:0,textAlign:"left",padding:"8px 9px",background:"#202020",color:"#D0D0D0",borderBottom:"1px solid #3A3A3A",whiteSpace:"nowrap"}}>{col.label}</th>)}</tr></thead>
+                          <tbody>{rows.map((row,i)=><tr key={`${row.playerNum || row.teamNum || "row"}-${i}`}>{columns.map(col=><td key={col.key} style={{padding:"7px 9px",borderBottom:"1px solid #292929",color:"#E0E0E0",whiteSpace:"nowrap"}}>{String(row[col.key] ?? "—")}</td>)}</tr>)}</tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div style={{fontSize:10.5,color:"#AAA",marginTop:7}}>Showing parsed records from the downloaded report. Review names, IDs, ratings, and totals before importing.</div>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+
+          {hasEmptyParsedReport && !result && (
+            <div className="import-warning-block" style={{marginTop:10}}>
+              <div className="import-warning-block__title"><AlertCircle size={12}/> Import blocked — no rows detected</div>
+              <div style={{fontSize:11,color:"#D0D0D0"}}>The PDFs downloaded, but one or more reports could not be parsed into records. Review the extracted text below. Import remains disabled until parsing is corrected.</div>
             </div>
           )}
-          {data.preview.standings && <div style={{fontSize:11,color:"#5FCF9E",marginTop:8}}>Team standings: {data.preview.standings.rows.length} rows detected.</div>}
-          {data.preview.mvp && <div style={{fontSize:11,color:"#5FCF9E",marginTop:8}}>MVP: {data.preview.mvp.rows.length} rows detected.</div>}
-
-          {(() => {
-            const hasEmptyParsedReport =
-              (data.reports ?? []).some(r => r.status === "ok" && (
-                (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
-                (r.reportType === "div" && data.preview.standings?.rows.length === 0) ||
-                (r.reportType === "mvp" && data.preview.mvp?.rows.length === 0)
-              ));
-            return hasEmptyParsedReport && !result ? (
-              <div className="import-warning-block" style={{marginTop:10}}>
-                <div className="import-warning-block__title"><AlertCircle size={12}/> Import blocked — no rows detected</div>
-                <div style={{fontSize:11,color:"#D0D0D0"}}>The PDFs downloaded, but one or more reports could not be parsed into records. Refreshing or importing will not fix this; verify the report format before importing.</div>
-              </div>
-            ) : null;
-          })()}
 
           {(data.reports ?? []).filter(r => r.status === "ok" && (
             (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
