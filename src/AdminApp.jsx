@@ -510,6 +510,17 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     return (
       <>
         <PageHeader title={page === "manual-import" ? "Manual Team & Schedule Import" : "Manage Season Data"} />
+        {page === "manual-import" && viewingSeason && !isViewingActive && (
+          <div className="card" style={{ margin: "0 12px 12px", padding: 12 }}>
+            <div className="card__title">Activate this season to import manually</div>
+            <div style={{ fontSize: 12, color: "#BDBDBD", lineHeight: 1.5, marginBottom: 10 }}>
+              Inactive seasons are read-only. Activate this season to enable manual team and schedule setup.
+            </div>
+            <button className="btn-primary" onClick={() => handleToggleActive(viewingSeason)}>
+              Set Season Active
+            </button>
+          </div>
+        )}
         <SubTabBar>
           <SubTabBtn active={manageSubTab==="teams"} onClick={()=>setManageSubTab("teams")}>Teams</SubTabBtn>
           <SubTabBtn active={manageSubTab==="schedule"} onClick={()=>setManageSubTab("schedule")}>Schedule</SubTabBtn>
