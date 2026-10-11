@@ -199,16 +199,17 @@ function parseLeagueRoster(raw) {
   // intact rather than guessing where those names should be split.
   const normalizedRaw = String(raw || "")
     .replace(/Team(?=\d{5})/gi, "Team ")
-    .replace(/(?<!\d)(\d{5})(\d{1,2})(\d{1,2})(?=[A-Za-z"'])/g, "\n$1 $2 $3 ")
+    // Restore common venue boundaries so the existing team-header parser
+    // keeps team name and venue separate.
+    .replace(/\s+(Twin City Billiards|C\.?R\.?['’]?s Sports Bar|Two Stooges Sports Bar|Shooter['’]?s Billiards|Turtle['’]?s Bar\s*&\s*Grill|Pullman Club)\s+(?=Num\s*Play|NumPlay|Rate\s*Num)/gi, "\n$1\n")
+    .replace(/(?<!\d)(\d{5})(\d)(\d)(?=[A-Za-z"'])/g, "\n$1 $2 $3 ")
     .split(/\r?\n/)
     .map(line => {
-      const row = line.match(/^(\d{5})\s+(\d{1,2})\s+(\d{1,2})\s+(.+?)(\d{2,3})\s*$/);
+      // Ratings are normally two digits or 100–199. Prefer a three-digit
+      // rating before falling back to two digits, so 105 stays 105 (not 1 + 05).
+      const row = line.match(/^(\d{5})\s+(\d)\s+(\d)\s+(.+?)(1\d{2}|\d{2})\s*$/);
       if (!row) return line;
-      const suffix3 = Number(row[5]);
-      const rateLength = suffix3 >= 100 && suffix3 <= 200 ? 3 : 2;
-      const name = row[4] + row[5].slice(0, row[5].length - rateLength);
-      const rate = row[5].slice(-rateLength);
-      return row[1] + " " + row[2] + " " + row[3] + " " + name.trim() + " " + rate;
+      return row[1] + " " + row[2] + " " + row[3] + " " + row[4].trim() + " " + row[5];
     })
     .join("\n");
   const parts = normalizedRaw.split(/Division Roster and Handicap Report/i);
