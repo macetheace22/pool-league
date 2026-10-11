@@ -29,8 +29,8 @@ describe("IBA parsers", () => {
       "Report printed: 10/09/26",
       "Team 15201 No Bull",
       "C.R.'s Sports Bar",
-      '88 13102 4 3 Johnson, Loren "Smooth"',
-      '89 02256 4 2 Reyes, Oakley"Natural"',
+    expect(result.registry["13102"]).toMatchObject({ name: "Johnson, Loren", nickname: "Smooth", rating: 88 });
+    expect(result.registry["02256"]).toMatchObject({ name: "Reyes, Oakley", nickname: "Natural", rating: 89 });
     ].join("\n");
 
     const result = parseLeagueRoster(raw);
@@ -41,9 +41,9 @@ describe("IBA parsers", () => {
     expect(result.registry["34240"]).toMatchObject({ name: "Marier, Dave", rating: 105 });
     expect(result.registry["14768"]).toMatchObject({ name: "Barrett, Scott", rating: 116 });
     expect(result.registry["25953"]).toMatchObject({ name: "Stewart, Ryan", rating: 73 });
-      '88 13102 4 3 Johnson, Loren "Smooth"',
+    expect(result.registry["13102"]).toMatchObject({ name: "Johnson, Loren", nickname: "Smooth", rating: 88 });
     expect(result.rosters["15201"]).toEqual(["13102", "02256"]);
-      '89 02256 4 2 Reyes, Oakley"Natural"',
+    expect(result.registry["02256"]).toMatchObject({ name: "Reyes, Oakley", nickname: "Natural", rating: 89 });
   });
 
   it("parses a simple single-column roster without changing the existing output contract", () => {
