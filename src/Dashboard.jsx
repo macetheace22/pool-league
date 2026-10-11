@@ -474,7 +474,7 @@ export function SeasonManagementHub() {
         {profile.role !== "manager" ? <AccessDenied /> : (
           <>
             <p className="season-hub-intro">
-              Follow these two steps to get a season ready and keep its league data current.
+              Use these three areas to set up a season, update weekly reports, and maintain playoff and location details.
             </p>
             <div className="season-hub-section">
               <div className="season-hub-section__title">1. Set up the season, teams & schedule</div>
@@ -489,19 +489,46 @@ export function SeasonManagementHub() {
               <Link to="/manage" className="season-hub-card">
                 <div className="season-hub-card__icon"><Settings2 size={19} /></div>
                 <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Import teams & schedule manually</div>
-                  <div className="season-hub-card__desc">Use the Teams and Schedule tabs to paste, enter, or correct the team list and match schedule when you need a manual path or fallback.</div>
+                  <div className="season-hub-card__title">Manage season data</div>
+                  <div className="season-hub-card__desc">Review or manually maintain teams and schedules, make roster and rating corrections, and manage season-specific settings when needed.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
             </div>
             <div className="season-hub-section">
-              <div className="season-hub-section__title">2. Import weekly league data</div>
+              <div className="season-hub-section__title">2. Update weekly league data</div>
               <Link to="/weekly-data" className="season-hub-card">
                 <div className="season-hub-card__icon"><Upload size={19} /></div>
                 <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Update rosters, ratings & standings</div>
-                  <div className="season-hub-card__desc">Use automatic IBA report sync or the manual import tools for rosters and ratings, team standings, and MVP standings. Playoff eligibility is a separate manual import when needed.</div>
+                  <div className="season-hub-card__title">Roster & ratings, team standings, and MVP standings</div>
+                  <div className="season-hub-card__desc">Choose automatic IBA sync or manual import independently for each weekly data category.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">3. Maintain playoff setup & locations</div>
+              <Link to="/manage?tab=eligibility" className="season-hub-card">
+                <div className="season-hub-card__icon"><AlertCircle size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Playoff eligibility</div>
+                  <div className="season-hub-card__desc">Manually import and review the IBA playoff-eligibility report when it becomes available.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+              <Link to="/manage?tab=playoffs" className="season-hub-card">
+                <div className="season-hub-card__icon"><Trophy size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Playoffs</div>
+                  <div className="season-hub-card__desc">Maintain playoff-related setup for the selected season and division.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+              <Link to="/manage?tab=locations" className="season-hub-card">
+                <div className="season-hub-card__icon"><MapPin size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Locations</div>
+                  <div className="season-hub-card__desc">Maintain the locations used for league teams and venues.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>

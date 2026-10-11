@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, Download, RefreshCw, AlertCircle } from "lucide-react";
 import { fetchIbaReports, buildIbaPreview, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
 
-export default function IbaAutoSyncPanel({ season, schedule, onComplete }) {
+export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null }) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
@@ -11,13 +11,17 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete }) {
 
   const codes = ibaCodesForSeason(season);
   const supported = !!codes.leagueType && !!codes.day;
+  const reportLabels = { rost: "roster & ratings", div: "team standings", mvp: "MVP standings" };
+  const selectedReportLabel = reportLabels[reportType] || "weekly league data";
+  const selectedReports = (reports) => reportType ? (reports ?? []).filter(r => r.reportType === reportType) : (reports ?? []);
 
   const fetchReports = async () => {
     setLoading(true); setError(""); setResult(null);
     try {
-      const fetched = await fetchIbaReports(season);
-      const preview = await buildIbaPreview(fetched.reports);
-      setData({ ...fetched, preview });
+      const fetched = await fetchIbaReports(season, reportType);
+      const reports = selectedReports(fetched.reports);
+      const preview = await buildIbaPreview(reports);
+      setData({ ...fetched, reports, preview });
     } catch (e) {
       setError(e?.message || "Unable to retrieve IBA reports.");
     } finally { setLoading(false); }
@@ -27,7 +31,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete }) {
     if (!data?.reports) return;
     setImporting(true); setError("");
     try {
-      const imported = await importIbaReports(data.reports, season, schedule);
+      const imported = await importIbaReports(selectedReports(data.reports), season, schedule);
       setResult(imported);
       if (onComplete) await onComplete();
     } catch (e) {
@@ -38,18 +42,18 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete }) {
   return (
     <div className="card" style={{marginBottom:12}}>
       <div className="card__title" style={{display:"flex",alignItems:"center",gap:7}}>
-        <Download size={14}/> Automatic IBA Report Sync
+        <Download size={14}/> {reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
       </div>
       <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>
-        Automatically checks the current IBA {season?.format || "league"} · {season?.day || "day"} reports for roster/ratings, team standings, and MVP standings. A report may be missing when that league is not playing.
+        Automatically checks the current IBA {season?.format || "league"} · {season?.day || "day"} report{reportType ? ` for ${selectedReportLabel}` : "s for roster/ratings, team standings, and MVP standings"}. A report may be missing when that league is not playing.
       </div>
-      <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
-        <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use the separate <strong>Playoff Eligibility</strong> tab for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
-      </div>
+      {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
+        <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
+      </div>}
       {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Select a season with a supported format and day.</div></div>}
       {supported && !data && (
         <button className="btn-primary" onClick={fetchReports} disabled={loading} style={{marginTop:8}}>
-          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Fetch Latest IBA Reports"}
+          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : reportType ? `Fetch Latest ${reportLabels[reportType] || "IBA Report"}` : "Fetch Latest IBA Reports"}
         </button>
       )}
 

@@ -280,8 +280,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [locations, setLocations] = useState([]);
   const refreshLocations = () => db.listLocations().then(setLocations);
 
-  const [manageSubTab, setManageSubTab]   = useState("teams");
-  const [weeklySubTab, setWeeklySubTab]   = useState("ratings");
+  const [manageSubTab, setManageSubTab]   = useState(() => ["teams", "schedule", "players", "eligibility", "playoffs", "locations"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "teams");
+  const [weeklyCategory, setWeeklyCategory] = useState("ratings");
+  const [weeklyMode, setWeeklyMode] = useState("auto");
   const [infoSubTab, setInfoSubTab]       = useState("teams");
   const [accessSubTab, setAccessSubTab]   = useState("users");
   const [accessCounts, setAccessCounts]   = useState({ users: 0, codes: 0 });
@@ -526,6 +527,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SubTabBtn active={manageSubTab==="schedule"} onClick={()=>setManageSubTab("schedule")}>Schedule</SubTabBtn>
           {page !== "manual-import" && <>
             <SubTabBtn active={manageSubTab==="players"} onClick={()=>setManageSubTab("players")}>Players & Ratings</SubTabBtn>
+            <SubTabBtn active={manageSubTab==="eligibility"} onClick={()=>setManageSubTab("eligibility")}>Playoff Eligibility</SubTabBtn>
             <SubTabBtn active={manageSubTab==="playoffs"} onClick={()=>setManageSubTab("playoffs")}>Playoffs</SubTabBtn>
             <SubTabBtn active={manageSubTab==="locations"} onClick={()=>setManageSubTab("locations")}>Locations</SubTabBtn>
           </>}
@@ -560,6 +562,15 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               onMovePlayer={isViewingActive && viewingDiv ? handleMovePlayer : null}
               lockedTeamId={null} readOnly={!isViewingActive} />
           )}
+          {manageSubTab==="eligibility" && viewingDiv && isViewingActive && (
+            <SeedPlayoffEligibilityImport divisionId={viewingDiv.id} existingCount={Object.keys(playoffEligibility).length} onImported={refreshCurrentDivision} />
+          )}
+          {manageSubTab==="eligibility" && !viewingDiv && (
+            <div className="empty-state">Pick a division from the Season tab first.</div>
+          )}
+          {manageSubTab==="eligibility" && viewingDiv && !isViewingActive && (
+            <div className="empty-state">Activate this season to import playoff eligibility.</div>
+          )}
           {manageSubTab==="playoffs" && viewingDiv && (
             <PlayoffsTab divisionId={viewingDiv.id} teams={viewTeams} />
           )}
@@ -574,37 +585,76 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     );
   }
 
-  // ── Update Weekly League Data — manager only ──
+  // ── Weekly league data — manager only ──
   if (page === "weekly") {
-    if (!isManager) return <><PageHeader title="Update Weekly League Data"/><div className="tab-content"><AccessDenied/></div></>;
+    if (!isManager) return <><PageHeader title="Weekly Import Page" subtitle="AUTOMATIC IBA SYNC + MANUAL IMPORTS"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
-        <PageHeader title="Update Weekly League Data" />
-        <SubTabBar>
-          <SubTabBtn active={weeklySubTab==="ratings"} onClick={()=>setWeeklySubTab("ratings")}>Import Ratings</SubTabBtn>
-          <SubTabBtn active={weeklySubTab==="standings"} onClick={()=>setWeeklySubTab("standings")}>Import Team Standings</SubTabBtn>
-          <SubTabBtn active={weeklySubTab==="mvp"} onClick={()=>setWeeklySubTab("mvp")}>Import MVP Standings</SubTabBtn>
-          <SubTabBtn active={weeklySubTab==="eligibility"} onClick={()=>setWeeklySubTab("eligibility")}>Playoff Eligibility</SubTabBtn>
-        </SubTabBar>
+        <PageHeader title="Weekly Import Page" subtitle="AUTOMATIC IBA SYNC + MANUAL IMPORTS" />
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
-          {isViewingActive && isManager && viewingSeason && (
-            <IbaAutoSyncPanel season={viewingSeason} schedule={viewSchedule} onComplete={refreshCurrentDivision} />
-          )}
-          {!viewingDiv
-            ? <div className="empty-state">Pick a division above to import weekly data.</div>
-            : weeklySubTab==="ratings"
-            ? <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
-                divisionId={viewingDiv?.id ?? null} onReconciled={refreshCurrentDivision}
-                onBulkImport={isViewingActive ? handleBulkImport : null}
-                onManualRating={isViewingActive ? handleManualRating : null}
-                onMovePlayer={isViewingActive ? handleMovePlayer : null}
-                lockedTeamId={null} readOnly={!isViewingActive} />
-            : weeklySubTab==="eligibility"
-            ? <SeedPlayoffEligibilityImport divisionId={viewingDiv.id} existingCount={Object.keys(playoffEligibility).length} onImported={refreshCurrentDivision} />
-            : <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklySubTab} />
-          }
+          <div className="weekly-data-global-action">
+            <div><div className="weekly-data-global-action__title">Need to update everything?</div><div className="weekly-data-global-action__desc">Check all three IBA weekly reports in one shared sync.</div></div>
+            <button className={weeklyCategory==="all" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("all");setWeeklyMode("auto");}}>Sync All Weekly Data</button>
+          </div>
+          <div className="weekly-data-tiles">
+            <div className={`weekly-data-tile ${weeklyCategory==="ratings" ? "weekly-data-tile--active" : ""}`}>
+              <div className="weekly-data-tile__title">Roster & Ratings</div>
+              <div className="weekly-data-tile__desc">Update team rosters and player ratings from the IBA roster report, or import and maintain them manually.</div>
+              <div className="weekly-data-tile__actions">
+                <button className={weeklyCategory==="ratings" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("auto");}}>Automatic Sync</button>
+                <button className={weeklyCategory==="ratings" && weeklyMode==="manual" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("manual");}}>Manual Import</button>
+              </div>
+            </div>
+            <div className={`weekly-data-tile ${weeklyCategory==="standings" ? "weekly-data-tile--active" : ""}`}>
+              <div className="weekly-data-tile__title">Team Standings</div>
+              <div className="weekly-data-tile__desc">Import the IBA team-standings report automatically or use the manual standings importer.</div>
+              <div className="weekly-data-tile__actions">
+                <button className={weeklyCategory==="standings" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("auto");}}>Automatic Sync</button>
+                <button className={weeklyCategory==="standings" && weeklyMode==="manual" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("manual");}}>Manual Import</button>
+              </div>
+            </div>
+            <div className={`weekly-data-tile ${weeklyCategory==="mvp" ? "weekly-data-tile--active" : ""}`}>
+              <div className="weekly-data-tile__title">MVP Standings</div>
+              <div className="weekly-data-tile__desc">Import the IBA MVP report automatically or use the manual MVP standings importer.</div>
+              <div className="weekly-data-tile__actions">
+                <button className={weeklyCategory==="mvp" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("auto");}}>Automatic Sync</button>
+                <button className={weeklyCategory==="mvp" && weeklyMode==="manual" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("manual");}}>Manual Import</button>
+              </div>
+            </div>
+          </div>
+          <div className="weekly-data-workspace">
+            <div className="weekly-data-workspace__heading">
+              <div className="weekly-data-workspace__title">
+                {weeklyCategory==="all" ? "All Weekly Data" : weeklyCategory==="ratings" ? "Roster & Ratings" : weeklyCategory==="standings" ? "Team Standings" : "MVP Standings"}
+              </div>
+              <div className="weekly-data-workspace__mode">{weeklyMode==="auto" ? "AUTOMATIC IBA SYNC" : "MANUAL IMPORT"}</div>
+            </div>
+            {weeklyMode==="auto"
+              ? isViewingActive && viewingSeason
+                ? <IbaAutoSyncPanel
+                    key={`${viewingSeason.id}-${weeklyCategory}`}
+                    season={viewingSeason}
+                    schedule={viewSchedule}
+                    reportType={weeklyCategory==="all" ? null : weeklyCategory==="ratings" ? "rost" : weeklyCategory==="standings" ? "div" : "mvp"}
+                    onComplete={refreshCurrentDivision}
+                  />
+                : <div className="empty-state">Select an active season to sync its weekly IBA report.</div>
+              : !isViewingActive
+                ? <div className="empty-state">Activate a season to import weekly data.</div>
+                : !viewingDiv
+                  ? <div className="empty-state">Pick a division above to import weekly data.</div>
+                  : weeklyCategory==="ratings"
+                    ? <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
+                        divisionId={viewingDiv?.id ?? null} onReconciled={refreshCurrentDivision}
+                        onBulkImport={handleBulkImport}
+                        onManualRating={handleManualRating}
+                        onMovePlayer={handleMovePlayer}
+                        lockedTeamId={null} readOnly={false} />
+                    : <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklyCategory} />
+            }
+          </div>
         </div>
       </>
     );
@@ -5392,6 +5442,22 @@ html,body{width:100%;overflow-x:hidden;}
 .tab-bar{display:flex;background:#141414;border-bottom:1.5px solid #2E2E2E;padding:6px 10px;gap:5px;overflow-x:auto;}
 .tab-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 6px;border-radius:8px;border:none;background:none;font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;color:#6A6A6A;cursor:pointer;white-space:nowrap;min-width:0;}
 .tab-btn--active{background:#0B3D2E;color:#5FCF9E;}
+.weekly-data-global-action{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 10px;padding:12px;background:#141414;border:1px solid #2E2E2E;border-radius:12px;}
+.weekly-data-global-action__title{font-size:12px;font-weight:800;color:#E0E0E0;}
+.weekly-data-global-action__desc{font-size:10.5px;color:#9A9A9A;line-height:1.4;margin-top:3px;}
+.weekly-data-global-action button{flex:0 0 auto;max-width:48%;white-space:normal;line-height:1.2;}
+.weekly-data-tiles{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0 0 16px;}
+.weekly-data-tile{display:flex;flex-direction:column;gap:8px;min-width:0;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:12px;padding:13px;}
+.weekly-data-tile--active{border-color:#28634C;background:#17251F;}
+.weekly-data-tile__title{font-size:13px;font-weight:800;color:#F4F4F4;}
+.weekly-data-tile__desc{font-size:11px;line-height:1.45;color:#9A9A9A;flex:1;}
+.weekly-data-tile__actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+.weekly-data-tile__actions button{min-width:0;white-space:normal;line-height:1.2;min-height:36px;padding:8px 5px;}
+.weekly-data-workspace{border:1.5px solid #2E2E2E;border-radius:14px;padding:12px;background:#141414;}
+.weekly-data-workspace__heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.weekly-data-workspace__title{font-size:14px;font-weight:800;color:#F4F4F4;}
+.weekly-data-workspace__mode{font-size:9px;font-weight:800;letter-spacing:.06em;color:#9FC4B4;text-align:right;}
+@media (min-width:700px){.weekly-data-tiles{grid-template-columns:repeat(3,minmax(0,1fr));}.weekly-data-tile{padding:14px;}}
 .sub-tab-bar{display:flex;gap:6px;margin-bottom:4px;}
 .sub-tab{flex:1;padding:8px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:8px;font-family:'Archivo',sans-serif;font-size:11.5px;font-weight:700;color:#6A6A6A;cursor:pointer;}
 .sub-tab--active{background:#0B3D2E;border-color:#0B3D2E;color:#5FCF9E;}
