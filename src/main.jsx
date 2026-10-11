@@ -24,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/tournaments" element={<TournamentsPlaceholder />} />
             <Route path="/seasons" element={<AdminApp page="seasons" />} />
             <Route path="/manage" element={<AdminApp page="manage" />} />
+            <Route path="/manual-season-import" element={<AdminApp page="manual-import" />} />
             <Route path="/weekly-data" element={<AdminApp page="weekly" />} />
             <Route path="/matches" element={<AdminApp page="matches" />} />
             <Route path="/team-info" element={<AdminApp page="teaminfo" />} />

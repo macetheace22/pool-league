@@ -279,7 +279,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [captainsByTeam, setCaptainsByTeam] = useState({}); // { teamId: {username, phone} }
   const [locations, setLocations] = useState([]);
   const refreshLocations = () => db.listLocations().then(setLocations);
-  const [divisionTeamCounts, setDivisionTeamCounts] = useState({}); // { divisionId: teamCount } -- powers the Seasons page's "still needs teams" check
 
   const [manageSubTab, setManageSubTab]   = useState("teams");
   const [weeklySubTab, setWeeklySubTab]   = useState("ratings");
@@ -290,29 +289,11 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [myTeamSubTab, setMyTeamSubTab]   = useState("roster");
 
   const activeSeasons = seasons.filter(s => s.is_active);
-  // A season is still waiting on teams if it has at least one division and
-  // zero teams across all of them -- drives each active season card's
-  // "Next: Import Teams" button. More than one active season can need this
-  // at once, so this is the full set, not just the first match.
-  const seasonIdsNeedingTeams = new Set(
-    activeSeasons.filter(s => {
-      const divs = s.divisions ?? [];
-      if (divs.length === 0) return false;
-      return divs.reduce((sum, d) => sum + (divisionTeamCounts[d.id] ?? 0), 0) === 0;
-    }).map(s => s.id)
-  );
-
   const refreshSeasons = async () => {
     const list = await db.listSeasons();
     setSeasons(list);
     return list;
   };
-
-  useEffect(() => {
-    const allDivisionIds = seasons.flatMap(s => (s.divisions ?? []).map(d => d.id));
-    if (allDivisionIds.length === 0) { setDivisionTeamCounts({}); return; }
-    db.countTeamsByDivisions(allDivisionIds).then(setDivisionTeamCounts);
-  }, [seasons]);
 
   useEffect(() => {
     refreshSeasons().then(list => {
@@ -516,7 +497,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
-            seasonIdsNeedingTeams={seasonIdsNeedingTeams} onImportTeams={(seasonId)=>navigate(`/manage?season=${seasonId}`)}
             onSeasonCreated={()=>setSeasonsSubTab("inactive")}
             onImportIbaSchedule={refreshSeasons} />
         </div>
@@ -525,17 +505,30 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   }
 
   // ── Manage Season Data — manager only, full edit ──
-  if (page === "manage") {
+  if (page === "manage" || page === "manual-import") {
     if (!isManager) return <><PageHeader title="Manage Season Data"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
-        <PageHeader title="Manage Season Data" />
+        <PageHeader title={page === "manual-import" ? "Manual Team & Schedule Import" : "Manage Season Data"} />
+        {page === "manual-import" && viewingSeason && !isViewingActive && (
+          <div className="card" style={{ margin: "0 12px 12px", padding: 12 }}>
+            <div className="card__title">Activate this season to import manually</div>
+            <div style={{ fontSize: 12, color: "#BDBDBD", lineHeight: 1.5, marginBottom: 10 }}>
+              Inactive seasons are read-only. Activate this season to enable manual team and schedule setup.
+            </div>
+            <button className="btn-primary" onClick={() => handleToggleActive(viewingSeason)}>
+              Set Season Active
+            </button>
+          </div>
+        )}
         <SubTabBar>
           <SubTabBtn active={manageSubTab==="teams"} onClick={()=>setManageSubTab("teams")}>Teams</SubTabBtn>
           <SubTabBtn active={manageSubTab==="schedule"} onClick={()=>setManageSubTab("schedule")}>Schedule</SubTabBtn>
-          <SubTabBtn active={manageSubTab==="players"} onClick={()=>setManageSubTab("players")}>Players & Ratings</SubTabBtn>
-          <SubTabBtn active={manageSubTab==="playoffs"} onClick={()=>setManageSubTab("playoffs")}>Playoffs</SubTabBtn>
-          <SubTabBtn active={manageSubTab==="locations"} onClick={()=>setManageSubTab("locations")}>Locations</SubTabBtn>
+          {page !== "manual-import" && <>
+            <SubTabBtn active={manageSubTab==="players"} onClick={()=>setManageSubTab("players")}>Players & Ratings</SubTabBtn>
+            <SubTabBtn active={manageSubTab==="playoffs"} onClick={()=>setManageSubTab("playoffs")}>Playoffs</SubTabBtn>
+            <SubTabBtn active={manageSubTab==="locations"} onClick={()=>setManageSubTab("locations")}>Locations</SubTabBtn>
+          </>}
         </SubTabBar>
         <div className="tab-content">
           {manageSubTab!=="players" && manageSubTab!=="locations" && manageSubTab!=="playoffs" && (
@@ -557,7 +550,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               onAddPairing={isViewingActive && viewingDiv ? handleAddPairing : null}
               onUpdatePairing={isViewingActive && viewingDiv ? handleUpdatePairing : null}
               onDeletePairing={isViewingActive && viewingDiv ? handleDeletePairing : null}
-              readOnly={!isViewingActive} onNext={()=>setManageSubTab("players")} />
+              readOnly={!isViewingActive} onNext={page === "manual-import" ? null : ()=>setManageSubTab("players")} />
           )}
           {manageSubTab==="players" && (
             <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
@@ -1571,7 +1564,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 }
 
 // ─── Seasons Tab ──────────────────────────────────────────────────────────────
-function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, seasonIdsNeedingTeams, onImportTeams, onSeasonCreated, onImportIbaSchedule }) {
+function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSeasonCreated, onImportIbaSchedule }) {
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
   const [format, setFormat] = useState("Masters");
@@ -1686,7 +1679,6 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 const isAct        = s.is_active;
                 const isExpanded   = expandedSeason === s.id;
                 const divs         = s.divisions ?? [];
-                const needsTeams   = seasonIdsNeedingTeams?.has(s.id);
                 return (
                   <div key={s.id} className={`season-card ${isAct?"season-card--active":""}`}>
                     <div className="season-card__header" onClick={()=>setExpandedSeason(isExpanded?null:s.id)}>
@@ -1695,11 +1687,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                         <div className="season-card__meta">{divs.length} division{divs.length!==1?"s":""}{isAct?" · ● Active":""}</div>
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        {needsTeams && (
-                          <button className="btn-sm btn-sm--accent" onClick={e=>{e.stopPropagation();onImportTeams(s.id);}}>
-                            Import Teams <ChevronRight size={11}/>
-                          </button>
-                        )}
+                        
                         <button className={`btn-sm ${isAct?"btn-sm--warn":"btn-sm--accent"}`}
                           onClick={e=>{e.stopPropagation();onToggleActive(s);if(!isAct)setExpandedSeason(s.id);}}>
                           {isAct?"Deactivate":"Set Active"}
@@ -1736,6 +1724,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim()}><Plus size={13}/></button>
                         </div>
                         <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
+                         
                         <div className="field" style={{marginTop:10}}>
                           <Label>Playoffs Start Date</Label>
                           <div style={{fontSize:12.5,color:s.playoffs_start_date?"#E0E0E0":"#6A6A6A",fontWeight:600}}>
