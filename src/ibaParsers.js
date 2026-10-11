@@ -160,8 +160,10 @@ const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\
 // ==================================================================
 function parseLeagueRoster(raw) {
   const parts = raw.split(/Division Roster and Handicap Report/i);
-  const sections = parts.slice(1);
-  if (sections.length === 0) sections.push(raw);
+  // Some IBA PDF text extraction layouts place the division heading AFTER
+  // that division's team blocks. Keep the pre-heading text as a section too;
+  // dropping parts[0] silently loses the first division in those reports.
+  const sections = parts.filter(part => part.trim());
 
   const registry = {};
   const rosters = {};
@@ -379,6 +381,15 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 
     if (!current) continue;
 
+    // Current IBA roster PDFs commonly extract rows as:
+    // "Rate Num Play Win Name" (rate FIRST), unlike older rate-last layouts.
+    // Keep the player number as a string to preserve leading zeroes.
+    const rateFirst = line.match(/^(\\d{1,3})\\s+(\\d{5})\\.?\\s+[\\dO]+\\.?\\s+[\\dO]+\\.?\\s+(.+)$/);
+    if (rateFirst) {
+      current.players.push({ num: rateFirst[2], name: rateFirst[3], rate: parseInt(rateFirst[1], 10) });
+      continue;
+    }
+
     const m = RE_RATE_LAST_OPT.exec(line);
     if (m) {
       current.players.push({ num: m[1], name: m[2] });
@@ -389,6 +400,18 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 
   const teamsList = allTeams;
   if (teamsList.length === 0) return;
+
+  // Rate-first rows carry their own rating and must never enter the legacy
+  // rate-shifting logic used for the older multi-column PDF extraction.
+  if (teamsList.some(team => team.players.some(player => player.rate !== undefined))) {
+    for (const team of teamsList) {
+      team.players.forEach((player, i) => {
+        const rate = player.rate !== undefined ? player.rate : team.trailingRates[i];
+        addPlayer(registry, rosters, team.id, player.num, player.name, rate, needsRating);
+      });
+    }
+    return;
+  }
 
   // Does any team block genuinely lack a rate column? That's the signature
   // of the shifted/bled layout, where the rightmost grid column never gets
