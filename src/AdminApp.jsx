@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
+import SearchableOptionSelect from "./SearchableOptionSelect";
 import { getActiveTeamIds } from "./teamMembership";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
@@ -4751,11 +4752,7 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
       </div>
       {mode==="existing" ? (
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          <input className="edit-input" value={captainSearch} onChange={e=>setCaptainSearch(e.target.value)} placeholder="Type to search captains…" aria-label="Search captain accounts" disabled={saving} />
-          <select className="edit-input" style={{flex:1,minWidth:0}} value={pickedId} onChange={e=>setPickedId(e.target.value)} disabled={saving}>
-            <option value="">Select a captain…</option>
-            {candidates.filter(p=>`${labelFor(p)} ${p.phone_number ?? ""}`.toLowerCase().includes(captainSearch.trim().toLowerCase())).map(p => <option key={p.id} value={p.id}>{labelFor(p)}</option>)}
-          </select>
+          <SearchableOptionSelect options={candidates.map(p=>({value:p.id,label:labelFor(p),searchText:`${labelFor(p)} ${p.phone_number ?? ""}`}))} value={pickedId} onChange={setPickedId} disabled={saving} placeholder="Select a captain…" ariaLabel="Search captain accounts" className="edit-input" />
           <button className="btn-icon btn-icon--confirm" onClick={assignExisting} disabled={!pickedId||saving}><Check size={13}/></button>
         </div>
       ) : (
