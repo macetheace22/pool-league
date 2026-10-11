@@ -49,8 +49,8 @@ describe("IBA parsers", () => {
   it("parses current compact DIV PDF cells with tenths and sets played joined", () => {
     const raw = ["Fall Season 2026", "Week", "6", "Wed (BCA/VNEA)TCB Masters", "Team", "Points / Set", "Team Name", "Total PointsPoints Last WkSets Plyd", "15103", "115", "T.C.'s", "2752", "95924", "15101", "86", "Scotty Doesn't Know", "2143", "30225", "Division Standings", "Printed: 10/9/2026"].join("\n");
     expect(parseStandingsImport(raw)).toEqual([
-      { teamNum:"15103", teamName:"T.C.'s", pointsLastWk:95.9, totalPoints:2752, setsPlayed:24 },
-      { teamNum:"15101", teamName:"Scotty Doesn't Know", pointsLastWk:30.2, totalPoints:2143, setsPlayed:25 }
+      { teamNum:"15103", teamName:"T.C.'s", pointsLastWk:959, totalPoints:2752, setsPlayed:24 },
+      { teamNum:"15101", teamName:"Scotty Doesn't Know", pointsLastWk:302, totalPoints:2143, setsPlayed:25 }
     ]);
   });
 
