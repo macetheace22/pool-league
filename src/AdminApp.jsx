@@ -576,16 +576,18 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   // ── Update Weekly League Data — manager only ──
   if (page === "weekly") {
-    if (!isManager) return <><PageHeader title="Update Weekly League Data"/><div className="tab-content"><AccessDenied/></div></>;
+    if (!isManager) return <><PageHeader title="Weekly Import Page" subtitle="AUTOMATIC IBA SYNC + MANUAL IMPORTS"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
-        <PageHeader title="Update Weekly League Data" />
-        <SubTabBar>
-          <SubTabBtn active={weeklySubTab==="ratings"} onClick={()=>setWeeklySubTab("ratings")}>Import Ratings</SubTabBtn>
-          <SubTabBtn active={weeklySubTab==="standings"} onClick={()=>setWeeklySubTab("standings")}>Import Team Standings</SubTabBtn>
-          <SubTabBtn active={weeklySubTab==="mvp"} onClick={()=>setWeeklySubTab("mvp")}>Import MVP Standings</SubTabBtn>
-          <SubTabBtn active={weeklySubTab==="eligibility"} onClick={()=>setWeeklySubTab("eligibility")}>Playoff Eligibility</SubTabBtn>
-        </SubTabBar>
+        <PageHeader title="Weekly Import Page" subtitle="AUTOMATIC IBA SYNC + MANUAL IMPORTS" />
+        <div className="weekly-import-tabs">
+          <SubTabBar>
+            <SubTabBtn active={weeklySubTab==="ratings"} onClick={()=>setWeeklySubTab("ratings")}>Roster & Ratings</SubTabBtn>
+            <SubTabBtn active={weeklySubTab==="standings"} onClick={()=>setWeeklySubTab("standings")}>Team Standings</SubTabBtn>
+            <SubTabBtn active={weeklySubTab==="mvp"} onClick={()=>setWeeklySubTab("mvp")}>MVP Standings</SubTabBtn>
+            <SubTabBtn active={weeklySubTab==="eligibility"} onClick={()=>setWeeklySubTab("eligibility")}>Playoff Eligibility</SubTabBtn>
+          </SubTabBar>
+        </div>
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
@@ -5392,6 +5394,9 @@ html,body{width:100%;overflow-x:hidden;}
 .tab-bar{display:flex;background:#141414;border-bottom:1.5px solid #2E2E2E;padding:6px 10px;gap:5px;overflow-x:auto;}
 .tab-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 6px;border-radius:8px;border:none;background:none;font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;color:#6A6A6A;cursor:pointer;white-space:nowrap;min-width:0;}
 .tab-btn--active{background:#0B3D2E;color:#5FCF9E;}
+.weekly-import-tabs .tab-bar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;align-items:stretch;}
+.weekly-import-tabs .tab-btn{white-space:normal;line-height:1.2;min-height:38px;padding:8px 5px;text-align:center;}
+@media (min-width:600px){.weekly-import-tabs .tab-bar{grid-template-columns:repeat(4,minmax(0,1fr));}}
 .sub-tab-bar{display:flex;gap:6px;margin-bottom:4px;}
 .sub-tab{flex:1;padding:8px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:8px;font-family:'Archivo',sans-serif;font-size:11.5px;font-weight:700;color:#6A6A6A;cursor:pointer;}
 .sub-tab--active{background:#0B3D2E;border-color:#0B3D2E;color:#5FCF9E;}
