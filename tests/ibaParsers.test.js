@@ -64,9 +64,9 @@ describe("IBA parsers", () => {
 
   it("recovers compact current ROST player rows from a flattened PDF line", () => {
     const raw = [
-      "Team15101 Scotty Doesn't Know Twin City Billiards NumPlayW inNameRate 3424042Marier, Dave105 1476821Barrett, Scott116 2277431Norberg, Scott \\\"304\\\"79 2595332Stewart, Ryan73",
-      'Team15102 Damn It Twin City Billiards NumPlayW inNameRate 1852932Carlson, Doug "DamnIt"134 0186830Wylie, Wayne94'
-    ].join("\\n");
+      `Team15101 Scotty Doesn't Know Twin City Billiards NumPlayW inNameRate 3424042Marier, Dave105 1476821Barrett, Scott116 2277431Norberg, Scott "304"79 2595332Stewart, Ryan73`,
+      `Team15102 Damn It Twin City Billiards NumPlayW inNameRate 1852932Carlson, Doug "DamnIt"134 0186830Wylie, Wayne94`
+    ].join("\n");
     const result = parseLeagueRoster(raw);
     expect(result.rosters["15101"]).toContain("34240");
     expect(result.rosters["15101"]).toContain("14768");
