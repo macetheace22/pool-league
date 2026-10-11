@@ -497,7 +497,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
-            onImportIbaSchedule={refreshSeasons}
             onSeasonCreated={()=>setSeasonsSubTab("inactive")}
             onImportIbaSchedule={refreshSeasons} />
         </div>
