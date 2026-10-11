@@ -1,6 +1,6 @@
 # Security role regression matrix
 
-This checklist complements the fast Vitest security-contract tests. The Vitest tests guard important SQL authorization invariants against accidental removal; they do **not** prove PostgreSQL RLS behavior. Run this matrix against a staging Supabase project with dedicated test accounts and disposable match/team fixtures before treating authorization as integration-tested.
+This checklist complements the fast Vitest security-contract tests. The Vitest tests guard important SQL authorization invariants against accidental removal; they do **not** prove PostgreSQL RLS behavior. An executable, rollback-only smoke harness is provided at `tests/security-role-matrix.integration.sql`; it covers membership removal, live scoring, scheduled-team integrity, and match reopening. Run it only in a staging Supabase project with dedicated test accounts and disposable match/team fixtures. The captain/player/non-member cases require those role fixtures to exist before running.
 
 ## Test identities and fixtures
 
