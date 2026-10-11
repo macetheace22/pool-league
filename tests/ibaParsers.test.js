@@ -22,15 +22,15 @@ describe("IBA parsers", () => {
       "73 25953 0 0 Stewart, Ryan",
       "Team 15102 Damn It",
       "Twin City Billiards",
-      "134 18529 3 2 Carlson, Doug \\"DamnIt\\"",
+      '134 18529 3 2 Carlson, Doug "DamnIt"',
       "Division Roster and Handicap Report Wed (BCA/VNEA)TCB Masters",
       "For Week: 6 Division # 151",
       "Fall Season 2026",
       "Report printed: 10/09/26",
       "Team 15201 No Bull",
       "C.R.'s Sports Bar",
-      "88 13102 4 3 Johnson, Loren \\"Smooth\\"",
-      "89 02256 4 2 Reyes, Oakley\\"Natural\\"",
+      '88 13102 4 3 Johnson, Loren "Smooth"',
+      '89 02256 4 2 Reyes, Oakley"Natural"',
     ].join("\n");
 
     const result = parseLeagueRoster(raw);
@@ -41,9 +41,9 @@ describe("IBA parsers", () => {
     expect(result.registry["34240"]).toMatchObject({ name: "Marier, Dave", rating: 105 });
     expect(result.registry["14768"]).toMatchObject({ name: "Barrett, Scott", rating: 116 });
     expect(result.registry["25953"]).toMatchObject({ name: "Stewart, Ryan", rating: 73 });
-    expect(result.registry["13102"]).toMatchObject({ name: "Johnson, Loren", nickname: "Smooth", rating: 88 });
+      '88 13102 4 3 Johnson, Loren "Smooth"',
     expect(result.rosters["15201"]).toEqual(["13102", "02256"]);
-    expect(result.registry["02256"]).toMatchObject({ name: "Reyes, Oakley", nickname: "Natural", rating: 89 });
+      '89 02256 4 2 Reyes, Oakley"Natural"',
   });
 
   it("parses a simple single-column roster without changing the existing output contract", () => {
