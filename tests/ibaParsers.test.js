@@ -46,6 +46,22 @@ describe("IBA parsers", () => {
     expect(result.registry["02256"]).toMatchObject({ name: "Reyes, Oakley", nickname: "Natural", rating: 89 });
   });
 
+  it("parses current compact DIV PDF cells with tenths and sets played joined", () => {
+    const raw = ["Fall Season 2026", "Week", "6", "Wed (BCA/VNEA)TCB Masters", "Team", "Points / Set", "Team Name", "Total PointsPoints Last WkSets Plyd", "15103", "115", "T.C.'s", "2752", "95924", "15101", "86", "Scotty Doesn't Know", "2143", "30225", "Division Standings", "Printed: 10/9/2026"].join("\n");
+    expect(parseStandingsImport(raw)).toEqual([
+      { teamNum:"15103", teamName:"T.C.'s", pointsLastWk:95.9, totalPoints:2752, setsPlayed:24 },
+      { teamNum:"15101", teamName:"Scotty Doesn't Know", pointsLastWk:30.2, totalPoints:2143, setsPlayed:25 }
+    ]);
+  });
+
+  it("parses compact current MVP PDF rows and preserves player-number zeroes", () => {
+    const raw = ["Plyr # Player Name Team Sets Won Total MVP Ranking Points Sets Lost Points Scored", "00609 Scott Peterson15103415200720", "27585 Mike Quackenbush15103414371837", "MVP Standings"].join("\n");
+    expect(parseMvpImport(raw)).toEqual([
+      { playerNum:"00609", playerName:"Scott Peterson", teamNum:"15103", wins:4, losses:0, pointsScored:720, mvpRankingPoints:1520 },
+      { playerNum:"27585", playerName:"Mike Quackenbush", teamNum:"15103", wins:4, losses:1, pointsScored:837, mvpRankingPoints:1437 }
+    ]);
+  });
+
   it("parses a simple single-column roster without changing the existing output contract", () => {
     const result = parseLeagueRoster([
       "Division Roster and Handicap Report",
