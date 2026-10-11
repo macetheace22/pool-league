@@ -5,7 +5,7 @@ import { AuthProvider } from './AuthContext.jsx';
 import AdminApp from './AdminApp.jsx';
 import LiveEntryApp from './LiveEntryApp.jsx';
 import { NavHistoryProvider } from './Shell.jsx';
-import { Home, LeaguesDashboard, LeagueOffice, TournamentsPlaceholder } from './Dashboard.jsx';
+import { Home, LeaguesDashboard, LeagueOffice, SeasonManagementHub, TournamentsPlaceholder } from './Dashboard.jsx';
 import Practice from './Practice.jsx';
 import Schedules from './Schedules.jsx';
 
@@ -19,6 +19,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/leagues" element={<LeaguesDashboard />} />
             <Route path="/schedules" element={<Schedules />} />
             <Route path="/league-office" element={<LeagueOffice />} />
+            <Route path="/season-management" element={<SeasonManagementHub />} />
             <Route path="/practice" element={<Practice />} />
             <Route path="/tournaments" element={<TournamentsPlaceholder />} />
             <Route path="/seasons" element={<AdminApp page="seasons" />} />

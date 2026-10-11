@@ -49,9 +49,7 @@ export function NavHistoryProvider({ children }) {
 // still gates visibility -- a manager sees everything, a captain sees their
 // scoped subset, a player sees just the shared reference pages.
 export const LEAGUE_OFFICE_ITEMS = [
-  { key: "seasons",  label: "Create or Update Seasons",     path: "/seasons",      roles: ["manager"],                     icon: Calendar },
-  { key: "manage",   label: "Manage Season Data",           path: "/manage",       roles: ["manager"],                     icon: Settings2 },
-  { key: "weekly",   label: "Update Weekly League Data",    path: "/weekly-data",  roles: ["manager"],                     icon: Upload },
+  { key: "season-workspace", label: "Season Setup & Management", path: "/season-management", roles: ["manager"], icon: Calendar },
   { key: "access",   label: "Manage App Access",            path: "/access",       roles: ["manager"],                     icon: Key },
   { key: "myteam",   label: "Manage My Team",               path: "/my-team",      roles: ["captain"],                     icon: Users },
   { key: "schedules", label: "Schedules",                    path: "/schedules",      roles: ["manager", "captain", "player"], icon: Calendar },

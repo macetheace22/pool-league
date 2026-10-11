@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart3, Trophy, Dumbbell, Award, ChevronRight, MapPin, Calendar,
-  Newspaper, Wrench, AlertCircle, Users, Check, TrendingUp,
+  Newspaper, Wrench, AlertCircle, Users, Check, TrendingUp, Settings2, Upload,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
-import { PageHeader, TabBar, navItemsForRole, shellCss } from "./Shell";
+import { PageHeader, TabBar, navItemsForRole, shellCss, AccessDenied } from "./Shell";
 import { css, Loader } from "./AdminApp";
 import * as db from "./db";
 import { getActiveTeamIds } from "./teamMembership";
@@ -461,6 +461,63 @@ export function LeagueOffice() {
   );
 }
 
+// ─── Season setup and maintenance hub ────────────────────────────────────────
+export function SeasonManagementHub() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+
+  return (
+    <div className="app">
+      <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
+      <PageHeader title="Season Setup & Management" />
+      <div className="tab-content">
+        {profile.role !== "manager" ? <AccessDenied /> : (
+          <>
+            <p className="season-hub-intro">
+              Set up a season, bring in its schedule, and maintain the league data used throughout the season.
+              Choose the workflow that matches what you need to do.
+            </p>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">Season setup</div>
+              <Link to="/seasons" className="season-hub-card">
+                <div className="season-hub-card__icon"><Calendar size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Create or update a season</div>
+                  <div className="season-hub-card__desc">Create the season, activate it, and add or maintain divisions. Expand a season card to discover and import its IBA schedule automatically.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">Import or maintain season data</div>
+              <Link to="/manage" className="season-hub-card">
+                <div className="season-hub-card__icon"><Settings2 size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Manual import and season maintenance</div>
+                  <div className="season-hub-card__desc">Use the existing paste/import tools to maintain teams, schedules, player rosters and ratings, playoff brackets, and locations.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">During the season</div>
+              <Link to="/weekly-data" className="season-hub-card">
+                <div className="season-hub-card__icon"><Upload size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Update weekly league reports</div>
+                  <div className="season-hub-card__desc">Fetch supported IBA reports automatically or use the matching manual import tools for rosters and ratings, team standings, MVP standings, and playoff eligibility.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+      <TabBar />
+    </div>
+  );
+}
+
 // ─── Tournaments placeholder ────────────────────────────────────────────────
 export function TournamentsPlaceholder() {
   return (
@@ -502,6 +559,17 @@ export const dashboardCss = `
 .office-card__title{font-size:13.5px;font-weight:700;}
 .office-card__desc{font-size:10.5px;color:#9A9A9A;}
 .office-list-item{display:flex;align-items:center;gap:10px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:12px;padding:13px 14px;text-decoration:none;color:#E0E0E0;font-size:12.5px;font-weight:600;}
+
+.season-hub-intro{font-size:12.5px;line-height:1.55;color:#B0B0B0;margin:0 0 18px;}
+.season-hub-section{display:flex;flex-direction:column;gap:9px;margin-bottom:20px;}
+.season-hub-section__title{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#9FC4B4;}
+.season-hub-card{display:flex;align-items:center;gap:12px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;padding:14px;text-decoration:none;color:#FFF;min-width:0;}
+.season-hub-card:hover{border-color:#3E6B58;}
+.season-hub-card__icon{width:40px;height:40px;flex:0 0 40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#0F2D1F;color:#5FCF9E;}
+.season-hub-card__body{flex:1;min-width:0;}
+.season-hub-card__title{font-size:13px;font-weight:800;color:#F4F4F4;margin-bottom:5px;}
+.season-hub-card__desc{font-size:11px;line-height:1.45;color:#9A9A9A;}
+.season-hub-card__arrow{flex:0 0 auto;color:#6A6A6A;}
 
 .team-selector-wrap{padding:0 0 8px;display:flex;flex-direction:column;gap:4px;}
 .team-selector-label{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8A8A8A;}
