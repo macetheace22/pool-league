@@ -2016,17 +2016,11 @@ function ApplyForfeitPanel({ matchRow, onCancel, onDone }) {
             <div className="card__title">Table {s.setNum}</div>
             <div className="field">
               <Label>{shortTeamName} — forfeiting player (0 pts)</Label>
-              <select className="input" value={pick.forfeitingPlayer?.num ?? ""} onChange={e=>setPick(s.setNum,"forfeitingPlayer", shortAvailable.find(p=>p.num===e.target.value) ?? null)}>
-                <option value="">Select player…</option>
-                {shortAvailable.map(p => <option key={p.num} value={p.num}>{p.name}{p.nickname?` "${p.nickname}"`:""} ({p.rating})</option>)}
-              </select>
+              <SearchableOptionSelect options={shortAvailable.map(p=>({value:p.num,label:`${p.name}${p.nickname ? ` "${p.nickname}"` : ""} (${p.rating})`,searchText:`${p.name} ${p.nickname ?? ""} ${p.num}`}))} value={pick.forfeitingPlayer?.num ?? ""} onChange={value=>setPick(s.setNum,"forfeitingPlayer",shortAvailable.find(p=>p.num===value) ?? null)} placeholder="Select forfeiting player…" ariaLabel="Search forfeiting player" />
             </div>
             <div className="field">
               <Label>{receivingTeamName} — receiving player</Label>
-              <select className="input" value={pick.receivingPlayer?.num ?? ""} onChange={e=>setPick(s.setNum,"receivingPlayer", receivingAvailable.find(p=>p.num===e.target.value) ?? null)}>
-                <option value="">Select player…</option>
-                {receivingAvailable.map(p => <option key={p.num} value={p.num}>{p.name}{p.nickname?` "${p.nickname}"`:""} ({p.rating})</option>)}
-              </select>
+              <SearchableOptionSelect options={receivingAvailable.map(p=>({value:p.num,label:`${p.name}${p.nickname ? ` "${p.nickname}"` : ""} (${p.rating})`,searchText:`${p.name} ${p.nickname ?? ""} ${p.num}`}))} value={pick.receivingPlayer?.num ?? ""} onChange={value=>setPick(s.setNum,"receivingPlayer",receivingAvailable.find(p=>p.num===value) ?? null)} placeholder="Select receiving player…" ariaLabel="Search receiving player" />
             </div>
             {points != null && <div style={{fontSize:12,color:"#5FCF9E",fontWeight:700}}>{pick.receivingPlayer.name} credited {points} pts</div>}
           </div>
@@ -4116,22 +4110,8 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             {newRole==="captain" && (
               <div className="field">
                 <Label>Assign Team</Label>
-                <input
-                  className="input"
-                  type="search"
-                  value={inviteTeamSearch}
-                  onChange={e=>setInviteTeamSearch(e.target.value)}
-                  placeholder="Type to search teams…"
-                  aria-label="Search teams for invite code"
-                  autoComplete="off"
-                />
-                <select className="input input--select" value={newTeamId} onChange={e=>setNewTeamId(e.target.value)} disabled={filteredInviteTeams.length===0}>
-                  <option value="">{filteredInviteTeams.length ? "Choose a matching team…" : "No matching teams"}</option>
-                  {filteredInviteTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>)}
-                </select>
-                <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>
-                  {inviteTeamSearch.trim() ? `${filteredInviteTeams.length} matching team${filteredInviteTeams.length===1?"":"s"}` : "Captains are assigned a team here — they no longer pick one at registration."}
-                </div>
+                <SearchableOptionSelect options={activePickableTeams.map(t=>({value:t.id,label:`${t.name}${t.context ? ` — ${t.context}` : ""}`,searchText:`${t.name} ${t.context ?? ""} ${t.teamNum ?? ""}`}))} value={newTeamId} onChange={setNewTeamId} disabled={activePickableTeams.length===0} placeholder={activePickableTeams.length ? "Choose a team…" : "No matching teams"} ariaLabel="Search teams for invite code" />
+                <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Captains are assigned a team here — they no longer pick one at registration.</div>
               </div>
             )}
             <button className="btn-primary" onClick={generateInvite} disabled={newRole==="captain" && !newTeamId}><Key size={13}/> Generate Code</button>
@@ -4551,11 +4531,7 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
                     <input className="edit-input" style={{maxWidth:70}} value={editData.teamNum} onChange={e=>setEditData(d=>({...d,teamNum:e.target.value}))}/>
                     <input className="edit-input" style={{flex:1}} value={editData.name} onChange={e=>setEditData(d=>({...d,name:e.target.value}))}/>
                   </div>
-                  <select className="edit-input edit-input--sub" value={editData.venue} onChange={e=>setEditData(d=>({...d,venue:e.target.value}))}>
-                    <option value="">No venue</option>
-                    {editData.venue && !locations?.some(l=>l.name===editData.venue) && <option value={editData.venue}>{editData.venue} (not in list)</option>}
-                    {locations?.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
-                  </select>
+                  <SearchableOptionSelect options={[...(editData.venue && !locations?.some(l=>l.name===editData.venue) ? [{value:editData.venue,label:`${editData.venue} (not in list)`,searchText:editData.venue}] : []), ...(locations ?? []).map(l=>({value:l.name,label:l.name,searchText:l.name}))]} value={editData.venue} onChange={value=>setEditData(d=>({...d,venue:value}))} placeholder="Choose a venue…" ariaLabel="Search team venues" className="edit-input edit-input--sub" clearLabel="Clear venue" />
                   {!team.isBye && onAssignCaptain && (
                     <CaptainField team={team} allProfiles={allProfiles} captainsByTeam={captainsByTeam}
                       onAssign={(newId)=>onAssignCaptain(team.id, newId)}
@@ -5201,11 +5177,7 @@ function UnmatchedTeamRow({ unmatched, divisionId, existingTeams, onResolved }) 
       ) : (
         <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
           <div style={{flex:"1 1 220px",minWidth:0}}>
-            <input className="edit-input" style={{width:"100%",boxSizing:"border-box",fontSize:12}} value={teamSearch} onChange={e=>setTeamSearch(e.target.value)} placeholder="Type to search existing teams…" aria-label="Search existing teams to map" disabled={saving} />
-            <select className="input input--select edit-input" style={{fontSize:12,padding:"6px 8px",width:"100%",marginTop:4}} value={pickedTeamId} onChange={e=>setPickedTeamId(e.target.value)} disabled={saving}>
-              <option value="">Select a team…</option>
-              {existingTeams.filter(t=>!t.isBye && `${t.name} ${t.teamNum ?? ""}`.toLowerCase().includes(teamSearch.trim().toLowerCase())).map(t => <option key={t.id} value={t.id}>{t.name} (#{t.teamNum})</option>)}
-            </select>
+            <SearchableOptionSelect options={existingTeams.filter(t=>!t.isBye).map(t=>({value:t.id,label:`${t.name} (#${t.teamNum})`,searchText:`${t.name} ${t.teamNum ?? ""}`}))} value={pickedTeamId} onChange={setPickedTeamId} disabled={saving} placeholder="Select an existing team…" ariaLabel="Search existing teams to map" className="input input--select edit-input" style={{fontSize:12,padding:"6px 8px",width:"100%"}} />
           </div>
           <button className="btn-icon btn-icon--confirm" onClick={mapToExisting} disabled={!pickedTeamId||saving}><Check size={13}/></button>
           <button className="btn-icon btn-icon--cancel" onClick={()=>{setMode(null);setPickedTeamId("");}} disabled={saving}><X size={13}/></button>
@@ -5311,11 +5283,7 @@ function PlayerRatingRow({ player, weekOptions, defaultTag, onManualRating, curr
         <div className="list-row__edit" style={{flexWrap:"wrap"}}>
           <span style={{fontSize:11.5,color:"#9A9A9A",width:"100%"}}>Move {player.name} to:</span>
           <div style={{flex:"1 1 180px",minWidth:0}}>
-            <input className="edit-input" style={{width:"100%",boxSizing:"border-box"}} value={moveSearch} onChange={e=>setMoveSearch(e.target.value)} placeholder="Search teams…" aria-label="Search destination teams" />
-            <select className="input input--select edit-input" style={{width:"100%",marginTop:4}} value={moveTarget} onChange={e=>setMoveTarget(e.target.value)}>
-              {moveTargets.length === 0 && <option value="">No other teams in this division</option>}
-              {moveTargets.filter(t=>t.id===moveTarget || t.name.toLowerCase().includes(moveSearch.trim().toLowerCase())).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <SearchableOptionSelect options={moveTargets.map(t=>({value:t.id,label:t.name,searchText:t.name}))} value={moveTarget} onChange={setMoveTarget} disabled={moveTargets.length===0} placeholder={moveTargets.length ? "Search destination teams…" : "No other teams in this division"} ariaLabel="Search destination teams" className="input input--select edit-input" style={{width:"100%"}} />
           </div>
           <div className="list-row__edit-actions">
             <button className="btn-icon btn-icon--confirm" onClick={confirmMove} disabled={!moveTarget}><Check size={14}/></button>
