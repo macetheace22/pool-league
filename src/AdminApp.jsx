@@ -2584,7 +2584,7 @@ function ManualMatchEntry({ divisionId, teams, format, seasonLabelText, playoffs
       <div className="card">
         <div className="card__title">Match Details</div>
         <div className="field"><Label>Home Team</Label>
-          <SearchableTeamSelect teams={teams.filter(t => !t.isBye)} value={homeTeamId} onChange={setHomeTeamId} search={homeTeamSearch} onSearch={setHomeTeamSearch} placeholder="Select home team…" ariaLabel="Search home teams" />
+          <SearchableTeamSelect teams={teams.filter(t => !t.isBye)} value={homeTeamId} onChange={id => { setHomeTeamId(id); if (id && id === awayTeamId) setAwayTeamId(""); }} search={homeTeamSearch} onSearch={setHomeTeamSearch} placeholder="Select home team…" ariaLabel="Search home teams" />
         </div>
         <div className="field"><Label>Away Team</Label>
           <SearchableTeamSelect teams={teams.filter(t => !t.isBye && t.id !== homeTeamId)} value={awayTeamId} onChange={setAwayTeamId} search={awayTeamSearch} onSearch={setAwayTeamSearch} placeholder="Select away team…" ariaLabel="Search away teams" />
@@ -3237,34 +3237,16 @@ function AccountSettings({ profile, onProfileRefresh }) {
         {profile.role === "manager" && pickableTeams.length > 0 && (
           <div className="field">
             <Label>Add Team Membership</Label>
-            <input
-              className="input"
-              type="search"
-              value={teamSearch}
-              onChange={e => setTeamSearch(e.target.value)}
-              placeholder="Type to search teams…"
-              aria-label="Search active teams"
-              autoComplete="off"
+            <SearchableTeamSelect
+              teams={visiblePickableTeams}
+              value=""
+              onChange={teamId => { if (teamId) saveOwnTeam(teamId); }}
+              search={teamSearch}
+              onSearch={setTeamSearch}
+              placeholder="Choose a team…"
+              ariaLabel="Search active teams"
               disabled={savingTeam}
             />
-            <select
-              className="input input--select"
-              value=""
-              onChange={e => {
-                const teamId = e.target.value;
-                if (teamId) {
-                  saveOwnTeam(teamId);
-                  setTeamSearch("");
-                }
-              }}
-              disabled={savingTeam || visiblePickableTeams.length === 0}
-              aria-label="Choose a team to add"
-            >
-              <option value="">{visiblePickableTeams.length ? "Choose a matching team…" : "No matching teams"}</option>
-              {visiblePickableTeams.map(t => (
-                <option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>
-              ))}
-            </select>
             <div style={{fontSize:10.5,color:"#777",marginTop:4}}>
               {teamSearch.trim() ? `${visiblePickableTeams.length} matching team${visiblePickableTeams.length === 1 ? "" : "s"}` : `${pickableTeams.length} active teams available`}
             </div>
@@ -4604,16 +4586,68 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
 // action (demotes the outgoing captain) so a team never ends up with two
 // captains because a manager forgot a manual cleanup step.
 function SearchableTeamSelect({ teams, value, onChange, search = "", onSearch, placeholder = "Select a team…", ariaLabel = "Search teams", className = "input input--select", disabled = false }) {
+  const [open, setOpen] = useState(false);
   const query = search.trim().toLowerCase();
-  const visibleTeams = (teams ?? []).filter(t => t.id === value || `${t.name ?? ""} ${t.context ?? ""} ${t.teamNum ?? ""}`.toLowerCase().includes(query));
+  const selected = (teams ?? []).find(t => t.id === value);
+  const visibleTeams = (teams ?? []).filter(t =>
+    `${t.name ?? ""} ${t.context ?? ""} ${t.teamNum ?? ""}`.toLowerCase().includes(query)
+  );
+  const optionLabel = t => `${t.name ?? "Unnamed team"}${t.context ? ` — ${t.context}` : ""}${t.isBye ? " (BYE)" : ""}`;
+  const clearSelection = () => {
+    onChange("");
+    onSearch("");
+    setOpen(true);
+  };
   return (
-    <div style={{minWidth:0}}>
-      <input className="edit-input" style={{width:"100%",boxSizing:"border-box",marginBottom:4}} value={search} onChange={e=>onSearch(e.target.value)} placeholder={placeholder.replace(/[.…]+$/, "") + " — type to search"} aria-label={ariaLabel} disabled={disabled} />
-      <select className={className} style={{width:"100%",minWidth:0}} value={value} onChange={e=>onChange(e.target.value)} disabled={disabled}>
-        <option value="">{placeholder}</option>
-        {visibleTeams.map(t=><option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}{t.isBye ? " (BYE)" : ""}</option>)}
-      </select>
-      {query && <div style={{fontSize:11,color:"#8A8A8A",marginTop:3}}>{visibleTeams.length} matching team{visibleTeams.length===1?"":"s"}</div>}
+    <div style={{position:"relative",minWidth:0}}>
+      <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+        <input
+          className={className}
+          style={{width:"100%",minWidth:0,boxSizing:"border-box",paddingRight:selected ? 38 : 12}}
+          value={open ? search : (selected ? optionLabel(selected) : search)}
+          onFocus={() => setOpen(true)}
+          onChange={e => { onSearch(e.target.value); setOpen(true); }}
+          onKeyDown={e => {
+            if (e.key === "Escape") { setOpen(false); onSearch(""); }
+            if (e.key === "Enter" && open && visibleTeams.length === 1) {
+              e.preventDefault();
+              onChange(visibleTeams[0].id);
+              onSearch("");
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder.replace(/[.…]+$/, "") + " — type to search"}
+          aria-label={ariaLabel}
+          aria-autocomplete="list"
+          aria-expanded={open}
+          disabled={disabled}
+          autoComplete="off"
+        />
+        {selected && !disabled && (
+          <button type="button" aria-label="Clear selected team" title="Clear selection"
+            onMouseDown={e=>e.preventDefault()}
+            onClick={clearSelection}
+            style={{position:"absolute",right:6,width:28,height:28,border:0,borderRadius:6,background:"transparent",color:"#9A9A9A",fontSize:20,lineHeight:"20px",cursor:"pointer"}}>
+            ×
+          </button>
+        )}
+      </div>
+      {open && !disabled && (
+        <div role="listbox" aria-label={ariaLabel}
+          style={{position:"absolute",zIndex:50,top:"calc(100% + 4px)",left:0,right:0,maxHeight:240,overflowY:"auto",background:"#1C1C1C",border:"1px solid #3A3A3A",borderRadius:9,boxShadow:"0 8px 24px rgba(0,0,0,.35)"}}>
+          {visibleTeams.length ? visibleTeams.map(t => (
+            <button type="button" role="option" aria-selected={t.id===value} key={t.id}
+              onMouseDown={e=>e.preventDefault()}
+              onClick={()=>{onChange(t.id);onSearch("");setOpen(false);}}
+              style={{display:"block",width:"100%",textAlign:"left",padding:"11px 12px",border:0,borderBottom:"1px solid #2A2A2A",background:t.id===value?"#0B3D2E":"transparent",color:"#E0E0E0",fontSize:13,cursor:"pointer"}}>
+              {optionLabel(t)}
+            </button>
+          )) : (
+            <div style={{padding:"11px 12px",fontSize:12,color:"#8A8A8A"}}>No matching teams</div>
+          )}
+        </div>
+      )}
+      {open && query && <div style={{fontSize:11,color:"#8A8A8A",marginTop:3}}>{visibleTeams.length} matching team{visibleTeams.length===1?"":"s"}</div>}
     </div>
   );
 }
