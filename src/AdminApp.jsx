@@ -599,9 +599,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           <div className="weekly-data-global-action">
             <div><div className="weekly-data-global-action__title">Need to update everything?</div><div className="weekly-data-global-action__desc">Check all three IBA weekly reports in one shared sync.</div></div>
-            <button className={weeklyCategory==="all" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("all");setWeeklyMode("auto");}}>Sync All Weekly Data</button>
+            <button className={weeklyCategory==="all" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("all");setWeeklyMode("auto");}}>Open Combined Sync</button>
           </div>
-          <div className="weekly-data-tiles">
+          {!(weeklyCategory === "all" && weeklyMode === "auto") && <div className="weekly-data-tiles">
             <div className={`weekly-data-tile ${weeklyCategory==="ratings" ? "weekly-data-tile--active" : ""}`}>
               <div className="weekly-data-tile__title">Roster & Ratings</div>
               <div className="weekly-data-tile__desc">Update team rosters and player ratings from the IBA roster report, or import and maintain them manually.</div>
@@ -626,7 +626,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                 <button className={weeklyCategory==="mvp" && weeklyMode==="manual" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("manual");}}>Manual Import</button>
               </div>
             </div>
-          </div>
+          </div>}
           <div className="weekly-data-workspace">
             <div className="weekly-data-workspace__heading">
               <div className="weekly-data-workspace__title">

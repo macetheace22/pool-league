@@ -79,12 +79,31 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
               {data.preview.roster.parsed.ambiguousRoster?.length ? ` · ${data.preview.roster.parsed.ambiguousRoster.length} placement review${data.preview.roster.parsed.ambiguousRoster.length===1?"":"s"}` : ""}
             </div>
           )}
-          {data.preview.standings && <div style={{fontSize:11,color:"#D0D0D0",marginTop:4}}>Team standings: {data.preview.standings.rows.length} rows detected.</div>}
-          {data.preview.mvp && <div style={{fontSize:11,color:"#D0D0D0",marginTop:4}}>MVP: {data.preview.mvp.rows.length} rows detected.</div>}
+          {data.preview.standings && <div style={{fontSize:11,color:"#5FCF9E",marginTop:8}}>Team standings: {data.preview.standings.rows.length} rows detected.</div>}
+          {data.preview.mvp && <div style={{fontSize:11,color:"#5FCF9E",marginTop:8}}>MVP: {data.preview.mvp.rows.length} rows detected.</div>}
+
+          {(() => {
+            const hasEmptyParsedReport =
+              (data.reports ?? []).some(r => r.status === "ok" && (
+                (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
+                (r.reportType === "div" && data.preview.standings?.rows.length === 0) ||
+                (r.reportType === "mvp" && data.preview.mvp?.rows.length === 0)
+              ));
+            return hasEmptyParsedReport && !result ? (
+              <div className="import-warning-block" style={{marginTop:10}}>
+                <div className="import-warning-block__title"><AlertCircle size={12}/> Import blocked — no rows detected</div>
+                <div style={{fontSize:11,color:"#D0D0D0"}}>The PDFs downloaded, but one or more reports could not be parsed into records. Refreshing or importing will not fix this; verify the report format before importing.</div>
+              </div>
+            ) : null;
+          })()}
 
           {!result ? (
             <div style={{display:"flex",gap:6,marginTop:10}}>
-              <button className="btn-primary" onClick={importReports} disabled={importing}>
+              <button className="btn-primary" onClick={importReports} disabled={importing || (data.reports ?? []).some(r => r.status === "ok" && (
+                (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
+                (r.reportType === "div" && data.preview.standings?.rows.length === 0) ||
+                (r.reportType === "mvp" && data.preview.mvp?.rows.length === 0)
+              ))}>
                 {importing ? "Importing…" : "Import Retrieved Reports"}
               </button>
               <button className="btn-sm" onClick={fetchReports} disabled={loading}>Refresh</button>
