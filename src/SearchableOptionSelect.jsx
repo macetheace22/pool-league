@@ -7,7 +7,7 @@ export default function SearchableOptionSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const rootRef = useRef(null);
   const selected = options.find(option => String(option.value) === String(value));
   const normalized = query.trim().toLowerCase();
@@ -48,10 +48,10 @@ export default function SearchableOptionSelect({
           role="combobox"
           disabled={disabled}
           autoComplete="off"
-          onFocus={() => {setQuery("");setOpen(true);setActiveIndex(0);}}
-          onChange={event => {setQuery(event.target.value);setOpen(true);setActiveIndex(0);}}
+          onFocus={() => {setQuery("");setOpen(true);setActiveIndex(-1);}}
+          onChange={event => {setQuery(event.target.value);setOpen(true);setActiveIndex(-1);}}
           onKeyDown={event => {
-            if (event.key === "ArrowDown") {event.preventDefault();setOpen(true);setActiveIndex(i=>Math.min(i+1,Math.max(filtered.length-1,0)));}
+            if (event.key === "ArrowDown") {event.preventDefault();setOpen(true);setActiveIndex(i=>i < 0 ? 0 : Math.min(i+1,Math.max(filtered.length-1,0)));}
             else if (event.key === "ArrowUp") {event.preventDefault();setActiveIndex(i=>Math.max(i-1,0));}
             else if (event.key === "Enter" && open && filtered.length) {event.preventDefault();choose(filtered[activeIndex] ?? filtered[0]);}
             else if (event.key === "Escape") {event.preventDefault();setOpen(false);setQuery("");}
