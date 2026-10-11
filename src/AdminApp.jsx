@@ -594,6 +594,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
+          <div className="weekly-data-global-action">
+            <div><div className="weekly-data-global-action__title">Need to update everything?</div><div className="weekly-data-global-action__desc">Check all three IBA weekly reports in one shared sync.</div></div>
+            <button className={weeklyCategory==="all" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("all");setWeeklyMode("auto");}}>Sync All Weekly Data</button>
+          </div>
           <div className="weekly-data-tiles">
             <div className={`weekly-data-tile ${weeklyCategory==="ratings" ? "weekly-data-tile--active" : ""}`}>
               <div className="weekly-data-tile__title">Roster & Ratings</div>
@@ -623,7 +627,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <div className="weekly-data-workspace">
             <div className="weekly-data-workspace__heading">
               <div className="weekly-data-workspace__title">
-                {weeklyCategory==="ratings" ? "Roster & Ratings" : weeklyCategory==="standings" ? "Team Standings" : "MVP Standings"}
+                {weeklyCategory==="all" ? "All Weekly Data" : weeklyCategory==="ratings" ? "Roster & Ratings" : weeklyCategory==="standings" ? "Team Standings" : "MVP Standings"}
               </div>
               <div className="weekly-data-workspace__mode">{weeklyMode==="auto" ? "AUTOMATIC IBA SYNC" : "MANUAL IMPORT"}</div>
             </div>
@@ -633,7 +637,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                     key={`${viewingSeason.id}-${weeklyCategory}`}
                     season={viewingSeason}
                     schedule={viewSchedule}
-                    reportType={weeklyCategory==="ratings" ? "rost" : weeklyCategory==="standings" ? "div" : "mvp"}
+                    reportType={weeklyCategory==="all" ? null : weeklyCategory==="ratings" ? "rost" : weeklyCategory==="standings" ? "div" : "mvp"}
                     onComplete={refreshCurrentDivision}
                   />
                 : <div className="empty-state">Select an active season to sync its weekly IBA report.</div>
@@ -5438,7 +5442,11 @@ html,body{width:100%;overflow-x:hidden;}
 .tab-bar{display:flex;background:#141414;border-bottom:1.5px solid #2E2E2E;padding:6px 10px;gap:5px;overflow-x:auto;}
 .tab-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 6px;border-radius:8px;border:none;background:none;font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;color:#6A6A6A;cursor:pointer;white-space:nowrap;min-width:0;}
 .tab-btn--active{background:#0B3D2E;color:#5FCF9E;}
-.weekly-data-tiles{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:14px 0 16px;}
+.weekly-data-global-action{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 10px;padding:12px;background:#141414;border:1px solid #2E2E2E;border-radius:12px;}
+.weekly-data-global-action__title{font-size:12px;font-weight:800;color:#E0E0E0;}
+.weekly-data-global-action__desc{font-size:10.5px;color:#9A9A9A;line-height:1.4;margin-top:3px;}
+.weekly-data-global-action button{flex:0 0 auto;max-width:48%;white-space:normal;line-height:1.2;}
+.weekly-data-tiles{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0 0 16px;}
 .weekly-data-tile{display:flex;flex-direction:column;gap:8px;min-width:0;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:12px;padding:13px;}
 .weekly-data-tile--active{border-color:#28634C;background:#17251F;}
 .weekly-data-tile__title{font-size:13px;font-weight:800;color:#F4F4F4;}
