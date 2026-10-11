@@ -62,6 +62,20 @@ describe("IBA parsers", () => {
     ]);
   });
 
+  it("recovers compact current ROST player rows from a flattened PDF line", () => {
+    const raw = [
+      'Team15101 Scotty Doesn\\'t Know Twin City Billiards NumPlayW inNameRate 3424042Marier, Dave105 1476821Barrett, Scott116 2277431Norberg, Scott "304"79 2595332Stewart, Ryan73',
+      'Team15102 Damn It Twin City Billiards NumPlayW inNameRate 1852932Carlson, Doug "DamnIt"134 0186830Wylie, Wayne94'
+    ].join("\\n");
+    const result = parseLeagueRoster(raw);
+    expect(result.rosters["15101"]).toContain("34240");
+    expect(result.rosters["15101"]).toContain("14768");
+    expect(result.registry["34240"]).toMatchObject({ num:"34240", rating:105 });
+    expect(result.registry["14768"]).toMatchObject({ num:"14768", rating:116 });
+    expect(result.registry["25953"]).toMatchObject({ num:"25953", rating:73 });
+    expect(result.registry["01868"]).toMatchObject({ num:"01868", rating:94 });
+  });
+
   it("parses a simple single-column roster without changing the existing output contract", () => {
     const result = parseLeagueRoster([
       "Division Roster and Handicap Report",
