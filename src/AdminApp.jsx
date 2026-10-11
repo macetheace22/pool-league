@@ -3122,6 +3122,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
   const [allTeamsForManager, setAllTeamsForManager] = useState(null);
   const [teamSearch, setTeamSearch] = useState("");
   const [savingTeam, setSavingTeam] = useState(false);
+  const [savingMembershipId, setSavingMembershipId] = useState("");
 
   useEffect(() => {
     if (profile.role === "manager") db.listAllTeamsWithContext().then(setAllTeamsForManager);
@@ -3142,6 +3143,24 @@ function AccountSettings({ profile, onProfileRefresh }) {
     setSavingTeam(false);
     if (!result.ok) { setError("Could not add that team to your profile."); return; }
     setError(""); setSuccess("Team added to your profile."); setTimeout(() => setSuccess(""), 2500);
+    if (onProfileRefresh) await onProfileRefresh();
+  };
+
+  const removeOwnTeam = async (membership) => {
+    const teamName = membership.teams?.name ?? "this team";
+    if (!window.confirm(`Remove ${teamName} from your profile? This ends the active membership but does not delete roster or match history.`)) return;
+    setSavingMembershipId(membership.id);
+    setError("");
+    const result = await db.removeOwnTeamMembership(membership.team_id);
+    setSavingMembershipId("");
+    if (!result.ok) {
+      setError(result.reason === "MEMBERSHIP_NOT_FOUND"
+        ? "That team membership is no longer active. Refresh your profile and try again."
+        : "Could not remove that team from your profile.");
+      return;
+    }
+    setSuccess("Team removed from your profile.");
+    setTimeout(() => setSuccess(""), 2500);
     if (onProfileRefresh) await onProfileRefresh();
   };
 
@@ -3224,11 +3243,24 @@ function AccountSettings({ profile, onProfileRefresh }) {
               const division = team?.divisions;
               const season = division?.seasons;
               return (
-                <div key={m.id} style={{background:"#141414",border:"1px solid #2A2A2A",borderRadius:9,padding:"9px 10px"}}>
-                  <div style={{fontWeight:700,fontSize:12,color:"#E0E0E0"}}>{team?.name ?? "Team"}</div>
-                  <div style={{fontSize:10.5,color:"#8A8A8A",marginTop:3}}>
-                    {division?.name ? `${division.name} · ` : ""}{season ? `${season.format} · ${season.day} · ${season.year}` : "Season unavailable"}
+                <div key={m.id} style={{background:"#141414",border:"1px solid #2A2A2A",borderRadius:9,padding:"9px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:12,color:"#E0E0E0"}}>{team?.name ?? "Team"}</div>
+                    <div style={{fontSize:10.5,color:"#8A8A8A",marginTop:3}}>
+                      {division?.name ? `${division.name} · ` : ""}{season ? `${season.format} · ${season.day} · ${season.year}` : "Season unavailable"}
+                    </div>
                   </div>
+                  {profile.role === "manager" && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{flexShrink:0,padding:"6px 9px",fontSize:10.5}}
+                      onClick={() => removeOwnTeam(m)}
+                      disabled={savingTeam || !!savingMembershipId}
+                    >
+                      {savingMembershipId === m.id ? "Removing…" : "Remove"}
+                    </button>
+                  )}
                 </div>
               );
             })}

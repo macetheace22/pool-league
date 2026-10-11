@@ -79,6 +79,13 @@ export async function addOwnTeamMembership(teamId) {
   const row = data?.[0];
   return row ?? { ok: false, reason: "ERROR" };
 }
+
+export async function removeOwnTeamMembership(teamId) {
+  const { data, error } = await supabase.rpc("remove_own_team_membership", { p_team_id: teamId });
+  if (error) return { ok: false, reason: error.message ?? "ERROR" };
+  const row = data?.[0];
+  return row ?? { ok: false, reason: "ERROR" };
+}
 export async function validateInviteCode(code) {
   const { data, error } = await supabase.rpc("validate_invite_code", { p_code: code });
   if (error || !data || data.length === 0) return null;
