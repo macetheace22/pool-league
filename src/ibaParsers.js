@@ -1,34 +1,45 @@
 // Shared IBA report parsers. Manual paste and automatic PDF imports both use these functions.
 function parseStandingsImport(raw) {
   const rows = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+  const lines = String(raw || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  for (const trimmed of lines) {
     const parts = trimmed.split(/\t+/);
     let teamNum, teamName, pointsLastWk, totalPoints, setsPlayed;
     if (parts.length >= 4) {
-      teamNum = parts[0].trim();
-      teamName = parts[1].trim();
-      pointsLastWk = parseInt(parts[2], 10) || 0;
+      teamNum = parts[0].trim(); teamName = parts[1].trim();
+      pointsLastWk = parseFloat(parts[2]) || 0;
       totalPoints = parseInt(parts[3], 10) || 0;
       setsPlayed = parseInt(parts[4], 10) || 0;
     } else {
-      // pdf-parse commonly returns spaces instead of the tab stops produced
-      // by browser copy/paste. The numeric columns are at the end, so the
-      // team name can safely contain spaces.
-      const m = trimmed.match(/^(\d{5})\s+(.+?)\s+(-?\d+)\s+(-?\d+)\s+(\d+)(?:\s+[\d.]+)?$/);
+      const m = trimmed.match(/^(\d{5})\s+(.+?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+)\s+(\d+)(?:\s+[\d.]+)?$/);
       if (!m) continue;
       teamNum = m[1]; teamName = m[2];
-      pointsLastWk = parseInt(m[3], 10) || 0;
+      pointsLastWk = parseFloat(m[3]) || 0;
       totalPoints = parseInt(m[4], 10) || 0;
       setsPlayed = parseInt(m[5], 10) || 0;
     }
-    if (!teamNum || !teamName) continue;
-    rows.push({ teamNum, teamName, pointsLastWk, totalPoints, setsPlayed });
+    if (teamNum && teamName) rows.push({ teamNum, teamName, pointsLastWk, totalPoints, setsPlayed });
   }
-  return rows;
-}
+  if (rows.length) return rows;
 
+  // Current IBA DIV PDFs may extract each cell on its own line. The final
+  // token joins points-last-week (in tenths) and sets played, e.g. 95924 = 95.9, 24.
+  const compactRows = [];
+  for (let i = 0; i < lines.length - 4; i++) {
+    if (!/^\d{5}$/.test(lines[i]) || !/^[-\d.]+$/.test(lines[i + 1])) continue;
+    const teamNum = lines[i], teamName = lines[i + 2];
+    if (!teamName || /^\d+$/.test(teamName) || /^(Team|Division|Printed|Fall Season|Week|Wed|Sun|Mon|Tue|Thu|Fri|Sat)\b/i.test(teamName)) continue;
+    if (!/^\d{3,5}$/.test(lines[i + 3]) || !/^\d{4,6}$/.test(lines[i + 4])) continue;
+    const totalPoints = parseInt(lines[i + 3], 10);
+    const packed = lines[i + 4], setsPlayed = parseInt(packed.slice(-2), 10);
+    const tenths = packed.slice(0, -2);
+    if (!tenths || !Number.isFinite(setsPlayed) || setsPlayed < 1 || setsPlayed > 99) continue;
+    const pointsLastWk = Number(tenths);
+    compactRows.push({ teamNum, teamName, pointsLastWk, totalPoints, setsPlayed });
+    i += 4;
+  }
+  return compactRows;
+}
 // MVP Standings report: Plyr# <tab> Player Name <tab> Team# <tab> Sets Won
 // <tab> Sets Lost <tab> Points Scored <tab> Total MVP Ranking Points. The
 // last column is recomputed by the app (pointsScored + 200/win - 200/loss,
@@ -36,32 +47,53 @@ function parseStandingsImport(raw) {
 // so real matches and imported weeks use the exact same formula.
 function parseMvpImport(raw) {
   const rows = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+  const lines = String(raw || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  for (const trimmed of lines) {
     const parts = trimmed.split(/\t+/);
     let playerNum, playerName, teamNum, wins, losses, pointsScored, mvpRankingPoints;
     if (parts.length >= 7) {
       [playerNum, playerName, teamNum] = parts.slice(0, 3).map(x => x.trim());
-      wins = parseInt(parts[3], 10) || 0;
-      losses = parseInt(parts[4], 10) || 0;
-      pointsScored = parseInt(parts[5], 10) || 0;
-      mvpRankingPoints = parseInt(parts[6], 10) || 0;
-    } else {
-      // Space-delimited PDF extraction: player/team numbers and the four
-      // numeric columns are fixed at the edges; only playerName is variable.
-      const m = trimmed.match(/^(\d{5})\s+(.+?)\s+(\d{5})\s+(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)$/);
-      if (!m) continue;
-      playerNum = m[1]; playerName = m[2]; teamNum = m[3];
-      wins = parseInt(m[4], 10) || 0; losses = parseInt(m[5], 10) || 0;
-      pointsScored = parseInt(m[6], 10) || 0; mvpRankingPoints = parseInt(m[7], 10) || 0;
+      wins = parseInt(parts[3], 10) || 0; losses = parseInt(parts[4], 10) || 0;
+      pointsScored = parseInt(parts[5], 10) || 0; mvpRankingPoints = parseInt(parts[6], 10) || 0;
+      if (playerNum && playerName && teamNum) rows.push({ playerNum, playerName, teamNum, wins, losses, pointsScored, mvpRankingPoints });
+      continue;
     }
-    if (!playerNum || !playerName) continue;
-    rows.push({ playerNum, playerName, teamNum, wins, losses, pointsScored, mvpRankingPoints });
+    const m = trimmed.match(/^(\d{5})\s+(.+?)\s+(\d{5})\s+(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)$/);
+    if (m) {
+      rows.push({ playerNum:m[1], playerName:m[2], teamNum:m[3], wins:parseInt(m[4],10)||0, losses:parseInt(m[5],10)||0, pointsScored:parseInt(m[6],10)||0, mvpRankingPoints:parseInt(m[7],10)||0 });
+      continue;
+    }
+    // Compact current IBA PDF row: player number + name + team number + joined stats.
+    const start = trimmed.match(/^(\d{5})(.*)$/);
+    if (!start) continue;
+    const playerNumCompact = start[1], remainder = start[2];
+    const teamMatches = [...remainder.matchAll(/(15\d{3})/g)];
+    let parsed = null;
+    for (const tm of teamMatches) {
+      const playerNameCompact = remainder.slice(0, tm.index).trim();
+      const tail = remainder.slice(tm.index + tm[1].length);
+      if (!playerNameCompact || !/^\d+$/.test(tail)) continue;
+      for (let winLen = 1; winLen <= 2 && !parsed; winLen++) {
+        for (let rankLen = 3; rankLen <= 4 && !parsed; rankLen++) {
+          for (let lossLen = 1; lossLen <= 2 && !parsed; lossLen++) {
+            const pointsLen = tail.length - winLen - rankLen - lossLen;
+            if (pointsLen < 3 || pointsLen > 4) continue;
+            const w = Number(tail.slice(0, winLen));
+            const rank = Number(tail.slice(winLen, winLen + rankLen));
+            const l = Number(tail.slice(winLen + rankLen, winLen + rankLen + lossLen));
+            const p = Number(tail.slice(winLen + rankLen + lossLen));
+            if (rank === p + 200 * w - 200 * l) {
+              parsed = { playerNum:playerNumCompact, playerName:playerNameCompact, teamNum:tm[1], wins:w, losses:l, pointsScored:p, mvpRankingPoints:rank };
+            }
+          }
+        }
+      }
+      if (parsed) break;
+    }
+    if (parsed) rows.push(parsed);
   }
   return rows;
 }
-
 // ─── Bulk league roster parser (IBA PDF format) ───────────────────────────────
 // Handles multiple known "pasted from PDF viewer" layouts. Each layout is
 // detected per report-section and dispatched to its own strategy, so new
@@ -138,7 +170,7 @@ function addPlayer(registry, rosters, teamId, num, fullName, rate, needsRating) 
 function detectTeamHeader(line) {
   if (/^\d{1,3}\s+\d{5}/.test(line)) return null; // a player row, not a header
   if (/^\d{5}\s+[^\dO]*[\dO]+\.?\s+[\dO]/.test(line)) return null; // player row
-  const inline = line.match(/^\s*Team\s+(\d{5})\b\s*(.*)$/i);
+  const inline = line.match(/^\s*Team\s*(\d{5})\b\s*(.*)$/i);
   if (inline) return { id: inline[1], name: inline[2].replace(/\s*Team\s*$/i, '').trim() };
   // Bare "<id> <team name>" header. Team names can start with a digit
   // (e.g. "8 Ball Donkeys"), so we can't require a leading letter -- we
@@ -160,7 +192,27 @@ const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\
 // Section-level dispatch
 // ==================================================================
 function parseLeagueRoster(raw) {
-  const parts = raw.split(/Division Roster and Handicap Report/i);
+  // The current PDF extractor can collapse an entire roster page into one
+  // line. Restore player-row boundaries from the stable numeric prefix
+  // (five-digit player number + play/win counts) before the established
+  // layout-specific parser runs. This deliberately leaves team/venue text
+  // intact rather than guessing where those names should be split.
+  const normalizedRaw = String(raw || "")
+    .replace(/Team(?=\d{5})/gi, "Team ")
+    // Restore common venue boundaries so the existing team-header parser
+    // keeps team name and venue separate.
+    .replace(/\s+(Twin City Billiards|C\.?R\.?['’]?s Sports Bar|Two Stooges Sports Bar|Shooter['’]?s Billiards|Turtle['’]?s Bar\s*&\s*Grill|Pullman Club)\s+(?=Num\s*Play|NumPlay|Rate\s*Num)/gi, "\n$1\n")
+    .replace(/(?<!\d)(\d{5})(\d)(\d)(?=[A-Za-z"'])/g, "\n$1 $2 $3 ")
+    .split(/\r?\n/)
+    .map(line => {
+      // Ratings are normally two digits or 100–199. Prefer a three-digit
+      // rating before falling back to two digits, so 105 stays 105 (not 1 + 05).
+      const row = line.match(/^(\d{5})\s+(\d)\s+(\d)\s+(.+?)(1\d{2}|\d{2})\s*$/);
+      if (!row) return line;
+      return row[1] + " " + row[2] + " " + row[3] + " " + row[4].trim() + " " + row[5];
+    })
+    .join("\n");
+  const parts = normalizedRaw.split(/Division Roster and Handicap Report/i);
   // Some IBA PDF extraction layouts place the division heading AFTER
   // that division's team blocks. Keep the pre-heading text as a section too;
   // dropping parts[0] silently loses the first division in those reports.
@@ -179,7 +231,7 @@ function parseLeagueRoster(raw) {
   for (const s of sections) {
     const lines = s.split('\n').map(l => l.trim()).filter(Boolean);
     for (const line of lines) {
-      const inlineTeams = [...line.matchAll(/\bTeam\s+(\d{5})\b/gi)];
+      const inlineTeams = [...line.matchAll(/\bTeam\s*(\d{5})\b/gi)];
       if (inlineTeams.length >= 2) {
         learnedColumns = Math.max(learnedColumns || 0, inlineTeams.length);
       }
@@ -345,7 +397,7 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
     // Venue line right after a header (e.g. "C.R.'s Sports Bar") is
     // normally filtered as noise -- intercept it here first so it can be
     // recorded against the team it belongs to.
-    if (expectLocationLine && /Sports Bar$/i.test(line)) {
+    if (expectLocationLine && /(?:Sports Bar|Billiards|Bar\s*&\s*Grill|Pullman Club)$/i.test(line)) {
       if (current) registerTeam(teams, current.id, undefined, line.trim());
       expectLocationLine = false;
       continue;
