@@ -34,7 +34,7 @@ function parseStandingsImport(raw) {
     const packed = lines[i + 4], setsPlayed = parseInt(packed.slice(-2), 10);
     const tenths = packed.slice(0, -2);
     if (!tenths || !Number.isFinite(setsPlayed) || setsPlayed < 1 || setsPlayed > 99) continue;
-    const pointsLastWk = tenths.length > 1 ? Number(tenths.slice(0, -1) + "." + tenths.slice(-1)) : Number(tenths);
+    const pointsLastWk = Number(tenths);
     compactRows.push({ teamNum, teamName, pointsLastWk, totalPoints, setsPlayed });
     i += 4;
   }
