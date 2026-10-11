@@ -2584,7 +2584,7 @@ function ManualMatchEntry({ divisionId, teams, format, seasonLabelText, playoffs
       <div className="card">
         <div className="card__title">Match Details</div>
         <div className="field"><Label>Home Team</Label>
-          <SearchableTeamSelect teams={teams.filter(t => !t.isBye)} value={homeTeamId} onChange={setHomeTeamId} search={homeTeamSearch} onSearch={setHomeTeamSearch} placeholder="Select home team…" ariaLabel="Search home teams" />
+          <SearchableTeamSelect teams={teams.filter(t => !t.isBye)} value={homeTeamId} onChange={id => { setHomeTeamId(id); if (id && id === awayTeamId) setAwayTeamId(""); }} search={homeTeamSearch} onSearch={setHomeTeamSearch} placeholder="Select home team…" ariaLabel="Search home teams" />
         </div>
         <div className="field"><Label>Away Team</Label>
           <SearchableTeamSelect teams={teams.filter(t => !t.isBye && t.id !== homeTeamId)} value={awayTeamId} onChange={setAwayTeamId} search={awayTeamSearch} onSearch={setAwayTeamSearch} placeholder="Select away team…" ariaLabel="Search away teams" />
