@@ -3678,14 +3678,7 @@ function LineupPlannerPanel({ teamId, profileId }) {
       <div className="card">
         <div className="card__title">Plan a Week</div>
         <div className="field"><Label>Week</Label>
-          <select className="input input--select" value={selectedWeekId} onChange={e => loadWeekIntoForm(e.target.value)}>
-            <option value="">Select a week…</option>
-            {weekOptions.map(w => (
-              <option key={w.id} value={w.id}>
-                {w.week ? `Week ${w.week} · ` : ""}{w.date} — vs {opponentNameFor(w.pairings[0], teamId, overview.teams)}{planForWeek(w.id) ? " (planned)" : ""}
-              </option>
-            ))}
-          </select>
+          <SearchableOptionSelect options={weekOptions.map(w=>({value:w.id,label:`${w.week ? `Week ${w.week} · ` : ""}${w.date} — vs ${opponentNameFor(w.pairings[0],teamId,overview.teams)}${planForWeek(w.id) ? " (planned)" : ""}`,searchText:`${w.week ?? ""} ${w.date} ${opponentNameFor(w.pairings[0],teamId,overview.teams)}`}))} value={selectedWeekId} onChange={loadWeekIntoForm} placeholder="Select a week…" ariaLabel="Search scheduled weeks" />
         </div>
 
         {selectedWeek && (
