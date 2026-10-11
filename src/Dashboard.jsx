@@ -474,7 +474,7 @@ export function SeasonManagementHub() {
         {profile.role !== "manager" ? <AccessDenied /> : (
           <>
             <p className="season-hub-intro">
-              Use these three areas to set up a season, update weekly reports, and maintain playoff and location details.
+              Use these focused pages to set up the season, update weekly reports, and manage playoff eligibility, playoffs, and locations.
             </p>
             <div className="season-hub-section">
               <div className="season-hub-section__title">1. Set up the season, teams & schedule</div>
@@ -486,11 +486,11 @@ export function SeasonManagementHub() {
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
-              <Link to="/manage" className="season-hub-card">
+              <Link to="/manual-season-import" className="season-hub-card">
                 <div className="season-hub-card__icon"><Settings2 size={19} /></div>
                 <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Manage season data</div>
-                  <div className="season-hub-card__desc">Review or manually maintain teams and schedules, make roster and rating corrections, and manage season-specific settings when needed.</div>
+                  <div className="season-hub-card__title">Manual team & schedule import</div>
+                  <div className="season-hub-card__desc">Open the focused manual import page to add or correct teams and schedules for an active season.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
@@ -508,7 +508,7 @@ export function SeasonManagementHub() {
             </div>
             <div className="season-hub-section">
               <div className="season-hub-section__title">3. Maintain playoff setup & locations</div>
-              <Link to="/manage?tab=eligibility" className="season-hub-card">
+              <Link to="/playoff-eligibility" className="season-hub-card">
                 <div className="season-hub-card__icon"><AlertCircle size={19} /></div>
                 <div className="season-hub-card__body">
                   <div className="season-hub-card__title">Playoff eligibility</div>
@@ -516,7 +516,7 @@ export function SeasonManagementHub() {
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
-              <Link to="/manage?tab=playoffs" className="season-hub-card">
+              <Link to="/playoffs" className="season-hub-card">
                 <div className="season-hub-card__icon"><Trophy size={19} /></div>
                 <div className="season-hub-card__body">
                   <div className="season-hub-card__title">Playoffs</div>
@@ -524,7 +524,7 @@ export function SeasonManagementHub() {
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
-              <Link to="/manage?tab=locations" className="season-hub-card">
+              <Link to="/locations" className="season-hub-card">
                 <div className="season-hub-card__icon"><MapPin size={19} /></div>
                 <div className="season-hub-card__body">
                   <div className="season-hub-card__title">Locations</div>
