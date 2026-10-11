@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart3, Trophy, Dumbbell, Award, ChevronRight, MapPin, Calendar,
-  Newspaper, Wrench, AlertCircle, Users, Check, TrendingUp,
+  Newspaper, Wrench, AlertCircle, Users, Check, TrendingUp, Settings2, Upload,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
-import { PageHeader, TabBar, navItemsForRole, shellCss } from "./Shell";
+import { PageHeader, TabBar, navItemsForRole, shellCss, AccessDenied } from "./Shell";
 import { css, Loader } from "./AdminApp";
 import * as db from "./db";
 import { getActiveTeamIds } from "./teamMembership";
@@ -455,6 +455,63 @@ export function LeagueOffice() {
             </Link>
           );
         })}
+      </div>
+      <TabBar />
+    </div>
+  );
+}
+
+// ─── Season setup and maintenance hub ────────────────────────────────────────
+export function SeasonManagementHub() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+
+  return (
+    <div className="app">
+      <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
+      <PageHeader title="Season Setup & Management" />
+      <div className="tab-content">
+        {profile.role !== "manager" ? <AccessDenied /> : (
+          <>
+            <p className="season-hub-intro">
+              Set up a season, bring in its schedule, and maintain the league data used throughout the season.
+              Choose the workflow that matches what you need to do.
+            </p>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">Season setup</div>
+              <Link to="/seasons" className="season-hub-card">
+                <div className="season-hub-card__icon"><Calendar size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Create or update a season</div>
+                  <div className="season-hub-card__desc">Create the season, activate it, and add or maintain divisions. Expand a season card to discover and import its IBA schedule automatically.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">Import or maintain season data</div>
+              <Link to="/manage" className="season-hub-card">
+                <div className="season-hub-card__icon"><Settings2 size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Manual import and season maintenance</div>
+                  <div className="season-hub-card__desc">Use the existing paste/import tools to maintain teams, schedules, player rosters and ratings, playoff brackets, and locations.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">During the season</div>
+              <Link to="/weekly-data" className="season-hub-card">
+                <div className="season-hub-card__icon"><Upload size={19} /></div>
+                <div className="season-hub-card__body">
+                  <div className="season-hub-card__title">Update weekly league reports</div>
+                  <div className="season-hub-card__desc">Fetch supported IBA reports automatically or use the matching manual import tools for rosters and ratings, team standings, MVP standings, and playoff eligibility.</div>
+                </div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+          </>
+        )}
       </div>
       <TabBar />
     </div>
