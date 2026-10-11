@@ -4793,7 +4793,7 @@ function ScheduleTab({ schedule, teams, onSave, onAddPairing, onUpdatePairing, o
           })}
         </div>
       )}
-      {!readOnly && schedule.length>0 && <button className="btn-next" onClick={onNext}>Next: Import Players <ChevronRight size={14}/></button>}
+      {!readOnly && onNext && schedule.length>0 && <button className="btn-next" onClick={onNext}>Next: Import Players <ChevronRight size={14}/></button>}
     </>
   );
 }
