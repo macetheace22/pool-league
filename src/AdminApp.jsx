@@ -4008,7 +4008,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   return (
     <>
       {subTab==="users" && (
-        <div className="list">
+        <div className="list" style={{overflow: editRoleId ? "visible" : "hidden"}}>
           {users.map(u => {
             const team = u.team_id ? allTeams.find(t=>t.id===u.team_id) : null;
             const isMe = u.id===currentUserId;
