@@ -41,7 +41,10 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete }) {
         <Download size={14}/> Automatic IBA Report Sync
       </div>
       <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>
-        Fetches the current IBA {season?.format || "league"} · {season?.day || "day"} reports for roster/ratings, team standings, and MVP standings. Missing reports are treated as normal when that league is not playing.
+        Automatically checks the current IBA {season?.format || "league"} · {season?.day || "day"} reports for roster/ratings, team standings, and MVP standings. A report may be missing when that league is not playing.
+      </div>
+      <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
+        <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use the separate <strong>Playoff Eligibility</strong> tab for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
       </div>
       {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Select a season with a supported format and day.</div></div>}
       {supported && !data && (
