@@ -632,7 +632,14 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               <div className="weekly-data-workspace__title">
                 {weeklyCategory==="all" ? "All Weekly Data" : weeklyCategory==="ratings" ? "Roster & Ratings" : weeklyCategory==="standings" ? "Team Standings" : "MVP Standings"}
               </div>
-              <div className="weekly-data-workspace__mode">{weeklyMode==="auto" ? "AUTOMATIC IBA SYNC" : "MANUAL IMPORT"}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <div className="weekly-data-workspace__mode">{weeklyMode==="auto" ? "AUTOMATIC IBA SYNC" : "MANUAL IMPORT"}</div>
+                {weeklyCategory==="all" && weeklyMode==="auto" && (
+                  <button className="btn-sm" onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("auto");}}>
+                    Back to report options
+                  </button>
+                )}
+              </div>
             </div>
             {weeklyMode==="auto"
               ? isViewingActive && viewingSeason
