@@ -27,12 +27,12 @@ export function ibaCodesForSeason(season) {
   return { leagueType: FORMAT_TO_CODE[format] || null, day: DAY_TO_CODE[day] || null };
 }
 
-export async function fetchIbaReports(season) {
+export async function fetchIbaReports(season, reportType = null) {
   const { leagueType, day } = ibaCodesForSeason(season);
   if (!leagueType || !day) throw new Error("The selected season must have a supported format and day.");
   const response = await fetch("/api/iba-reports", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ leagueType, day }),
+    body: JSON.stringify(reportType ? { reports: [{ leagueType, day, reportType }] } : { leagueType, day }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || "Could not retrieve IBA reports.");
