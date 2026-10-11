@@ -486,14 +486,6 @@ export function SeasonManagementHub() {
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
-              <Link to="/manual-season-import" className="season-hub-card">
-                <div className="season-hub-card__icon"><Settings2 size={19} /></div>
-                <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Manual team & schedule import</div>
-                  <div className="season-hub-card__desc">Open the focused manual import page to add or correct teams and schedules for an active season.</div>
-                </div>
-                <ChevronRight size={17} className="season-hub-card__arrow" />
-              </Link>
             </div>
             <div className="season-hub-section">
               <div className="season-hub-section__title">2. Update weekly league data</div>
