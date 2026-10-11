@@ -192,7 +192,26 @@ const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\
 // Section-level dispatch
 // ==================================================================
 function parseLeagueRoster(raw) {
-  const parts = raw.split(/Division Roster and Handicap Report/i);
+  // The current PDF extractor can collapse an entire roster page into one
+  // line. Restore player-row boundaries from the stable numeric prefix
+  // (five-digit player number + play/win counts) before the established
+  // layout-specific parser runs. This deliberately leaves team/venue text
+  // intact rather than guessing where those names should be split.
+  const normalizedRaw = String(raw || "")
+    .replace(/Team(?=\d{5})/gi, "Team ")
+    .replace(/(?<!\d)(\d{5})(\d{1,2})(\d{1,2})(?=[A-Za-z"'])/g, "\n$1 $2 $3 ")
+    .split(/\r?\n/)
+    .map(line => {
+      const row = line.match(/^(\d{5})\s+(\d{1,2})\s+(\d{1,2})\s+(.+?)(\d{2,3})\s*$/);
+      if (!row) return line;
+      const suffix3 = Number(row[5]);
+      const rateLength = suffix3 >= 100 && suffix3 <= 200 ? 3 : 2;
+      const name = row[4] + row[5].slice(0, row[5].length - rateLength);
+      const rate = row[5].slice(-rateLength);
+      return row[1] + " " + row[2] + " " + row[3] + " " + name.trim() + " " + rate;
+    })
+    .join("\n");
+  const parts = normalizedRaw.split(/Division Roster and Handicap Report/i);
   // Some IBA PDF extraction layouts place the division heading AFTER
   // that division's team blocks. Keep the pre-heading text as a section too;
   // dropping parts[0] silently loses the first division in those reports.
