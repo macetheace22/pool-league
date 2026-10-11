@@ -29,8 +29,8 @@ describe("IBA parsers", () => {
       "Report printed: 10/09/26",
       "Team 15201 No Bull",
       "C.R.'s Sports Bar",
-    expect(result.registry["13102"]).toMatchObject({ name: "Johnson, Loren", nickname: "Smooth", rating: 88 });
-    expect(result.registry["02256"]).toMatchObject({ name: "Reyes, Oakley", nickname: "Natural", rating: 89 });
+      '88 13102 4 3 Johnson, Loren "Smooth"',
+      '89 02256 4 2 Reyes, Oakley"Natural"',
     ].join("\n");
 
     const result = parseLeagueRoster(raw);
