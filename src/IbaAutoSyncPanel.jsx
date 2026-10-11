@@ -18,7 +18,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const fetchReports = async () => {
     setLoading(true); setError(""); setResult(null);
     try {
-      const fetched = await fetchIbaReports(season);
+      const fetched = await fetchIbaReports(season, reportType);
       const reports = selectedReports(fetched.reports);
       const preview = await buildIbaPreview(reports);
       setData({ ...fetched, reports, preview });
