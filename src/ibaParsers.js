@@ -397,7 +397,7 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
     // Venue line right after a header (e.g. "C.R.'s Sports Bar") is
     // normally filtered as noise -- intercept it here first so it can be
     // recorded against the team it belongs to.
-    if (expectLocationLine && /Sports Bar$/i.test(line)) {
+    if (expectLocationLine && /(?:Sports Bar|Billiards|Bar\s*&\s*Grill|Pullman Club)$/i.test(line)) {
       if (current) registerTeam(teams, current.id, undefined, line.trim());
       expectLocationLine = false;
       continue;
