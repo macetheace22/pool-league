@@ -474,38 +474,34 @@ export function SeasonManagementHub() {
         {profile.role !== "manager" ? <AccessDenied /> : (
           <>
             <p className="season-hub-intro">
-              Set up a season, bring in its schedule, and maintain the league data used throughout the season.
-              Choose the workflow that matches what you need to do.
+              Follow these two steps to get a season ready and keep its league data current.
             </p>
             <div className="season-hub-section">
-              <div className="season-hub-section__title">Season setup</div>
+              <div className="season-hub-section__title">1. Set up the season, teams & schedule</div>
               <Link to="/seasons" className="season-hub-card">
                 <div className="season-hub-card__icon"><Calendar size={19} /></div>
                 <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Create or update a season</div>
-                  <div className="season-hub-card__desc">Create the season, activate it, and add or maintain divisions. Expand a season card to discover and automatically import published IBA divisions, teams, and schedules.</div>
+                  <div className="season-hub-card__title">Create the season & import from IBA</div>
+                  <div className="season-hub-card__desc">Create or activate the season, then expand its season card to automatically discover and import published divisions, teams, and schedules.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
-            </div>
-            <div className="season-hub-section">
-              <div className="season-hub-section__title">Import or maintain season data</div>
               <Link to="/manage" className="season-hub-card">
                 <div className="season-hub-card__icon"><Settings2 size={19} /></div>
                 <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Manage season data & manual imports</div>
-                  <div className="season-hub-card__desc">Manually edit or correct teams and schedules, maintain player rosters and ratings, and manage playoff brackets and locations. Use these tools when a manual change or fallback is needed.</div>
+                  <div className="season-hub-card__title">Import teams & schedule manually</div>
+                  <div className="season-hub-card__desc">Use the Teams and Schedule tabs to paste, enter, or correct the team list and match schedule when you need a manual path or fallback.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
             </div>
             <div className="season-hub-section">
-              <div className="season-hub-section__title">During the season</div>
+              <div className="season-hub-section__title">2. Import weekly league data</div>
               <Link to="/weekly-data" className="season-hub-card">
                 <div className="season-hub-card__icon"><Upload size={19} /></div>
                 <div className="season-hub-card__body">
-                  <div className="season-hub-card__title">Update weekly league reports</div>
-                  <div className="season-hub-card__desc">Fetch supported IBA reports automatically or use the matching manual import tools for rosters and ratings, team standings, MVP standings, and playoff eligibility.</div>
+                  <div className="season-hub-card__title">Update rosters, ratings & standings</div>
+                  <div className="season-hub-card__desc">Use automatic IBA report sync or the manual import tools for rosters and ratings, team standings, and MVP standings. Playoff eligibility is a separate manual import when needed.</div>
                 </div>
                 <ChevronRight size={17} className="season-hub-card__arrow" />
               </Link>
