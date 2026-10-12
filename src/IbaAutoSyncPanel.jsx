@@ -8,7 +8,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
   const [result, setResult] = useState(null);
-  const [expandedPreview, setExpandedPreview] = useState({ rost: true, div: true, mvp: true });
+  const [expandedPreview, setExpandedPreview] = useState({ rost: false, div: false, mvp: false });
 
   const codes = ibaCodesForSeason(season);
   const supported = !!codes.leagueType && !!codes.day;
@@ -85,23 +85,14 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
 
       {data && (
         <>
-          <div className="list" style={{marginTop:10}}>
-            {data.reports.map(r => {
-              const parsedRows = previewRows(r.reportType);
-              const rowCount = r.reportType === "rost"
-                ? (data.preview.roster?.playerCount || 0)
-                : parsedRows.length;
-              return (
-                <div key={r.key} className="list-row" style={{alignItems:"flex-start"}}>
-                  <div className="list-row__body">
-                    <span className="list-row__name">{r.reportType.toUpperCase()}</span>
-                    <span className="list-row__sub">{r.key}.pdf · {r.status === "ok" ? `${rowCount.toLocaleString()} parsed ${r.reportType === "rost" ? "players" : "rows"}` : (r.message || "Report unavailable")}</span>
-                  </div>
-                  <span className="player-rating-badge" style={{color:r.status === "ok" ? "#5FCF9E" : "#9A9A9A"}}>{r.status}</span>
-                </div>
-              );
-            })}
-          </div>
+          {data.reports.some(r => r.status !== "ok") && (
+            <div className="import-warning-block" style={{marginTop:10}}>
+              <div className="import-warning-block__title"><AlertCircle size={12}/> Some IBA reports are unavailable</div>
+              <div style={{fontSize:11,color:"#D0D0D0"}}>
+                {data.reports.filter(r => r.status !== "ok").map(r => `${r.reportType.toUpperCase()}: ${r.message || "report not available"}`).join(" · ")}
+              </div>
+            </div>
+          )}
 
           {data.reports.filter(r => r.status === "ok" && ["rost","div","mvp"].includes(r.reportType)).map(r => {
             const rows = previewRows(r.reportType);
