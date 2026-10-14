@@ -1785,9 +1785,6 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim()}><Plus size={13}/></button>
                         </div>
                         <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
-                        <button className="btn-sm" style={{width:"100%",marginTop:8}} onClick={()=>navigate(`/manual-season-import?season=${encodeURIComponent(s.id)}`)}>
-                          Manual Team & Schedule Import
-                        </button>
                          
                         <div className="field" style={{marginTop:10}}>
                           <Label>Playoffs Start Date</Label>
