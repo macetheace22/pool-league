@@ -345,3 +345,17 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 - Schedule dates are now normalized from either Postgres ISO dates (`YYYY-MM-DD`) or legacy/manual US dates (`M/D/YYYY`), with calendar validation. This addresses a compatibility issue where a valid Postgres date could be rejected by the earlier US-only parser.
 - The report validator now blocks if a valid SHA-256 fingerprint is missing or malformed, preventing a report from reaching writes without duplicate protection.
 - Added focused unit coverage for missing/malformed fingerprints. These changes require a new CI run before being considered validated.
+
+
+### Validation update — 2026-10-16, date/fingerprint hardening
+
+- Latest code commit: `348e5f360a976793b6069f8f76b9236be17ed529`.
+- GitHub Actions CI run #191 passed: tests and production build succeeded. Run #190 failed during build due to an invalid regex escape in an intermediate date-helper placement; the helper was moved into the pure validation module and the corrected commit passed run #191.
+- Vercel status for commit `348e5f3`: success.
+- Added unit tests for ISO and US schedule-date normalization, invalid calendar dates, and missing/malformed SHA-256 fingerprints.
+- The date helper lives in `src/ibaImportValidation.js`, keeping the logic side-effect-free and straightforward to unit test.
+- No live import was executed; no SQL migration was applied and no live database data was changed.
+
+### Current status clarification
+
+The existing automatic import panel still handles one selected season's format/day at a time. The all-21-combination / up-to-63-report discovery-and-review workflow and manual single-PDF upload path are **not complete**. Do not describe PR #38 as the complete end-to-end redesign, and do not merge until those workflows, parser behavior on real PDFs, and the multi-category partial-write safeguards have been addressed.
