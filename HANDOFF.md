@@ -327,7 +327,7 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 - Review partial-write behavior across multiple report categories; Supabase client writes are not one transaction, so if one category succeeds and a later category fails, earlier writes remain. History is recorded after each successful category/division.
 - Keep using the already validated parser behavior; revisit parser debugging only if a new, reproducible zero-row failure appears.
 - Exact duplicate divisions are now skipped independently for roster/ratings, standings, and MVP where team/division routing is unambiguous. Continue testing this behavior against real report samples before merge; changed content must remain held for review.
-- Complete the review UI for all 21 format/day combinations, fetching up to 63 PDFs, and the manual one-PDF-at-a-time upload path using the same validation/history service.
+- Complete and validate the consolidated review/import UI for all 21 format/day combinations, fetching up to 63 PDFs, and the manual one-PDF-at-a-time upload path using the same validation/history service.
 - Review section 57 RLS role assumptions before asking the user to apply it. Do not apply the SQL automatically.
 
 
@@ -398,3 +398,26 @@ The existing automatic import panel still handles one selected season's format/d
 - PR remains draft/open/unmerged. No Supabase migration was applied and no live database writes were performed.
 - Do not treat the earlier no-data parsing issue as outstanding; user confirmed it is resolved and previous preview counts were ROST 271 players / 36 teams, DIV 33 rows, MVP 60 rows.
 - Manual single-PDF upload/extraction and preview are implemented. Remaining major work is the safe consolidated mapping/review/import flow and multi-category partial-write handling, plus review of Section 57 RLS/migration assumptions.
+
+
+### Progress update — 2026-10-16, mapped consolidated review/import
+
+- Added a review/import panel to the all-format discovery results. It groups reports by format/day and requires an explicit target season whose format/day match the report group.
+- Import now requires a separate explicit target division and processes one report category for one division at a time. Preflight is scoped to the selected division; standings/MVP import loops now skip divisions that are not included in the validated preflight. This reduces the risk of unrelated divisions or categories being partially written together.
+- Zero-row reports are not eligible for validation/import. Missing/error reports are shown and cannot be imported. Report-week, schedule-date, duplicate-history, and fingerprint checks remain in the existing fail-closed preflight.
+- Results now show per-category counts and warnings. Error messaging tells the operator to verify the selected division before retrying, since the writes inside a single category/division are still not wrapped in a database transaction.
+- Manual PDF imports now record source `manual` in history instead of being mislabeled `automatic`. Corrected manual-PDF extracted-text newline normalization.
+- CI run #209 passed on code commit `6d752ca048f01129a9684696b79ff7ed7a9a32db`: tests and production build succeeded. Vercel status for that commit: success. The later handoff-only commit will need its own checks.
+
+### Section 57 read-only compatibility review — 2026-10-16
+
+- Read-only inspection of the active Supabase project `iba-pool-league` confirmed `public.current_role_name()` exists, returns text, and returns the active profile's role. The `profiles_role_check` constraint allows `manager`, `captain`, and `player`, so the migration's manager-only policies use an existing role and function.
+- Confirmed the referenced `seasons.id`, `divisions.id`, `divisions.season_id`, and `profiles.id` columns are UUIDs, matching the proposed Section 57 foreign-key types.
+- Confirmed `public.iba_report_import_history` does not exist yet and has no policies. No SQL was applied and no database rows were changed.
+- Migration is still pending manual review/application. Its SELECT/INSERT policies are manager-only; insert relies on `imported_by` defaulting to `auth.uid()`, which matches the app's history insert payload (the app does not supply `imported_by`).
+
+### Latest state — PR #38
+
+- Latest code implementation validated at `6d752ca048f01129a9684696b79ff7ed7a9a32db`, CI run #209 success, Vercel success.
+- The consolidated flow is implemented but still needs user-side end-to-end validation with real reports before merge. Do not merge yet.
+- Remaining: inspect and harden intra-category partial-write outcomes (the app cannot currently make multiple Supabase client writes transactional); run end-to-end report-group tests against real data once the user validates in the UI; keep Section 57 unapplied until the user manually approves it.
