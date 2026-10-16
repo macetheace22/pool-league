@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { fetchIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
+import { fetchIbaReports, fetchAllIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
 
 export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null }) {
   const [loading, setLoading] = useState(false);
@@ -10,6 +10,10 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [result, setResult] = useState(null);
   const [preflight, setPreflight] = useState(null);
   const [expandedPreview, setExpandedPreview] = useState({ rost: false, div: false, mvp: false });
+  const [allScan, setAllScan] = useState(null);
+  const [scanProgress, setScanProgress] = useState(null);
+  const [scanningAll, setScanningAll] = useState(false);
+  const [scanError, setScanError] = useState("");
 
   const codes = ibaCodesForSeason(season);
   const supported = !!codes.leagueType && !!codes.day;
@@ -52,6 +56,33 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     } finally { setLoading(false); }
   };
 
+  const scanAllReports = async () => {
+    setScanningAll(true);
+    setScanError("");
+    setAllScan(null);
+    setScanProgress({ completedGroups: 0, totalGroups: 21, reports: 0 });
+    try {
+      const fetched = await fetchAllIbaReports(setScanProgress);
+      const reports = await Promise.all((fetched.reports || []).map(async report => {
+        if (report.status !== "ok") return { ...report, detectedRows: null, reportWeek: null };
+        const preview = await buildIbaPreview([report]);
+        const reportWeek = preview.reports?.[0]?.reportWeek || null;
+        const detectedRows = report.reportType === "rost"
+          ? (preview.roster?.playerCount || 0)
+          : report.reportType === "div"
+            ? (preview.standings?.rows?.length || 0)
+            : (preview.mvp?.rows?.length || 0);
+        const teamCount = report.reportType === "rost" ? (preview.roster?.teamCount || 0) : null;
+        return { ...report, detectedRows, teamCount, reportWeek };
+      }));
+      setAllScan({ generatedAt: fetched.generatedAt, reports });
+    } catch (e) {
+      setScanError(e?.message || "Unable to scan all IBA reports.");
+    } finally {
+      setScanningAll(false);
+    }
+  };
+
   const importReports = async () => {
     if (!data?.reports) return;
     setImporting(true); setError("");
@@ -82,6 +113,52 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
         <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
       </div>}
+      {reportType === "rost" && (
+        <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>All-format report discovery</div>
+          <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
+            Scan Masters, Advanced, and Open for all seven days (21 format/day groups; up to 63 PDFs). This is a discovery and parsing review only: it does not import data or select a season automatically.
+          </div>
+          <button className="btn-sm" onClick={scanAllReports} disabled={scanningAll} style={{ marginTop: 8 }}>
+            {scanningAll ? <><RefreshCw size={12} className="spin" /> Scanning {scanProgress?.completedGroups || 0}/{scanProgress?.totalGroups || 21} groups…</> : "Scan All IBA Formats & Days"}
+          </button>
+          {scanError && <div className="error-msg" style={{ marginTop: 8 }}>{scanError}</div>}
+          {allScan && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 11, marginBottom: 8 }}>
+                <span>{allScan.reports.length} reports checked</span>
+                <span>· {allScan.reports.filter(r => r.status === "ok").length} available</span>
+                <span>· {allScan.reports.filter(r => r.status === "missing").length} missing</span>
+                <span>· {allScan.reports.filter(r => r.status !== "ok" && r.status !== "missing").length} errors/empty</span>
+                <span>· {allScan.reports.filter(r => r.status === "ok" && r.detectedRows === 0).length} with zero parsed rows</span>
+              </div>
+              <div style={{ maxHeight: 440, overflowY: "auto", border: "1px solid #303030", borderRadius: 7 }}>
+                {allScan.reports.map(report => {
+                  const zeroRows = report.status === "ok" && report.detectedRows === 0;
+                  const statusColor = report.status === "ok" && !zeroRows ? "#5FCF9E" : report.status === "missing" ? "#999" : "#F0C36D";
+                  return (
+                    <details key={report.key} style={{ padding: "8px 10px", borderBottom: "1px solid #292929" }}>
+                      <summary style={{ cursor: "pointer", fontSize: 11, color: statusColor }}>
+                        <strong>{report.formatLabel} · {report.dayLabel}</strong> — {report.reportType.toUpperCase()} · {report.status}
+                        {report.status === "ok" ? ` · ${report.detectedRows} ${report.reportType === "rost" ? "players" : "rows"}${report.reportType === "rost" ? ` / ${report.teamCount} teams` : ""}` : ""}
+                        {zeroRows ? " · REVIEW: zero rows parsed" : ""}
+                      </summary>
+                      <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 6 }}>
+                        {report.reportWeek?.missing ? "Report week not detected." : report.reportWeek?.ambiguous ? `Ambiguous report weeks: ${(report.reportWeek.weekNumbers || []).join(", ")}.` : report.reportWeek?.weekNumber ? `Week ${report.reportWeek.weekNumber} detected.` : ""}
+                        {report.message ? ` ${report.message}` : ""}
+                        {report.status === "ok" && <div style={{ marginTop: 4 }}>PDF: {report.key}.pdf · {report.pages || "?"} pages · {report.bytes?.toLocaleString() || "?"} bytes</div>}
+                      </div>
+                      {report.status === "ok" && zeroRows && (
+                        <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: 220, overflowY: "auto", fontSize: 10, lineHeight: 1.4, background: "#111", padding: 7, borderRadius: 5, color: "#D0D0D0", marginTop: 7 }}>{String(report.text || "").slice(0, 3000) || "[No extracted text returned]"}</pre>
+                      )}
+                    </details>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
       {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Select a season with a supported format and day.</div></div>}
       {supported && !data && (
         <button className="btn-primary" onClick={fetchReports} disabled={loading} style={{marginTop:8}}>
