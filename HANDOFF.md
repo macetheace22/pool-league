@@ -359,3 +359,14 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 ### Current status clarification
 
 The existing automatic import panel still handles one selected season's format/day at a time. The all-21-combination / up-to-63-report discovery-and-review workflow and manual single-PDF upload path are **not complete**. Do not describe PR #38 as the complete end-to-end redesign, and do not merge until those workflows, parser behavior on real PDFs, and the multi-category partial-write safeguards have been addressed.
+
+
+### Progress update — 2026-10-16, all-format discovery UI started
+
+- Added `fetchAllIbaReports()` to `src/ibaAutoSync.js`. It checks the 21 format/day groups (Masters, Advanced, Open × Monday–Sunday) in bounded groups rather than launching all requests at once.
+- Raised the API candidate cap in `api/iba-reports.js` from 12 to 63 so the endpoint can accept the full theoretical report set in a single request if needed. The current UI calls the endpoint per format/day group (three reports per call).
+- Added an **All-format report discovery** section to `src/IbaAutoSyncPanel.jsx` (shown once on the roster tile): scan progress, counts of available/missing/error reports and zero-row parses, and an expandable per-PDF review showing format/day, category, detected week, PDF metadata, and extracted text for zero-row reports.
+- This discovery action is deliberately **read-only**. It does not guess the target season, run import validation, or write to Supabase. The existing selected-season import path remains separate.
+- New commits on the existing PR #38 branch: `b67c4b0` (discovery helper), `2727cfe` (API cap), and `1138763` (discovery UI). PR remains open/draft/unmerged.
+- Vercel status for `1138763` was pending when checked. No passing build/test result is claimed for these latest changes yet.
+- Remaining before merge: run and inspect tests/build; add manual single-PDF upload using the same validator/history; fix and test real PDF parsing where row counts are zero; design a safe review/import flow that maps each discovered report to its correct season/division; address multi-category partial writes; review section 57 RLS/migration compatibility. No SQL migration applied and no live database writes performed.
