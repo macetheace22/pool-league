@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { fetchIbaReports, buildIbaPreview, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
+import { fetchIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
 
 export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null }) {
   const [loading, setLoading] = useState(false);
@@ -8,6 +8,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
   const [result, setResult] = useState(null);
+  const [preflight, setPreflight] = useState(null);
   const [expandedPreview, setExpandedPreview] = useState({ rost: false, div: false, mvp: false });
 
   const codes = ibaCodesForSeason(season);
@@ -40,7 +41,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       : [{ key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"teamNum", label:"Team #" }, { key:"wins", label:"Sets won" }, { key:"mvpRankingPoints", label:"MVP points" }, { key:"losses", label:"Sets lost" }, { key:"pointsScored", label:"Points scored" }];
 
   const fetchReports = async () => {
-    setLoading(true); setError(""); setResult(null);
+    setLoading(true); setError(""); setResult(null); setPreflight(null);
     try {
       const fetched = await fetchIbaReports(season, reportType);
       const reports = selectedReports(fetched.reports);
@@ -55,7 +56,14 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     if (!data?.reports) return;
     setImporting(true); setError("");
     try {
-      const imported = await importIbaReports(selectedReports(data.reports), season, schedule);
+      const reportsToImport = selectedReports(data.reports);
+      const validation = await validateIbaReports(reportsToImport, season);
+      setPreflight(validation);
+      if (!validation.canImport) {
+        setError("Import blocked. Review the per-division validation results below; no report data was written.");
+        return;
+      }
+      const imported = await importIbaReports(reportsToImport, season, schedule, validation);
       setResult(imported);
       if (onComplete) await onComplete();
     } catch (e) {
@@ -178,9 +186,25 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
             </div>
           )}
 
+          {preflight && (
+            <div className="import-warning-block" style={{marginTop:10}}>
+              <div className="import-warning-block__title"><AlertCircle size={12}/> Import validation results</div>
+              <div style={{fontSize:11,color:"#D0D0D0"}}>Every report is checked against each division's schedule and saved import history before any data is written. Any duplicate, changed report, missing week, schedule mismatch, or unavailable history blocks this batch. Exact duplicates will be skipped in a later division-scoped import step; this batch importer cannot safely skip only part of a multi-division roster PDF yet.</div>
+              {preflight.reportFailures.map((item,i)=><div key={`failure-${i}`} style={{fontSize:11,color:"#F0C36D"}}>{item.reportType.toUpperCase()}: {item.reason}</div>)}
+              <div style={{display:"grid",gap:6,marginTop:5}}>
+                {preflight.checks.map(check=>(
+                  <div key={check.key} style={{borderTop:"1px solid #3A3A3A",paddingTop:5,fontSize:11,color:check.status==="ready"?"#5FCF9E":"#F0C36D"}}>
+                    <strong>{check.reportType.toUpperCase()} · Division {check.divisionNum} {check.divisionName || ""}</strong> · {check.weekNumber ? `Week ${check.weekNumber}` : "week unknown"} · {check.status}
+                    <div style={{color:"#AAA",marginTop:2}}>{check.reason}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {!result ? (
             <div style={{display:"flex",gap:6,marginTop:10}}>
-              <button className="btn-primary" onClick={importReports} disabled={importing || (data.reports ?? []).some(r => r.status === "ok" && (
+              <button className="btn-primary" onClick={importReports} disabled={importing || (preflight && !preflight.canImport) || (data.reports ?? []).some(r => r.status === "ok" && (
                 (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
                 (r.reportType === "div" && data.preview.standings?.rows.length === 0) ||
                 (r.reportType === "mvp" && data.preview.mvp?.rows.length === 0)

@@ -304,3 +304,28 @@ The season workflow now treats the IBA schedule page as the initial season-struc
 - The automatic report importer remains separate: DIV/MVP are treated as later/weekly data sources, not required for initial season setup.
 
 The schedule endpoint includes several request fallbacks because the IBA page's selection controls are dynamic. If IBA changes its form/AJAX mechanism, the endpoint may need one targeted adjustment; the manual importer remains available.
+
+
+## IBA weekly report import — current PR #38 work (2026-10-16)
+
+Branch: `feat/weekly-import-report-week-metadata`  
+PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](https://github.com/macetheace22/pool-league/pull/38) — remains draft and must not be merged yet.
+
+### Added in this implementation slice
+
+- Connected the shared report-week/duplicate validator to the actual automatic report import button.
+- Before any report write, the app reloads the selected season's divisions and checks each downloaded report against that division's saved schedule and persistent import history.
+- Missing/ambiguous week, schedule mismatch, missing schedule date, unavailable history, exact duplicate, and changed content block the whole batch. This is intentionally fail-closed while the importer still writes a multi-division roster report as one operation.
+- Uses each report type's own week and each division's scheduled date to build snapshot keys. Different divisions can use different report weeks without borrowing another division's week.
+- Adds visible per-division validation results to the automatic import panel.
+- After successful category writes, records report hash/history per affected division. Supabase history table must exist for history checks to pass; section 57 is a manual migration and has not been applied by ChatGPT.
+- Tightened roster/rating database writes to check returned errors and pre-resolve each player's division-specific week before writes. No live database was changed.
+
+### Important remaining work
+
+- Validate this commit with GitHub Actions tests/build and inspect the exact job results.
+- Review partial-write behavior across multiple report categories; Supabase client writes are not one transaction, so if one category succeeds and a later category fails, earlier writes remain. History is recorded after each successful category/division.
+- Confirm parsers produce rows for every division before treating a whole multi-division PDF as complete.
+- Exact duplicates are currently blocked at batch level rather than skipped division-by-division. Implementing the required skip behavior safely needs division-scoped roster import; changed content must remain held for review.
+- Complete the review UI for all 21 format/day combinations, fetching up to 63 PDFs, and the manual one-PDF-at-a-time upload path using the same validation/history service.
+- Review section 57 RLS role assumptions before asking the user to apply it. Do not apply the SQL automatically.

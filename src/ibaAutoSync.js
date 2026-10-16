@@ -1,4 +1,5 @@
 import * as db from "./db";
+import { classifyIbaReportImport } from "./ibaImportValidation";
 import { extractIbaReportWeek, extractIbaReportWeeksByDivision, parseLeagueRoster, parseStandingsImport, parseMvpImport } from "./ibaParsers";
 
 const FORMAT_TO_CODE = { masters: "mast", advanced: "adv", open: "open" };
@@ -55,6 +56,78 @@ function groupByDivision(rows, activeTeamsByNum) {
   return { groups, skipped };
 }
 
+
+export async function validateIbaReports(reports, season) {
+  const seasons = await db.listSeasons();
+  const selected = (seasons ?? []).find(item => String(item.id) === String(season?.id));
+  if (!selected) throw new Error("The selected season could not be reloaded. Refresh the page and retry.");
+  const divisions = selected.divisions ?? [];
+  if (!divisions.length) throw new Error("No divisions are configured for this season. Import its IBA schedule before weekly reports.");
+
+  const checks = [];
+  const weekTagsByReportDivision = {};
+  for (const division of divisions) {
+    const teams = await db.listTeams(division.id);
+    const scheduledWeeks = await db.listSchedule(division.id, teams);
+    const historyResult = await db.listIbaReportImportHistory(season.id, division.id);
+    for (const report of (reports ?? []).filter(item => item.status === "ok")) {
+      const reportMetadata = {
+        reportWeek: extractIbaReportWeek(report.text),
+        reportWeeksByDivision: extractIbaReportWeeksByDivision(report.text),
+      };
+      const classification = classifyIbaReportImport({
+        reportType: report.reportType,
+        divisionNum: division.num,
+        reportMetadata,
+        scheduledWeeks,
+        history: historyResult.error ? null : historyResult.data,
+        contentSha256: report.sha256,
+      });
+      const scheduledWeek = scheduledWeeks.find(item => Number(item.week) === Number(classification.week?.weekNumber));
+      let status = classification.status;
+      let reason = classification.reason;
+      let weekTag = null;
+      if (status === "ready") {
+        const match = String(scheduledWeek?.date ?? "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (!match) {
+          status = "blocked_schedule_date_unavailable";
+          reason = "The matching schedule week has no usable date; import is blocked.";
+        } else {
+          const [, month, day, year] = match;
+          weekTag = {
+            weekKey: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+            label: `IBA Week ${classification.week.weekNumber} · ${scheduledWeek.date}`,
+          };
+          weekTagsByReportDivision[`${report.reportType}:${division.id}`] = weekTag;
+        }
+      }
+      checks.push({
+        key: `${report.reportType}:${division.id}`,
+        reportType: report.reportType,
+        divisionId: division.id,
+        divisionNum: String(division.num),
+        divisionName: division.name,
+        weekNumber: classification.week?.weekNumber ?? null,
+        status,
+        reason,
+        weekTag,
+      });
+    }
+  }
+  const reportFailures = (reports ?? []).filter(report => report.status !== "ok");
+  const allChecksReady = checks.length > 0 && checks.every(check => check.status === "ready");
+  return {
+    checks,
+    weekTagsByReportDivision,
+    canImport: allChecksReady && reportFailures.length === 0,
+    reportFailures: reportFailures.map(report => ({
+      reportType: report.reportType,
+      status: report.status,
+      reason: report.message || "Report unavailable",
+    })),
+  };
+}
+
 export async function buildIbaPreview(reports) {
   const byType = Object.fromEntries((reports ?? []).map(r => [r.reportType, r]));
   const preview = { reports: [], roster: null, standings: null, mvp: null, errors: [] };
@@ -70,14 +143,33 @@ export async function buildIbaPreview(reports) {
   return preview;
 }
 
-export async function importIbaReports(reports, season, schedule) {
+export async function importIbaReports(reports, season, schedule, preflight) {
+  if (!preflight?.canImport) throw new Error("Import blocked: complete the per-division validation checks before writing any data.");
   const weekTag = currentWeekTag(schedule);
+  const importedDivisionIdsByType = { rost: [], div: [], mvp: [] };
+  const recordHistory = async (report, reportType, divisionIds) => {
+    const checks = preflight.checks.filter(check => check.reportType === reportType && divisionIds.includes(check.divisionId));
+    for (const check of checks) {
+      const saved = await db.recordIbaReportImportHistory({
+        seasonId: season.id,
+        divisionId: check.divisionId,
+        reportType,
+        reportWeek: check.weekNumber,
+        contentSha256: report.sha256,
+        source: "automatic",
+        metadata: { reportKey: report.key, divisionNum: check.divisionNum, weekKey: check.weekTag?.weekKey },
+      });
+      if (!saved.ok) throw new Error(`Data was saved, but import history could not be recorded for division ${check.divisionNum}: ${saved.error}`);
+    }
+  };
   const result = { weekTag, roster: null, standings: null, mvp: null, warnings: [] };
   const byType = Object.fromEntries((reports ?? []).map(r => [r.reportType, r]));
 
   if (byType.rost?.status === "ok") {
     const parsed = parseLeagueRoster(byType.rost.text);
-    result.roster = await db.bulkImportPlayers(parsed, weekTag);
+    result.roster = await db.bulkImportPlayers(parsed, { byReportDivision: preflight.weekTagsByReportDivision, fallback: weekTag });
+    importedDivisionIdsByType.rost = (result.roster?.updatedDivisions ?? []).map(item => item.divisionId);
+    if (importedDivisionIdsByType.rost.length) await recordHistory(byType.rost, "rost", importedDivisionIdsByType.rost);
     if (parsed.ambiguousRoster?.length) result.warnings.push(`${parsed.ambiguousRoster.length} roster assignments need review.`);
     if (result.roster?.ambiguousTeamIds?.length) result.warnings.push(`${result.roster.ambiguousTeamIds.length} team numbers matched more than one active division.`);
     if (result.roster?.unmatchedTeams?.length) result.warnings.push(`${result.roster.unmatchedTeams.length} team numbers were not matched to an active team.`);
@@ -94,9 +186,14 @@ export async function importIbaReports(reports, season, schedule) {
     const grouped = groupByDivision(rows, routing.byNum);
     result.standings = { imported: 0, skipped: grouped.skipped };
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
-      const ok = await db.importStandingsForWeek(divisionId, group.rows, group.teams, weekTag);
-      if (ok) result.standings.imported += group.rows.length;
+      const divisionWeekTag = preflight.weekTagsByReportDivision[`div:${divisionId}`];
+      if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} standings.`);
+      const ok = await db.importStandingsForWeek(divisionId, group.rows, group.teams, divisionWeekTag);
+      if (!ok) throw new Error(`Could not save standings for division ${divisionId}.`);
+      result.standings.imported += group.rows.length;
+      if (group.rows.length) importedDivisionIdsByType.div.push(divisionId);
     }
+    if (importedDivisionIdsByType.div.length) await recordHistory(byType.div, "div", importedDivisionIdsByType.div);
   }
 
   if (byType.mvp?.status === "ok") {
@@ -104,9 +201,14 @@ export async function importIbaReports(reports, season, schedule) {
     const grouped = groupByDivision(rows, routing.byNum);
     result.mvp = { imported: 0, skipped: grouped.skipped };
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
-      const ok = await db.importMvpForWeek(divisionId, group.rows, weekTag);
-      if (ok) result.mvp.imported += group.rows.length;
+      const divisionWeekTag = preflight.weekTagsByReportDivision[`mvp:${divisionId}`];
+      if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} MVP standings.`);
+      const ok = await db.importMvpForWeek(divisionId, group.rows, divisionWeekTag);
+      if (!ok) throw new Error(`Could not save MVP standings for division ${divisionId}.`);
+      result.mvp.imported += group.rows.length;
+      if (group.rows.length) importedDivisionIdsByType.mvp.push(divisionId);
     }
+    if (importedDivisionIdsByType.mvp.length) await recordHistory(byType.mvp, "mvp", importedDivisionIdsByType.mvp);
   }
   return result;
 }
