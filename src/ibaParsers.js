@@ -21,6 +21,40 @@ function extractIbaReportWeek(raw) {
   };
 }
 
+// Extract week labels independently for division-scoped report sections. Some
+// PDFs print a week label per division, so a report-wide week must never be
+// assigned to every division when the source contains differing weeks.
+function extractIbaReportWeeksByDivision(raw) {
+  const lines = String(raw || "").split(/\r?\n/);
+  const divisionHeader = /^\s*(?:Division\s+)?(\d{3,8})\s+(.{2,80}?)\s*$/i;
+  const sections = [];
+  let current = null;
+  for (const line of lines) {
+    const match = line.match(divisionHeader);
+    const looksLikeDivision = match && !/^(?:week|for week|team|player|printed|fall season|winter season|spring season)\b/i.test(match[2]);
+    if (looksLikeDivision) {
+      current = { divisionNum: match[1], divisionLabel: match[2].trim(), lines: [] };
+      sections.push(current);
+    }
+    if (current) current.lines.push(line);
+  }
+
+  const byDivision = {};
+  for (const section of sections) {
+    const metadata = extractIbaReportWeek(section.lines.join("\n"));
+    byDivision[section.divisionNum] = {
+      ...metadata,
+      divisionLabel: section.divisionLabel,
+    };
+  }
+  const reportMetadata = extractIbaReportWeek(lines.join("\n"));
+  return {
+    byDivision,
+    reportWeek: reportMetadata,
+    hasDivisionSections: sections.length > 0,
+  };
+}
+
 function parseStandingsImport(raw) {
   const rows = [];
   const lines = String(raw || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
@@ -539,4 +573,4 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 }
 
 
-export { extractIbaReportWeek, parseStandingsImport, parseMvpImport, parseLeagueRoster };
+export { extractIbaReportWeek, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster };
