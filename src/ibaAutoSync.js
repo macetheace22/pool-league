@@ -1,5 +1,5 @@
 import * as db from "./db";
-import { parseLeagueRoster, parseStandingsImport, parseMvpImport } from "./ibaParsers";
+import { extractIbaReportWeek, parseLeagueRoster, parseStandingsImport, parseMvpImport } from "./ibaParsers";
 
 const FORMAT_TO_CODE = { masters: "mast", advanced: "adv", open: "open" };
 const DAY_TO_CODE = { monday: "mon", tuesday: "tues", wednesday: "wed", thursday: "thur", friday: "fri", saturday: "sat", sunday: "sun" };
@@ -59,7 +59,7 @@ export async function buildIbaPreview(reports) {
   const byType = Object.fromEntries((reports ?? []).map(r => [r.reportType, r]));
   const preview = { reports: [], roster: null, standings: null, mvp: null, errors: [] };
   for (const r of reports ?? []) {
-    preview.reports.push({ key: r.key, reportType: r.reportType, status: r.status, pages: r.pages, bytes: r.bytes, message: r.message });
+    preview.reports.push({ key: r.key, reportType: r.reportType, status: r.status, pages: r.pages, bytes: r.bytes, message: r.message, reportWeek: r.status === "ok" ? extractIbaReportWeek(r.text) : null });
   }
   if (byType.rost?.status === "ok") {
     const parsed = parseLeagueRoster(byType.rost.text);
