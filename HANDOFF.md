@@ -370,3 +370,12 @@ The existing automatic import panel still handles one selected season's format/d
 - New commits on the existing PR #38 branch: `b67c4b0` (discovery helper), `2727cfe` (API cap), and `1138763` (discovery UI). PR remains open/draft/unmerged.
 - Vercel status for `1138763` was pending when checked. No passing build/test result is claimed for these latest changes yet.
 - Remaining before merge: run and inspect tests/build; add manual single-PDF upload using the same validator/history; fix and test real PDF parsing where row counts are zero; design a safe review/import flow that maps each discovered report to its correct season/division; address multi-category partial writes; review section 57 RLS/migration compatibility. No SQL migration applied and no live database writes performed.
+
+
+### Validation update — 2026-10-16, all-format discovery UI
+
+- Discovery UI implementation commit: `1138763`; module restoration/final code commit: `9b1a01c69122d97f3e0344b3a90e0ec3349d4266`.
+- CI run #196 exposed a build error: the discovery helper had replaced rather than extended `src/ibaAutoSync.js`. The complete prior module was restored and the helper inserted without removing existing exports.
+- CI run #197 passed: all 75 tests passed and the production build succeeded.
+- Vercel status for `9b1a01c`: success.
+- This validates automated tests and build, not real PDF extraction or end-to-end import behavior. Manual one-PDF upload and the safe mapped consolidated import flow remain incomplete. The PR remains draft/open/unmerged; no SQL migration or live DB writes occurred.
