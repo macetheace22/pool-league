@@ -309,7 +309,16 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   </div>
                 )}
                 {reviewError && <div className="error-msg" style={{ marginTop: 8 }}>{reviewError}</div>}
-                {reviewResult && <div style={{ fontSize: 11, color: "#5FCF9E", marginTop: 8 }}>Import completed for the selected report category. Review its results before selecting another category.</div>}
+                {reviewResult && (
+                  <div style={{ fontSize: 11, color: "#5FCF9E", marginTop: 8, padding: 8, border: "1px solid #315B49", borderRadius: 6 }}>
+                    <strong>Import operation finished.</strong>
+                    {reviewResult.roster && <div>Roster & ratings: {(reviewResult.roster.updatedDivisions || []).length} division(s) updated{reviewResult.roster.skippedDuplicates ? " · exact duplicate skipped" : ""}.</div>}
+                    {reviewResult.standings && <div>Team standings: {reviewResult.standings.imported || 0} row(s) imported{reviewResult.standings.skipped?.length ? ` · ${reviewResult.standings.skipped.length} unmatched/ambiguous row(s) skipped` : ""}.</div>}
+                    {reviewResult.mvp && <div>MVP standings: {reviewResult.mvp.imported || 0} row(s) imported{reviewResult.mvp.skipped?.length ? ` · ${reviewResult.mvp.skipped.length} unmatched/ambiguous row(s) skipped` : ""}.</div>}
+                    {(reviewResult.warnings || []).map((warning, index) => <div key={index} style={{ color: "#F0C36D" }}>{warning}</div>)}
+                    <div style={{ color: "#AAA", marginTop: 4 }}>Review this result before moving to another report category. If any error was reported, verify the selected division's data before retrying.</div>
+                  </div>
+                )}
               </section>
               <div style={{ maxHeight: 440, overflowY: "auto", border: "1px solid #303030", borderRadius: 7 }}>
                 {allScan.reports.map(report => {
