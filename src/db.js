@@ -1091,6 +1091,45 @@ export async function removePlayerFromTeam(teamId, playerNum) {
 // seasons (you're only ever importing weekly data for a season that's
 // currently running) and any number that still matches more than one team
 // is reported back as ambiguous rather than guessed at.
+// ─── IBA weekly report import history ────────────────────────────────────────
+// History is recorded only after a report's data import succeeds. Callers must
+// run classifyIbaReportImport() before writing, using this history to block
+// exact duplicates and flag changed content for the same division/report/week.
+export async function listIbaReportImportHistory(seasonId, divisionId) {
+  if (!seasonId || !divisionId) {
+    return { data: [], error: "A season and division are required to check IBA import history." };
+  }
+  const { data, error } = await supabase
+    .from("iba_report_import_history")
+    .select("id, season_id, division_id, report_type, report_week, content_sha256, source, metadata, imported_at")
+    .eq("season_id", seasonId)
+    .eq("division_id", divisionId)
+    .order("imported_at", { ascending: false });
+  return { data: data ?? [], error: error?.message ?? null };
+}
+
+export async function recordIbaReportImportHistory(entry) {
+  const payload = {
+    season_id: entry?.seasonId,
+    division_id: entry?.divisionId,
+    report_type: entry?.reportType,
+    report_week: entry?.reportWeek,
+    content_sha256: String(entry?.contentSha256 ?? "").toLowerCase(),
+    source: entry?.source,
+    metadata: entry?.metadata ?? {},
+  };
+  if (!payload.season_id || !payload.division_id || !payload.report_type || !payload.report_week || !/^[a-f0-9]{64}$/.test(payload.content_sha256)) {
+    return { ok: false, error: "A season, division, report type, report week, and valid SHA-256 fingerprint are required." };
+  }
+  const { data, error } = await supabase
+    .from("iba_report_import_history")
+    .insert(payload)
+    .select("id, season_id, division_id, report_type, report_week, content_sha256, source, metadata, imported_at")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data };
+}
+
 export async function bulkImportPlayers(parsed, weekTag) {
   const teamNums = Object.keys(parsed.rosters);
   const { data: teamRows } = await supabase
