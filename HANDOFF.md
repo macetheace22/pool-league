@@ -421,3 +421,12 @@ The existing automatic import panel still handles one selected season's format/d
 - Latest code implementation validated at `6d752ca048f01129a9684696b79ff7ed7a9a32db`, CI run #209 success, Vercel success.
 - The consolidated flow is implemented but still needs user-side end-to-end validation with real reports before merge. Do not merge yet.
 - Remaining: inspect and harden intra-category partial-write outcomes (the app cannot currently make multiple Supabase client writes transactional); run end-to-end report-group tests against real data once the user validates in the UI; keep Section 57 unapplied until the user manually approves it.
+
+
+### Latest import-safety validation — 2026-10-16
+
+- Latest code commit: `9fe3522947df4fdee48b94d1becd1dd048525fc0`.
+- CI run #211 passed: tests and production build succeeded. Vercel status for this commit: success.
+- On mapped-import failure, the UI now explicitly warns that some writes may already have succeeded and directs the operator to verify the selected division's data and import history before retrying.
+- The mapped review flow still processes one report category for one selected division at a time. This reduces cross-category/division partial-write risk, but does not make the multiple database writes within a category/division transactional.
+- PR #38 remains draft/open/unmerged. No SQL migration applied and no live DB writes were performed by ChatGPT.
