@@ -9,7 +9,7 @@
 // ambiguous result rather than silently choosing one.
 function extractIbaReportWeek(raw) {
   const text = String(raw || "");
-  const matches = [...text.matchAll(/\\b(?:For\\s+)?Week\\s*:?\\s*(\\d+)\\b/gi)]
+  const matches = [...text.matchAll(/\b(?:For\s+)?Week\s*:?\s*(\d+)\b/gi)]
     .map(match => ({ weekNumber: Number(match[1]), matchedText: match[0] }));
   const distinctWeeks = [...new Set(matches.map(match => match.weekNumber))];
   return {
