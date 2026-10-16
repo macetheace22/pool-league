@@ -223,7 +223,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
               </div>
               {(result.skippedDuplicateDivisions?.length || result.warnings?.length || result.standings?.skipped?.length || result.mvp?.skipped?.length) ? (
                 <div style={{fontSize:10.5,color:"#F59E0B",marginTop:5}}>
-                  Review warnings: [...(result.skippedDuplicateDivisions||[]).map(x=>`Skipped duplicate ${x}`), ...(result.warnings||[]), ...((result.standings?.skipped||[]).map(x=>`Standings Team ${x.teamNum}: ${x.reason}`)), ...((result.mvp?.skipped||[]).map(x=>`MVP Team ${x.teamNum}: ${x.reason}`))].join(" · ")}
+                  Review warnings: {[...(result.skippedDuplicateDivisions||[]).map(x=>`Skipped duplicate ${x}`), ...(result.warnings||[]), ...((result.standings?.skipped||[]).map(x=>`Standings Team ${x.teamNum}: ${x.reason}`)), ...((result.mvp?.skipped||[]).map(x=>`MVP Team ${x.teamNum}: ${x.reason}`))].join(" · ")}
                 </div>
               ) : null}
             </div>
