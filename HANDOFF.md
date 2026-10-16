@@ -326,6 +326,6 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 - Validate this commit with GitHub Actions tests/build and inspect the exact job results.
 - Review partial-write behavior across multiple report categories; Supabase client writes are not one transaction, so if one category succeeds and a later category fails, earlier writes remain. History is recorded after each successful category/division.
 - Confirm parsers produce rows for every division before treating a whole multi-division PDF as complete.
-- Exact duplicates are currently blocked at batch level rather than skipped division-by-division. Implementing the required skip behavior safely needs division-scoped roster import; changed content must remain held for review.
+- Exact duplicate divisions are now skipped independently for roster/ratings, standings, and MVP where team/division routing is unambiguous. Continue testing this behavior against real report samples before merge; changed content must remain held for review.
 - Complete the review UI for all 21 format/day combinations, fetching up to 63 PDFs, and the manual one-PDF-at-a-time upload path using the same validation/history service.
 - Review section 57 RLS role assumptions before asking the user to apply it. Do not apply the SQL automatically.

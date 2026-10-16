@@ -189,11 +189,11 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           {preflight && (
             <div className="import-warning-block" style={{marginTop:10}}>
               <div className="import-warning-block__title"><AlertCircle size={12}/> Import validation results</div>
-              <div style={{fontSize:11,color:"#D0D0D0"}}>Every report is checked against each division's schedule and saved import history before any data is written. Any duplicate, changed report, missing week, schedule mismatch, or unavailable history blocks this batch. Exact duplicates will be skipped in a later division-scoped import step; this batch importer cannot safely skip only part of a multi-division roster PDF yet.</div>
+              <div style={{fontSize:11,color:"#D0D0D0"}}>Every report is checked against each division's schedule and saved import history before any data is written. Changed reports, missing weeks, schedule mismatches, and unavailable history block the batch. Exact duplicate divisions are skipped while other validated divisions can import.</div>
               {preflight.reportFailures.map((item,i)=><div key={`failure-${i}`} style={{fontSize:11,color:"#F0C36D"}}>{item.reportType.toUpperCase()}: {item.reason}</div>)}
               <div style={{display:"grid",gap:6,marginTop:5}}>
                 {preflight.checks.map(check=>(
-                  <div key={check.key} style={{borderTop:"1px solid #3A3A3A",paddingTop:5,fontSize:11,color:check.status==="ready"?"#5FCF9E":"#F0C36D"}}>
+                  <div key={check.key} style={{borderTop:"1px solid #3A3A3A",paddingTop:5,fontSize:11,color:check.status==="ready"?"#5FCF9E":check.status==="duplicate"?"#9A9A9A":"#F0C36D"}}>
                     <strong>{check.reportType.toUpperCase()} · Division {check.divisionNum} {check.divisionName || ""}</strong> · {check.weekNumber ? `Week ${check.weekNumber}` : "week unknown"} · {check.status}
                     <div style={{color:"#AAA",marginTop:2}}>{check.reason}</div>
                   </div>
@@ -221,9 +221,9 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                 {result.standings ? ` ${result.standings.imported} standings rows imported.` : ""}
                 {result.mvp ? ` ${result.mvp.imported} MVP rows imported.` : ""}
               </div>
-              {(result.warnings?.length || result.standings?.skipped?.length || result.mvp?.skipped?.length) ? (
+              {(result.skippedDuplicateDivisions?.length || result.warnings?.length || result.standings?.skipped?.length || result.mvp?.skipped?.length) ? (
                 <div style={{fontSize:10.5,color:"#F59E0B",marginTop:5}}>
-                  Review warnings: {[...(result.warnings||[]), ...((result.standings?.skipped||[]).map(x=>`Standings Team ${x.teamNum}: ${x.reason}`)), ...((result.mvp?.skipped||[]).map(x=>`MVP Team ${x.teamNum}: ${x.reason}`))].join(" · ")}
+                  Review warnings: [...(result.skippedDuplicateDivisions||[]).map(x=>`Skipped duplicate ${x}`), ...(result.warnings||[]), ...((result.standings?.skipped||[]).map(x=>`Standings Team ${x.teamNum}: ${x.reason}`)), ...((result.mvp?.skipped||[]).map(x=>`MVP Team ${x.teamNum}: ${x.reason}`))].join(" · ")}
                 </div>
               ) : null}
             </div>
