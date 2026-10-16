@@ -22,6 +22,22 @@ function currentWeekTag(schedule) {
   return { weekKey, label: `Week ${current.week} · ${current.date}` };
 }
 
+// Accept Postgres ISO dates and legacy/manual US dates; reject impossible calendar dates.
+export function getValidatedScheduleWeekTag(weekNumber, scheduleDate) {
+  const value = String(scheduleDate ?? "").trim();
+  let year, month, day, match = value.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
+  if (match) [, year, month, day] = match;
+  else {
+    match = value.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
+    if (match) [, month, day, year] = match;
+  }
+  if (!match) return null;
+  const y = Number(year), m = Number(month), d = Number(day);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return null;
+  const weekKey = String(y).padStart(4, "0") + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+  return { weekKey, label: "IBA Week " + weekNumber + " · " + value };
+}
 export function ibaCodesForSeason(season) {
   const format = String(season?.format || "").toLowerCase();
   const day = String(season?.day || "").toLowerCase();
@@ -88,16 +104,11 @@ export async function validateIbaReports(reports, season) {
       let reason = classification.reason;
       let weekTag = null;
       if (status === "ready") {
-        const match = String(scheduledWeek?.date ?? "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (!match) {
+        weekTag = getValidatedScheduleWeekTag(classification.week.weekNumber, scheduledWeek?.date);
+        if (!weekTag) {
           status = "blocked_schedule_date_unavailable";
-          reason = "The matching schedule week has no usable date; import is blocked.";
+          reason = "The matching schedule week has no valid date; import is blocked.";
         } else {
-          const [, month, day, year] = match;
-          weekTag = {
-            weekKey: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-            label: `IBA Week ${classification.week.weekNumber} · ${scheduledWeek.date}`,
-          };
           weekTagsByReportDivision[`${report.reportType}:${division.id}`] = weekTag;
         }
       }

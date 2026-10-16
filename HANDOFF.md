@@ -338,3 +338,10 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 - Vercel status for that code commit: success.
 - The PR remains a draft and has not been merged.
 - This validates automated tests/build only. No live IBA PDF import was run against Supabase; no migration was applied and no production data was changed.
+
+
+### Follow-up correctness hardening — 2026-10-16
+
+- Schedule dates are now normalized from either Postgres ISO dates (`YYYY-MM-DD`) or legacy/manual US dates (`M/D/YYYY`), with calendar validation. This addresses a compatibility issue where a valid Postgres date could be rejected by the earlier US-only parser.
+- The report validator now blocks if a valid SHA-256 fingerprint is missing or malformed, preventing a report from reaching writes without duplicate protection.
+- Added focused unit coverage for missing/malformed fingerprints. These changes require a new CI run before being considered validated.

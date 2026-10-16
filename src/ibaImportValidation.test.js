@@ -54,9 +54,11 @@ describe("classifyIbaReportImport", () => {
     expect(classifyIbaReportImport({ ...base, reportMetadata: reportMetadata(19) }).status).toBe("blocked_schedule_mismatch");
   });
 
-  it("fails closed when schedule or history cannot be checked", () => {
+  it("fails closed when schedule, fingerprint, or history cannot be checked", () => {
     expect(classifyIbaReportImport({ ...base, scheduledWeeks: [] }).status).toBe("blocked_schedule_unavailable");
     expect(classifyIbaReportImport({ ...base, history: null }).status).toBe("blocked_history_unavailable");
+    expect(classifyIbaReportImport({ ...base, contentSha256: "" }).status).toBe("blocked_content_fingerprint_unavailable");
+    expect(classifyIbaReportImport({ ...base, contentSha256: "not-a-hash" }).status).toBe("blocked_content_fingerprint_unavailable");
   });
 
   it("skips an exact duplicate but flags changed content for the same division/report/week", () => {

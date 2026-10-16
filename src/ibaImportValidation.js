@@ -61,6 +61,15 @@ export function classifyIbaReportImport({
     };
   }
 
+  const fingerprint = String(contentSha256 || "").toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(fingerprint)) {
+    return {
+      status: "blocked_content_fingerprint_unavailable",
+      reason: "A valid PDF content fingerprint is missing; duplicate protection cannot be guaranteed.",
+      week,
+    };
+  }
+
   if (!Array.isArray(history)) {
     return {
       status: "blocked_history_unavailable",
@@ -73,8 +82,7 @@ export function classifyIbaReportImport({
     String(item?.report_type ?? item?.reportType ?? "").toLowerCase() === String(reportType).toLowerCase()
     && Number(item?.report_week ?? item?.reportWeek) === week.weekNumber
   );
-  const fingerprint = String(contentSha256 || "").toLowerCase();
-  if (matchingWeek.some(item => String(item?.content_sha256 ?? item?.contentSha256 ?? "").toLowerCase() === fingerprint && fingerprint)) {
+  if (matchingWeek.some(item => String(item?.content_sha256 ?? item?.contentSha256 ?? "").toLowerCase() === fingerprint)) {
     return { status: "duplicate", reason: "This exact report has already been imported for this division and week.", week };
   }
   if (matchingWeek.length > 0) {
