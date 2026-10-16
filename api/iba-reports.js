@@ -5,7 +5,7 @@ const BASE = "https://ibapool.com/Content/Pdfs";
 const LEAGUE_TYPES = ["mast", "adv", "open"];
 const DAYS = ["mon", "tues", "wed", "thur", "fri", "sat", "sun"];
 const REPORT_TYPES = ["rost", "div", "mvp"];
-const MAX_BATCH = 12;
+const MAX_BATCH = 63;
 const TIMEOUT_MS = 15000;
 
 function expectedReports(leagueType, day) {
