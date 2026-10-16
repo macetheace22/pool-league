@@ -184,7 +184,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
         reportType,
         reportWeek: check.weekNumber,
         contentSha256: report.sha256,
-        source: "automatic",
+        source: report.source === "manual" ? "manual" : "automatic",
         metadata: { reportKey: report.key, divisionNum: check.divisionNum, weekKey: check.weekTag?.weekKey },
       });
       if (!saved.ok) throw new Error(`Data was saved, but import history could not be recorded for division ${check.divisionNum}: ${saved.error}`);
