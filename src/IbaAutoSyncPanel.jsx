@@ -23,6 +23,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [discoverySeasons, setDiscoverySeasons] = useState([]);
   const [reviewGroupKey, setReviewGroupKey] = useState("");
   const [reviewSeasonId, setReviewSeasonId] = useState("");
+  const [reviewReportType, setReviewReportType] = useState("rost");
   const [reviewValidation, setReviewValidation] = useState(null);
   const [reviewError, setReviewError] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -48,8 +49,9 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const reviewSeasonOptions = discoverySeasons.filter(target => reviewGroup && groupMatchesSeason(reviewGroup, target) && (target.divisions || []).length > 0);
   const reviewSeason = reviewSeasonOptions.find(target => String(target.id) === String(reviewSeasonId)) || null;
   const reviewGroupReports = (allScan?.reports || []).filter(report => reviewGroup && report.leagueType === reviewGroup.leagueType && report.day === reviewGroup.day);
-  const reviewReadyReports = reviewGroupReports.filter(report => report.status === "ok" && Number(report.detectedRows) > 0);
-  const reviewBlockedReports = reviewGroupReports.filter(report => report.status === "ok" && Number(report.detectedRows) === 0);
+  const reviewSelectedReports = reviewGroupReports.filter(report => report.reportType === reviewReportType);
+  const reviewReadyReports = reviewSelectedReports.filter(report => report.status === "ok" && Number(report.detectedRows) > 0);
+  const reviewBlockedReports = reviewSelectedReports.filter(report => report.status === "ok" && Number(report.detectedRows) === 0);
   useEffect(() => {
     if (!reviewGroups.length) return;
     const group = reviewGroups.find(item => item.key === reviewGroupKey) || reviewGroups[0];
@@ -222,9 +224,15 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
               <section style={{ margin: "10px 0", padding: 10, border: "1px solid #3A3A3A", borderRadius: 7 }}>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>Review & import a mapped format/day group</div>
                 <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-                  Choose the matching season explicitly. Only reports with successful extraction and nonzero parsed rows are eligible; missing/error/zero-row reports remain visible below and are not imported.
+                  Choose the matching season explicitly and import one report category at a time to reduce cross-category partial writes. Only the selected category with successful extraction and nonzero parsed rows can be validated; missing/error/zero-row reports are blocked.
                 </div>
                 <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
+                    Report category (import one category at a time)
+                    <select value={reviewReportType} onChange={e => { setReviewReportType(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                      <option value="rost">Roster & ratings</option><option value="div">Team standings</option><option value="mvp">MVP standings</option>
+                    </select>
+                  </label>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
                     IBA format and day
                     <select value={reviewGroupKey} onChange={e => { setReviewGroupKey(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
@@ -240,10 +248,10 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   </label>
                 </div>
                 <div style={{ fontSize: 11, color: "#CCC", marginTop: 8 }}>
-                  {reviewGroupReports.filter(report => report.status === "ok").length} extracted · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewGroupReports.filter(report => report.status !== "ok").length} missing/error
+                  {reviewSelectedReports.filter(report => report.status === "ok").length} extracted for selected category · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewSelectedReports.filter(report => report.status !== "ok").length} missing/error
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                  <button className="btn-sm" disabled={!reviewSeason || !reviewReadyReports.length || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
+                  <button className="btn-sm" disabled={!reviewSeason || reviewReadyReports.length !== 1 || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
                     setReviewLoading(true); setReviewError(""); setReviewValidation(null); setReviewResult(null);
                     try {
                       const validation = await validateIbaReports(reviewReadyReports, reviewSeason);
@@ -255,7 +263,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   }}>
                     {reviewLoading ? "Validating…" : "Validate mapped reports"}
                   </button>
-                  <button className="btn-sm" disabled={!reviewValidation?.canImport || !reviewSeason || reviewImporting || reviewLoading} onClick={async () => {
+                  <button className="btn-sm" disabled={!reviewValidation?.canImport || reviewReadyReports.length !== 1 || !reviewSeason || reviewImporting || reviewLoading} onClick={async () => {
                     setReviewImporting(true); setReviewError(""); setReviewResult(null);
                     try {
                       const result = await importIbaReports(reviewReadyReports, reviewSeason, [], reviewValidation);
@@ -282,7 +290,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   </div>
                 )}
                 {reviewError && <div className="error-msg" style={{ marginTop: 8 }}>{reviewError}</div>}
-                {reviewResult && <div style={{ fontSize: 11, color: "#5FCF9E", marginTop: 8 }}>Import completed for the selected group. Review the per-category results below before continuing.</div>}
+                {reviewResult && <div style={{ fontSize: 11, color: "#5FCF9E", marginTop: 8 }}>Import completed for the selected report category. Review its results before selecting another category.</div>}
               </section>
               <div style={{ maxHeight: 440, overflowY: "auto", border: "1px solid #303030", borderRadius: 7 }}>
                 {allScan.reports.map(report => {
@@ -315,7 +323,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>Manual single-PDF upload</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-            Upload a PDF for this report category to extract and preview it. This step does not write to the database. Import still uses the selected season and its validation checks.
+            Upload a PDF for this report category to extract and preview it. This step does not write to the database. Import still uses the selected season and its validation checks. The consolidated review flow imports one report category at a time.
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
             <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
