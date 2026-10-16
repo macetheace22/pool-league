@@ -386,5 +386,15 @@ The existing automatic import panel still handles one selected season's format/d
 - User confirmed the earlier no-data import issue has already been resolved. Prior validated preview counts were ROST 271 players / 36 teams, DIV 33 rows, and MVP 60 rows. Parser debugging is not an outstanding task unless a new reproducible failure appears.
 - Added a manual single-PDF upload path to the report-category panel. It collects format/day/category, sends the PDF to the existing server endpoint for PDF validation, text extraction, and SHA-256 fingerprinting, and displays the normal parsed preview. The upload/extraction step is read-only; the subsequent import still runs the selected season's existing fail-closed validation/history checks.
 - Server endpoint now supports the manual upload action, validates the selected format/day/report category and PDF signature, and rejects empty/oversized payloads. Manual format/day labels are normalized to IBA API codes.
-- New commits after the prior discovery validation: `6b6fd69` (server-side manual PDF extraction), `20c765a` (manual upload/preview UI), `ff3e82e` (normalize format/day codes). Latest code commit needs its own CI/build and Vercel validation; do not infer validation from run #197 for the older code commit.
+- New commits after the prior discovery validation: `6b6fd69` (server-side manual PDF extraction), `20c765a` (manual upload/preview UI), `ff3e82e` (normalize format/day codes). Handoff correction commit: `3ad593e`.
+- CI run #202 passed on latest PR head `3ad593e`: GitHub Actions CI succeeded. Vercel status for that head is success. This validates automated tests/build for the manual upload path, not an actual user-uploaded PDF or live import.
 - Remaining before merge: complete the consolidated review flow that explicitly maps discovered/manual reports to the correct season/division; address multi-category partial-write behavior; review Section 57 SQL/RLS assumptions and document how/when the user should apply it manually. PR #38 remains draft/open/unmerged. No SQL migration applied and no live database writes performed by this work.
+
+
+### Latest validation — 2026-10-16
+
+- PR #38 head: `3ad593ee0637c22328998938fc8d2caafca9ee41`.
+- GitHub Actions CI run #202: success. Vercel status: success.
+- PR remains draft/open/unmerged. No Supabase migration was applied and no live database writes were performed.
+- Do not treat the earlier no-data parsing issue as outstanding; user confirmed it is resolved and previous preview counts were ROST 271 players / 36 teams, DIV 33 rows, MVP 60 rows.
+- Manual single-PDF upload/extraction and preview are implemented. Remaining major work is the safe consolidated mapping/review/import flow and multi-category partial-write handling, plus review of Section 57 RLS/migration assumptions.
