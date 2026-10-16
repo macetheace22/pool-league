@@ -108,11 +108,22 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   {expandedPreview[r.reportType] ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
                 </button>
                 {(() => {
-                  const metadata = data.preview.reports.find(item => item.key === r.key)?.reportWeek;
+                  const reportMetadata = data.preview.reports.find(item => item.key === r.key);
+                  const metadata = reportMetadata?.reportWeek;
+                  const divisionWeeks = Object.entries(reportMetadata?.reportWeeksByDivision?.byDivision || {});
                   if (!metadata) return null;
                   return (
                     <div style={{padding:"7px 10px",fontSize:11,color:metadata.missing || metadata.ambiguous ? "#F0C36D" : "#AAA",borderTop:"1px solid #292929"}}>
-                      {metadata.missing ? "Report week not detected" : metadata.ambiguous ? `Conflicting week labels detected: ${metadata.weekNumbers.join(", ")} — review before importing` : `Week ${metadata.weekNumber} detected from PDF text`}
+                      <div>{metadata.missing ? "Report week not detected" : metadata.ambiguous ? `Multiple week labels found (${metadata.weekNumbers.join(", ")}); verify each division before importing` : `Week ${metadata.weekNumber} detected in PDF text`}</div>
+                      {divisionWeeks.length > 0 && (
+                        <div style={{display:"grid",gap:3,marginTop:6}}>
+                          {divisionWeeks.map(([divisionNum, division]) => (
+                            <div key={divisionNum} style={{color:division.missing || division.ambiguous ? "#F0C36D" : "#AFAFAF"}}>
+                              Division {divisionNum} · {division.divisionLabel}: {division.missing ? "week not detected" : division.ambiguous ? `conflicting weeks ${division.weekNumbers.join(", ")}` : `Week ${division.weekNumber}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
