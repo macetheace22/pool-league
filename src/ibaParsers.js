@@ -26,7 +26,7 @@ function extractIbaReportWeek(raw) {
 // assigned to every division when the source contains differing weeks.
 function extractIbaReportWeeksByDivision(raw) {
   const lines = String(raw || "").split(/\r?\n/);
-  const divisionHeader = /^\s*(?:Division\s+)?(\d{3,8})\s+(.{2,80}?)\s*$/i;
+  const divisionHeader = /^\s*(?:Division\s+)?(\d{3})\s+(.{2,80}?)\s*$/i;
   const sections = [];
   let current = null;
   for (const line of lines) {
