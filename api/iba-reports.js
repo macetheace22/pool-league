@@ -91,7 +91,7 @@ export default async function handler(req, res) {
     const digest = crypto.createHash("sha256").update(buffer).digest("hex");
     try {
       const parsed = await pdfParse(buffer);
-      const text = String(parsed.text || "").replace(/\\r\\n/g, "\\n").replace(/\\r/g, "\\n");
+      const text = String(parsed.text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
       const report = {
         leagueType, day, reportType,
         key: `${leagueType}${day}${reportType}`,
