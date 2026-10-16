@@ -325,7 +325,7 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 
 - Validate this commit with GitHub Actions tests/build and inspect the exact job results.
 - Review partial-write behavior across multiple report categories; Supabase client writes are not one transaction, so if one category succeeds and a later category fails, earlier writes remain. History is recorded after each successful category/division.
-- Confirm parsers produce rows for every division before treating a whole multi-division PDF as complete.
+- Keep using the already validated parser behavior; revisit parser debugging only if a new, reproducible zero-row failure appears.
 - Exact duplicate divisions are now skipped independently for roster/ratings, standings, and MVP where team/division routing is unambiguous. Continue testing this behavior against real report samples before merge; changed content must remain held for review.
 - Complete the review UI for all 21 format/day combinations, fetching up to 63 PDFs, and the manual one-PDF-at-a-time upload path using the same validation/history service.
 - Review section 57 RLS role assumptions before asking the user to apply it. Do not apply the SQL automatically.
@@ -358,7 +358,7 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 
 ### Current status clarification
 
-The existing automatic import panel still handles one selected season's format/day at a time. The all-21-combination / up-to-63-report discovery-and-review workflow and manual single-PDF upload path are **not complete**. Do not describe PR #38 as the complete end-to-end redesign, and do not merge until those workflows, parser behavior on real PDFs, and the multi-category partial-write safeguards have been addressed.
+The existing automatic import panel still handles one selected season's format/day at a time. All-21-combination / up-to-63-report discovery is implemented as read-only review, and manual single-PDF upload/extraction is now implemented on PR #38. The safe consolidated mapping/import workflow and multi-category partial-write safeguards are still incomplete. Do not describe PR #38 as the complete end-to-end redesign or merge until those remaining workflows are implemented and validated.
 
 
 ### Progress update — 2026-10-16, all-format discovery UI started
@@ -369,7 +369,7 @@ The existing automatic import panel still handles one selected season's format/d
 - This discovery action is deliberately **read-only**. It does not guess the target season, run import validation, or write to Supabase. The existing selected-season import path remains separate.
 - New commits on the existing PR #38 branch: `b67c4b0` (discovery helper), `2727cfe` (API cap), and `1138763` (discovery UI). PR remains open/draft/unmerged.
 - Vercel status for `1138763` was pending when checked. No passing build/test result is claimed for these latest changes yet.
-- Remaining before merge: run and inspect tests/build; add manual single-PDF upload using the same validator/history; fix and test real PDF parsing where row counts are zero; design a safe review/import flow that maps each discovered report to its correct season/division; address multi-category partial writes; review section 57 RLS/migration compatibility. No SQL migration applied and no live database writes performed.
+- At the time of this discovery commit, manual single-PDF upload, safe mapped import, partial-write safeguards, and Section 57 review remained. See the later validation/progress notes below for updates.
 
 
 ### Validation update — 2026-10-16, all-format discovery UI
@@ -379,3 +379,12 @@ The existing automatic import panel still handles one selected season's format/d
 - CI run #197 passed: all 75 tests passed and the production build succeeded.
 - Vercel status for `9b1a01c`: success.
 - This validates automated tests and build, not real PDF extraction or end-to-end import behavior. Manual one-PDF upload and the safe mapped consolidated import flow remain incomplete. The PR remains draft/open/unmerged; no SQL migration or live DB writes occurred.
+
+
+### Progress update — 2026-10-16, manual PDF upload and parser-status correction
+
+- User confirmed the earlier no-data import issue has already been resolved. Prior validated preview counts were ROST 271 players / 36 teams, DIV 33 rows, and MVP 60 rows. Parser debugging is not an outstanding task unless a new reproducible failure appears.
+- Added a manual single-PDF upload path to the report-category panel. It collects format/day/category, sends the PDF to the existing server endpoint for PDF validation, text extraction, and SHA-256 fingerprinting, and displays the normal parsed preview. The upload/extraction step is read-only; the subsequent import still runs the selected season's existing fail-closed validation/history checks.
+- Server endpoint now supports the manual upload action, validates the selected format/day/report category and PDF signature, and rejects empty/oversized payloads. Manual format/day labels are normalized to IBA API codes.
+- New commits after the prior discovery validation: `6b6fd69` (server-side manual PDF extraction), `20c765a` (manual upload/preview UI), `ff3e82e` (normalize format/day codes). Latest code commit needs its own CI/build and Vercel validation; do not infer validation from run #197 for the older code commit.
+- Remaining before merge: complete the consolidated review flow that explicitly maps discovered/manual reports to the correct season/division; address multi-category partial-write behavior; review Section 57 SQL/RLS assumptions and document how/when the user should apply it manually. PR #38 remains draft/open/unmerged. No SQL migration applied and no live database writes performed by this work.
