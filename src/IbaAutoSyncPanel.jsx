@@ -107,6 +107,15 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   <span style={{textAlign:"left"}}>{r.reportType.toUpperCase()} parsed preview · {count.toLocaleString()} {r.reportType === "rost" ? "players" : "rows"}{r.reportType === "rost" ? ` across ${data.preview.roster?.teamCount || 0} teams` : ""}</span>
                   {expandedPreview[r.reportType] ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
                 </button>
+                {(() => {
+                  const metadata = data.preview.reports.find(item => item.key === r.key)?.reportWeek;
+                  if (!metadata) return null;
+                  return (
+                    <div style={{padding:"7px 10px",fontSize:11,color:metadata.missing || metadata.ambiguous ? "#F0C36D" : "#AAA",borderTop:"1px solid #292929"}}>
+                      {metadata.missing ? "Report week not detected" : metadata.ambiguous ? `Conflicting week labels detected: ${metadata.weekNumbers.join(", ")} — review before importing` : `Week ${metadata.weekNumber} detected from PDF text`}
+                    </div>
+                  );
+                })()}
                 {expandedPreview[r.reportType] && (
                   <div style={{padding:10}}>
                     {empty ? (
