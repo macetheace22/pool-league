@@ -632,6 +632,46 @@ async function getDivisions(format, day) {
   };
 }
 
+async function discoverAllDivisionGroups() {
+  const combinations = FORMATS.flatMap(format => DAYS.map(day => ({ format, day })));
+  const groups = [];
+  const errors = [];
+  // Keep concurrency bounded to avoid overloading IBA or a serverless function.
+  for (let i = 0; i < combinations.length; i += 4) {
+    const batch = combinations.slice(i, i + 4);
+    const settled = await Promise.allSettled(
+      batch.map(async ({ format, day }) => {
+        const discovered = await getDivisions(format, day);
+        return {
+          format,
+          day,
+          divisions: discovered.divisions,
+          count: discovered.divisions.length,
+          diagnostic: discovered.diagnostic,
+        };
+      })
+    );
+    settled.forEach((result, index) => {
+      const group = batch[index];
+      if (result.status === "fulfilled") groups.push(result.value);
+      else errors.push({
+        ...group,
+        error: result.reason?.message || "Unable to discover divisions.",
+      });
+    });
+  }
+  return {
+    groups,
+    errors,
+    totals: {
+      groupsChecked: combinations.length,
+      groupsWithDivisions: groups.filter(group => group.divisions.length > 0).length,
+      divisionsFound: groups.reduce((total, group) => total + group.divisions.length, 0),
+      errors: errors.length,
+    },
+  };
+}
+
 async function getDivisionSchedule(division) {
   if (!division) throw new Error("A division value is required.");
 
@@ -737,6 +777,11 @@ export default async function handler(req, res) {
     const format = body.format || "Masters";
     const day = body.day || "Wednesday";
 
+    if (action === "discover-all") {
+      const data = await discoverAllDivisionGroups();
+      return res.status(200).json(data);
+    }
+
     if (action === "discover") {
       const data = await getDivisions(format, day);
       return res.status(200).json({
@@ -773,7 +818,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(400).json({
-      error: "Unknown action. Use discover, fetch, or fetch-all.",
+      error: "Unknown action. Use discover, discover-all, fetch, or fetch-all.",
     });
   } catch (error) {
     console.error("IBA schedule API error:", error);
