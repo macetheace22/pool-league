@@ -329,3 +329,12 @@ PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](ht
 - Exact duplicate divisions are now skipped independently for roster/ratings, standings, and MVP where team/division routing is unambiguous. Continue testing this behavior against real report samples before merge; changed content must remain held for review.
 - Complete the review UI for all 21 format/day combinations, fetching up to 63 PDFs, and the manual one-PDF-at-a-time upload path using the same validation/history service.
 - Review section 57 RLS role assumptions before asking the user to apply it. Do not apply the SQL automatically.
+
+
+### Validation update — 2026-10-16, latest integrated-import code
+
+- Latest integrated-import code commit: `8a16b5a21abdcc75420abdda530ef19ba3476733`.
+- GitHub Actions CI run #188 passed: tests passed and production build passed.
+- Vercel status for that code commit: success.
+- The PR remains a draft and has not been merged.
+- This validates automated tests/build only. No live IBA PDF import was run against Supabase; no migration was applied and no production data was changed.
