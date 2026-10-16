@@ -289,7 +289,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                       setReviewResult(result);
                       if (onComplete) await onComplete();
                     } catch (e) {
-                      setReviewError(e?.message || "Import failed. Check the result and database before retrying.");
+                      setReviewError(`Import failed. Some writes may already have succeeded; verify this division's data and import history before retrying. ${e?.message || ""}`);
                     } finally { setReviewImporting(false); }
                   }}>
                     {reviewImporting ? "Importing…" : "Import validated group"}
