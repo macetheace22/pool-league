@@ -90,11 +90,14 @@ function groupByDivision(rows, activeTeamsByNum) {
 }
 
 
-export async function validateIbaReports(reports, season) {
+export async function validateIbaReports(reports, season, options = {}) {
   const seasons = await db.listSeasons();
   const selected = (seasons ?? []).find(item => String(item.id) === String(season?.id));
   if (!selected) throw new Error("The selected season could not be reloaded. Refresh the page and retry.");
-  const divisions = selected.divisions ?? [];
+  const allDivisions = selected.divisions ?? [];
+  const requestedDivisionId = options?.divisionId ? String(options.divisionId) : null;
+  const divisions = requestedDivisionId ? allDivisions.filter(item => String(item.id) === requestedDivisionId) : allDivisions;
+  if (requestedDivisionId && !divisions.length) throw new Error("The selected division does not belong to this season. Refresh the page and select it again.");
   if (!divisions.length) throw new Error("No divisions are configured for this season. Import its IBA schedule before weekly reports.");
 
   const checks = [];
@@ -231,6 +234,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     const grouped = groupByDivision(rows, routing.byNum);
     result.standings = { imported: 0, skipped: grouped.skipped };
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
+      if (!preflight.checks.some(check => check.reportType === "div" && check.divisionId === divisionId)) continue;
       if (preflight.checks.some(check => check.reportType === "div" && check.divisionId === divisionId && check.status === "duplicate")) continue;
       const divisionWeekTag = preflight.weekTagsByReportDivision[`div:${divisionId}`];
       if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} standings.`);
@@ -247,6 +251,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     const grouped = groupByDivision(rows, routing.byNum);
     result.mvp = { imported: 0, skipped: grouped.skipped };
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
+      if (!preflight.checks.some(check => check.reportType === "mvp" && check.divisionId === divisionId)) continue;
       if (preflight.checks.some(check => check.reportType === "mvp" && check.divisionId === divisionId && check.status === "duplicate")) continue;
       const divisionWeekTag = preflight.weekTagsByReportDivision[`mvp:${divisionId}`];
       if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} MVP standings.`);
