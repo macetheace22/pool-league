@@ -112,7 +112,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       const response = await fetch("/api/iba-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "manual-upload", leagueType: manualFormat, day: manualDay, reportType, pdfBase64 }),
+        body: JSON.stringify({ action: "manual-upload", leagueType: ({ masters: "mast", advanced: "adv", open: "open" })[manualFormat] || manualFormat, day: ({ monday: "mon", tuesday: "tues", wednesday: "wed", thursday: "thur", friday: "fri", saturday: "sat", sunday: "sun" })[manualDay] || manualDay, reportType, pdfBase64 }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Unable to extract the uploaded PDF.");
