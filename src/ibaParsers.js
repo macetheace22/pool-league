@@ -1,4 +1,26 @@
 // Shared IBA report parsers. Manual paste and automatic PDF imports both use these functions.
+// Extract the week explicitly printed in an IBA weekly PDF. IBA report types
+// use two common labels: roster/ratings and MVP use "For week: 17", while
+// team standings uses "Week 17". Do not infer a week from today's date or the
+// app's current week; callers must compare this value with the selected
+// division's schedule before importing.
+//
+// If the extracted PDF text contains conflicting week labels, return an
+// ambiguous result rather than silently choosing one.
+function extractIbaReportWeek(raw) {
+  const text = String(raw || "");
+  const matches = [...text.matchAll(/\\b(?:For\\s+)?Week\\s*:?\\s*(\\d+)\\b/gi)]
+    .map(match => ({ weekNumber: Number(match[1]), matchedText: match[0] }));
+  const distinctWeeks = [...new Set(matches.map(match => match.weekNumber))];
+  return {
+    weekNumber: distinctWeeks.length === 1 ? distinctWeeks[0] : null,
+    weekNumbers: distinctWeeks,
+    matchedLabels: matches.map(match => match.matchedText),
+    missing: matches.length === 0,
+    ambiguous: distinctWeeks.length > 1,
+  };
+}
+
 function parseStandingsImport(raw) {
   const rows = [];
   const lines = String(raw || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
@@ -517,4 +539,4 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 }
 
 
-export { parseStandingsImport, parseMvpImport, parseLeagueRoster };
+export { extractIbaReportWeek, parseStandingsImport, parseMvpImport, parseLeagueRoster };
