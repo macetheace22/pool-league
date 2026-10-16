@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { fetchIbaReports, fetchAllIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
+import * as db from "./db";
 
 export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null }) {
   const [loading, setLoading] = useState(false);
@@ -19,6 +20,47 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [manualDay, setManualDay] = useState(String(season?.day || "Wednesday").toLowerCase());
   const [manualError, setManualError] = useState("");
   const [uploadingManual, setUploadingManual] = useState(false);
+  const [discoverySeasons, setDiscoverySeasons] = useState([]);
+  const [reviewGroupKey, setReviewGroupKey] = useState("");
+  const [reviewSeasonId, setReviewSeasonId] = useState("");
+  const [reviewValidation, setReviewValidation] = useState(null);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewImporting, setReviewImporting] = useState(false);
+  const [reviewResult, setReviewResult] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    db.listSeasons()
+      .then(rows => { if (active) setDiscoverySeasons(rows || []); })
+      .catch(() => { if (active) setReviewError("Unable to load seasons for report mapping."); });
+    return () => { active = false; };
+  }, []);
+
+  const reviewGroups = [...new Map((allScan?.reports || []).map(report => [
+    `${report.leagueType}:${report.day}`,
+    { key: `${report.leagueType}:${report.day}`, leagueType: report.leagueType, day: report.day, formatLabel: report.formatLabel, dayLabel: report.dayLabel }
+  ])).values()];
+  const groupMatchesSeason = (group, target) =>
+    String(target?.format || "").toLowerCase() === ({ mast: "masters", adv: "advanced", open: "open" })[group?.leagueType] &&
+    String(target?.day || "").toLowerCase() === ({ mon: "monday", tues: "tuesday", wed: "wednesday", thur: "thursday", fri: "friday", sat: "saturday", sun: "sunday" })[group?.day];
+  const reviewGroup = reviewGroups.find(group => group.key === reviewGroupKey) || null;
+  const reviewSeasonOptions = discoverySeasons.filter(target => reviewGroup && groupMatchesSeason(reviewGroup, target) && (target.divisions || []).length > 0);
+  const reviewSeason = reviewSeasonOptions.find(target => String(target.id) === String(reviewSeasonId)) || null;
+  const reviewGroupReports = (allScan?.reports || []).filter(report => reviewGroup && report.leagueType === reviewGroup.leagueType && report.day === reviewGroup.day);
+  const reviewReadyReports = reviewGroupReports.filter(report => report.status === "ok" && Number(report.detectedRows) > 0);
+  const reviewBlockedReports = reviewGroupReports.filter(report => report.status === "ok" && Number(report.detectedRows) === 0);
+  useEffect(() => {
+    if (!reviewGroups.length) return;
+    const group = reviewGroups.find(item => item.key === reviewGroupKey) || reviewGroups[0];
+    if (group.key !== reviewGroupKey) setReviewGroupKey(group.key);
+    const matches = discoverySeasons.filter(target => groupMatchesSeason(group, target) && (target.divisions || []).length > 0);
+    if (!matches.some(target => String(target.id) === String(reviewSeasonId))) {
+      setReviewSeasonId(matches.length === 1 ? String(matches[0].id) : "");
+    }
+    setReviewValidation(null);
+    setReviewResult(null);
+  }, [allScan, discoverySeasons, reviewGroupKey]);
 
   const codes = ibaCodesForSeason(season);
   const supported = !!codes.leagueType && !!codes.day;
@@ -177,6 +219,71 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                 <span>· {allScan.reports.filter(r => r.status !== "ok" && r.status !== "missing").length} errors/empty</span>
                 <span>· {allScan.reports.filter(r => r.status === "ok" && r.detectedRows === 0).length} with zero parsed rows</span>
               </div>
+              <section style={{ margin: "10px 0", padding: 10, border: "1px solid #3A3A3A", borderRadius: 7 }}>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>Review & import a mapped format/day group</div>
+                <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
+                  Choose the matching season explicitly. Only reports with successful extraction and nonzero parsed rows are eligible; missing/error/zero-row reports remain visible below and are not imported.
+                </div>
+                <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                  <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
+                    IBA format and day
+                    <select value={reviewGroupKey} onChange={e => { setReviewGroupKey(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                      {reviewGroups.map(group => <option key={group.key} value={group.key}>{group.formatLabel} · {group.dayLabel}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
+                    Target season (must match format and day)
+                    <select value={reviewSeasonId} onChange={e => { setReviewSeasonId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                      <option value="">Select matching season…</option>
+                      {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {target.format} · {target.day} · {target.divisions?.length || 0} divisions</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div style={{ fontSize: 11, color: "#CCC", marginTop: 8 }}>
+                  {reviewGroupReports.filter(report => report.status === "ok").length} extracted · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewGroupReports.filter(report => report.status !== "ok").length} missing/error
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  <button className="btn-sm" disabled={!reviewSeason || !reviewReadyReports.length || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
+                    setReviewLoading(true); setReviewError(""); setReviewValidation(null); setReviewResult(null);
+                    try {
+                      const validation = await validateIbaReports(reviewReadyReports, reviewSeason);
+                      setReviewValidation(validation);
+                      if (!validation.canImport) setReviewError("Preflight blocked this group. Review each division result; no data was written.");
+                    } catch (e) {
+                      setReviewError(e?.message || "Could not validate this report group.");
+                    } finally { setReviewLoading(false); }
+                  }}>
+                    {reviewLoading ? "Validating…" : "Validate mapped reports"}
+                  </button>
+                  <button className="btn-sm" disabled={!reviewValidation?.canImport || !reviewSeason || reviewImporting || reviewLoading} onClick={async () => {
+                    setReviewImporting(true); setReviewError(""); setReviewResult(null);
+                    try {
+                      const result = await importIbaReports(reviewReadyReports, reviewSeason, [], reviewValidation);
+                      setReviewResult(result);
+                      if (onComplete) await onComplete();
+                    } catch (e) {
+                      setReviewError(e?.message || "Import failed. Check the result and database before retrying.");
+                    } finally { setReviewImporting(false); }
+                  }}>
+                    {reviewImporting ? "Importing…" : "Import validated group"}
+                  </button>
+                </div>
+                {reviewGroupReports.length > 0 && (
+                  <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 8 }}>
+                    {reviewGroupReports.map(report => <div key={report.key}>{report.reportType.toUpperCase()}: {report.status === "ok" ? `${report.detectedRows} rows${report.reportWeek?.weekNumber ? ` · Week ${report.reportWeek.weekNumber}` : ""}` : `${report.status} — ${report.message || "not available"}`}{report.status === "ok" && report.detectedRows === 0 ? " · BLOCKED" : ""}</div>)}
+                  </div>
+                )}
+                {reviewValidation && (
+                  <div style={{ marginTop: 10, borderTop: "1px solid #303030", paddingTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>Per-division preflight</div>
+                    {reviewValidation.checks.map((check, index) => <div key={check.key || index} style={{ fontSize: 10.5, color: check.status === "ready" || check.status === "duplicate" ? "#5FCF9E" : "#F0C36D", marginTop: 4 }}>
+                      {check.reportType.toUpperCase()} · Division {check.divisionNum}: {check.status} — {check.reason}
+                    </div>)}
+                  </div>
+                )}
+                {reviewError && <div className="error-msg" style={{ marginTop: 8 }}>{reviewError}</div>}
+                {reviewResult && <div style={{ fontSize: 11, color: "#5FCF9E", marginTop: 8 }}>Import completed for the selected group. Review the per-category results below before continuing.</div>}
+              </section>
               <div style={{ maxHeight: 440, overflowY: "auto", border: "1px solid #303030", borderRadius: 7 }}>
                 {allScan.reports.map(report => {
                   const zeroRows = report.status === "ok" && report.detectedRows === 0;
