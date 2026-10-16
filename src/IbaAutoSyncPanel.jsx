@@ -14,6 +14,11 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [scanProgress, setScanProgress] = useState(null);
   const [scanningAll, setScanningAll] = useState(false);
   const [scanError, setScanError] = useState("");
+  const [manualFile, setManualFile] = useState(null);
+  const [manualFormat, setManualFormat] = useState(String(season?.format || "Masters").toLowerCase());
+  const [manualDay, setManualDay] = useState(String(season?.day || "Wednesday").toLowerCase());
+  const [manualError, setManualError] = useState("");
+  const [uploadingManual, setUploadingManual] = useState(false);
 
   const codes = ibaCodesForSeason(season);
   const supported = !!codes.leagueType && !!codes.day;
@@ -80,6 +85,46 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       setScanError(e?.message || "Unable to scan all IBA reports.");
     } finally {
       setScanningAll(false);
+    }
+  };
+
+  const uploadManualPdf = async () => {
+    if (!manualFile || !reportType) return;
+    setUploadingManual(true);
+    setManualError("");
+    setError("");
+    setResult(null);
+    setPreflight(null);
+    try {
+      if (manualFile.type && manualFile.type !== "application/pdf" && !manualFile.name.toLowerCase().endsWith(".pdf")) {
+        throw new Error("Choose a PDF file.");
+      }
+      const pdfBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not read the selected file."));
+        reader.onload = () => {
+          const value = String(reader.result || "");
+          const comma = value.indexOf(",");
+          resolve(comma >= 0 ? value.slice(comma + 1) : "");
+        };
+        reader.readAsDataURL(manualFile);
+      });
+      const response = await fetch("/api/iba-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "manual-upload", leagueType: manualFormat, day: manualDay, reportType, pdfBase64 }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "Unable to extract the uploaded PDF.");
+      const reports = selectedReports(body.reports || []);
+      const preview = await buildIbaPreview(reports);
+      setData({ ...body, reports, preview });
+      if (reports[0]?.status !== "ok") setManualError("The PDF was received, but no searchable text was extracted. It may be scanned/image-only.");
+      setManualFile(null);
+    } catch (e) {
+      setManualError(e?.message || "Unable to process the selected PDF.");
+    } finally {
+      setUploadingManual(false);
     }
   };
 
@@ -157,6 +202,34 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
               </div>
             </div>
           )}
+        </section>
+      )}
+      {reportType && (
+        <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>Manual single-PDF upload</div>
+          <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
+            Upload a PDF for this report category to extract and preview it. This step does not write to the database. Import still uses the selected season and its validation checks.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
+              Format
+              <select value={manualFormat} onChange={e => setManualFormat(e.target.value)} style={{ minWidth: 115 }}>
+                <option value="masters">Masters</option><option value="advanced">Advanced</option><option value="open">Open</option>
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
+              Day
+              <select value={manualDay} onChange={e => setManualDay(e.target.value)} style={{ minWidth: 115 }}>
+                <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option><option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option><option value="sunday">Sunday</option>
+              </select>
+            </label>
+          </div>
+          <input type="file" accept="application/pdf,.pdf" onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }} style={{ display: "block", maxWidth: "100%", marginTop: 8, fontSize: 11 }} />
+          {manualFile && <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 4 }}>{manualFile.name} · {Math.ceil(manualFile.size / 1024).toLocaleString()} KB</div>}
+          <button className="btn-sm" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual} style={{ marginTop: 8 }}>
+            {uploadingManual ? <><RefreshCw size={12} className="spin" /> Extracting PDF…</> : "Extract & Preview PDF"}
+          </button>
+          {manualError && <div className="error-msg" style={{ marginTop: 8 }}>{manualError}</div>}
         </section>
       )}
       {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Select a season with a supported format and day.</div></div>}
