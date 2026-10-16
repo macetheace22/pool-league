@@ -3,6 +3,22 @@
 // when schedule/history data is unavailable.
 const VALID_REPORT_TYPES = new Set(["rost", "div", "mvp"]);
 
+export function getValidatedScheduleWeekTag(weekNumber, scheduleDate) {
+  const value = String(scheduleDate ?? "").trim();
+  let year, month, day, match = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (match) [, year, month, day] = match;
+  else {
+    match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (match) [, month, day, year] = match;
+  }
+  if (!match) return null;
+  const y = Number(year), m = Number(month), d = Number(day);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return null;
+  const weekKey = String(y).padStart(4, "0") + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+  return { weekKey, label: "IBA Week " + weekNumber + " · " + value };
+}
+
 function missingWeek() {
   return { weekNumber: null, weekNumbers: [], missing: true, ambiguous: false };
 }

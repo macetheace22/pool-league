@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyIbaReportImport, getDivisionReportWeek } from "./ibaImportValidation";
+import { classifyIbaReportImport, getDivisionReportWeek, getValidatedScheduleWeekTag } from "./ibaImportValidation";
 
 const reportMetadata = weekNumber => ({
   reportWeek: { weekNumber, weekNumbers: [weekNumber], missing: false, ambiguous: false },
@@ -73,5 +73,22 @@ describe("classifyIbaReportImport", () => {
       reportType: "mvp",
       history: [{ report_type: "div", report_week: 17, content_sha256: "a".repeat(64) }],
     }).status).toBe("ready");
+  });
+});
+
+describe("getValidatedScheduleWeekTag", () => {
+  it.each([
+    ["2026-10-09", "2026-10-09"],
+    ["10/9/2026", "2026-10-09"],
+    ["10/09/2026", "2026-10-09"],
+  ])("normalizes valid schedule date %s", (date, expectedKey) => {
+    expect(getValidatedScheduleWeekTag(17, date)).toMatchObject({
+      weekKey: expectedKey,
+      label: expect.stringContaining("Week 17"),
+    });
+  });
+
+  it.each(["2026-02-30", "13/40/2026", "not-a-date", ""])("rejects invalid schedule date %s", date => {
+    expect(getValidatedScheduleWeekTag(17, date)).toBeNull();
   });
 });

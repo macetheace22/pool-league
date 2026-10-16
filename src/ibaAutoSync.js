@@ -1,5 +1,5 @@
 import * as db from "./db";
-import { classifyIbaReportImport } from "./ibaImportValidation";
+import { classifyIbaReportImport, getValidatedScheduleWeekTag } from "./ibaImportValidation";
 import { extractIbaReportWeek, extractIbaReportWeeksByDivision, parseLeagueRoster, parseStandingsImport, parseMvpImport } from "./ibaParsers";
 
 const FORMAT_TO_CODE = { masters: "mast", advanced: "adv", open: "open" };
@@ -22,22 +22,6 @@ function currentWeekTag(schedule) {
   return { weekKey, label: `Week ${current.week} · ${current.date}` };
 }
 
-// Accept Postgres ISO dates and legacy/manual US dates; reject impossible calendar dates.
-export function getValidatedScheduleWeekTag(weekNumber, scheduleDate) {
-  const value = String(scheduleDate ?? "").trim();
-  let year, month, day, match = value.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
-  if (match) [, year, month, day] = match;
-  else {
-    match = value.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
-    if (match) [, month, day, year] = match;
-  }
-  if (!match) return null;
-  const y = Number(year), m = Number(month), d = Number(day);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return null;
-  const weekKey = String(y).padStart(4, "0") + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
-  return { weekKey, label: "IBA Week " + weekNumber + " · " + value };
-}
 export function ibaCodesForSeason(season) {
   const format = String(season?.format || "").toLowerCase();
   const day = String(season?.day || "").toLowerCase();
