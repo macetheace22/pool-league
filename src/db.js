@@ -563,7 +563,7 @@ export async function listActiveTeamsByNumbers(teamNums = []) {
 
   const { data, error } = await supabase
     .from('teams')
-    .select('id, name, team_num, division_id, divisions(num, name, seasons(is_active))')
+    .select('id, name, team_num, division_id, divisions(num, name, format, day, seasons(is_active))')
     .in('team_num', nums);
 
   if (error) throw new Error(error.message);
@@ -580,6 +580,8 @@ export async function listActiveTeamsByNumbers(teamNums = []) {
       divisionId: row.division_id,
       divisionNum: row.divisions?.num ?? null,
       divisionName: row.divisions?.name ?? null,
+      format: row.divisions?.format ?? null,
+      day: row.divisions?.day ?? null,
     });
   }
 
@@ -1143,10 +1145,16 @@ export async function bulkImportPlayers(parsed, weekTag) {
   const teamNums = Object.keys(parsed.rosters ?? {});
   const { data: teamRows, error: teamLookupError } = await supabase
     .from("teams")
-    .select("id, division_id, team_num, divisions(seasons(is_active))")
+    .select("id, division_id, team_num, divisions(format, day, seasons(is_active))")
     .in("team_num", teamNums);
   if (teamLookupError) throw new Error(`Could not resolve roster teams: ${teamLookupError.message}`);
-  const activeRows = (teamRows ?? []).filter(r => r.divisions?.seasons?.is_active);
+  const allowedDivisionIds = Array.isArray(weekTag?.allowedDivisionIds)
+    ? new Set(weekTag.allowedDivisionIds.map(String))
+    : null;
+  const activeRows = (teamRows ?? []).filter(r =>
+    r.divisions?.seasons?.is_active &&
+    (!allowedDivisionIds || allowedDivisionIds.has(String(r.division_id)))
+  );
 
   const byNum = {};
   const ambiguousTeamIds = [];
