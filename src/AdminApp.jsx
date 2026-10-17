@@ -656,13 +656,33 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                 : !viewingDiv
                   ? <div className="empty-state">Pick a division above to import weekly data.</div>
                   : weeklyCategory==="ratings"
-                    ? <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
-                        divisionId={viewingDiv?.id ?? null} onReconciled={refreshCurrentDivision}
-                        onBulkImport={handleBulkImport}
-                        onManualRating={handleManualRating}
-                        onMovePlayer={handleMovePlayer}
-                        lockedTeamId={null} readOnly={false} />
-                    : <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklyCategory} />
+                    ? <>
+                        <IbaAutoSyncPanel
+                          key={`${viewingSeason.id}-ratings-manual-pdf`}
+                          season={viewingSeason}
+                          schedule={viewSchedule}
+                          reportType="rost"
+                          manualMode
+                          onComplete={refreshCurrentDivision}
+                        />
+                        <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
+                          divisionId={viewingDiv?.id ?? null} onReconciled={refreshCurrentDivision}
+                          onBulkImport={handleBulkImport}
+                          onManualRating={handleManualRating}
+                          onMovePlayer={handleMovePlayer}
+                          lockedTeamId={null} readOnly={false} />
+                      </>
+                    : <>
+                        <IbaAutoSyncPanel
+                          key={`${viewingSeason.id}-${weeklyCategory}-manual-pdf`}
+                          season={viewingSeason}
+                          schedule={viewSchedule}
+                          reportType={weeklyCategory==="standings" ? "div" : "mvp"}
+                          manualMode
+                          onComplete={refreshCurrentDivision}
+                        />
+                        <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklyCategory} />
+                      </>
             }
           </div>
         </div>
