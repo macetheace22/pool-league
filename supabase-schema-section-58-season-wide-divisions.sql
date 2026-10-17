@@ -28,6 +28,13 @@ ALTER TABLE public.divisions
   ALTER COLUMN format SET NOT NULL,
   ALTER COLUMN day SET NOT NULL;
 
+-- Division numbers are scoped to a format and night within a season.
+-- This permits an IBA division number to be reused in another context.
+ALTER TABLE public.divisions
+  DROP CONSTRAINT IF EXISTS divisions_season_id_num_key;
+ALTER TABLE public.divisions
+  ADD CONSTRAINT divisions_season_format_day_num_key UNIQUE (season_id, format, day, num);
+
 -- Retain legacy fields during the transition, but permit new season records
 -- to omit format/day. Updated code uses division-level context for imports.
 ALTER TABLE public.seasons
