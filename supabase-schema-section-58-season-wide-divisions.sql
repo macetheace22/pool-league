@@ -31,7 +31,8 @@ ALTER TABLE public.divisions
 -- Division numbers are scoped to a format and night within a season.
 -- This permits an IBA division number to be reused in another context.
 ALTER TABLE public.divisions
-  DROP CONSTRAINT IF EXISTS divisions_season_id_num_key;
+  DROP CONSTRAINT IF EXISTS divisions_season_id_num_key,
+  DROP CONSTRAINT IF EXISTS divisions_season_format_day_num_key;
 ALTER TABLE public.divisions
   ADD CONSTRAINT divisions_season_format_day_num_key UNIQUE (season_id, format, day, num);
 
