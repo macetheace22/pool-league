@@ -651,38 +651,28 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                     onComplete={refreshCurrentDivision}
                   />
                 : <div className="empty-state">Select an active season to sync its weekly IBA report.</div>
-              : !isViewingActive
+              : !isViewingActive || !viewingSeason
                 ? <div className="empty-state">Activate a season to import weekly data.</div>
-                : !viewingDiv
-                  ? <div className="empty-state">Pick a division above to import weekly data.</div>
-                  : weeklyCategory==="ratings"
-                    ? <>
-                        <IbaAutoSyncPanel
-                          key={`${viewingSeason.id}-ratings-manual-pdf`}
-                          season={viewingSeason}
-                          schedule={viewSchedule}
-                          reportType="rost"
-                          manualMode
-                          onComplete={refreshCurrentDivision}
-                        />
-                        <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
-                          divisionId={viewingDiv?.id ?? null} onReconciled={refreshCurrentDivision}
-                          onBulkImport={handleBulkImport}
-                          onManualRating={handleManualRating}
-                          onMovePlayer={handleMovePlayer}
-                          lockedTeamId={null} readOnly={false} />
-                      </>
-                    : <>
-                        <IbaAutoSyncPanel
-                          key={`${viewingSeason.id}-${weeklyCategory}-manual-pdf`}
-                          season={viewingSeason}
-                          schedule={viewSchedule}
-                          reportType={weeklyCategory==="standings" ? "div" : "mvp"}
-                          manualMode
-                          onComplete={refreshCurrentDivision}
-                        />
-                        <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklyCategory} />
-                      </>
+                : <>
+                    <IbaAutoSyncPanel
+                      key={`${viewingSeason.id}-${weeklyCategory}-manual-pdf`}
+                      season={viewingSeason}
+                      schedule={viewSchedule}
+                      reportType={weeklyCategory==="ratings" ? "rost" : weeklyCategory==="standings" ? "div" : "mvp"}
+                      manualMode
+                      onComplete={refreshCurrentDivision}
+                    />
+                    {viewingDiv
+                      ? weeklyCategory==="ratings"
+                        ? <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
+                            divisionId={viewingDiv.id} onReconciled={refreshCurrentDivision}
+                            onBulkImport={handleBulkImport}
+                            onManualRating={handleManualRating}
+                            onMovePlayer={handleMovePlayer}
+                            lockedTeamId={null} readOnly={false} />
+                        : <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklyCategory} />
+                      : <div className="empty-state">The PDF import above works across the selected season. Select a division to use the separate in-app manual maintenance tools below.</div>}
+                  </>
             }
           </div>
         </div>
