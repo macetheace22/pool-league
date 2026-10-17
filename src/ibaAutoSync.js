@@ -181,7 +181,10 @@ export async function validateIbaReports(reports, season, options = {}) {
   return {
     checks,
     weekTagsByReportDivision,
-    canImport: allChecksReady && reportFailures.length === 0,
+    // A missing PDF is normal when a format/day is not playing this week.
+    // Other independently validated format/day groups may still be imported.
+    // Actual fetch errors and empty PDFs remain fail-closed.
+    canImport: allChecksReady && reportFailures.every(failure => failure.status === "missing"),
     reportFailures: reportFailures.map(report => ({
       reportType: report.reportType,
       status: report.status,
