@@ -20,13 +20,15 @@ const season = {
   format: "Masters",
   day: "Wednesday",
   divisions: [
-    { id: "division-151", num: 151, name: "TCB Masters" },
-    { id: "division-152", num: 152, name: "North Masters" },
+    { id: "division-151", num: 151, name: "TCB Masters", format: "Masters", day: "Wednesday" },
+    { id: "division-152", num: 152, name: "North Masters", format: "Masters", day: "Wednesday" },
   ],
 };
 
 const report = {
-  key: "mast-wed-div",
+  key: "mastweddiv",
+  leagueType: "mast",
+  day: "wed",
   reportType: "div",
   status: "ok",
   source: "manual",
@@ -59,6 +61,32 @@ describe("mapped IBA report validation", () => {
     expect(db.listTeams).toHaveBeenCalledTimes(1);
     expect(db.listTeams).toHaveBeenCalledWith("division-151");
     expect(db.listIbaReportImportHistory).toHaveBeenCalledWith("season-1", "division-151");
+  });
+
+
+  it("validates each report only against divisions with the same format and day", async () => {
+    const multiContextSeason = {
+      ...season,
+      divisions: [
+        ...season.divisions,
+        { id: "division-287", num: 287, name: "Advanced Wednesday", format: "Advanced", day: "Wednesday" },
+      ],
+    };
+    const advancedReport = {
+      ...report,
+      key: "advweddiv",
+      leagueType: "adv",
+      day: "wed",
+      text: "Fall Season 2026 Week 17\n287 Advanced Wednesday\nFor week: 17\n",
+    };
+    const result = await validateIbaReports([report, advancedReport], multiContextSeason);
+
+    expect(result.canImport).toBe(true);
+    expect(result.checks).toHaveLength(3);
+    expect(result.checks.filter(check => check.reportKey === report.key).map(check => check.divisionId))
+      .toEqual(["division-151", "division-152"]);
+    expect(result.checks.filter(check => check.reportKey === advancedReport.key).map(check => check.divisionId))
+      .toEqual(["division-287"]);
   });
 
   it("rejects a division that does not belong to the selected season", async () => {
