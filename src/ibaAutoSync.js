@@ -22,22 +22,45 @@ function currentWeekTag(schedule) {
   return { weekKey, label: `Week ${current.week} · ${current.date}` };
 }
 
-export function ibaCodesForSeason(season) {
-  const format = String(season?.format || "").toLowerCase();
-  const day = String(season?.day || "").toLowerCase();
+const REPORT_TYPES = ["rost", "div", "mvp"];
+const FORMAT_LABELS = { mast: "Masters", adv: "Advanced", open: "Open" };
+const DAY_LABELS = { mon: "Monday", tues: "Tuesday", wed: "Wednesday", thur: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
+
+function contextCodes(context) {
+  const format = String(context?.format || "").toLowerCase();
+  const day = String(context?.day || "").toLowerCase();
   return { leagueType: FORMAT_TO_CODE[format] || null, day: DAY_TO_CODE[day] || null };
 }
 
+export function ibaCodesForSeason(season) {
+  const contexts = [...new Map((season?.divisions || [])
+    .map(division => ({ ...contextCodes(division), format: division.format, dayName: division.day }))
+    .filter(context => context.leagueType && context.day)
+    .map(context => [`${context.leagueType}:${context.day}`, context])).values()];
+  if (contexts.length) return { ...contexts[0], contexts };
+  const legacy = contextCodes(season);
+  return { ...legacy, contexts: legacy.leagueType && legacy.day ? [{ ...legacy, format: season?.format, dayName: season?.day }] : [] };
+}
+
 export async function fetchIbaReports(season, reportType = null) {
-  const { leagueType, day } = ibaCodesForSeason(season);
-  if (!leagueType || !day) throw new Error("The selected season must have a supported format and day.");
+  const { contexts } = ibaCodesForSeason(season);
+  if (!contexts.length) throw new Error("The selected season has no divisions with a valid IBA format and day. Import its IBA schedule first.");
+  const requestedTypes = reportType ? [reportType] : REPORT_TYPES;
+  const reportsToFetch = contexts.flatMap(context =>
+    requestedTypes.map(type => ({ leagueType: context.leagueType, day: context.day, reportType: type }))
+  );
   const response = await fetch("/api/iba-reports", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(reportType ? { reports: [{ leagueType, day, reportType }] } : { leagueType, day }),
+    body: JSON.stringify({ reports: reportsToFetch }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || "Could not retrieve IBA reports.");
-  return { ...body, leagueType, day };
+  const reports = (body.reports || []).map(report => ({
+    ...report,
+    formatLabel: FORMAT_LABELS[report.leagueType] || report.leagueType,
+    dayLabel: DAY_LABELS[report.day] || report.day,
+  }));
+  return { ...body, reports, contexts };
 }
 
 const ALL_LEAGUE_TYPES = ["mast", "adv", "open"];
