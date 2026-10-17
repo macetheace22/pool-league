@@ -518,16 +518,16 @@ export async function setPlayoffsStartDate(seasonId, date) {
 }
 
 // ─── Divisions ──────────────────────────────────────────────────────────────
-export async function addDivision(seasonId, num, name) {
-  const { data, error } = await supabase.from("divisions").insert({ season_id: seasonId, num, name }).select().single();
+export async function addDivision(seasonId, num, name, format = "Masters", day = "Wednesday") {
+  const { data, error } = await supabase.from("divisions").insert({ season_id: seasonId, num, name, format, day }).select().single();
   return error ? null : data;
 }
 export async function removeDivision(divisionId) {
   const { error } = await supabase.from("divisions").delete().eq("id", divisionId);
   return !error;
 }
-export async function updateDivision(divisionId, num, name) {
-  const { error } = await supabase.from("divisions").update({ num, name }).eq("id", divisionId);
+export async function updateDivision(divisionId, num, name, format, day) {
+  const { error } = await supabase.from("divisions").update({ num, name, format, day }).eq("id", divisionId);
   return !error;
 }
 // Lightweight team counts per division -- used by the Seasons page to know
