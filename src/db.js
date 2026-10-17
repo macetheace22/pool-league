@@ -198,13 +198,17 @@ export async function generateChampionshipBracket(divisionId) {
 // awkward small one. Returned as a proposal for the manager to review/edit
 // before committing -- nothing is written yet.
 export async function previewConsolationBrackets(divisionId) {
-  const { data: thisDivision } = await supabase.from("divisions").select("id, season_id, seasons(format, day)").eq("id", divisionId).single();
+  const { data: thisDivision } = await supabase.from("divisions")
+    .select("id, season_id, format, day").eq("id", divisionId).single();
   if (!thisDivision) return { error: "Division not found.", brackets: [] };
 
   const { data: sisterDivisions } = await supabase.from("divisions")
-    .select("id").eq("season_id", thisDivision.season_id);
-  // Only divisions sharing this division's season (same format+day, since
-  // it's one season_id per format/day combo in how seasons are modeled here).
+    .select("id")
+    .eq("season_id", thisDivision.season_id)
+    .eq("format", thisDivision.format)
+    .eq("day", thisDivision.day);
+  // Only divisions sharing this season and IBA format/day context can share
+  // consolation bracket slots.
   const divisionIds = (sisterDivisions ?? []).map(d => d.id);
 
   const pools = await Promise.all(divisionIds.map(async (divId) => {
