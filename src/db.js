@@ -672,6 +672,8 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
       .from("divisions")
       .select("id, num, name, season_id, format, day")
       .eq("season_id", seasonId)
+      .eq("format", format)
+      .eq("day", day)
       .eq("num", divisionNum)
       .maybeSingle();
 
@@ -702,7 +704,9 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
           .from("divisions")
           .select("id, num, name, season_id, format, day")
           .eq("season_id", seasonId)
-          .eq("num", divisionNum)
+          .eq("format", format)
+      .eq("day", day)
+      .eq("num", divisionNum)
           .maybeSingle();
         if (!existing) return { ok: false, error: error?.message || "Could not create the division." };
         division = existing;
