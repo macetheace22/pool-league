@@ -129,7 +129,12 @@ export async function validateIbaReports(reports, season, options = {}) {
     const teams = await db.listTeams(division.id);
     const scheduledWeeks = await db.listSchedule(division.id, teams);
     const historyResult = await db.listIbaReportImportHistory(season.id, division.id);
-    for (const report of (reports ?? []).filter(item => item.status === "ok")) {
+    const divisionCodes = contextCodes(division);
+    for (const report of (reports ?? []).filter(item =>
+      item.status === "ok" &&
+      item.leagueType === divisionCodes.leagueType &&
+      item.day === divisionCodes.day
+    )) {
       const reportMetadata = {
         reportWeek: extractIbaReportWeek(report.text),
         reportWeeksByDivision: extractIbaReportWeeksByDivision(report.text),
@@ -157,6 +162,9 @@ export async function validateIbaReports(reports, season, options = {}) {
       }
       checks.push({
         key: `${report.reportType}:${division.id}`,
+        reportKey: report.key,
+        leagueType: report.leagueType,
+        day: report.day,
         reportType: report.reportType,
         divisionId: division.id,
         divisionNum: String(division.num),
