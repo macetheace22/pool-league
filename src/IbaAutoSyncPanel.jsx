@@ -83,6 +83,15 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const selectedReportLabel = reportLabels[reportType] || "weekly league data";
   const selectedReports = (reports) => reportType ? (reports ?? []).filter(r => r.reportType === reportType) : (reports ?? []);
   const previewRows = (type) => {
+    const sections = (data?.preview?.sections || []).filter(section => section.reportType === type && section.status === "ok");
+    if (type === "rost" && sections.length) {
+      return sections.flatMap(section => Object.entries(section.parsed?.registry || {}).map(([playerNum, player]) => ({
+        sourceContext: `${section.formatLabel} · ${section.dayLabel}`,
+        sourceKey: section.key,
+        teamNum: Object.entries(section.parsed?.rosters || {}).find(([, nums]) => nums.includes(playerNum))?.[0] || "",
+        playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—",
+      })));
+    }
     if (type === "rost") {
       const parsed = data?.preview?.roster?.parsed;
       if (!parsed) return [];
@@ -91,20 +100,23 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—",
       }));
     }
+    if (sections.length) return sections.flatMap(section => (section.rows || []).map(row => ({
+      ...row, sourceContext: `${section.formatLabel} · ${section.dayLabel}`, sourceKey: section.key,
+    })));
     if (type === "div") return data?.preview?.standings?.rows || [];
     if (type === "mvp") return data?.preview?.mvp?.rows || [];
     return [];
   };
-  const hasEmptyParsedReport = (data?.reports ?? []).some(r => r.status === "ok" && (
-    (r.reportType === "rost" && data?.preview?.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
-    (r.reportType === "div" && data?.preview?.standings?.rows.length === 0) ||
-    (r.reportType === "mvp" && data?.preview?.mvp?.rows.length === 0)
-  ));
+  const hasEmptyParsedReport = (data?.reports ?? []).some(report => {
+    if (report.status !== "ok") return false;
+    const parsedReport = (data?.preview?.reports || []).find(item => item.key === report.key);
+    return Number(parsedReport?.detectedRows ?? 0) === 0;
+  });
   const columnsFor = (type) => type === "rost"
-    ? [{ key:"teamNum", label:"Team" }, { key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"nickname", label:"Nickname" }, { key:"rating", label:"Rating" }]
+    ? [{ key:"sourceContext", label:"IBA group" }, { key:"teamNum", label:"Team" }, { key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"nickname", label:"Nickname" }, { key:"rating", label:"Rating" }]
     : type === "div"
-      ? [{ key:"teamNum", label:"Team #" }, { key:"teamName", label:"Team" }, { key:"pointsLastWk", label:"Last week" }, { key:"totalPoints", label:"Total points" }, { key:"setsPlayed", label:"Sets played" }]
-      : [{ key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"teamNum", label:"Team #" }, { key:"wins", label:"Sets won" }, { key:"mvpRankingPoints", label:"MVP points" }, { key:"losses", label:"Sets lost" }, { key:"pointsScored", label:"Points scored" }];
+      ? [{ key:"sourceContext", label:"IBA group" }, { key:"teamNum", label:"Team #" }, { key:"teamName", label:"Team" }, { key:"pointsLastWk", label:"Last week" }, { key:"totalPoints", label:"Total points" }, { key:"setsPlayed", label:"Sets played" }]
+      : [{ key:"sourceContext", label:"IBA group" }, { key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"teamNum", label:"Team #" }, { key:"wins", label:"Sets won" }, { key:"mvpRankingPoints", label:"MVP points" }, { key:"losses", label:"Sets lost" }, { key:"pointsScored", label:"Points scored" }];
 
   const fetchReports = async () => {
     setLoading(true); setError(""); setResult(null); setPreflight(null);
