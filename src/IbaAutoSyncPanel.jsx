@@ -78,7 +78,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   }, [allScan, discoverySeasons, reviewGroupKey]);
 
   const codes = ibaCodesForSeason(season);
-  const supported = !!codes.leagueType && !!codes.day;
+  const supported = Array.isArray(codes.contexts) && codes.contexts.length > 0;
   const reportLabels = { rost: "roster & ratings", div: "team standings", mvp: "MVP standings" };
   const selectedReportLabel = reportLabels[reportType] || "weekly league data";
   const selectedReports = (reports) => reportType ? (reports ?? []).filter(r => r.reportType === reportType) : (reports ?? []);
