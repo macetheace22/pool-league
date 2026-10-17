@@ -657,6 +657,11 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
   const divisionName = String(name ?? "").trim();
 
   if (!seasonId) return { ok: false, error: "A season is required." };
+  const { data: seasonContext, error: seasonContextError } = await supabase
+    .from("seasons").select("format, day").eq("id", seasonId).single();
+  if (seasonContextError) return { ok: false, error: seasonContextError.message };
+  const format = String(payload.format || seasonContext?.format || "Masters");
+  const day = String(payload.day || seasonContext?.day || "Wednesday");
   if (!divisionNum) return { ok: false, error: "An IBA division number is required." };
   if (!divisionName) return { ok: false, error: "An IBA division name is required." };
   if (!importedTeams.length) return { ok: false, error: "IBA returned no teams for this division." };
@@ -665,7 +670,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
   try {
     let { data: division, error: divisionLookupError } = await supabase
       .from("divisions")
-      .select("id, num, name, season_id")
+      .select("id, num, name, season_id, format, day")
       .eq("season_id", seasonId)
       .eq("num", divisionNum)
       .maybeSingle();
@@ -677,7 +682,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
     if (division) {
       const { data: updated, error } = await supabase
         .from("divisions")
-        .update({ name: divisionName })
+        .update({ name: divisionName, format, day })
         .eq("id", division.id)
         .select()
         .single();
@@ -686,7 +691,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
     } else {
       const { data: created, error } = await supabase
         .from("divisions")
-        .insert({ season_id: seasonId, num: divisionNum, name: divisionName })
+        .insert({ season_id: seasonId, num: divisionNum, name: divisionName, format, day })
         .select()
         .single();
 
@@ -695,7 +700,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
         // insert, re-read it rather than leaving the import half-complete.
         const { data: existing } = await supabase
           .from("divisions")
-          .select("id, num, name, season_id")
+          .select("id, num, name, season_id, format, day")
           .eq("season_id", seasonId)
           .eq("num", divisionNum)
           .maybeSingle();
