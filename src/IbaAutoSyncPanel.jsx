@@ -3,7 +3,7 @@ import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from 
 import { fetchIbaReports, fetchAllIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
 import * as db from "./db";
 
-export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null }) {
+export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null, manualMode = false }) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
@@ -16,8 +16,8 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [scanningAll, setScanningAll] = useState(false);
   const [scanError, setScanError] = useState("");
   const [manualFile, setManualFile] = useState(null);
-  const [manualFormat, setManualFormat] = useState(String(season?.format || "Masters").toLowerCase());
-  const [manualDay, setManualDay] = useState(String(season?.day || "Wednesday").toLowerCase());
+  const [manualFormat, setManualFormat] = useState(String(season?.divisions?.[0]?.format || season?.format || "Masters").toLowerCase());
+  const [manualDay, setManualDay] = useState(String(season?.divisions?.[0]?.day || season?.day || "Wednesday").toLowerCase());
   const [manualError, setManualError] = useState("");
   const [uploadingManual, setUploadingManual] = useState(false);
   const [discoverySeasons, setDiscoverySeasons] = useState([]);
@@ -30,6 +30,25 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewImporting, setReviewImporting] = useState(false);
   const [reviewResult, setReviewResult] = useState(null);
+  const manualContexts = [...new Map((season?.divisions || [])
+    .map(division => ({
+      format: String(division.format || "").toLowerCase(),
+      day: String(division.day || "").toLowerCase(),
+    }))
+    .filter(context => context.format && context.day)
+    .map(context => [`${context.format}:${context.day}`, context])).values()];
+  const manualFormatOptions = [...new Set(manualContexts.map(context => context.format))];
+  const manualDayOptions = [...new Set(manualContexts.filter(context => context.format === manualFormat).map(context => context.day))];
+
+  useEffect(() => {
+    if (!manualContexts.length) return;
+    if (!manualFormatOptions.includes(manualFormat)) {
+      setManualFormat(manualContexts[0].format);
+      setManualDay(manualContexts[0].day);
+      return;
+    }
+    if (!manualDayOptions.includes(manualDay)) setManualDay(manualDayOptions[0] || manualContexts[0].day);
+  }, [season?.id, manualFormat, manualDay, manualContexts.length, manualFormatOptions.join(","), manualDayOptions.join(",")]);
 
   useEffect(() => {
     let active = true;
