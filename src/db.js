@@ -2299,7 +2299,7 @@ export async function listPlayerTeamHistory(playerNum) {
   const teamIds = [...new Set((rosterRows ?? []).map(r => r.team_id))];
   if (teamIds.length === 0) return [];
   const { data: teamRows } = await supabase.from("teams")
-    .select("id, name, team_num, division_id, divisions(id, num, name, season_id, seasons(id, type, year, format, day, is_active))")
+    .select("id, name, team_num, division_id, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active))")
     .in("id", teamIds);
   return (teamRows ?? []).map(t => {
     const d = t.divisions, s = d?.seasons;
@@ -2307,7 +2307,7 @@ export async function listPlayerTeamHistory(playerNum) {
       teamId: t.id, teamName: t.name, teamNum: t.team_num,
       divisionId: d?.id ?? null, divisionNum: d?.num ?? null, divisionName: d?.name ?? "",
       seasonId: s?.id ?? null, seasonType: s?.type ?? "", seasonYear: s?.year ?? null,
-      seasonFormat: s?.format ?? "", seasonDay: s?.day ?? "", isActive: !!s?.is_active,
+      seasonFormat: d?.format ?? s?.format ?? "", seasonDay: d?.day ?? s?.day ?? "", isActive: !!s?.is_active,
     };
   }).sort((a, b) => (b.isActive - a.isActive) || ((b.seasonYear ?? 0) - (a.seasonYear ?? 0)));
 }
