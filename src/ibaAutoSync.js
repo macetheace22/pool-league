@@ -191,17 +191,83 @@ export async function validateIbaReports(reports, season, options = {}) {
 }
 
 export async function buildIbaPreview(reports) {
-  const byType = Object.fromEntries((reports ?? []).map(r => [r.reportType, r]));
-  const preview = { reports: [], roster: null, standings: null, mvp: null, errors: [] };
-  for (const r of reports ?? []) {
-    preview.reports.push({ key: r.key, reportType: r.reportType, status: r.status, pages: r.pages, bytes: r.bytes, message: r.message, reportWeek: r.status === "ok" ? extractIbaReportWeek(r.text) : null, reportWeeksByDivision: r.status === "ok" ? extractIbaReportWeeksByDivision(r.text) : null });
+  const preview = { reports: [], sections: [], roster: null, standings: null, mvp: null, errors: [] };
+  const rosterSections = [];
+  const standingsSections = [];
+  const mvpSections = [];
+
+  for (const report of reports ?? []) {
+    const section = {
+      key: report.key,
+      reportType: report.reportType,
+      leagueType: report.leagueType,
+      day: report.day,
+      formatLabel: report.formatLabel || FORMAT_LABELS[report.leagueType] || report.leagueType,
+      dayLabel: report.dayLabel || DAY_LABELS[report.day] || report.day,
+      status: report.status,
+      reportWeek: report.status === "ok" ? extractIbaReportWeek(report.text) : null,
+      reportWeeksByDivision: report.status === "ok" ? extractIbaReportWeeksByDivision(report.text) : null,
+    };
+    if (report.status === "ok") {
+      if (report.reportType === "rost") {
+        section.parsed = parseLeagueRoster(report.text);
+        section.teamCount = Object.keys(section.parsed.rosters || {}).length;
+        section.playerCount = Object.keys(section.parsed.registry || {}).length;
+        rosterSections.push(section);
+      } else if (report.reportType === "div") {
+        section.rows = parseStandingsImport(report.text);
+        standingsSections.push(section);
+      } else if (report.reportType === "mvp") {
+        section.rows = parseMvpImport(report.text);
+        mvpSections.push(section);
+      }
+    }
+    preview.reports.push({
+      key: section.key,
+      reportType: section.reportType,
+      status: section.status,
+      pages: report.pages,
+      bytes: report.bytes,
+      message: report.message,
+      reportWeek: section.reportWeek,
+      reportWeeksByDivision: section.reportWeeksByDivision,
+      formatLabel: section.formatLabel,
+      dayLabel: section.dayLabel,
+      detectedRows: section.reportType === "rost" ? section.playerCount : section.rows?.length,
+      teamCount: section.teamCount,
+    });
+    preview.sections.push(section);
   }
-  if (byType.rost?.status === "ok") {
-    const parsed = parseLeagueRoster(byType.rost.text);
-    preview.roster = { parsed, teamCount: Object.keys(parsed.rosters).length, playerCount: Object.keys(parsed.registry).length };
+
+  const mergeRosterSections = sections => {
+    const parsed = { registry: {}, rosters: {}, teams: {}, needsRating: [], ambiguousRoster: [] };
+    let playerCount = 0;
+    let teamCount = 0;
+    for (const section of sections) {
+      const current = section.parsed;
+      if (!current) continue;
+      playerCount += Object.keys(current.registry || {}).length;
+      teamCount += Object.keys(current.rosters || {}).length;
+      Object.assign(parsed.registry, current.registry || {});
+      Object.assign(parsed.teams, current.teams || {});
+      for (const [teamNum, players] of Object.entries(current.rosters || {})) {
+        parsed.rosters[teamNum] = [...new Set([...(parsed.rosters[teamNum] || []), ...players])];
+      }
+      parsed.needsRating.push(...(current.needsRating || []));
+      parsed.ambiguousRoster.push(...(current.ambiguousRoster || []));
+    }
+    return { parsed, playerCount, teamCount };
+  };
+  if (rosterSections.length) {
+    const merged = mergeRosterSections(rosterSections);
+    preview.roster = { ...merged, sections: rosterSections };
   }
-  if (byType.div?.status === "ok") preview.standings = { rows: parseStandingsImport(byType.div.text) };
-  if (byType.mvp?.status === "ok") preview.mvp = { rows: parseMvpImport(byType.mvp.text) };
+  if (standingsSections.length) {
+    preview.standings = { rows: standingsSections.flatMap(section => section.rows || []), sections: standingsSections };
+  }
+  if (mvpSections.length) {
+    preview.mvp = { rows: mvpSections.flatMap(section => section.rows || []), sections: mvpSections };
+  }
   return preview;
 }
 
