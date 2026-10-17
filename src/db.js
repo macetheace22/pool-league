@@ -47,7 +47,7 @@ export async function getProfile(userId) {
   if (!data) return data;
   const { data: memberships } = await supabase
     .from("profile_team_memberships")
-    .select("id, team_id, joined_at, ended_at, teams(id, name, team_num, division_id, venue, is_bye, divisions(id, num, name, season_id, seasons(id, type, year, format, day, is_active)))")
+    .select("id, team_id, joined_at, ended_at, teams(id, name, team_num, division_id, venue, is_bye, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active)))")
     .eq("profile_id", userId)
     .is("ended_at", null)
     .order("joined_at", { ascending: true });
