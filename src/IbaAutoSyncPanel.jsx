@@ -241,26 +241,26 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                 <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
                     Report category (import one category at a time)
-                    <select value={reviewReportType} onChange={e => { setReviewReportType(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                    <select className="input" value={reviewReportType} onChange={e => { setReviewReportType(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
                       <option value="rost">Roster & ratings</option><option value="div">Team standings</option><option value="mvp">MVP standings</option>
                     </select>
                   </label>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
                     IBA format and day
-                    <select value={reviewGroupKey} onChange={e => { setReviewGroupKey(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                    <select className="input" value={reviewGroupKey} onChange={e => { setReviewGroupKey(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
                       {reviewGroups.map(group => <option key={group.key} value={group.key}>{group.formatLabel} · {group.dayLabel}</option>)}
                     </select>
                   </label>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
-                    Target season (must match format and day)
-                    <select value={reviewSeasonId} onChange={e => { setReviewSeasonId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                    Target season
+                    <select className="input" value={reviewSeasonId} onChange={e => { setReviewSeasonId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
                       <option value="">Select matching season…</option>
                       {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {target.format} · {target.day} · {target.divisions?.length || 0} divisions</option>)}
                     </select>
                   </label>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
                     Target division
-                    <select value={reviewDivisionId} onChange={e => { setReviewDivisionId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }} disabled={!reviewSeason}>
+                    <select className="input" value={reviewDivisionId} onChange={e => { setReviewDivisionId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }} disabled={!reviewSeason}>
                       <option value="">Select division…</option>
                       {reviewDivisions.map(target => <option key={target.id} value={String(target.id)}>Division {target.num} · {target.name || "Unnamed"}</option>)}
                     </select>
@@ -282,7 +282,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   }}>
                     {reviewLoading ? "Validating…" : "Validate mapped reports"}
                   </button>
-                  <button className="btn-sm" disabled={!reviewValidation?.canImport || reviewReadyReports.length !== 1 || !reviewSeason || !reviewDivision || reviewImporting || reviewLoading} onClick={async () => {
+                  <button className="btn-primary" disabled={!reviewValidation?.canImport || reviewReadyReports.length !== 1 || !reviewSeason || !reviewDivision || reviewImporting || reviewLoading} onClick={async () => {
                     setReviewImporting(true); setReviewError(""); setReviewResult(null);
                     try {
                       const result = await importIbaReports(reviewReadyReports, reviewSeason, [], reviewValidation);
@@ -328,7 +328,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                     <details key={report.key} style={{ padding: "8px 10px", borderBottom: "1px solid #292929" }}>
                       <summary style={{ cursor: "pointer", fontSize: 11, color: statusColor }}>
                         <strong>{report.formatLabel} · {report.dayLabel}</strong> — {report.reportType.toUpperCase()} · {report.status}
-                        {report.status === "ok" ? ` · ${report.detectedRows} ${report.reportType === "rost" ? "players" : "rows"}${report.reportType === "rost" ? ` / ${report.teamCount} teams` : ""}` : ""}
+                        {report.status === "ok" ? ` · ${report.detectedRows} ${report.reportType === "rost" ? "players" : "rows"}${report.reportType === "rost" ? ` / ${report.teamCount} teams` : ""}${report.reportWeek?.weekNumber ? ` · Week ${report.reportWeek.weekNumber}` : report.reportWeek?.ambiguous ? " · Week needs review" : report.reportWeek?.missing ? " · Week not detected" : ""}` : ""}
                         {zeroRows ? " · REVIEW: zero rows parsed" : ""}
                       </summary>
                       <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 6 }}>
@@ -356,20 +356,20 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
             <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
               Format
-              <select value={manualFormat} onChange={e => setManualFormat(e.target.value)} style={{ minWidth: 115 }}>
+              <select className="input" value={manualFormat} onChange={e => setManualFormat(e.target.value)} style={{ minWidth: 140, width: "100%" }}>
                 <option value="masters">Masters</option><option value="advanced">Advanced</option><option value="open">Open</option>
               </select>
             </label>
             <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
               Day
-              <select value={manualDay} onChange={e => setManualDay(e.target.value)} style={{ minWidth: 115 }}>
+              <select className="input" value={manualDay} onChange={e => setManualDay(e.target.value)} style={{ minWidth: 140, width: "100%" }}>
                 <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option><option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option><option value="sunday">Sunday</option>
               </select>
             </label>
           </div>
           <input type="file" accept="application/pdf,.pdf" onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }} style={{ display: "block", maxWidth: "100%", marginTop: 8, fontSize: 11 }} />
           {manualFile && <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 4 }}>{manualFile.name} · {Math.ceil(manualFile.size / 1024).toLocaleString()} KB</div>}
-          <button className="btn-sm" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual} style={{ marginTop: 8 }}>
+          <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual} style={{ marginTop: 8 }}>
             {uploadingManual ? <><RefreshCw size={12} className="spin" /> Extracting PDF…</> : "Extract & Preview PDF"}
           </button>
           {manualError && <div className="error-msg" style={{ marginTop: 8 }}>{manualError}</div>}
@@ -378,7 +378,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Select a season with a supported format and day.</div></div>}
       {supported && !data && (
         <button className="btn-primary" onClick={fetchReports} disabled={loading} style={{marginTop:8}}>
-          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : reportType ? `Fetch Latest ${reportLabels[reportType] || "IBA Report"}` : "Fetch Latest IBA Reports"}
+          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : reportType ? `Fetch & Preview ${reportLabels[reportType] || "IBA Report"}` : "Fetch & Preview IBA Reports"}
         </button>
       )}
 
