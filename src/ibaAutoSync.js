@@ -273,10 +273,25 @@ export async function buildIbaPreview(reports) {
 
 export async function importIbaReports(reports, season, schedule, preflight) {
   if (!preflight?.canImport) throw new Error("Import blocked: complete the per-division validation checks before writing any data.");
-  const weekTag = currentWeekTag(schedule);
-  const importedDivisionIdsByType = { rost: [], div: [], mvp: [] };
+  const fallbackWeekTag = currentWeekTag(schedule);
+  const result = {
+    weekTag: fallbackWeekTag,
+    roster: { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], warnings: [] },
+    standings: { imported: 0, skipped: [] },
+    mvp: { imported: 0, skipped: [] },
+    warnings: [],
+    skippedDuplicateDivisions: preflight.checks
+      .filter(check => check.status === "duplicate")
+      .map(check => `${check.reportType.toUpperCase()} · Division ${check.divisionNum} · Week ${check.weekNumber}`),
+  };
+
   const recordHistory = async (report, reportType, divisionIds) => {
-    const checks = preflight.checks.filter(check => check.reportType === reportType && divisionIds.includes(check.divisionId));
+    const checks = preflight.checks.filter(check =>
+      check.reportKey === report.key &&
+      check.reportType === reportType &&
+      divisionIds.includes(check.divisionId) &&
+      check.status === "ready"
+    );
     for (const check of checks) {
       const saved = await db.recordIbaReportImportHistory({
         seasonId: season.id,
@@ -290,74 +305,86 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       if (!saved.ok) throw new Error(`Data was saved, but import history could not be recorded for division ${check.divisionNum}: ${saved.error}`);
     }
   };
-  const result = { weekTag, roster: null, standings: null, mvp: null, warnings: [], skippedDuplicateDivisions: preflight.checks.filter(check => check.status === "duplicate").map(check => `${check.reportType.toUpperCase()} · Division ${check.divisionNum} · Week ${check.weekNumber}`) };
-  const byType = Object.fromEntries((reports ?? []).map(r => [r.reportType, r]));
 
-  if (byType.rost?.status === "ok") {
-    const parsed = parseLeagueRoster(byType.rost.text);
-    const readyRosterDivisions = new Set(preflight.checks.filter(check => check.reportType === "rost" && check.status === "ready").map(check => check.divisionId));
-    const allRosterTeamNums = Object.keys(parsed.rosters ?? {});
-    const rosterRouting = await db.listActiveTeamsByNumbers(allRosterTeamNums);
-    const eligibleTeamNums = new Set(allRosterTeamNums.filter(teamNum => {
-      const matches = rosterRouting.byNum[teamNum] || [];
-      return matches.length === 1 && readyRosterDivisions.has(matches[0].divisionId);
+  const successfulReports = (reports ?? []).filter(report => report.status === "ok");
+  const teamNums = [...new Set(successfulReports.flatMap(report => {
+    if (report.reportType === "rost") return Object.keys(parseLeagueRoster(report.text).rosters || {});
+    if (report.reportType === "div") return parseStandingsImport(report.text).map(row => row.teamNum);
+    if (report.reportType === "mvp") return parseMvpImport(report.text).map(row => row.teamNum);
+    return [];
+  }))];
+  const routing = await db.listActiveTeamsByNumbers(teamNums);
+
+  for (const report of successfulReports.filter(item => item.reportType === "rost")) {
+    const parsed = parseLeagueRoster(report.text);
+    const checks = preflight.checks.filter(check => check.reportKey === report.key && check.reportType === "rost");
+    const readyDivisionIds = new Set(checks.filter(check => check.status === "ready").map(check => check.divisionId));
+    const eligibleTeamNums = new Set(Object.keys(parsed.rosters || {}).filter(teamNum => {
+      const matches = routing.byNum[teamNum] || [];
+      return matches.length === 1 && readyDivisionIds.has(matches[0].divisionId);
     }));
+    const ambiguousTeamNums = Object.keys(parsed.rosters || {}).filter(teamNum => {
+      const matches = routing.byNum[teamNum] || [];
+      return matches.length > 1 && matches.some(team => readyDivisionIds.has(team.divisionId));
+    });
+    if (ambiguousTeamNums.length) result.warnings.push(`${report.key}: ${ambiguousTeamNums.length} roster team numbers matched multiple active divisions and were skipped.`);
     const eligiblePlayerNums = new Set([...eligibleTeamNums].flatMap(teamNum => parsed.rosters[teamNum] || []));
     const filteredParsed = {
       ...parsed,
-      rosters: Object.fromEntries(Object.entries(parsed.rosters ?? {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
-      teams: Object.fromEntries(Object.entries(parsed.teams ?? {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
-      registry: Object.fromEntries(Object.entries(parsed.registry ?? {}).filter(([, player]) => eligiblePlayerNums.has(player.num))),
-      needsRating: (parsed.needsRating ?? []).filter(player => eligiblePlayerNums.has(player.num)),
+      rosters: Object.fromEntries(Object.entries(parsed.rosters || {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
+      teams: Object.fromEntries(Object.entries(parsed.teams || {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
+      registry: Object.fromEntries(Object.entries(parsed.registry || {}).filter(([, player]) => eligiblePlayerNums.has(player.num))),
+      needsRating: (parsed.needsRating || []).filter(player => eligiblePlayerNums.has(player.num)),
+      ambiguousRoster: (parsed.ambiguousRoster || []).filter(item => eligiblePlayerNums.has(item.playerNum || item.num)),
     };
-    result.roster = eligibleTeamNums.size
-      ? await db.bulkImportPlayers(filteredParsed, { byReportDivision: preflight.weekTagsByReportDivision, fallback: weekTag })
-      : { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], skippedDuplicates: true };
-    importedDivisionIdsByType.rost = (result.roster?.updatedDivisions ?? []).map(item => item.divisionId);
-    if (importedDivisionIdsByType.rost.length) await recordHistory(byType.rost, "rost", importedDivisionIdsByType.rost);
-    if (parsed.ambiguousRoster?.length) result.warnings.push(`${parsed.ambiguousRoster.length} roster assignments need review.`);
-    if (result.roster?.ambiguousTeamIds?.length) result.warnings.push(`${result.roster.ambiguousTeamIds.length} team numbers matched more than one active division.`);
-    if (result.roster?.unmatchedTeams?.length) result.warnings.push(`${result.roster.unmatchedTeams.length} team numbers were not matched to an active team.`);
+    if (!eligibleTeamNums.size) continue;
+    const imported = await db.bulkImportPlayers(filteredParsed, {
+      byReportDivision: preflight.weekTagsByReportDivision,
+      fallback: fallbackWeekTag,
+    });
+    result.roster.updatedDivisions.push(...(imported?.updatedDivisions || []));
+    result.roster.unmatchedTeams.push(...(imported?.unmatchedTeams || []));
+    result.roster.ambiguousTeamIds.push(...(imported?.ambiguousTeamIds || []));
+    result.roster.warnings.push(...(imported?.warnings || []));
+    const updatedIds = (imported?.updatedDivisions || []).map(item => item.divisionId);
+    if (updatedIds.length) await recordHistory(report, "rost", updatedIds);
   }
 
-  const teamNums = [
-    ...(byType.div?.status === "ok" ? parseStandingsImport(byType.div.text).map(r => r.teamNum) : []),
-    ...(byType.mvp?.status === "ok" ? parseMvpImport(byType.mvp.text).map(r => r.teamNum) : []),
-  ];
-  const routing = await db.listActiveTeamsByNumbers([...new Set(teamNums)]);
-
-  if (byType.div?.status === "ok") {
-    const rows = parseStandingsImport(byType.div.text);
-    const grouped = groupByDivision(rows, routing.byNum);
-    result.standings = { imported: 0, skipped: grouped.skipped };
+  for (const report of successfulReports.filter(item => item.reportType === "div")) {
+    const grouped = groupByDivision(parseStandingsImport(report.text), routing.byNum);
+    result.standings.skipped.push(...grouped.skipped);
+    const importedDivisionIds = [];
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
-      if (!preflight.checks.some(check => check.reportType === "div" && check.divisionId === divisionId)) continue;
-      if (preflight.checks.some(check => check.reportType === "div" && check.divisionId === divisionId && check.status === "duplicate")) continue;
-      const divisionWeekTag = preflight.weekTagsByReportDivision[`div:${divisionId}`];
-      if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} standings.`);
-      const ok = await db.importStandingsForWeek(divisionId, group.rows, group.teams, divisionWeekTag);
+      const check = preflight.checks.find(item => item.reportKey === report.key && item.reportType === "div" && item.divisionId === divisionId);
+      if (!check || check.status === "duplicate") continue;
+      if (check.status !== "ready") throw new Error(`Import blocked: division ${check.divisionNum} standings were not validated.`);
+      const tag = preflight.weekTagsByReportDivision[`div:${divisionId}`];
+      if (!tag) throw new Error(`Import blocked: no validated report week for division ${divisionId} standings.`);
+      const ok = await db.importStandingsForWeek(divisionId, group.rows, group.teams, tag);
       if (!ok) throw new Error(`Could not save standings for division ${divisionId}.`);
       result.standings.imported += group.rows.length;
-      if (group.rows.length) importedDivisionIdsByType.div.push(divisionId);
+      if (group.rows.length) importedDivisionIds.push(divisionId);
     }
-    if (importedDivisionIdsByType.div.length) await recordHistory(byType.div, "div", importedDivisionIdsByType.div);
+    if (importedDivisionIds.length) await recordHistory(report, "div", importedDivisionIds);
   }
 
-  if (byType.mvp?.status === "ok") {
-    const rows = parseMvpImport(byType.mvp.text);
-    const grouped = groupByDivision(rows, routing.byNum);
-    result.mvp = { imported: 0, skipped: grouped.skipped };
+  for (const report of successfulReports.filter(item => item.reportType === "mvp")) {
+    const grouped = groupByDivision(parseMvpImport(report.text), routing.byNum);
+    result.mvp.skipped.push(...grouped.skipped);
+    const importedDivisionIds = [];
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
-      if (!preflight.checks.some(check => check.reportType === "mvp" && check.divisionId === divisionId)) continue;
-      if (preflight.checks.some(check => check.reportType === "mvp" && check.divisionId === divisionId && check.status === "duplicate")) continue;
-      const divisionWeekTag = preflight.weekTagsByReportDivision[`mvp:${divisionId}`];
-      if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} MVP standings.`);
-      const ok = await db.importMvpForWeek(divisionId, group.rows, divisionWeekTag);
+      const check = preflight.checks.find(item => item.reportKey === report.key && item.reportType === "mvp" && item.divisionId === divisionId);
+      if (!check || check.status === "duplicate") continue;
+      if (check.status !== "ready") throw new Error(`Import blocked: division ${check.divisionNum} MVP standings were not validated.`);
+      const tag = preflight.weekTagsByReportDivision[`mvp:${divisionId}`];
+      if (!tag) throw new Error(`Import blocked: no validated report week for division ${divisionId} MVP standings.`);
+      const ok = await db.importMvpForWeek(divisionId, group.rows, tag);
       if (!ok) throw new Error(`Could not save MVP standings for division ${divisionId}.`);
       result.mvp.imported += group.rows.length;
-      if (group.rows.length) importedDivisionIdsByType.mvp.push(divisionId);
+      if (group.rows.length) importedDivisionIds.push(divisionId);
     }
-    if (importedDivisionIdsByType.mvp.length) await recordHistory(byType.mvp, "mvp", importedDivisionIdsByType.mvp);
+    if (importedDivisionIds.length) await recordHistory(report, "mvp", importedDivisionIds);
   }
+
   return result;
 }
