@@ -222,7 +222,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <Download size={14}/> {reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
       </div>
       <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>
-        Automatically checks the current IBA {season?.format || "league"} · {season?.day || "day"} report{reportType ? ` for ${selectedReportLabel}` : "s for roster/ratings, team standings, and MVP standings"}. A report may be missing when that league is not playing.
+        Checks IBA reports for every format/day represented by this season's imported divisions{reportType ? ` for ${selectedReportLabel}` : " across roster/ratings, team standings, and MVP standings"}. Each report is validated against the matching division schedule before import. A report may be missing when that league is not playing.
       </div>
       {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
         <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
@@ -231,7 +231,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>All-format report discovery</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-            Scan Masters, Advanced, and Open for all seven days (21 format/day groups; up to 63 PDFs). This is a discovery and parsing review only: it does not import data or select a season automatically.
+            Scan Masters, Advanced, and Open for all seven days (21 format/day groups; up to 63 PDFs). Discovery is read-only; map each report group to the matching division context within the selected season before importing.
           </div>
           <button className="btn-sm" onClick={scanAllReports} disabled={scanningAll} style={{ marginTop: 8 }}>
             {scanningAll ? <><RefreshCw size={12} className="spin" /> Scanning {scanProgress?.completedGroups || 0}/{scanProgress?.totalGroups || 21} groups…</> : "Scan All IBA Formats & Days"}
