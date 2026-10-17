@@ -401,7 +401,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           </div>
           <input type="file" accept="application/pdf,.pdf" onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }} style={{ display: "block", maxWidth: "100%", marginTop: 8, fontSize: 11 }} />
           {manualFile && <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 4 }}>{manualFile.name} · {Math.ceil(manualFile.size / 1024).toLocaleString()} KB</div>}
-          <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual} style={{ marginTop: 8 }}>
+          <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual || !supported || !manualFormatOptions.length || !manualDayOptions.length} style={{ marginTop: 8 }}>
             {uploadingManual ? <><RefreshCw size={12} className="spin" /> Extracting PDF…</> : "Extract & Preview PDF"}
           </button>
           {manualError && <div className="error-msg" style={{ marginTop: 8 }}>{manualError}</div>}
