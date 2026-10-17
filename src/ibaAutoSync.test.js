@@ -72,6 +72,10 @@ describe("mapped IBA report validation", () => {
         { id: "division-287", num: 287, name: "Advanced Wednesday", format: "Advanced", day: "Wednesday" },
       ],
     };
+    const mastersReport = {
+      ...report,
+      text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n152 North Masters\nFor week: 17\n",
+    };
     const advancedReport = {
       ...report,
       key: "advweddiv",
@@ -79,11 +83,11 @@ describe("mapped IBA report validation", () => {
       day: "wed",
       text: "Fall Season 2026 Week 17\n287 Advanced Wednesday\nFor week: 17\n",
     };
-    const result = await validateIbaReports([report, advancedReport], multiContextSeason);
+    const result = await validateIbaReports([mastersReport, advancedReport], multiContextSeason);
 
     expect(result.canImport).toBe(true);
     expect(result.checks).toHaveLength(3);
-    expect(result.checks.filter(check => check.reportKey === report.key).map(check => check.divisionId))
+    expect(result.checks.filter(check => check.reportKey === mastersReport.key).map(check => check.divisionId))
       .toEqual(["division-151", "division-152"]);
     expect(result.checks.filter(check => check.reportKey === advancedReport.key).map(check => check.divisionId))
       .toEqual(["division-287"]);
