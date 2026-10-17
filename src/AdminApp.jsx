@@ -1673,7 +1673,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const addDivision = async (s) => {
     if (!divNum.trim()) return;
     const divs = s.divisions ?? [];
-    if (divs.find(d => d.num === divNum.trim())) { setError("Division already exists."); return; }
+    if (divs.find(d => d.num === divNum.trim() && (d.format || "Masters") === newDivisionFormat && (d.day || "Wednesday") === newDivisionDay)) { setError("That division number already exists for this format and day."); return; }
     await onAddDivision(s, divNum.trim(), divName.trim(), newDivisionFormat, newDivisionDay);
     setDivNum(""); setDivName(""); setError("");
   };
@@ -1687,8 +1687,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const saveEditDivision = async (s) => {
     if (!editDivNum.trim()) { setEditDivError("Division # is required."); return; }
     const divs = s.divisions ?? [];
-    if (divs.find(d => d.id !== editingDivId && d.num === editDivNum.trim())) {
-      setEditDivError("Another division already uses that number."); return;
+    if (divs.find(d => d.id !== editingDivId && d.num === editDivNum.trim() && (d.format || "Masters") === editDivFormat && (d.day || "Wednesday") === editDivDay)) {
+      setEditDivError("Another division already uses that number for this format and day."); return;
     }
     const ok = await onUpdateDivision(editingDivId, editDivNum.trim(), editDivName.trim(), editDivFormat, editDivDay);
     if (!ok) { setEditDivError("Could not save changes."); return; }
