@@ -2245,7 +2245,7 @@ export async function listAllDivisionsFlat() {
   for (const s of seasons) {
     for (const d of (s.divisions ?? [])) {
       divs.push({ id: d.id, num: d.num, name: d.name, isActive: s.is_active,
-        seasonLabel: `${s.type} ${s.year} · ${s.format} · ${s.day}` });
+        seasonLabel: `${s.type} ${s.year}` });
     }
   }
   return divs;
