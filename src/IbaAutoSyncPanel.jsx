@@ -409,17 +409,16 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           )}
 
           {data.reports.filter(r => r.status === "ok" && ["rost","div","mvp"].includes(r.reportType)).map(r => {
-            const rows = previewRows(r.reportType);
+            const rows = previewRows(r.reportType).filter(row => !row.sourceKey || row.sourceKey === r.key);
             const columns = columnsFor(r.reportType);
-            const count = r.reportType === "rost" ? (data.preview.roster?.playerCount || 0) : rows.length;
-            const empty = r.reportType === "rost"
-              ? !data.preview.roster || (data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0)
-              : rows.length === 0;
+            const parsedReport = data.preview.reports.find(item => item.key === r.key);
+            const count = Number(parsedReport?.detectedRows ?? rows.length);
+            const empty = count === 0;
             return (
               <section key={r.key} style={{marginTop:12,border:"1px solid #353535",borderRadius:9,overflow:"hidden"}}>
-                <button type="button" className="btn-sm" onClick={() => setExpandedPreview(v => ({...v,[r.reportType]:!v[r.reportType]}))} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"10px 12px",borderRadius:0}}>
+                <button type="button" className="btn-sm" onClick={() => setExpandedPreview(v => ({...v,[r.key]:!v[r.key]}))} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"10px 12px",borderRadius:0}}>
                   <span style={{textAlign:"left"}}>{r.reportType.toUpperCase()} parsed preview · {count.toLocaleString()} {r.reportType === "rost" ? "players" : "rows"}{r.reportType === "rost" ? ` across ${data.preview.roster?.teamCount || 0} teams` : ""}</span>
-                  {expandedPreview[r.reportType] ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
+                  {expandedPreview[r.key] ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
                 </button>
                 {(() => {
                   const reportMetadata = data.preview.reports.find(item => item.key === r.key);
@@ -441,7 +440,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                     </div>
                   );
                 })()}
-                {expandedPreview[r.reportType] && (
+                {expandedPreview[r.key] && (
                   <div style={{padding:10}}>
                     {empty ? (
                       <div className="import-warning-block">
