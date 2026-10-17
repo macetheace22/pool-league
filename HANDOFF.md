@@ -304,3 +304,129 @@ The season workflow now treats the IBA schedule page as the initial season-struc
 - The automatic report importer remains separate: DIV/MVP are treated as later/weekly data sources, not required for initial season setup.
 
 The schedule endpoint includes several request fallbacks because the IBA page's selection controls are dynamic. If IBA changes its form/AJAX mechanism, the endpoint may need one targeted adjustment; the manual importer remains available.
+
+
+## IBA weekly report import — current PR #38 work (2026-10-16)
+
+Branch: `feat/weekly-import-report-week-metadata`  
+PR: [#38 — Lay groundwork for IBA group discovery and report-week tracking](https://github.com/macetheace22/pool-league/pull/38) — remains draft and must not be merged yet.
+
+### Added in this implementation slice
+
+- Connected the shared report-week/duplicate validator to the actual automatic report import button.
+- Before any report write, the app reloads the selected season's divisions and checks each downloaded report against that division's saved schedule and persistent import history.
+- Missing/ambiguous week, schedule mismatch, missing schedule date, unavailable history, exact duplicate, and changed content block the whole batch. This is intentionally fail-closed while the importer still writes a multi-division roster report as one operation.
+- Uses each report type's own week and each division's scheduled date to build snapshot keys. Different divisions can use different report weeks without borrowing another division's week.
+- Adds visible per-division validation results to the automatic import panel.
+- After successful category writes, records report hash/history per affected division. Supabase history table must exist for history checks to pass; section 57 is a manual migration and has not been applied by ChatGPT.
+- Tightened roster/rating database writes to check returned errors and pre-resolve each player's division-specific week before writes. No live database was changed.
+
+### Important remaining work
+
+- Validate this commit with GitHub Actions tests/build and inspect the exact job results.
+- Review partial-write behavior across multiple report categories; Supabase client writes are not one transaction, so if one category succeeds and a later category fails, earlier writes remain. History is recorded after each successful category/division.
+- Keep using the already validated parser behavior; revisit parser debugging only if a new, reproducible zero-row failure appears.
+- Exact duplicate divisions are now skipped independently for roster/ratings, standings, and MVP where team/division routing is unambiguous. Continue testing this behavior against real report samples before merge; changed content must remain held for review.
+- Complete and validate the consolidated review/import UI for all 21 format/day combinations, fetching up to 63 PDFs, and the manual one-PDF-at-a-time upload path using the same validation/history service.
+- Review section 57 RLS role assumptions before asking the user to apply it. Do not apply the SQL automatically.
+
+
+### Validation update — 2026-10-16, latest integrated-import code
+
+- Latest integrated-import code commit: `8a16b5a21abdcc75420abdda530ef19ba3476733`.
+- GitHub Actions CI run #188 passed: tests passed and production build passed.
+- Vercel status for that code commit: success.
+- The PR remains a draft and has not been merged.
+- This validates automated tests/build only. No live IBA PDF import was run against Supabase; no migration was applied and no production data was changed.
+
+
+### Follow-up correctness hardening — 2026-10-16
+
+- Schedule dates are now normalized from either Postgres ISO dates (`YYYY-MM-DD`) or legacy/manual US dates (`M/D/YYYY`), with calendar validation. This addresses a compatibility issue where a valid Postgres date could be rejected by the earlier US-only parser.
+- The report validator now blocks if a valid SHA-256 fingerprint is missing or malformed, preventing a report from reaching writes without duplicate protection.
+- Added focused unit coverage for missing/malformed fingerprints. These changes require a new CI run before being considered validated.
+
+
+### Validation update — 2026-10-16, date/fingerprint hardening
+
+- Latest code commit: `348e5f360a976793b6069f8f76b9236be17ed529`.
+- GitHub Actions CI run #191 passed: tests and production build succeeded. Run #190 failed during build due to an invalid regex escape in an intermediate date-helper placement; the helper was moved into the pure validation module and the corrected commit passed run #191.
+- Vercel status for commit `348e5f3`: success.
+- Added unit tests for ISO and US schedule-date normalization, invalid calendar dates, and missing/malformed SHA-256 fingerprints.
+- The date helper lives in `src/ibaImportValidation.js`, keeping the logic side-effect-free and straightforward to unit test.
+- No live import was executed; no SQL migration was applied and no live database data was changed.
+
+### Current status clarification
+
+The existing automatic import panel still handles one selected season's format/day at a time. All-21-combination / up-to-63-report discovery is implemented as read-only review, and manual single-PDF upload/extraction is now implemented on PR #38. The safe consolidated mapping/import workflow and multi-category partial-write safeguards are still incomplete. Do not describe PR #38 as the complete end-to-end redesign or merge until those remaining workflows are implemented and validated.
+
+
+### Progress update — 2026-10-16, all-format discovery UI started
+
+- Added `fetchAllIbaReports()` to `src/ibaAutoSync.js`. It checks the 21 format/day groups (Masters, Advanced, Open × Monday–Sunday) in bounded groups rather than launching all requests at once.
+- Raised the API candidate cap in `api/iba-reports.js` from 12 to 63 so the endpoint can accept the full theoretical report set in a single request if needed. The current UI calls the endpoint per format/day group (three reports per call).
+- Added an **All-format report discovery** section to `src/IbaAutoSyncPanel.jsx` (shown once on the roster tile): scan progress, counts of available/missing/error reports and zero-row parses, and an expandable per-PDF review showing format/day, category, detected week, PDF metadata, and extracted text for zero-row reports.
+- This discovery action is deliberately **read-only**. It does not guess the target season, run import validation, or write to Supabase. The existing selected-season import path remains separate.
+- New commits on the existing PR #38 branch: `b67c4b0` (discovery helper), `2727cfe` (API cap), and `1138763` (discovery UI). PR remains open/draft/unmerged.
+- Vercel status for `1138763` was pending when checked. No passing build/test result is claimed for these latest changes yet.
+- At the time of this discovery commit, manual single-PDF upload, safe mapped import, partial-write safeguards, and Section 57 review remained. See the later validation/progress notes below for updates.
+
+
+### Validation update — 2026-10-16, all-format discovery UI
+
+- Discovery UI implementation commit: `1138763`; module restoration/final code commit: `9b1a01c69122d97f3e0344b3a90e0ec3349d4266`.
+- CI run #196 exposed a build error: the discovery helper had replaced rather than extended `src/ibaAutoSync.js`. The complete prior module was restored and the helper inserted without removing existing exports.
+- CI run #197 passed: all 75 tests passed and the production build succeeded.
+- Vercel status for `9b1a01c`: success.
+- This validates automated tests and build, not real PDF extraction or end-to-end import behavior. Manual one-PDF upload and the safe mapped consolidated import flow remain incomplete. The PR remains draft/open/unmerged; no SQL migration or live DB writes occurred.
+
+
+### Progress update — 2026-10-16, manual PDF upload and parser-status correction
+
+- User confirmed the earlier no-data import issue has already been resolved. Prior validated preview counts were ROST 271 players / 36 teams, DIV 33 rows, and MVP 60 rows. Parser debugging is not an outstanding task unless a new reproducible failure appears.
+- Added a manual single-PDF upload path to the report-category panel. It collects format/day/category, sends the PDF to the existing server endpoint for PDF validation, text extraction, and SHA-256 fingerprinting, and displays the normal parsed preview. The upload/extraction step is read-only; the subsequent import still runs the selected season's existing fail-closed validation/history checks.
+- Server endpoint now supports the manual upload action, validates the selected format/day/report category and PDF signature, and rejects empty/oversized payloads. Manual format/day labels are normalized to IBA API codes.
+- New commits after the prior discovery validation: `6b6fd69` (server-side manual PDF extraction), `20c765a` (manual upload/preview UI), `ff3e82e` (normalize format/day codes). Handoff correction commit: `3ad593e`.
+- CI run #202 passed on latest PR head `3ad593e`: GitHub Actions CI succeeded. Vercel status for that head is success. This validates automated tests/build for the manual upload path, not an actual user-uploaded PDF or live import.
+- Remaining before merge: complete the consolidated review flow that explicitly maps discovered/manual reports to the correct season/division; address multi-category partial-write behavior; review Section 57 SQL/RLS assumptions and document how/when the user should apply it manually. PR #38 remains draft/open/unmerged. No SQL migration applied and no live database writes performed by this work.
+
+
+### Latest validation — 2026-10-16
+
+- PR #38 head: `3ad593ee0637c22328998938fc8d2caafca9ee41`.
+- GitHub Actions CI run #202: success. Vercel status: success.
+- PR remains draft/open/unmerged. No Supabase migration was applied and no live database writes were performed.
+- Do not treat the earlier no-data parsing issue as outstanding; user confirmed it is resolved and previous preview counts were ROST 271 players / 36 teams, DIV 33 rows, MVP 60 rows.
+- Manual single-PDF upload/extraction and preview are implemented. Remaining major work is the safe consolidated mapping/review/import flow and multi-category partial-write handling, plus review of Section 57 RLS/migration assumptions.
+
+
+### Progress update — 2026-10-16, mapped consolidated review/import
+
+- Added a review/import panel to the all-format discovery results. It groups reports by format/day and requires an explicit target season whose format/day match the report group.
+- Import now requires a separate explicit target division and processes one report category for one division at a time. Preflight is scoped to the selected division; standings/MVP import loops now skip divisions that are not included in the validated preflight. This reduces the risk of unrelated divisions or categories being partially written together.
+- Zero-row reports are not eligible for validation/import. Missing/error reports are shown and cannot be imported. Report-week, schedule-date, duplicate-history, and fingerprint checks remain in the existing fail-closed preflight.
+- Results now show per-category counts and warnings. Error messaging tells the operator to verify the selected division before retrying, since the writes inside a single category/division are still not wrapped in a database transaction.
+- Manual PDF imports now record source `manual` in history instead of being mislabeled `automatic`. Corrected manual-PDF extracted-text newline normalization.
+- CI run #209 passed on code commit `6d752ca048f01129a9684696b79ff7ed7a9a32db`: tests and production build succeeded. Vercel status for that commit: success. The later handoff-only commit will need its own checks.
+
+### Section 57 read-only compatibility review — 2026-10-16
+
+- Read-only inspection of the active Supabase project `iba-pool-league` confirmed `public.current_role_name()` exists, returns text, and returns the active profile's role. The `profiles_role_check` constraint allows `manager`, `captain`, and `player`, so the migration's manager-only policies use an existing role and function.
+- Confirmed the referenced `seasons.id`, `divisions.id`, `divisions.season_id`, and `profiles.id` columns are UUIDs, matching the proposed Section 57 foreign-key types.
+- Confirmed `public.iba_report_import_history` does not exist yet and has no policies. No SQL was applied and no database rows were changed.
+- Migration is still pending manual review/application. Its SELECT/INSERT policies are manager-only; insert relies on `imported_by` defaulting to `auth.uid()`, which matches the app's history insert payload (the app does not supply `imported_by`).
+
+### Latest state — PR #38
+
+- Latest code implementation validated at `6d752ca048f01129a9684696b79ff7ed7a9a32db`, CI run #209 success, Vercel success.
+- The consolidated flow is implemented but still needs user-side end-to-end validation with real reports before merge. Do not merge yet.
+- Remaining: inspect and harden intra-category partial-write outcomes (the app cannot currently make multiple Supabase client writes transactional); run end-to-end report-group tests against real data once the user validates in the UI; keep Section 57 unapplied until the user manually approves it.
+
+
+### Latest import-safety validation — 2026-10-16
+
+- Latest code commit: `9fe3522947df4fdee48b94d1becd1dd048525fc0`.
+- CI run #211 passed: tests and production build succeeded. Vercel status for this commit: success.
+- On mapped-import failure, the UI now explicitly warns that some writes may already have succeeded and directs the operator to verify the selected division's data and import history before retrying.
+- The mapped review flow still processes one report category for one selected division at a time. This reduces cross-category/division partial-write risk, but does not make the multiple database writes within a category/division transactional.
+- PR #38 remains draft/open/unmerged. No SQL migration applied and no live DB writes were performed by ChatGPT.

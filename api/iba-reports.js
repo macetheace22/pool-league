@@ -5,7 +5,7 @@ const BASE = "https://ibapool.com/Content/Pdfs";
 const LEAGUE_TYPES = ["mast", "adv", "open"];
 const DAYS = ["mon", "tues", "wed", "thur", "fri", "sat", "sun"];
 const REPORT_TYPES = ["rost", "div", "mvp"];
-const MAX_BATCH = 12;
+const MAX_BATCH = 63;
 const TIMEOUT_MS = 15000;
 
 function expectedReports(leagueType, day) {
@@ -70,6 +70,42 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "POST required" });
   }
+
+  // Manual single-PDF upload uses the same server-side PDF extraction and SHA-256
+  // fingerprint as automatic retrieval, so both paths produce the same report shape.
+  if (req.body?.action === "manual-upload") {
+    const { leagueType, day, reportType } = req.body;
+    if (!LEAGUE_TYPES.includes(String(leagueType || "").toLowerCase()) ||
+        !DAYS.includes(String(day || "").toLowerCase()) ||
+        !REPORT_TYPES.includes(String(reportType || "").toLowerCase())) {
+      return res.status(400).json({ error: "Choose a valid format, day, and report category." });
+    }
+    const encoded = String(req.body?.pdfBase64 || "");
+    if (!encoded || encoded.length > 4_000_000) {
+      return res.status(413).json({ error: "PDF is empty or too large. Choose a PDF smaller than about 3 MB." });
+    }
+    const buffer = Buffer.from(encoded, "base64");
+    if (!buffer.length || buffer.subarray(0, 4).toString() !== "%PDF") {
+      return res.status(400).json({ error: "The selected file is not a valid PDF." });
+    }
+    const digest = crypto.createHash("sha256").update(buffer).digest("hex");
+    try {
+      const parsed = await pdfParse(buffer);
+      const text = String(parsed.text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      const report = {
+        leagueType, day, reportType,
+        key: `${leagueType}${day}${reportType}`,
+        status: text.trim() ? "ok" : "empty",
+        httpStatus: 200, bytes: buffer.length, sha256: digest,
+        pages: parsed.numpages || null, text,
+        source: "manual",
+      };
+      return res.status(200).json({ generatedAt: new Date().toISOString(), reports: [report] });
+    } catch (error) {
+      return res.status(400).json({ error: `Could not read the PDF: ${error?.message || "PDF extraction failed"}` });
+    }
+  }
+
   const reports = normalizeCandidates(req.body || {});
   if (!reports.length) return res.status(400).json({ error: "Provide a valid leagueType/day or report list" });
 
