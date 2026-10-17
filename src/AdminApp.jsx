@@ -1571,7 +1571,7 @@ function TeamLookupPage() {
 function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, onView, readOnly }) {
   const [open, setOpen] = useState(false);
   const isActive = !!viewingSeason?.is_active;
-  const divName = viewingDiv ? `Div ${viewingDiv.num}${viewingDiv.name ? " · " + viewingDiv.name : ""}` : "No division";
+  const divName = viewingDiv ? `Div ${viewingDiv.num}${viewingDiv.name ? " · " + viewingDiv.name : ""} · ${viewingDiv.format || "Masters"} · ${viewingDiv.day || "Wednesday"}` : "No division";
 
   return (
     <div className="season-banner">
@@ -1604,7 +1604,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
                   return (
                     <button key={d.id} className={`season-picker__btn season-picker__btn--div ${isThis?"season-picker__btn--active":""}`}
                       onClick={() => { onView(s, d); setOpen(false); }}>
-                      Div {d.num}{d.name ? ` · ${d.name}` : ""}
+                      Div {d.num}{d.name ? ` · ${d.name}` : ""} · {d.format || "Masters"} · {d.day || "Wednesday"}
                     </button>
                   );
                 })}
