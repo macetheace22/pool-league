@@ -23,10 +23,8 @@ import IbaScheduleImportPanel from "./IbaScheduleImportPanel";
 import { SetEntry, css as liveEntryCss } from "./LiveEntryApp";
 
 // ─── Season helpers ───────────────────────────────────────────────────────────
-const SEASON_TYPES   = ["Summer", "Winter", "Spring"];
-const SEASON_FORMATS = ["Masters", "Advanced", "Open"];
-const SEASON_DAYS    = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const CURRENT_YEAR   = new Date().getFullYear();
+const SEASON_TYPES   = ["Spring", "Summer", "Fall", "Winter"];
+ const CURRENT_YEAR   = new Date().getFullYear();
 const YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
 // Retained from Old version for zero-loss preservation; used by legacy/team import forms.
@@ -37,7 +35,7 @@ const US_STATE_CODES = [
   "WV","WI","WY",
 ];
 
-function seasonLabel(s) { return `${s.type} · ${s.year} · ${s.format} · ${s.day}`; }
+function seasonLabel(s) { return `${s.type} · ${s.year}`; }
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 const ROLES = {
@@ -1628,9 +1626,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const navigate = useNavigate();
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
-  const [format, setFormat] = useState("Masters");
-  const [day, setDay]       = useState("Wednesday");
-  const [error, setError]   = useState("");
+   const [error, setError]   = useState("");
   const [saved, setSaved]   = useState(false);
   const [divNum, setDivNum] = useState("");
   const [divName, setDivName] = useState("");
@@ -1646,9 +1642,9 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   useEffect(() => { setError(""); }, [subTab]);
 
   const createSeason = async () => {
-    const exists = seasons.find(x => x.type===type && x.year===parseInt(year) && x.format===format && x.day===day);
+    const exists = seasons.find(x => x.type === type && Number(x.year) === Number(year));
     if (exists) { setError("That season already exists."); return; }
-    const created = await onCreateSeason({ type, year: parseInt(year), format, day });
+    const created = await onCreateSeason({ type, year: parseInt(year) });
     if (!created) { setError("Could not create season."); return; }
     setError(""); setSaved(true); setTimeout(() => setSaved(false), 1800);
     onSeasonCreated?.(created);
@@ -1657,7 +1653,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
 
   const deleteSeason = async (s) => {
     if (s.is_active) { setError("Deactivate this season before deleting it."); return; }
-    const label = `${s.type} ${s.year} ${s.format} (${s.day})`;
+    const label = `${s.type} ${s.year}`;
     if (!window.confirm(`Delete ${label} and its season-specific data? This cannot be undone.`)) return;
     setError("");
     const deleted = await onDeleteSeason(s.id);
@@ -1712,18 +1708,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
               {YEARS.map(y => <button key={y} className={`seg-btn ${year===y?"seg-btn--active":""}`} onClick={()=>setYear(y)}>{y}</button>)}
             </div>
           </div>
-          <div className="field"><Label>Format</Label>
-            <div className="seg-control">
-              {SEASON_FORMATS.map(f => <button key={f} className={`seg-btn ${format===f?"seg-btn--active":""}`} onClick={()=>setFormat(f)}>{f}</button>)}
-            </div>
-          </div>
-          <div className="field"><Label>Day</Label>
-            <div className="seg-control" style={{flexWrap:"wrap"}}>
-              {SEASON_DAYS.map(d => <button key={d} className={`seg-btn ${day===d?"seg-btn--active":""}`} onClick={()=>setDay(d)}>{d.slice(0,3)}</button>)}
-            </div>
-          </div>
           <div className="season-preview">
-            <Star size={11} color="#F59E0B" /> {type} · {year} · {format} · {day}
+            <Star size={11} color="#F59E0B" /> {type} · {year}
           </div>
           <button className="btn-primary" onClick={createSeason}>
             {saved ? <><Check size={13}/> Created!</> : "Create Season"}
