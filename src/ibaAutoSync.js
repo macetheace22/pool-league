@@ -38,6 +38,9 @@ export function ibaCodesForSeason(season) {
     .filter(context => context.leagueType && context.day)
     .map(context => [`${context.leagueType}:${context.day}`, context])).values()];
   if (contexts.length) return { ...contexts[0], contexts };
+  if (Array.isArray(season?.divisions) && season.divisions.length === 0) {
+    return { leagueType: null, day: null, contexts: [] };
+  }
   const legacy = contextCodes(season);
   return { ...legacy, contexts: legacy.leagueType && legacy.day ? [{ ...legacy, format: season?.format, dayName: season?.day }] : [] };
 }
