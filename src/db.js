@@ -439,8 +439,10 @@ export async function getIbaScheduleImportStatus(seasonId) {
 
   const { data: divisions, error: divisionError } = await supabase
     .from("divisions")
-    .select("id, num, name")
+    .select("id, num, name, format, day")
     .eq("season_id", seasonId)
+    .order("format")
+    .order("day")
     .order("num");
 
   if (divisionError) return { divisions: [], totals: { divisions: 0, teams: 0, weeks: 0, pairings: 0 }, error: divisionError.message };
@@ -478,6 +480,8 @@ export async function getIbaScheduleImportStatus(seasonId) {
       id: d.id,
       num: d.num,
       name: d.name,
+      format: d.format,
+      day: d.day,
       teamCount: teamCounts[d.id] ?? 0,
       weekCount: weekCounts[d.id] ?? 0,
       pairingCount: pairingCounts[d.id] ?? 0,
