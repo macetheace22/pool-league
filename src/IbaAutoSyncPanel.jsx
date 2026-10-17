@@ -238,15 +238,15 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   return (
     <div className="card" style={{marginBottom:12}}>
       <div className="card__title" style={{display:"flex",alignItems:"center",gap:7}}>
-        <Download size={14}/> {reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
+        <Download size={14}/> {manualMode ? `Manual PDF Import · ${reportLabels[reportType] || reportType}` : reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
       </div>
       <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>
-        Checks IBA reports for every format/day represented by this season's imported divisions{reportType ? ` for ${selectedReportLabel}` : " across roster/ratings, team standings, and MVP standings"}. Each report is validated against the matching division schedule before import. A report may be missing when that league is not playing.
+        {manualMode ? "Upload a PDF for the selected report type. Choose only a format/day represented by this season; the report week and schedule are validated before import." : <>Checks IBA reports for every format/day represented by this season's imported divisions{reportType ? ` for ${selectedReportLabel}` : " across roster/ratings, team standings, and MVP standings"}. Each report is validated against the matching division schedule before import. A report may be missing when that league is not playing.</>}
       </div>
       {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
         <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
       </div>}
-      {reportType === "rost" && (
+      {reportType === "rost" && !manualMode && (
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>All-format report discovery</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
@@ -379,23 +379,23 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           )}
         </section>
       )}
-      {reportType && (
+      {reportType && manualMode && (
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
-          <div style={{ fontSize: 12, fontWeight: 700 }}>Manual single-PDF upload</div>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>Upload PDF</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
             Upload a PDF for this report category to extract and preview it. This step does not write to the database. Import still uses the selected season and its validation checks. The consolidated review flow imports one report category at a time.
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
             <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
               Format
-              <select className="input" value={manualFormat} onChange={e => setManualFormat(e.target.value)} style={{ minWidth: 140, width: "100%" }}>
-                <option value="masters">Masters</option><option value="advanced">Advanced</option><option value="open">Open</option>
+              <select className="input" value={manualFormat} onChange={e => { setManualFormat(e.target.value); setManualError(""); }} style={{ minWidth: 140, width: "100%" }}>
+                {manualFormatOptions.map(format => <option key={format} value={format}>{({ masters: "Masters", advanced: "Advanced", open: "Open" })[format] || format}</option>)}
               </select>
             </label>
             <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
               Day
-              <select className="input" value={manualDay} onChange={e => setManualDay(e.target.value)} style={{ minWidth: 140, width: "100%" }}>
-                <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option><option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option><option value="sunday">Sunday</option>
+              <select className="input" value={manualDay} onChange={e => { setManualDay(e.target.value); setManualError(""); }} style={{ minWidth: 140, width: "100%" }}>
+                {manualDayOptions.map(day => <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>)}
               </select>
             </label>
           </div>
@@ -408,7 +408,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         </section>
       )}
       {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Import the IBA schedule for this season first so its divisions have format/day context.</div></div>}
-      {supported && !data && (
+      {!manualMode && supported && !data && (
         <button className="btn-primary" onClick={fetchReports} disabled={loading} style={{marginTop:8}}>
           {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : reportType ? `Fetch & Preview ${reportLabels[reportType] || "IBA Report"}` : "Fetch & Preview IBA Reports"}
         </button>
@@ -521,7 +521,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           {!result ? (
             <div style={{display:"flex",gap:6,marginTop:10}}>
               <button className="btn-primary" onClick={importReports} disabled={importing || (preflight && !preflight.canImport) || hasEmptyParsedReport}>
-                {importing ? "Importing…" : "Import Retrieved Reports"}
+                {importing ? "Importing…" : manualMode ? "Import Manual PDF" : "Import Retrieved Reports"}
               </button>
               <button className="btn-sm" onClick={fetchReports} disabled={loading}>Refresh</button>
             </div>
