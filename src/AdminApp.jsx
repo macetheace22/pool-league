@@ -24,6 +24,8 @@ import { SetEntry, css as liveEntryCss } from "./LiveEntryApp";
 
 // ─── Season helpers ───────────────────────────────────────────────────────────
 const SEASON_TYPES   = ["Spring", "Summer", "Fall", "Winter"];
+const IBA_FORMATS = ["Masters", "Advanced", "Open"];
+const IBA_DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
  const CURRENT_YEAR   = new Date().getFullYear();
 const YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
@@ -357,12 +359,12 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
       if (fresh) handleSeasonView(fresh, fresh.divisions?.[0] ?? null);
     }
   };
-  const handleAddDivision = async (season, num, name) => {
-    await db.addDivision(season.id, num, name);
+  const handleAddDivision = async (season, num, name, format, day) => {
+    await db.addDivision(season.id, num, name, format, day);
     await refreshSeasons();
   };
-  const handleUpdateDivision = async (divisionId, num, name) => {
-    const ok = await db.updateDivision(divisionId, num, name);
+  const handleUpdateDivision = async (divisionId, num, name, format, day) => {
+    const ok = await db.updateDivision(divisionId, num, name, format, day);
     await refreshSeasons();
     return ok;
   };
@@ -1630,10 +1632,14 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const [saved, setSaved]   = useState(false);
   const [divNum, setDivNum] = useState("");
   const [divName, setDivName] = useState("");
+  const [newDivisionFormat, setNewDivisionFormat] = useState("Masters");
+  const [newDivisionDay, setNewDivisionDay] = useState("Wednesday");
   const [expandedSeason, setExpandedSeason] = useState(null);
   const [editingDivId, setEditingDivId] = useState(null);
   const [editDivNum, setEditDivNum] = useState("");
   const [editDivName, setEditDivName] = useState("");
+  const [editDivFormat, setEditDivFormat] = useState("Masters");
+  const [editDivDay, setEditDivDay] = useState("Wednesday");
   const [editDivError, setEditDivError] = useState("");
 
   // Clear any leftover error banner when switching sub-tabs, so an error
@@ -1668,12 +1674,12 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
     if (!divNum.trim()) return;
     const divs = s.divisions ?? [];
     if (divs.find(d => d.num === divNum.trim())) { setError("Division already exists."); return; }
-    await onAddDivision(s, divNum.trim(), divName.trim());
+    await onAddDivision(s, divNum.trim(), divName.trim(), newDivisionFormat, newDivisionDay);
     setDivNum(""); setDivName(""); setError("");
   };
 
   const startEditDivision = (d) => {
-    setEditingDivId(d.id); setEditDivNum(d.num ?? ""); setEditDivName(d.name ?? ""); setEditDivError("");
+    setEditingDivId(d.id); setEditDivNum(d.num ?? ""); setEditDivName(d.name ?? ""); setEditDivFormat(d.format || "Masters"); setEditDivDay(d.day || "Wednesday"); setEditDivError("");
   };
   const cancelEditDivision = () => {
     setEditingDivId(null); setEditDivError("");
@@ -1684,7 +1690,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
     if (divs.find(d => d.id !== editingDivId && d.num === editDivNum.trim())) {
       setEditDivError("Another division already uses that number."); return;
     }
-    const ok = await onUpdateDivision(editingDivId, editDivNum.trim(), editDivName.trim());
+    const ok = await onUpdateDivision(editingDivId, editDivNum.trim(), editDivName.trim(), editDivFormat, editDivDay);
     if (!ok) { setEditDivError("Could not save changes."); return; }
     setEditingDivId(null); setEditDivError("");
   };
@@ -1752,6 +1758,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                                 onChange={e=>setEditDivNum(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") saveEditDivision(s); }} />
                               <input className="edit-input" style={{flex:1}} placeholder="Name (e.g. North)" value={editDivName}
                                 onChange={e=>setEditDivName(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") saveEditDivision(s); }} />
+                              <select className="input" value={editDivFormat} onChange={e=>setEditDivFormat(e.target.value)} aria-label="Division IBA format" style={{minWidth:120}}>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
+                              <select className="input" value={editDivDay} onChange={e=>setEditDivDay(e.target.value)} aria-label="Division IBA day" style={{minWidth:120}}>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
                               <button className="btn-icon btn-icon--confirm" onClick={()=>saveEditDivision(s)}><Check size={13}/></button>
                               <button className="btn-icon btn-icon--cancel" onClick={cancelEditDivision}><X size={13}/></button>
                             </div>
@@ -1759,15 +1767,18 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                             <div key={d.id} className="div-row">
                               <span className="div-row__num">Div {d.num}</span>
                               <span className="div-row__name">{d.name || "—"}</span>
+                              <span className="div-row__name" style={{fontSize:10,color:"#8A8A8A"}}>{d.format || "Masters"} · {d.day || "Wednesday"}</span>
                               <button className="btn-icon" onClick={()=>startEditDivision(d)}><Edit2 size={11}/></button>
                               <button className="btn-icon btn-icon--danger" onClick={()=>onRemoveDivision(d.id)}><Trash2 size={11}/></button>
                             </div>
                           )
                         ))}
                         {editDivError && <ErrorMsg>{editDivError}</ErrorMsg>}
-                        <div className="div-add-row">
+                        <div className="div-add-row" style={{flexWrap:"wrap"}}>
                           <input className="edit-input" style={{width:70,flex:"none"}} placeholder="Div #" value={divNum} onChange={e=>setDivNum(e.target.value)}/>
-                          <input className="edit-input" style={{flex:1}} placeholder="Name (e.g. North)" value={divName} onChange={e=>setDivName(e.target.value)}/>
+                          <input className="edit-input" style={{flex:1,minWidth:120}} placeholder="Name (e.g. North)" value={divName} onChange={e=>setDivName(e.target.value)}/>
+                          <select className="input" value={newDivisionFormat} onChange={e=>setNewDivisionFormat(e.target.value)} aria-label="New division IBA format" style={{minWidth:120}}>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
+                          <select className="input" value={newDivisionDay} onChange={e=>setNewDivisionDay(e.target.value)} aria-label="New division IBA day" style={{minWidth:120}}>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
                           <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim()}><Plus size={13}/></button>
                         </div>
                         <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
