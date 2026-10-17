@@ -774,7 +774,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           {!viewingDiv
             ? <div className="empty-state">Pick a division above to see standings & match history.</div>
             : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingSeason?.playoffs_start_date} myProfile={profile}
-                seasonFormat={(viewingSeason?.format || "masters").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
+                seasonFormat={(viewingDiv?.format || viewingSeason?.format || "masters").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
           }
         </div>
       </>
@@ -869,7 +869,7 @@ function FilterChips({ options, value, onChange }) {
 }
 
 function seasonLabelFor(row) {
-  return `${row.seasonType} · ${row.seasonFormat} · ${row.seasonDay}`;
+  return `${row.seasonType}`;
 }
 
 // ─── Player Stats Profile (shared) ─────────────────────────────────────────
@@ -1817,7 +1817,7 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
     matchId: `match-w${currentWeek.week}-${match.pairing.home}v${match.pairing.away}-${Date.now()}`,
     schedulePairingId: match.pairing.id ?? null,
     seasonId: activeSeason?.id ?? null,
-    format: activeSeason?.format?.toLowerCase() ?? "masters",
+    format: (viewingDiv?.format || activeSeason?.format || "Masters").toLowerCase(),
     venue: match.homeTeam.venue || "",
     seasonLabel: activeSeason ? seasonLabel(activeSeason) : null,
     divisionId: viewingDiv?.id ?? null,
@@ -3278,7 +3278,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
                   <div style={{minWidth:0}}>
                     <div style={{fontWeight:700,fontSize:12,color:"#E0E0E0"}}>{team?.name ?? "Team"}</div>
                     <div style={{fontSize:10.5,color:"#8A8A8A",marginTop:3}}>
-                      {division?.name ? `${division.name} · ` : ""}{season ? `${season.format} · ${season.day} · ${season.year}` : "Season unavailable"}
+                      {division?.name ? `${division.name} · ` : ""}{season ? `${division?.format || season.format} · ${division?.day || season.day} · ${season.year}` : "Season unavailable"}
                     </div>
                   </div>
                   {profile.role === "manager" && (
