@@ -26,7 +26,7 @@ import { SetEntry, css as liveEntryCss } from "./LiveEntryApp";
 const SEASON_TYPES   = ["Spring", "Summer", "Fall", "Winter"];
 const IBA_FORMATS = ["Masters", "Advanced", "Open"];
 const IBA_DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
- const CURRENT_YEAR   = new Date().getFullYear();
+const CURRENT_YEAR   = new Date().getFullYear();
 const YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
 // Retained from Old version for zero-loss preservation; used by legacy/team import forms.
@@ -1753,7 +1753,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                       <div className="season-card__body">
                         {divs.map((d) => (
                           editingDivId === d.id ? (
-                            <div key={d.id} className="div-row div-row--edit">
+                            <div key={d.id} className="div-row div-row--edit" style={{flexWrap:"wrap"}}>
                               <input className="edit-input" style={{width:70,flex:"none"}} placeholder="Div #" value={editDivNum}
                                 onChange={e=>setEditDivNum(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") saveEditDivision(s); }} />
                               <input className="edit-input" style={{flex:1}} placeholder="Name (e.g. North)" value={editDivName}
