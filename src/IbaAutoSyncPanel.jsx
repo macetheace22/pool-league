@@ -469,19 +469,11 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
             </div>
           )}
 
-          {(data.reports ?? []).filter(r => r.status === "ok" && (
-            (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
-            (r.reportType === "div" && data.preview.standings?.rows.length === 0) ||
-            (r.reportType === "mvp" && data.preview.mvp?.rows.length === 0)
-          )).length > 0 && !result && (
+          {hasEmptyParsedReport && !result && (
             <div style={{marginTop:10,border:"1px solid #3A3A3A",borderRadius:8,padding:10}}>
               <div style={{fontSize:12,fontWeight:700,marginBottom:5}}>Report parsing diagnostics</div>
               <div style={{fontSize:11,color:"#AAA",marginBottom:8}}>This is the actual text extracted from the downloaded PDF. Expand a report to inspect it; you can select the text and copy it into the chat. No data has been imported.</div>
-              {data.reports.filter(r => r.status === "ok" && (
-                (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
-                (r.reportType === "div" && data.preview.standings?.rows.length === 0) ||
-                (r.reportType === "mvp" && data.preview.mvp?.rows.length === 0)
-              )).map(r => (
+              {(data.reports ?? []).filter(r => r.status === "ok" && (data.preview.reports || []).some(item => item.key === r.key && Number(item.detectedRows ?? 0) === 0)).map(r => (
                 <details key={r.key} style={{marginTop:8}}>
                   <summary style={{cursor:"pointer",fontSize:11,color:"#E0E0E0"}}>{r.reportType.toUpperCase()} · {String(r.text || "").length.toLocaleString()} characters · {String(r.text || "").split("\n").length.toLocaleString()} lines</summary>
                   <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",maxHeight:360,overflowY:"auto",fontSize:10.5,lineHeight:1.45,background:"#111",padding:8,borderRadius:6,color:"#D0D0D0"}}>{String(r.text || "").slice(0,5000) || "[No extracted text returned]"}</pre>
@@ -509,11 +501,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
 
           {!result ? (
             <div style={{display:"flex",gap:6,marginTop:10}}>
-              <button className="btn-primary" onClick={importReports} disabled={importing || (preflight && !preflight.canImport) || (data.reports ?? []).some(r => r.status === "ok" && (
-                (r.reportType === "rost" && data.preview.roster && data.preview.roster.teamCount === 0 && data.preview.roster.playerCount === 0) ||
-                (r.reportType === "div" && data.preview.standings?.rows.length === 0) ||
-                (r.reportType === "mvp" && data.preview.mvp?.rows.length === 0)
-              ))}>
+              <button className="btn-primary" onClick={importReports} disabled={importing || (preflight && !preflight.canImport) || hasEmptyParsedReport}>
                 {importing ? "Importing…" : "Import Retrieved Reports"}
               </button>
               <button className="btn-sm" onClick={fetchReports} disabled={loading}>Refresh</button>
