@@ -48,7 +48,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     String(division?.day || "").toLowerCase() === ({ mon: "monday", tues: "tuesday", wed: "wednesday", thur: "thursday", fri: "friday", sat: "saturday", sun: "sunday" })[group?.day];
   const divisionsForGroup = (group, target) => (target?.divisions || []).filter(division => group && groupMatchesDivision(group, division));
   const reviewGroup = reviewGroups.find(group => group.key === reviewGroupKey) || null;
-  const reviewSeasonOptions = discoverySeasons.filter(target => reviewGroup && divisionsForGroup(reviewGroup, target).length > 0);
+  const reviewSeasonOptions = discoverySeasons.filter(target => target.is_active && reviewGroup && divisionsForGroup(reviewGroup, target).length > 0);
   const reviewSeason = reviewSeasonOptions.find(target => String(target.id) === String(reviewSeasonId)) || null;
   const reviewDivisions = reviewSeason ? divisionsForGroup(reviewGroup, reviewSeason) : [];
   const reviewDivision = reviewDivisions.find(item => String(item.id) === String(reviewDivisionId)) || null;
@@ -69,7 +69,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     if (!reviewGroups.length) return;
     const group = reviewGroups.find(item => item.key === reviewGroupKey) || reviewGroups[0];
     if (group.key !== reviewGroupKey) setReviewGroupKey(group.key);
-    const matches = discoverySeasons.filter(target => divisionsForGroup(group, target).length > 0);
+    const matches = discoverySeasons.filter(target => target.is_active && divisionsForGroup(group, target).length > 0);
     if (!matches.some(target => String(target.id) === String(reviewSeasonId))) {
       setReviewSeasonId(matches.length === 1 ? String(matches[0].id) : "");
     }
@@ -388,7 +388,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           {manualError && <div className="error-msg" style={{ marginTop: 8 }}>{manualError}</div>}
         </section>
       )}
-      {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Select a season with a supported format and day.</div></div>}
+      {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Import the IBA schedule for this season first so its divisions have format/day context.</div></div>}
       {supported && !data && (
         <button className="btn-primary" onClick={fetchReports} disabled={loading} style={{marginTop:8}}>
           {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : reportType ? `Fetch & Preview ${reportLabels[reportType] || "IBA Report"}` : "Fetch & Preview IBA Reports"}
