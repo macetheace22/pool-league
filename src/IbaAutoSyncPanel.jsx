@@ -43,13 +43,14 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     `${report.leagueType}:${report.day}`,
     { key: `${report.leagueType}:${report.day}`, leagueType: report.leagueType, day: report.day, formatLabel: report.formatLabel, dayLabel: report.dayLabel }
   ])).values()];
-  const groupMatchesSeason = (group, target) =>
-    String(target?.format || "").toLowerCase() === ({ mast: "masters", adv: "advanced", open: "open" })[group?.leagueType] &&
-    String(target?.day || "").toLowerCase() === ({ mon: "monday", tues: "tuesday", wed: "wednesday", thur: "thursday", fri: "friday", sat: "saturday", sun: "sunday" })[group?.day];
+  const groupMatchesDivision = (group, division) =>
+    String(division?.format || "").toLowerCase() === ({ mast: "masters", adv: "advanced", open: "open" })[group?.leagueType] &&
+    String(division?.day || "").toLowerCase() === ({ mon: "monday", tues: "tuesday", wed: "wednesday", thur: "thursday", fri: "friday", sat: "saturday", sun: "sunday" })[group?.day];
+  const divisionsForGroup = (group, target) => (target?.divisions || []).filter(division => group && groupMatchesDivision(group, division));
   const reviewGroup = reviewGroups.find(group => group.key === reviewGroupKey) || null;
-  const reviewSeasonOptions = discoverySeasons.filter(target => reviewGroup && groupMatchesSeason(reviewGroup, target) && (target.divisions || []).length > 0);
+  const reviewSeasonOptions = discoverySeasons.filter(target => reviewGroup && divisionsForGroup(reviewGroup, target).length > 0);
   const reviewSeason = reviewSeasonOptions.find(target => String(target.id) === String(reviewSeasonId)) || null;
-  const reviewDivisions = reviewSeason?.divisions || [];
+  const reviewDivisions = reviewSeason ? divisionsForGroup(reviewGroup, reviewSeason) : [];
   const reviewDivision = reviewDivisions.find(item => String(item.id) === String(reviewDivisionId)) || null;
   useEffect(() => {
     if (!reviewSeason) {
@@ -68,7 +69,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     if (!reviewGroups.length) return;
     const group = reviewGroups.find(item => item.key === reviewGroupKey) || reviewGroups[0];
     if (group.key !== reviewGroupKey) setReviewGroupKey(group.key);
-    const matches = discoverySeasons.filter(target => groupMatchesSeason(group, target) && (target.divisions || []).length > 0);
+    const matches = discoverySeasons.filter(target => divisionsForGroup(group, target).length > 0);
     if (!matches.some(target => String(target.id) === String(reviewSeasonId))) {
       setReviewSeasonId(matches.length === 1 ? String(matches[0].id) : "");
     }
@@ -255,7 +256,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                     Target season
                     <select className="input" value={reviewSeasonId} onChange={e => { setReviewSeasonId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
                       <option value="">Select matching season…</option>
-                      {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {target.format} · {target.day} · {target.divisions?.length || 0} divisions</option>)}
+                      {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {divisionsForGroup(reviewGroup, target).length} matching divisions</option>)}
                     </select>
                   </label>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
