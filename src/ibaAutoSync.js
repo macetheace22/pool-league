@@ -314,17 +314,25 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     return [];
   }))];
   const routing = await db.listActiveTeamsByNumbers(teamNums);
+  const routingForReport = report => Object.fromEntries(Object.entries(routing.byNum || {}).map(([teamNum, matches]) => [
+    teamNum,
+    matches.filter(team => {
+      const codes = contextCodes(team);
+      return codes.leagueType === report.leagueType && codes.day === report.day;
+    }),
+  ]));
 
   for (const report of successfulReports.filter(item => item.reportType === "rost")) {
     const parsed = parseLeagueRoster(report.text);
     const checks = preflight.checks.filter(check => check.reportKey === report.key && check.reportType === "rost");
     const readyDivisionIds = new Set(checks.filter(check => check.status === "ready").map(check => check.divisionId));
+    const reportRouting = routingForReport(report);
     const eligibleTeamNums = new Set(Object.keys(parsed.rosters || {}).filter(teamNum => {
-      const matches = routing.byNum[teamNum] || [];
+      const matches = reportRouting[teamNum] || [];
       return matches.length === 1 && readyDivisionIds.has(matches[0].divisionId);
     }));
     const ambiguousTeamNums = Object.keys(parsed.rosters || {}).filter(teamNum => {
-      const matches = routing.byNum[teamNum] || [];
+      const matches = reportRouting[teamNum] || [];
       return matches.length > 1 && matches.some(team => readyDivisionIds.has(team.divisionId));
     });
     if (ambiguousTeamNums.length) result.warnings.push(`${report.key}: ${ambiguousTeamNums.length} roster team numbers matched multiple active divisions and were skipped.`);
@@ -340,6 +348,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     if (!eligibleTeamNums.size) continue;
     const imported = await db.bulkImportPlayers(filteredParsed, {
       byReportDivision: preflight.weekTagsByReportDivision,
+      allowedDivisionIds: [...readyDivisionIds],
       fallback: fallbackWeekTag,
     });
     result.roster.updatedDivisions.push(...(imported?.updatedDivisions || []));
@@ -351,7 +360,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
   }
 
   for (const report of successfulReports.filter(item => item.reportType === "div")) {
-    const grouped = groupByDivision(parseStandingsImport(report.text), routing.byNum);
+    const grouped = groupByDivision(parseStandingsImport(report.text), routingForReport(report));
     result.standings.skipped.push(...grouped.skipped);
     const importedDivisionIds = [];
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
@@ -369,7 +378,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
   }
 
   for (const report of successfulReports.filter(item => item.reportType === "mvp")) {
-    const grouped = groupByDivision(parseMvpImport(report.text), routing.byNum);
+    const grouped = groupByDivision(parseMvpImport(report.text), routingForReport(report));
     result.mvp.skipped.push(...grouped.skipped);
     const importedDivisionIds = [];
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
