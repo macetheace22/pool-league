@@ -1744,7 +1744,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 const divs         = s.divisions ?? [];
                 return (
                   <div key={s.id} className={`season-card ${isAct?"season-card--active":""}`}>
-                    <div className="season-card__header" onClick={()=>setExpandedSeason(isExpanded?null:s.id)}>
+                    <div className="season-card__header" onClick={()=>{setExpandedSeason(isExpanded?null:s.id);if(!isExpanded){setNewDivisionFormat(s.format || "Masters");setNewDivisionDay(s.day || "Wednesday");}}}>
                       <div>
                         <div className="season-card__name">{seasonLabel(s)}</div>
                         <div className="season-card__meta">{divs.length} division{divs.length!==1?"s":""}{isAct?" · ● Active":""}</div>
