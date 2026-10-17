@@ -283,7 +283,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   {reviewSelectedReports.filter(report => report.status === "ok").length} extracted for selected category · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewSelectedReports.filter(report => report.status !== "ok").length} missing/error
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                  <button className="btn-sm" disabled={!reviewSeason || !reviewDivision || reviewReadyReports.length !== 1 || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
+                  <button className="btn-primary" disabled={!reviewSeason || !reviewDivision || reviewReadyReports.length !== 1 || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
                     setReviewLoading(true); setReviewError(""); setReviewValidation(null); setReviewResult(null);
                     try {
                       const validation = await validateIbaReports(reviewReadyReports, reviewSeason, { divisionId: reviewDivisionId });
