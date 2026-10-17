@@ -73,7 +73,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           day: group.day,
         }))
       );
-      setDiagnostic(discovered.diagnostic || null);
+      setDiagnostic(discovered.diagnostic || { totals: discovered.totals, errors: discovered.errors });
 
       setSelected(
         Object.fromEntries(
