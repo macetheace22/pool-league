@@ -92,22 +92,29 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       const fetched = {};
       const errors = [];
 
-      for (const division of found) {
-        const key = divisionKey(division);
-
-        try {
-          const data = await postSchedule({
-            action: "fetch",
-            format: division.format,
-            day: division.day,
-            division: division.value || division.label,
-          });
-          fetched[key] = data;
-          setRetrieveProgress(p => ({ ...p, current: p.current + 1 }));
-        } catch (e) {
-          setRetrieveProgress(p => ({ ...p, current: p.current + 1 }));
-          errors.push(`${division.label}: ${e?.message || "Unable to retrieve division schedule."}`);
+      // Fetch in small batches so a season with many format/day groups does
+      // not require dozens of sequential round trips to IBA.
+      for (let i = 0; i < found.length; i += 4) {
+        const batch = found.slice(i, i + 4);
+        const results = await Promise.all(batch.map(async division => {
+          const key = divisionKey(division);
+          try {
+            const data = await postSchedule({
+              action: "fetch",
+              format: division.format,
+              day: division.day,
+              division: division.value || division.label,
+            });
+            return { key, data, division };
+          } catch (e) {
+            return { key, division, error: e?.message || "Unable to retrieve division schedule." };
+          }
+        }));
+        for (const item of results) {
+          if (item.data) fetched[item.key] = item.data;
+          if (item.error) errors.push(`${item.division.label} (${item.division.format} · ${item.division.day}): ${item.error}`);
         }
+        setRetrieveProgress(progress => ({ ...progress, current: Math.min(found.length, progress.current + batch.length) }));
       }
 
       setDivisions(found);
