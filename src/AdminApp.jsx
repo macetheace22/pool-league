@@ -786,7 +786,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           {!viewingDiv
             ? <div className="empty-state">Pick a division above to see standings & match history.</div>
             : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingSeason?.playoffs_start_date} myProfile={profile}
-                seasonFormat={(viewingDiv?.format || viewingSeason?.format || "masters").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
+                seasonFormat={(viewingDiv?.format || "masters").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
           }
         </div>
       </>
@@ -3299,7 +3299,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
                   <div style={{minWidth:0}}>
                     <div style={{fontWeight:700,fontSize:12,color:"#E0E0E0"}}>{team?.name ?? "Team"}</div>
                     <div style={{fontSize:10.5,color:"#8A8A8A",marginTop:3}}>
-                      {division?.name ? `${division.name} · ` : ""}{season ? `${division?.format || season.format} · ${division?.day || season.day} · ${season.year}` : "Season unavailable"}
+                      {division?.name ? `${division.name} · ` : ""}{season ? `${division?.format || "Format unavailable"} · ${division?.day || "Day unavailable"} · ${season.year}` : "Season unavailable"}
                     </div>
                   </div>
                   {profile.role === "manager" && (
