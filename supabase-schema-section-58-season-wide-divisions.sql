@@ -55,7 +55,7 @@ ALTER TABLE public.seasons
   ADD CONSTRAINT seasons_type_check
     CHECK (type = ANY (ARRAY['Spring','Summer','Fall','Winter']));
 
-DO $
+DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.seasons
@@ -73,7 +73,7 @@ BEGIN
     ALTER TABLE public.seasons
       ADD CONSTRAINT seasons_type_year_key UNIQUE (type, year);
   END IF;
-END $;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.set_division_iba_context()
 RETURNS trigger
