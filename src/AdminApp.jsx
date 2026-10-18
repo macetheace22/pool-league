@@ -1614,7 +1614,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
                   return (
                     <button key={d.id} className={`season-picker__btn season-picker__btn--div ${isThis?"season-picker__btn--active":""}`}
                       onClick={() => { onView(s, d); setOpen(false); }}>
-                      Div {d.num}{d.name ? ` · ${d.name}` : ""} · {d.format || "Masters"} · {d.day || "Wednesday"}
+                      Div {d.num}{d.name ? ` · ${d.name}` : ""} · {d.format || "Format required"} · {d.day || "Day required"}
                     </button>
                   );
                 })}
