@@ -2189,11 +2189,20 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   };
   useEffect(refresh, [divisionId]);
 
+  if (manualEntryOpen && !seasonFormat) {
+    return (
+      <div className="tab-content">
+        <ErrorMsg>This division is missing its IBA format. Update the division before manually recording a match.</ErrorMsg>
+        <button className="btn-secondary" onClick={() => setManualEntryOpen(false)}>Back</button>
+      </div>
+    );
+  }
+
   if (manualEntryOpen) {
     return (
       <div className="tab-content">
         <style>{liveEntryCss}</style>
-        <ManualMatchEntry divisionId={divisionId} teams={teams} format={seasonFormat || "masters"}
+        <ManualMatchEntry divisionId={divisionId} teams={teams} format={seasonFormat}
           seasonLabelText={seasonLabelText} playoffsStartDate={playoffsStartDate}
           onCancel={()=>setManualEntryOpen(false)}
           onDone={()=>{ setManualEntryOpen(false); refresh(); }} />
