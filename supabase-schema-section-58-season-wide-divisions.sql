@@ -79,9 +79,6 @@ CREATE OR REPLACE FUNCTION public.set_division_iba_context()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
-DECLARE
-  legacy_format text;
-  legacy_day text;
 BEGIN
   IF NEW.format IS NULL OR NEW.day IS NULL THEN
     RAISE EXCEPTION 'Division format and day are required; supply the IBA context explicitly.';
