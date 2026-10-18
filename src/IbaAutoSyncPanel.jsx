@@ -16,8 +16,8 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [scanningAll, setScanningAll] = useState(false);
   const [scanError, setScanError] = useState("");
   const [manualFile, setManualFile] = useState(null);
-  const [manualFormat, setManualFormat] = useState(String(season?.divisions?.[0]?.format || season?.format || "Masters").toLowerCase());
-  const [manualDay, setManualDay] = useState(String(season?.divisions?.[0]?.day || season?.day || "Wednesday").toLowerCase());
+  const [manualFormat, setManualFormat] = useState("");
+  const [manualDay, setManualDay] = useState("");
   const [manualError, setManualError] = useState("");
   const [uploadingManual, setUploadingManual] = useState(false);
   const [discoverySeasons, setDiscoverySeasons] = useState([]);
