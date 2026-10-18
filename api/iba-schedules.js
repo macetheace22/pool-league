@@ -774,12 +774,16 @@ export default async function handler(req, res) {
   try {
     const body = parseRequestBody(req);
     const action = body.action || "discover";
-    const format = body.format || "Masters";
-    const day = body.day || "Wednesday";
+    const format = String(body.format || "").trim();
+    const day = String(body.day || "").trim();
 
     if (action === "discover-all") {
       const data = await discoverAllDivisionGroups();
       return res.status(200).json(data);
+    }
+
+    if (!format || !day) {
+      return res.status(400).json({ error: "An explicit IBA format and day are required for this schedule action." });
     }
 
     if (action === "discover") {
