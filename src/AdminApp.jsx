@@ -1642,8 +1642,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const [saved, setSaved]   = useState(false);
   const [divNum, setDivNum] = useState("");
   const [divName, setDivName] = useState("");
-  const [newDivisionFormat, setNewDivisionFormat] = useState("Masters");
-  const [newDivisionDay, setNewDivisionDay] = useState("Wednesday");
+  const [newDivisionFormat, setNewDivisionFormat] = useState("");
+  const [newDivisionDay, setNewDivisionDay] = useState("");
   const [expandedSeason, setExpandedSeason] = useState(null);
   const [editingDivId, setEditingDivId] = useState(null);
   const [editDivNum, setEditDivNum] = useState("");
@@ -1683,7 +1683,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const addDivision = async (s) => {
     if (!divNum.trim()) return;
     const divs = s.divisions ?? [];
-    if (divs.find(d => d.num === divNum.trim() && (d.format || "Masters") === newDivisionFormat && (d.day || "Wednesday") === newDivisionDay)) { setError("That division number already exists for this format and day."); return; }
+    if (!newDivisionFormat || !newDivisionDay) { setError("Select the division IBA format and day."); return; }
+    if (divs.find(d => d.num === divNum.trim() && d.format === newDivisionFormat && d.day === newDivisionDay)) { setError("That division number already exists for this format and day."); return; }
     await onAddDivision(s, divNum.trim(), divName.trim(), newDivisionFormat, newDivisionDay);
     setDivNum(""); setDivName(""); setError("");
   };
@@ -1744,7 +1745,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 const divs         = s.divisions ?? [];
                 return (
                   <div key={s.id} className={`season-card ${isAct?"season-card--active":""}`}>
-                    <div className="season-card__header" onClick={()=>{setExpandedSeason(isExpanded?null:s.id);if(!isExpanded){setNewDivisionFormat(divs[0]?.format || s.format || "Masters");setNewDivisionDay(divs[0]?.day || s.day || "Wednesday");}}}>
+                    <div className="season-card__header" onClick={()=>{setExpandedSeason(isExpanded?null:s.id);if(!isExpanded){setNewDivisionFormat(divs[0]?.format || s.format || "");setNewDivisionDay(divs[0]?.day || s.day || "");}}}>
                       <div>
                         <div className="season-card__name">{seasonLabel(s)}</div>
                         <div className="season-card__meta">{divs.length} division{divs.length!==1?"s":""}{isAct?" · ● Active":""}</div>
@@ -1787,9 +1788,9 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                         <div className="div-add-row" style={{flexWrap:"wrap"}}>
                           <input className="edit-input" style={{width:70,flex:"none"}} placeholder="Div #" value={divNum} onChange={e=>setDivNum(e.target.value)}/>
                           <input className="edit-input" style={{flex:1,minWidth:120}} placeholder="Name (e.g. North)" value={divName} onChange={e=>setDivName(e.target.value)}/>
-                          <select className="input" value={newDivisionFormat} onChange={e=>setNewDivisionFormat(e.target.value)} aria-label="New division IBA format" style={{minWidth:120}}>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
-                          <select className="input" value={newDivisionDay} onChange={e=>setNewDivisionDay(e.target.value)} aria-label="New division IBA day" style={{minWidth:120}}>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
-                          <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim()}><Plus size={13}/></button>
+                          <select className="input" value={newDivisionFormat} onChange={e=>setNewDivisionFormat(e.target.value)} aria-label="New division IBA format" style={{minWidth:120}}><option value="">Select format…</option>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
+                          <select className="input" value={newDivisionDay} onChange={e=>setNewDivisionDay(e.target.value)} aria-label="New division IBA day" style={{minWidth:120}}><option value="">Select day…</option>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
+                          <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim() || !newDivisionFormat || !newDivisionDay}><Plus size={13}/></button>
                         </div>
                         <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
                          
