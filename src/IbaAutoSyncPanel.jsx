@@ -301,7 +301,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                       setReviewResult(result);
                       if (onComplete) await onComplete();
                     } catch (e) {
-                      setReviewError(`Import failed. Some writes may already have succeeded; verify this division's data and import history before retrying. ${e?.message || ""}`);
+                      setReviewError(`Import failed. Some writes may already have succeeded; verify data and import history for each matching division before retrying. ${e?.message || ""}`);
                     } finally { setReviewImporting(false); }
                   }}>
                     {reviewImporting ? "Importing…" : "Import validated group"}
@@ -328,7 +328,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                     {reviewResult.standings && <div>Team standings: {reviewResult.standings.imported || 0} row(s) imported{reviewResult.standings.skipped?.length ? ` · ${reviewResult.standings.skipped.length} unmatched/ambiguous row(s) skipped` : ""}.</div>}
                     {reviewResult.mvp && <div>MVP standings: {reviewResult.mvp.imported || 0} row(s) imported{reviewResult.mvp.skipped?.length ? ` · ${reviewResult.mvp.skipped.length} unmatched/ambiguous row(s) skipped` : ""}.</div>}
                     {(reviewResult.warnings || []).map((warning, index) => <div key={index} style={{ color: "#F0C36D" }}>{warning}</div>)}
-                    <div style={{ color: "#AAA", marginTop: 4 }}>Review this result before moving to another report category. If any error was reported, verify the selected division's data before retrying.</div>
+                    <div style={{ color: "#AAA", marginTop: 4 }}>Review this result before moving to another report category. If any error was reported, verify each matching division's data and import history before retrying.</div>
                   </div>
                 )}
               </section>
