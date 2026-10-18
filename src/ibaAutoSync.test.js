@@ -129,6 +129,54 @@ describe("mapped IBA report validation", () => {
       .toEqual(["division-287"]);
   });
 
+  it("allows missing PDFs in independent contexts when the available reports validate", async () => {
+    const multiContextSeason = {
+      ...season,
+      divisions: [
+        ...season.divisions,
+        { id: "division-287", num: 287, name: "Advanced Wednesday", format: "Advanced", day: "Wednesday" },
+      ],
+    };
+    const mastersReport = {
+      ...report,
+      text: "Fall Season 2026 Week 17\\n151 TCB Masters\\nFor week: 17\\n152 North Masters\\nFor week: 17\\n15001\\tTeam One\\t10\\t100\\t5\\n",
+    };
+    const missingAdvancedReport = {
+      key: "advweddiv",
+      leagueType: "adv",
+      day: "wed",
+      reportType: "div",
+      status: "missing",
+      message: "Not published",
+    };
+
+    const result = await validateIbaReports([mastersReport, missingAdvancedReport], multiContextSeason);
+
+    expect(result.canImport).toBe(true);
+    expect(result.checks.map(check => check.divisionId)).toEqual(["division-151", "division-152"]);
+    expect(result.reportFailures).toMatchObject([{ reportType: "div", status: "missing", reason: "Not published" }]);
+  });
+
+  it("blocks a fetch/extraction error rather than treating it like a missing PDF", async () => {
+    const failedReport = {
+      key: "mastwedmvp",
+      leagueType: "mast",
+      day: "wed",
+      reportType: "mvp",
+      status: "error",
+      message: "IBA request timed out",
+    };
+
+    const result = await validateIbaReports([report, failedReport], season);
+
+    expect(result.canImport).toBe(false);
+    expect(result.reportFailures).toContainEqual({
+      reportType: "mvp",
+      status: "error",
+      reason: "IBA request timed out",
+    });
+  });
+
   it("keeps repeated division numbers isolated by format and day", async () => {
     const repeatedNumberSeason = {
       ...season,
