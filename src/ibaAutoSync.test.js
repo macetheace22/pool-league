@@ -33,7 +33,7 @@ const report = {
   status: "ok",
   source: "manual",
   sha256: "a".repeat(64),
-  text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n",
+  text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n15001\\tTeam One\\t10\\t100\\t5\n",
   detectedRows: 12,
 };
 
@@ -91,6 +91,29 @@ describe("mapped IBA report validation", () => {
       .toEqual(["division-151", "division-152"]);
     expect(result.checks.filter(check => check.reportKey === advancedReport.key).map(check => check.divisionId))
       .toEqual(["division-287"]);
+  });
+
+  it("keeps repeated division numbers isolated by format and day", async () => {
+    const repeatedNumberSeason = {
+      ...season,
+      divisions: [
+        { id: "masters-wed-151", num: 151, name: "Masters Wednesday", format: "Masters", day: "Wednesday" },
+        { id: "advanced-wed-151", num: 151, name: "Advanced Wednesday", format: "Advanced", day: "Wednesday" },
+      ],
+    };
+    const result = await validateIbaReports([report], repeatedNumberSeason);
+
+    expect(result.canImport).toBe(true);
+    expect(result.checks.map(check => check.divisionId)).toEqual(["masters-wed-151"]);
+  });
+
+  it("blocks a report that parses to zero rows", async () => {
+    const emptyReport = { ...report, text: "Fall Season 2026 Week 17\\n151 TCB Masters\\nFor week: 17\\n" };
+    const result = await validateIbaReports([emptyReport], season);
+
+    expect(result.canImport).toBe(false);
+    expect(result.checks[0].status).toBe("blocked_zero_rows");
+    expect(result.checks[0].reason).toMatch(/zero records/i);
   });
 
   it("rejects a division that does not belong to the selected season", async () => {
