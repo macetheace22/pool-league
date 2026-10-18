@@ -786,7 +786,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           {!viewingDiv
             ? <div className="empty-state">Pick a division above to see standings & match history.</div>
             : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingSeason?.playoffs_start_date} myProfile={profile}
-                seasonFormat={(viewingDiv?.format || "masters").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
+                seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
           }
         </div>
       </>
@@ -1581,7 +1581,7 @@ function TeamLookupPage() {
 function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, onView, readOnly }) {
   const [open, setOpen] = useState(false);
   const isActive = !!viewingSeason?.is_active;
-  const divName = viewingDiv ? `Div ${viewingDiv.num}${viewingDiv.name ? " · " + viewingDiv.name : ""} · ${viewingDiv.format || "Masters"} · ${viewingDiv.day || "Wednesday"}` : "No division";
+  const divName = viewingDiv ? `Div ${viewingDiv.num}${viewingDiv.name ? " · " + viewingDiv.name : ""} · ${viewingDiv.format || "Format required"} · ${viewingDiv.day || "Day required"}` : "No division";
 
   return (
     <div className="season-banner">
@@ -1690,15 +1690,16 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   };
 
   const startEditDivision = (d) => {
-    setEditingDivId(d.id); setEditDivNum(d.num ?? ""); setEditDivName(d.name ?? ""); setEditDivFormat(d.format || "Masters"); setEditDivDay(d.day || "Wednesday"); setEditDivError("");
+    setEditingDivId(d.id); setEditDivNum(d.num ?? ""); setEditDivName(d.name ?? ""); setEditDivFormat(d.format || ""); setEditDivDay(d.day || ""); setEditDivError("");
   };
   const cancelEditDivision = () => {
     setEditingDivId(null); setEditDivError("");
   };
   const saveEditDivision = async (s) => {
     if (!editDivNum.trim()) { setEditDivError("Division # is required."); return; }
+    if (!editDivFormat || !editDivDay) { setEditDivError("Select the division IBA format and day."); return; }
     const divs = s.divisions ?? [];
-    if (divs.find(d => d.id !== editingDivId && d.num === editDivNum.trim() && (d.format || "Masters") === editDivFormat && (d.day || "Wednesday") === editDivDay)) {
+    if (divs.find(d => d.id !== editingDivId && d.num === editDivNum.trim() && d.format === editDivFormat && d.day === editDivDay)) {
       setEditDivError("Another division already uses that number for this format and day."); return;
     }
     const ok = await onUpdateDivision(editingDivId, editDivNum.trim(), editDivName.trim(), editDivFormat, editDivDay);
@@ -1769,8 +1770,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                                 onChange={e=>setEditDivNum(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") saveEditDivision(s); }} />
                               <input className="edit-input" style={{flex:1}} placeholder="Name (e.g. North)" value={editDivName}
                                 onChange={e=>setEditDivName(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") saveEditDivision(s); }} />
-                              <select className="input" value={editDivFormat} onChange={e=>setEditDivFormat(e.target.value)} aria-label="Division IBA format" style={{minWidth:120}}>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
-                              <select className="input" value={editDivDay} onChange={e=>setEditDivDay(e.target.value)} aria-label="Division IBA day" style={{minWidth:120}}>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
+                              <select className="input" value={editDivFormat} onChange={e=>setEditDivFormat(e.target.value)} aria-label="Division IBA format" style={{minWidth:120}}><option value="">Select format…</option>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
+                              <select className="input" value={editDivDay} onChange={e=>setEditDivDay(e.target.value)} aria-label="Division IBA day" style={{minWidth:120}}><option value="">Select day…</option>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
                               <button className="btn-icon btn-icon--confirm" onClick={()=>saveEditDivision(s)}><Check size={13}/></button>
                               <button className="btn-icon btn-icon--cancel" onClick={cancelEditDivision}><X size={13}/></button>
                             </div>
@@ -1778,7 +1779,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                             <div key={d.id} className="div-row">
                               <span className="div-row__num">Div {d.num}</span>
                               <span className="div-row__name">{d.name || "—"}</span>
-                              <span className="div-row__name" style={{fontSize:10,color:"#8A8A8A"}}>{d.format || s.format || "Context required"} · {d.day || s.day || "Context required"}</span>
+                              <span className="div-row__name" style={{fontSize:10,color:"#8A8A8A"}}>{d.format || "Format required"} · {d.day || "Day required"}</span>
                               <button className="btn-icon" onClick={()=>startEditDivision(d)}><Edit2 size={11}/></button>
                               <button className="btn-icon btn-icon--danger" onClick={()=>onRemoveDivision(d.id)}><Trash2 size={11}/></button>
                             </div>
@@ -1839,7 +1840,7 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
     matchId: `match-w${currentWeek.week}-${match.pairing.home}v${match.pairing.away}-${Date.now()}`,
     schedulePairingId: match.pairing.id ?? null,
     seasonId: activeSeason?.id ?? null,
-    format: (viewingDiv?.format || activeSeason?.format || "Masters").toLowerCase(),
+    format: String(viewingDiv?.format || "").toLowerCase(),
     venue: match.homeTeam.venue || "",
     seasonLabel: activeSeason ? seasonLabel(activeSeason) : null,
     divisionId: viewingDiv?.id ?? null,
@@ -1873,6 +1874,10 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
   // "seed" step first.
   const goScoreMatch = async (match) => {
     if (!match.homeTeam || !match.awayTeam || match.isBye || !match.pairing.id) return;
+    if (!viewingDiv?.format || !viewingDiv?.day) {
+      alert("This division is missing its IBA format or day. Update the division before starting live scoring.");
+      return;
+    }
     setLaunching(match.pairing.id);
     const existing = await db.getLiveMatch(match.pairing.id);
     if (!existing) {
