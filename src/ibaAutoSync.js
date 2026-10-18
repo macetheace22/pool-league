@@ -150,9 +150,18 @@ export async function validateIbaReports(reports, season, options = {}) {
         history: historyResult.error ? null : historyResult.data,
         contentSha256: report.sha256,
       });
+      const parsedRowCount = report.reportType === "rost"
+        ? Object.keys(parseLeagueRoster(report.text).registry || {}).length
+        : report.reportType === "div"
+          ? parseStandingsImport(report.text).length
+          : report.reportType === "mvp"
+            ? parseMvpImport(report.text).length
+            : 0;
       const scheduledWeek = scheduledWeeks.find(item => Number(item.week) === Number(classification.week?.weekNumber));
-      let status = classification.status;
-      let reason = classification.reason;
+      let status = parsedRowCount === 0 ? "blocked_zero_rows" : classification.status;
+      let reason = parsedRowCount === 0
+        ? "The report parsed to zero records; import is blocked."
+        : classification.reason;
       let weekTag = null;
       if (status === "ready") {
         weekTag = getValidatedScheduleWeekTag(classification.week.weekNumber, scheduledWeek?.date);
