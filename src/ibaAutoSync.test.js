@@ -116,14 +116,14 @@ describe("mapped IBA report validation", () => {
     };
     const mastersReport = {
       ...report,
-      text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n152 North Masters\nFor week: 17\n15001\\tTeam One\\t10\\t100\\t5\n15002\\tTeam Two\\t12\\t110\\t6\n",
+      text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n152 North Masters\nFor week: 17\n15001\tTeam One\t10\t100\t5\n15002\tTeam Two\t12\t110\t6\n",
     };
     const advancedReport = {
       ...report,
       key: "advweddiv",
       leagueType: "adv",
       day: "wed",
-      text: "Fall Season 2026 Week 17\n287 Advanced Wednesday\nFor week: 17\n28701\\tAdvanced Team\\t10\\t100\\t5\n",
+      text: "Fall Season 2026 Week 17\n287 Advanced Wednesday\nFor week: 17\n28701\tAdvanced Team\t10\t100\t5\n",
     };
     const result = await validateIbaReports([mastersReport, advancedReport], multiContextSeason);
 
@@ -186,7 +186,7 @@ describe("mapped IBA report validation", () => {
   it("blocks a division with no matching rows even when another division in the PDF has data", async () => {
     const mastersReport = {
       ...report,
-      text: "Fall Season 2026 Week 17\\n151 TCB Masters\\nFor week: 17\\n152 North Masters\\nFor week: 17\\n15001\\tTeam One\\t10\\t100\\t5\\n",
+      text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n152 North Masters\nFor week: 17\n15001\tTeam One\t10\t100\t5\n",
     };
 
     const result = await validateIbaReports([mastersReport], season);
