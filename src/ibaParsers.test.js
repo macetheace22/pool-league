@@ -63,7 +63,7 @@ describe("extractIbaReportWeeksByDivision", () => {
       "Division #152 North Masters",
       "For week: 16",
       "Team data...",
-    ].join("\\n");
+    ].join("\n");
     const result = extractIbaReportWeeksByDivision(text);
     expect(result.hasDivisionSections).toBe(true);
     expect(result.byDivision["151"]).toMatchObject({ weekNumber: 17, divisionLabel: "TCB Masters" });
