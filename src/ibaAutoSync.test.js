@@ -13,7 +13,7 @@ vi.mock("./db", () => ({
 }));
 
 import * as db from "./db";
-import { validateIbaReports, importIbaReports } from "./ibaAutoSync";
+import { validateIbaReports, importIbaReports, scopeIbaReportsToSeason } from "./ibaAutoSync";
 
 const season = {
   id: "season-1",
@@ -36,6 +36,42 @@ const report = {
   text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n15001\\tTeam One\\t10\\t100\\t5\n",
   detectedRows: 12,
 };
+
+describe("season-wide IBA report scoping", () => {
+  it("includes every matching format/day and supports one-category review", () => {
+    const multiContextSeason = {
+      ...season,
+      divisions: [
+        { id: "masters-wed-151", num: 151, format: "Masters", day: "Wednesday" },
+        { id: "advanced-fri-287", num: 287, format: "Advanced", day: "Friday" },
+      ],
+    };
+    const reports = [
+      { key: "mastwedrost", reportType: "rost", leagueType: "mast", day: "wed" },
+      { key: "mastweddiv", reportType: "div", leagueType: "mast", day: "wed" },
+      { key: "advfrimvp", reportType: "mvp", leagueType: "adv", day: "fri" },
+      { key: "openmonrost", reportType: "rost", leagueType: "open", day: "mon" },
+    ];
+
+    expect(scopeIbaReportsToSeason(reports, multiContextSeason).map(item => item.key))
+      .toEqual(["mastwedrost", "mastweddiv", "advfrimvp"]);
+    expect(scopeIbaReportsToSeason(reports, multiContextSeason, "rost").map(item => item.key))
+      .toEqual(["mastwedrost"]);
+    expect(scopeIbaReportsToSeason(reports, multiContextSeason, "mvp").map(item => item.key))
+      .toEqual(["advfrimvp"]);
+  });
+
+  it("does not use legacy season context when divisions are present", () => {
+    const seasonWithUnmatchedDivisions = {
+      ...season,
+      format: "Masters",
+      day: "Wednesday",
+      divisions: [{ id: "advanced-fri", num: 287, format: "Advanced", day: "Friday" }],
+    };
+    const report = { reportType: "rost", leagueType: "mast", day: "wed" };
+    expect(scopeIbaReportsToSeason([report], seasonWithUnmatchedDivisions)).toEqual([]);
+  });
+});
 
 describe("mapped IBA report validation", () => {
   beforeEach(() => {
