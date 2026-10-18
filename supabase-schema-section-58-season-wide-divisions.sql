@@ -15,7 +15,7 @@ WHERE s.id = d.season_id
   AND (d.format IS NULL OR d.day IS NULL);
 
 -- Fail with actionable diagnostics before tightening required fields.
-DO $
+DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.divisions
@@ -31,7 +31,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Section 58 blocked: duplicate division numbers exist within the same season/format/day. Reconcile those divisions before retrying.';
   END IF;
-END $;
+END $$;
 
 ALTER TABLE public.divisions
   DROP CONSTRAINT IF EXISTS divisions_format_check,
