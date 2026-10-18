@@ -408,7 +408,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           )}
 
           {data.reports.filter(r => r.status === "ok" && ["rost","div","mvp"].includes(r.reportType)).map(r => {
-            const rows = previewRows(r.reportType).filter(row => !row.sourceKey || row.sourceKey === r.key);
+            const rows = previewRows(r.reportType).filter(row => row.sourceKey === r.key);
             const columns = columnsFor(r.reportType);
             const parsedReport = data.preview.reports.find(item => item.key === r.key);
             const count = Number(parsedReport?.detectedRows ?? rows.length);
