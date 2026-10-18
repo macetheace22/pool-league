@@ -23,7 +23,6 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [discoverySeasons, setDiscoverySeasons] = useState([]);
   const [reviewGroupKey, setReviewGroupKey] = useState("");
   const [reviewSeasonId, setReviewSeasonId] = useState("");
-  const [reviewDivisionId, setReviewDivisionId] = useState("");
   const [reviewReportType, setReviewReportType] = useState("rost");
   const [reviewValidation, setReviewValidation] = useState(null);
   const [reviewError, setReviewError] = useState("");
@@ -68,17 +67,6 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const reviewGroup = reviewGroups.find(group => group.key === reviewGroupKey) || null;
   const reviewSeasonOptions = discoverySeasons.filter(target => target.is_active && reviewGroup && divisionsForGroup(reviewGroup, target).length > 0);
   const reviewSeason = reviewSeasonOptions.find(target => String(target.id) === String(reviewSeasonId)) || null;
-  const reviewDivisions = reviewSeason ? divisionsForGroup(reviewGroup, reviewSeason) : [];
-  const reviewDivision = reviewDivisions.find(item => String(item.id) === String(reviewDivisionId)) || null;
-  useEffect(() => {
-    if (!reviewSeason) {
-      setReviewDivisionId("");
-      return;
-    }
-    if (!reviewDivisions.some(item => String(item.id) === String(reviewDivisionId))) {
-      setReviewDivisionId(reviewDivisions.length === 1 ? String(reviewDivisions[0].id) : "");
-    }
-  }, [reviewSeasonId, reviewDivisionId, discoverySeasons]);
   const reviewGroupReports = (allScan?.reports || []).filter(report => reviewGroup && report.leagueType === reviewGroup.leagueType && report.day === reviewGroup.day);
   const reviewSelectedReports = reviewGroupReports.filter(report => report.reportType === reviewReportType);
   const reviewReadyReports = reviewSelectedReports.filter(report => report.status === "ok" && Number(report.detectedRows) > 0);
@@ -267,7 +255,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
               <section style={{ margin: "10px 0", padding: 10, border: "1px solid #3A3A3A", borderRadius: 7 }}>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>Review & import a mapped format/day group</div>
                 <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-                  Choose the matching season and division explicitly. Import one report category for one division at a time, reducing the chance of partial writes across unrelated categories or divisions. Only the selected category with successful extraction and nonzero parsed rows can be validated; missing/error/zero-row reports are blocked.
+                  Choose the matching season and IBA format/day. Each PDF covers every division in that context, so preflight validates every matching division independently. Missing PDFs may be normal; extraction errors and zero-row reports are blocked.
                 </div>
                 <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
@@ -289,22 +277,15 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                       {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {divisionsForGroup(reviewGroup, target).length} matching divisions</option>)}
                     </select>
                   </label>
-                  <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
-                    Target division
-                    <select className="input" value={reviewDivisionId} onChange={e => { setReviewDivisionId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }} disabled={!reviewSeason}>
-                      <option value="">Select division…</option>
-                      {reviewDivisions.map(target => <option key={target.id} value={String(target.id)}>Division {target.num} · {target.name || "Unnamed"}</option>)}
-                    </select>
-                  </label>
                 </div>
                 <div style={{ fontSize: 11, color: "#CCC", marginTop: 8 }}>
                   {reviewSelectedReports.filter(report => report.status === "ok").length} extracted for selected category · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewSelectedReports.filter(report => report.status !== "ok").length} missing/error
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                  <button className="btn-primary" disabled={!reviewSeason || !reviewDivision || reviewReadyReports.length !== 1 || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
+                  <button className="btn-primary" disabled={!reviewSeason || reviewReadyReports.length !== 1 || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
                     setReviewLoading(true); setReviewError(""); setReviewValidation(null); setReviewResult(null);
                     try {
-                      const validation = await validateIbaReports(reviewReadyReports, reviewSeason, { divisionId: reviewDivisionId });
+                      const validation = await validateIbaReports(reviewReadyReports, reviewSeason);
                       setReviewValidation(validation);
                       if (!validation.canImport) setReviewError("Preflight blocked this group. Review each division result; no data was written.");
                     } catch (e) {
@@ -313,7 +294,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   }}>
                     {reviewLoading ? "Validating…" : "Validate mapped reports"}
                   </button>
-                  <button className="btn-primary" disabled={!reviewValidation?.canImport || reviewReadyReports.length !== 1 || !reviewSeason || !reviewDivision || reviewImporting || reviewLoading} onClick={async () => {
+                  <button className="btn-primary" disabled={!reviewValidation?.canImport || reviewReadyReports.length !== 1 || !reviewSeason || reviewImporting || reviewLoading} onClick={async () => {
                     setReviewImporting(true); setReviewError(""); setReviewResult(null);
                     try {
                       const result = await importIbaReports(reviewReadyReports, reviewSeason, [], reviewValidation);
