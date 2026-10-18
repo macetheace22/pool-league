@@ -38,9 +38,14 @@ ALTER TABLE public.divisions
 
 -- Retain legacy fields during the transition, but permit new season records
 -- to omit format/day. Updated code uses division-level context for imports.
+-- Season-level format/day are legacy compatibility columns only. New
+-- seasons are identified by type/year and may span many division contexts.
+-- Do not silently default missing season context to Masters/Wednesday.
 ALTER TABLE public.seasons
-  ALTER COLUMN format SET DEFAULT 'Masters',
-  ALTER COLUMN day SET DEFAULT 'Wednesday';
+  ALTER COLUMN format DROP DEFAULT,
+  ALTER COLUMN day DROP DEFAULT,
+  ALTER COLUMN format DROP NOT NULL,
+  ALTER COLUMN day DROP NOT NULL;
 
 ALTER TABLE public.seasons
   DROP CONSTRAINT IF EXISTS seasons_type_year_format_day_key,
@@ -50,8 +55,16 @@ ALTER TABLE public.seasons
   ADD CONSTRAINT seasons_type_check
     CHECK (type = ANY (ARRAY['Spring','Summer','Fall','Winter']));
 
-DO $$
+DO $
 BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.seasons
+    GROUP BY type, year
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Section 58 blocked: multiple season rows share the same type/year. Reconcile those seasons and their division/team/schedule references before retrying.';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'seasons_type_year_key'
@@ -60,7 +73,7 @@ BEGIN
     ALTER TABLE public.seasons
       ADD CONSTRAINT seasons_type_year_key UNIQUE (type, year);
   END IF;
-END $$;
+END $;
 
 CREATE OR REPLACE FUNCTION public.set_division_iba_context()
 RETURNS trigger
@@ -71,13 +84,7 @@ DECLARE
   legacy_day text;
 BEGIN
   IF NEW.format IS NULL OR NEW.day IS NULL THEN
-    SELECT s.format, s.day
-      INTO legacy_format, legacy_day
-    FROM public.seasons s
-    WHERE s.id = NEW.season_id;
-
-    NEW.format := COALESCE(NEW.format, legacy_format, 'Masters');
-    NEW.day := COALESCE(NEW.day, legacy_day, 'Wednesday');
+    RAISE EXCEPTION 'Division format and day are required; supply the IBA context explicitly.';
   END IF;
   RETURN NEW;
 END;
