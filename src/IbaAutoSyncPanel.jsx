@@ -18,6 +18,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [manualFile, setManualFile] = useState(null);
   const [manualFormat, setManualFormat] = useState(String(season?.divisions?.[0]?.format || season?.format || "Masters").toLowerCase());
   const [manualDay, setManualDay] = useState(String(season?.divisions?.[0]?.day || season?.day || "Wednesday").toLowerCase());
+  const [manualDivisionId, setManualDivisionId] = useState(String(season?.divisions?.[0]?.id || ""));
   const [manualError, setManualError] = useState("");
   const [uploadingManual, setUploadingManual] = useState(false);
   const [discoverySeasons, setDiscoverySeasons] = useState([]);
@@ -39,6 +40,10 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     .map(context => [`${context.format}:${context.day}`, context])).values()];
   const manualFormatOptions = [...new Set(manualContexts.map(context => context.format))];
   const manualDayOptions = [...new Set(manualContexts.filter(context => context.format === manualFormat).map(context => context.day))];
+  const manualDivisionOptions = (season?.divisions || []).filter(division =>
+    String(division.format || "").toLowerCase() === manualFormat &&
+    String(division.day || "").toLowerCase() === manualDay
+  );
 
   useEffect(() => {
     if (!manualContexts.length) return;
@@ -49,6 +54,11 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     }
     if (!manualDayOptions.includes(manualDay)) setManualDay(manualDayOptions[0] || manualContexts[0].day);
   }, [season?.id, manualFormat, manualDay, manualContexts.length, manualFormatOptions.join(","), manualDayOptions.join(",")]);
+
+  useEffect(() => {
+    const validIds = manualDivisionOptions.map(division => String(division.id));
+    if (!validIds.includes(manualDivisionId)) setManualDivisionId(validIds[0] || "");
+  }, [season?.id, manualFormat, manualDay, manualDivisionOptions.map(division => division.id).join(","), manualDivisionId]);
 
   useEffect(() => {
     let active = true;
@@ -221,7 +231,11 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     setImporting(true); setError("");
     try {
       const reportsToImport = selectedReports(data.reports);
-      const validation = await validateIbaReports(reportsToImport, season);
+      const validation = await validateIbaReports(
+        reportsToImport,
+        season,
+        manualMode ? { divisionId: manualDivisionId } : {}
+      );
       setPreflight(validation);
       if (!validation.canImport) {
         setError("Import blocked. Review the per-division validation results below; no report data was written.");
@@ -388,20 +402,26 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
             <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
               Format
-              <select className="input" value={manualFormat} onChange={e => { setManualFormat(e.target.value); setManualError(""); }} style={{ minWidth: 140, width: "100%" }}>
+              <select className="input" value={manualFormat} onChange={e => { setManualFormat(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{ minWidth: 140, width: "100%" }}>
                 {manualFormatOptions.map(format => <option key={format} value={format}>{({ masters: "Masters", advanced: "Advanced", open: "Open" })[format] || format}</option>)}
               </select>
             </label>
             <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
               Day
-              <select className="input" value={manualDay} onChange={e => { setManualDay(e.target.value); setManualError(""); }} style={{ minWidth: 140, width: "100%" }}>
+              <select className="input" value={manualDay} onChange={e => { setManualDay(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{ minWidth: 140, width: "100%" }}>
                 {manualDayOptions.map(day => <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>)}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC", flex: "1 1 180px" }}>
+              Target division
+              <select className="input" value={manualDivisionId} onChange={e => { setManualDivisionId(e.target.value); setData(null); setPreflight(null); setResult(null); setError(""); setManualError(""); }} style={{ minWidth: 180, width: "100%" }} disabled={!manualDivisionOptions.length}>
+                {manualDivisionOptions.map(division => <option key={division.id} value={String(division.id)}>Division {division.num} · {division.name || "Unnamed"}</option>)}
               </select>
             </label>
           </div>
           <input type="file" accept="application/pdf,.pdf" onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }} style={{ display: "block", maxWidth: "100%", marginTop: 8, fontSize: 11 }} />
           {manualFile && <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 4 }}>{manualFile.name} · {Math.ceil(manualFile.size / 1024).toLocaleString()} KB</div>}
-          <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual || !supported || !manualFormatOptions.length || !manualDayOptions.length} style={{ marginTop: 8 }}>
+          <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual || !supported || !manualFormatOptions.length || !manualDayOptions.length || !manualDivisionId} style={{ marginTop: 8 }}>
             {uploadingManual ? <><RefreshCw size={12} className="spin" /> Extracting PDF…</> : "Extract & Preview PDF"}
           </button>
           {manualError && <div className="error-msg" style={{ marginTop: 8 }}>{manualError}</div>}
