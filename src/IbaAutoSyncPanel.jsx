@@ -56,32 +56,29 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     return () => { active = false; };
   }, []);
 
-  const reviewGroups = [...new Map((allScan?.reports || []).map(report => [
-    `${report.leagueType}:${report.day}`,
-    { key: `${report.leagueType}:${report.day}`, leagueType: report.leagueType, day: report.day, formatLabel: report.formatLabel, dayLabel: report.dayLabel }
-  ])).values()];
-  const groupMatchesDivision = (group, division) =>
-    String(division?.format || "").toLowerCase() === ({ mast: "masters", adv: "advanced", open: "open" })[group?.leagueType] &&
-    String(division?.day || "").toLowerCase() === ({ mon: "monday", tues: "tuesday", wed: "wednesday", thur: "thursday", fri: "friday", sat: "saturday", sun: "sunday" })[group?.day];
-  const divisionsForGroup = (group, target) => (target?.divisions || []).filter(division => group && groupMatchesDivision(group, division));
-  const reviewGroup = reviewGroups.find(group => group.key === reviewGroupKey) || null;
-  const reviewSeasonOptions = discoverySeasons.filter(target => target.is_active && reviewGroup && divisionsForGroup(reviewGroup, target).length > 0);
+  const groupMatchesDivision = (report, division) =>
+    String(division?.format || "").toLowerCase() === ({ mast: "masters", adv: "advanced", open: "open" })[report?.leagueType] &&
+    String(division?.day || "").toLowerCase() === ({ mon: "monday", tues: "tuesday", wed: "wednesday", thur: "thursday", fri: "friday", sat: "saturday", sun: "sunday" })[report?.day];
+  const divisionsForReport = (report, target) => (target?.divisions || []).filter(division => report && groupMatchesDivision(report, division));
+  const reviewSeasonOptions = discoverySeasons.filter(target => target.is_active && (allScan?.reports || []).some(report => divisionsForReport(report, target).length > 0));
   const reviewSeason = reviewSeasonOptions.find(target => String(target.id) === String(reviewSeasonId)) || null;
-  const reviewGroupReports = (allScan?.reports || []).filter(report => reviewGroup && report.leagueType === reviewGroup.leagueType && report.day === reviewGroup.day);
-  const reviewSelectedReports = reviewGroupReports.filter(report => report.reportType === reviewReportType);
-  const reviewReadyReports = reviewSelectedReports.filter(report => report.status === "ok" && Number(report.detectedRows) > 0);
-  const reviewBlockedReports = reviewSelectedReports.filter(report => report.status === "ok" && Number(report.detectedRows) === 0);
+  const reviewScopedReports = (allScan?.reports || []).filter(report =>
+    reviewSeason &&
+    divisionsForReport(report, reviewSeason).length > 0 &&
+    (reviewReportType === "all" || report.reportType === reviewReportType)
+  );
+  const reviewReadyReports = reviewScopedReports.filter(report => report.status === "ok" && Number(report.detectedRows) > 0);
+  const reviewBlockedReports = reviewScopedReports.filter(report => report.status === "ok" && Number(report.detectedRows) === 0);
+  const reviewMissingReports = reviewScopedReports.filter(report => report.status === "missing");
+  const reviewErrorReports = reviewScopedReports.filter(report => report.status !== "ok" && report.status !== "missing");
   useEffect(() => {
-    if (!reviewGroups.length) return;
-    const group = reviewGroups.find(item => item.key === reviewGroupKey) || reviewGroups[0];
-    if (group.key !== reviewGroupKey) setReviewGroupKey(group.key);
-    const matches = discoverySeasons.filter(target => target.is_active && divisionsForGroup(group, target).length > 0);
-    if (!matches.some(target => String(target.id) === String(reviewSeasonId))) {
-      setReviewSeasonId(matches.length === 1 ? String(matches[0].id) : "");
+    if (!allScan) return;
+    if (!reviewSeasonOptions.some(target => String(target.id) === String(reviewSeasonId))) {
+      setReviewSeasonId(reviewSeasonOptions.length === 1 ? String(reviewSeasonOptions[0].id) : "");
     }
     setReviewValidation(null);
     setReviewResult(null);
-  }, [allScan, discoverySeasons, reviewGroupKey]);
+  }, [allScan, discoverySeasons]);
 
   const codes = ibaCodesForSeason(season);
   const supported = Array.isArray(codes.contexts) && codes.contexts.length > 0;
@@ -237,7 +234,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>All-format report discovery</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-            Scan Masters, Advanced, and Open for all seven days (21 format/day groups; up to 63 PDFs). Discovery is read-only; map each report group to the matching division context within the selected season before importing.
+            Scan Masters, Advanced, and Open for all seven days (21 format/day groups; up to 63 PDFs). Discovery is read-only; review the matching reports together across the selected season, or filter to a single report category across all of its format/day groups.
           </div>
           <button className="btn-sm" onClick={scanAllReports} disabled={scanningAll} style={{ marginTop: 8 }}>
             {scanningAll ? <><RefreshCw size={12} className="spin" /> Scanning {scanProgress?.completedGroups || 0}/{scanProgress?.totalGroups || 21} groups…</> : "Scan All IBA Formats & Days"}
@@ -253,71 +250,64 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                 <span>· {allScan.reports.filter(r => r.status === "ok" && r.detectedRows === 0).length} with zero parsed rows</span>
               </div>
               <section style={{ margin: "10px 0", padding: 10, border: "1px solid #3A3A3A", borderRadius: 7 }}>
-                <div style={{ fontSize: 12, fontWeight: 700 }}>Review & import a mapped format/day group</div>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>Review & import across the selected season</div>
                 <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-                  Choose the matching season and IBA format/day. Each PDF covers every division in that context, so preflight validates every matching division independently. Missing PDFs may be normal; extraction errors and zero-row reports are blocked.
+                  Select a season and either import all three report categories together or focus on one category across every matching format/day. The review maps each discovered PDF to that season's divisions, validates each division's report week against its schedule and import history, and ignores unrelated format/day groups. Missing PDFs are normal; extraction errors and zero-row reports block the batch.
                 </div>
                 <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
-                    Report category (import one category at a time)
+                    Import scope
                     <select className="input" value={reviewReportType} onChange={e => { setReviewReportType(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
-                      <option value="rost">Roster & ratings</option><option value="div">Team standings</option><option value="mvp">MVP standings</option>
-                    </select>
-                  </label>
-                  <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
-                    IBA format and day
-                    <select className="input" value={reviewGroupKey} onChange={e => { setReviewGroupKey(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
-                      {reviewGroups.map(group => <option key={group.key} value={group.key}>{group.formatLabel} · {group.dayLabel}</option>)}
+                      <option value="all">All categories — full season</option><option value="rost">Roster & ratings — full season</option><option value="div">Team standings — full season</option><option value="mvp">MVP standings — full season</option>
                     </select>
                   </label>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
                     Target season
                     <select className="input" value={reviewSeasonId} onChange={e => { setReviewSeasonId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
-                      <option value="">Select matching season…</option>
-                      {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {divisionsForGroup(reviewGroup, target).length} matching divisions</option>)}
+                      <option value="">Select target season…</option>
+                      {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {(target.divisions || []).length} division(s)</option>)}
                     </select>
                   </label>
                 </div>
                 <div style={{ fontSize: 11, color: "#CCC", marginTop: 8 }}>
-                  {reviewSelectedReports.filter(report => report.status === "ok").length} extracted for selected category · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewSelectedReports.filter(report => report.status !== "ok").length} missing/error
+                  {reviewScopedReports.filter(report => report.status === "ok").length} extracted · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewMissingReports.length} missing (allowed) · {reviewErrorReports.length} extraction/fetch error(s)
+                </div>
+                <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 6 }}>
+                  {reviewScopedReports.map(report => <div key={report.key}>{report.formatLabel} · {report.dayLabel} · {report.reportLabel || report.reportType.toUpperCase()}: {report.status === "ok" ? `${report.detectedRows} rows${report.reportWeek?.weekNumber ? ` · Week ${report.reportWeek.weekNumber}` : ""}` : `${report.status} — ${report.message || "not available"}`}{report.status === "ok" && report.detectedRows === 0 ? " · BLOCKED" : ""}</div>)}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                  <button className="btn-primary" disabled={!reviewSeason || reviewReadyReports.length !== 1 || reviewBlockedReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
+                  <button className="btn-primary" disabled={!reviewSeason || reviewReadyReports.length === 0 || reviewBlockedReports.length > 0 || reviewErrorReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
                     setReviewLoading(true); setReviewError(""); setReviewValidation(null); setReviewResult(null);
                     try {
-                      const validation = await validateIbaReports(reviewReadyReports, reviewSeason);
+                      const validation = await validateIbaReports(reviewScopedReports, reviewSeason);
                       setReviewValidation(validation);
-                      if (!validation.canImport) setReviewError("Preflight blocked this group. Review each division result; no data was written.");
+                      if (!validation.canImport) setReviewError("Preflight blocked this season-wide batch. Review each division result; no data was written.");
                     } catch (e) {
-                      setReviewError(e?.message || "Could not validate this report group.");
+                      setReviewError(e?.message || "Could not validate the selected season reports.");
                     } finally { setReviewLoading(false); }
                   }}>
-                    {reviewLoading ? "Validating…" : "Validate mapped reports"}
+                    {reviewLoading ? "Validating…" : "Validate full-season selection"}
                   </button>
-                  <button className="btn-primary" disabled={!reviewValidation?.canImport || reviewReadyReports.length !== 1 || !reviewSeason || reviewImporting || reviewLoading} onClick={async () => {
+                  <button className="btn-primary" disabled={!reviewValidation?.canImport || reviewReadyReports.length === 0 || reviewBlockedReports.length > 0 || reviewErrorReports.length > 0 || !reviewSeason || reviewImporting || reviewLoading} onClick={async () => {
                     setReviewImporting(true); setReviewError(""); setReviewResult(null);
                     try {
-                      const result = await importIbaReports(reviewReadyReports, reviewSeason, [], reviewValidation);
+                      const result = await importIbaReports(reviewScopedReports, reviewSeason, [], reviewValidation);
                       setReviewResult(result);
                       if (onComplete) await onComplete();
                     } catch (e) {
                       setReviewError(`Import failed. Some writes may already have succeeded; verify data and import history for each matching division before retrying. ${e?.message || ""}`);
                     } finally { setReviewImporting(false); }
                   }}>
-                    {reviewImporting ? "Importing…" : "Import validated group"}
+                    {reviewImporting ? "Importing…" : "Import validated selection"}
                   </button>
                 </div>
-                {reviewGroupReports.length > 0 && (
-                  <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 8 }}>
-                    {reviewGroupReports.map(report => <div key={report.key}>{report.reportType.toUpperCase()}: {report.status === "ok" ? `${report.detectedRows} rows${report.reportWeek?.weekNumber ? ` · Week ${report.reportWeek.weekNumber}` : ""}` : `${report.status} — ${report.message || "not available"}`}{report.status === "ok" && report.detectedRows === 0 ? " · BLOCKED" : ""}</div>)}
-                  </div>
-                )}
                 {reviewValidation && (
                   <div style={{ marginTop: 10, borderTop: "1px solid #303030", paddingTop: 8 }}>
                     <div style={{ fontSize: 11, fontWeight: 700 }}>Per-division preflight</div>
                     {reviewValidation.checks.map((check, index) => <div key={check.key || index} style={{ fontSize: 10.5, color: check.status === "ready" || check.status === "duplicate" ? "#5FCF9E" : "#F0C36D", marginTop: 4 }}>
                       {check.reportType.toUpperCase()} · Division {check.divisionNum}: {check.status} — {check.reason}
                     </div>)}
+                    {reviewValidation.reportFailures?.filter(failure => failure.status !== "missing").map((failure, index) => <div key={index} style={{ fontSize: 10.5, color: "#F0C36D", marginTop: 4 }}>{failure.reportType.toUpperCase()}: {failure.status} — {failure.reason}</div>)}
                   </div>
                 )}
                 {reviewError && <div className="error-msg" style={{ marginTop: 8 }}>{reviewError}</div>}
@@ -328,7 +318,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                     {reviewResult.standings && <div>Team standings: {reviewResult.standings.imported || 0} row(s) imported{reviewResult.standings.skipped?.length ? ` · ${reviewResult.standings.skipped.length} unmatched/ambiguous row(s) skipped` : ""}.</div>}
                     {reviewResult.mvp && <div>MVP standings: {reviewResult.mvp.imported || 0} row(s) imported{reviewResult.mvp.skipped?.length ? ` · ${reviewResult.mvp.skipped.length} unmatched/ambiguous row(s) skipped` : ""}.</div>}
                     {(reviewResult.warnings || []).map((warning, index) => <div key={index} style={{ color: "#F0C36D" }}>{warning}</div>)}
-                    <div style={{ color: "#AAA", marginTop: 4 }}>Review this result before moving to another report category. If any error was reported, verify each matching division's data and import history before retrying.</div>
+                    <div style={{ color: "#AAA", marginTop: 4 }}>Review this result before another import. If any error was reported, verify each matching division's data and import history before retrying.</div>
                   </div>
                 )}
               </section>
