@@ -1744,7 +1744,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 const divs         = s.divisions ?? [];
                 return (
                   <div key={s.id} className={`season-card ${isAct?"season-card--active":""}`}>
-                    <div className="season-card__header" onClick={()=>{setExpandedSeason(isExpanded?null:s.id);if(!isExpanded){setNewDivisionFormat(s.format || "Masters");setNewDivisionDay(s.day || "Wednesday");}}}>
+                    <div className="season-card__header" onClick={()=>{setExpandedSeason(isExpanded?null:s.id);if(!isExpanded){setNewDivisionFormat(divs[0]?.format || s.format || "Masters");setNewDivisionDay(divs[0]?.day || s.day || "Wednesday");}}}>
                       <div>
                         <div className="season-card__name">{seasonLabel(s)}</div>
                         <div className="season-card__meta">{divs.length} division{divs.length!==1?"s":""}{isAct?" · ● Active":""}</div>
@@ -1777,7 +1777,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                             <div key={d.id} className="div-row">
                               <span className="div-row__num">Div {d.num}</span>
                               <span className="div-row__name">{d.name || "—"}</span>
-                              <span className="div-row__name" style={{fontSize:10,color:"#8A8A8A"}}>{d.format || "Masters"} · {d.day || "Wednesday"}</span>
+                              <span className="div-row__name" style={{fontSize:10,color:"#8A8A8A"}}>{d.format || s.format || "Context required"} · {d.day || s.day || "Context required"}</span>
                               <button className="btn-icon" onClick={()=>startEditDivision(d)}><Edit2 size={11}/></button>
                               <button className="btn-icon btn-icon--danger" onClick={()=>onRemoveDivision(d.id)}><Trash2 size={11}/></button>
                             </div>
