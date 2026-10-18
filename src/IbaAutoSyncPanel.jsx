@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
-import { fetchIbaReports, fetchAllIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason } from "./ibaAutoSync";
+import { fetchIbaReports, fetchAllIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason, scopeIbaReportsToSeason, ibaReportMatchesSeasonContext } from "./ibaAutoSync";
 import * as db from "./db";
 
 export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportType = null, manualMode = false }) {
@@ -56,17 +56,9 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     return () => { active = false; };
   }, []);
 
-  const groupMatchesDivision = (report, division) =>
-    String(division?.format || "").toLowerCase() === ({ mast: "masters", adv: "advanced", open: "open" })[report?.leagueType] &&
-    String(division?.day || "").toLowerCase() === ({ mon: "monday", tues: "tuesday", wed: "wednesday", thur: "thursday", fri: "friday", sat: "saturday", sun: "sunday" })[report?.day];
-  const divisionsForReport = (report, target) => (target?.divisions || []).filter(division => report && groupMatchesDivision(report, division));
-  const reviewSeasonOptions = discoverySeasons.filter(target => target.is_active && (allScan?.reports || []).some(report => divisionsForReport(report, target).length > 0));
+  const reviewSeasonOptions = discoverySeasons.filter(target => target.is_active && (allScan?.reports || []).some(report => ibaReportMatchesSeasonContext(report, target)));
   const reviewSeason = reviewSeasonOptions.find(target => String(target.id) === String(reviewSeasonId)) || null;
-  const reviewScopedReports = (allScan?.reports || []).filter(report =>
-    reviewSeason &&
-    divisionsForReport(report, reviewSeason).length > 0 &&
-    (reviewReportType === "all" || report.reportType === reviewReportType)
-  );
+  const reviewScopedReports = scopeIbaReportsToSeason(allScan?.reports || [], reviewSeason, reviewReportType);
   const reviewReadyReports = reviewScopedReports.filter(report => report.status === "ok" && Number(report.detectedRows) > 0);
   const reviewBlockedReports = reviewScopedReports.filter(report => report.status === "ok" && Number(report.detectedRows) === 0);
   const reviewMissingReports = reviewScopedReports.filter(report => report.status === "missing");
