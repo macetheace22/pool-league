@@ -77,7 +77,13 @@ describe("mapped IBA report validation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     db.listSeasons.mockResolvedValue([season]);
-    db.listTeams.mockResolvedValue([]);
+    db.listTeams.mockImplementation(async divisionId => {
+      if (divisionId === "division-151" || divisionId === "masters-wed-151") return [{ teamNum: "15001" }];
+      if (divisionId === "division-152") return [{ teamNum: "15002" }];
+      if (divisionId === "division-287") return [{ teamNum: "28701" }];
+      if (divisionId === "advanced-wed-151") return [{ teamNum: "15001" }];
+      return [];
+    });
     db.listSchedule.mockResolvedValue([{ week: 17, date: "10/09/2026" }]);
     db.listIbaReportImportHistory.mockResolvedValue({ data: [], error: null });
   });
@@ -110,14 +116,14 @@ describe("mapped IBA report validation", () => {
     };
     const mastersReport = {
       ...report,
-      text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n152 North Masters\nFor week: 17\n",
+      text: "Fall Season 2026 Week 17\n151 TCB Masters\nFor week: 17\n152 North Masters\nFor week: 17\n15001\\tTeam One\\t10\\t100\\t5\n15002\\tTeam Two\\t12\\t110\\t6\n",
     };
     const advancedReport = {
       ...report,
       key: "advweddiv",
       leagueType: "adv",
       day: "wed",
-      text: "Fall Season 2026 Week 17\n287 Advanced Wednesday\nFor week: 17\n",
+      text: "Fall Season 2026 Week 17\n287 Advanced Wednesday\nFor week: 17\n28701\\tAdvanced Team\\t10\\t100\\t5\n",
     };
     const result = await validateIbaReports([mastersReport, advancedReport], multiContextSeason);
 
@@ -175,6 +181,22 @@ describe("mapped IBA report validation", () => {
       status: "error",
       reason: "IBA request timed out",
     });
+  });
+
+  it("blocks a division with no matching rows even when another division in the PDF has data", async () => {
+    const mastersReport = {
+      ...report,
+      text: "Fall Season 2026 Week 17\\n151 TCB Masters\\nFor week: 17\\n152 North Masters\\nFor week: 17\\n15001\\tTeam One\\t10\\t100\\t5\\n",
+    };
+
+    const result = await validateIbaReports([mastersReport], season);
+
+    expect(result.canImport).toBe(false);
+    expect(result.checks).toHaveLength(2);
+    expect(result.checks.find(check => check.divisionId === "division-151"))
+      .toMatchObject({ status: "ready", parsedRowCount: 1 });
+    expect(result.checks.find(check => check.divisionId === "division-152"))
+      .toMatchObject({ status: "blocked_zero_rows", parsedRowCount: 0, reason: expect.stringMatching(/zero records for this division/i) });
   });
 
   it("keeps repeated division numbers isolated by format and day", async () => {
