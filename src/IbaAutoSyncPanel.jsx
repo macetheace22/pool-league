@@ -297,7 +297,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                   <div style={{ marginTop: 10, borderTop: "1px solid #303030", paddingTop: 8 }}>
                     <div style={{ fontSize: 11, fontWeight: 700 }}>Per-division preflight</div>
                     {reviewValidation.checks.map((check, index) => <div key={check.key || index} style={{ fontSize: 10.5, color: check.status === "ready" || check.status === "duplicate" ? "#5FCF9E" : "#F0C36D", marginTop: 4 }}>
-                      {check.reportType.toUpperCase()} · Division {check.divisionNum}: {check.status} — {check.reason}
+                      {check.reportType.toUpperCase()} · Division {check.divisionNum}: {check.status} — {check.reason}{Number.isFinite(check.parsedRowCount) ? ` (${check.parsedRowCount} matching record(s))` : ""}
                     </div>)}
                     {reviewValidation.reportFailures?.filter(failure => failure.status !== "missing").map((failure, index) => <div key={index} style={{ fontSize: 10.5, color: "#F0C36D", marginTop: 4 }}>{failure.reportType.toUpperCase()}: {failure.status} — {failure.reason}</div>)}
                   </div>
