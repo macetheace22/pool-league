@@ -320,11 +320,16 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     return [];
   }))];
   const routing = await db.listActiveTeamsByNumbers(teamNums);
+  // Restrict team-number routing to the explicitly selected season. Team
+  // numbers may repeat across seasons as well as across IBA format/day groups.
+  const seasonDivisionIds = new Set((season?.divisions || []).map(division => String(division.id)));
   const routingForReport = report => Object.fromEntries(Object.entries(routing.byNum || {}).map(([teamNum, matches]) => [
     teamNum,
     matches.filter(team => {
       const codes = contextCodes(team);
-      return codes.leagueType === report.leagueType && codes.day === report.day;
+      return seasonDivisionIds.has(String(team.divisionId)) &&
+        codes.leagueType === report.leagueType &&
+        codes.day === report.day;
     }),
   ]));
 
