@@ -526,7 +526,8 @@ export async function setPlayoffsStartDate(seasonId, date) {
 }
 
 // ─── Divisions ──────────────────────────────────────────────────────────────
-export async function addDivision(seasonId, num, name, format = "Masters", day = "Wednesday") {
+export async function addDivision(seasonId, num, name, format, day) {
+  if (!seasonId || !String(format || "").trim() || !String(day || "").trim()) return null;
   const { data, error } = await supabase.from("divisions").insert({ season_id: seasonId, num, name, format, day }).select().single();
   return error ? null : data;
 }
@@ -667,13 +668,12 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
   const divisionName = String(name ?? "").trim();
 
   if (!seasonId) return { ok: false, error: "A season is required." };
-  const { data: seasonContext, error: seasonContextError } = await supabase
-    .from("seasons").select("format, day").eq("id", seasonId).single();
-  if (seasonContextError) return { ok: false, error: seasonContextError.message };
-  const format = String(payload.format || seasonContext?.format || "Masters");
-  const day = String(payload.day || seasonContext?.day || "Wednesday");
+  const format = String(payload.format || "").trim();
+  const day = String(payload.day || "").trim();
   if (!divisionNum) return { ok: false, error: "An IBA division number is required." };
   if (!divisionName) return { ok: false, error: "An IBA division name is required." };
+  if (!["Masters", "Advanced", "Open"].includes(format)) return { ok: false, error: "A valid IBA format is required for this division." };
+  if (!["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].includes(day)) return { ok: false, error: "A valid IBA day is required for this division." };
   if (!importedTeams.length) return { ok: false, error: "IBA returned no teams for this division." };
   if (!importedWeeks.length) return { ok: false, error: "IBA returned no schedule weeks for this division." };
 
