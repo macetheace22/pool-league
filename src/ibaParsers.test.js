@@ -55,6 +55,20 @@ describe("extractIbaReportWeeksByDivision", () => {
     expect(result.reportWeek).toMatchObject({ weekNumber: null, ambiguous: true });
   });
 
+  it("recognizes IBA division headers that include a hash marker", () => {
+    const text = [
+      "Division #151 TCB Masters",
+      "For week: 17",
+      "Team data...",
+      "Division #152 North Masters",
+      "For week: 16",
+      "Team data...",
+    ].join("\n");
+    const result = extractIbaReportWeeksByDivision(text);
+    expect(result.hasDivisionSections).toBe(true);
+    expect(result.byDivision["151"]).toMatchObject({ weekNumber: 17, divisionLabel: "TCB Masters" });
+    expect(result.byDivision["152"]).toMatchObject({ weekNumber: 16, divisionLabel: "North Masters" });
+  });
   it("reports missing week metadata for a division rather than borrowing another division's week", () => {
     const text = [
       "Division 151 TCB Masters",

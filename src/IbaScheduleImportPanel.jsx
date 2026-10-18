@@ -21,6 +21,10 @@ async function postSchedule(body) {
   return data;
 }
 
+function divisionKey(division) {
+  return `${division?.format || ""}:${division?.day || ""}:${division?.value || division?.label || ""}`;
+}
+
 export default function IbaScheduleImportPanel({ season, onImported, compact = false }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -61,24 +65,25 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setRetrieveProgress({ current: 0, total: 0 });
 
     try {
-      const discovered = await postSchedule({
-        action: "discover",
-        format: season.format,
-        day: season.day,
-      });
-
-      const found = discovered.divisions || [];
-      setDiagnostic(discovered.diagnostic || null);
+      const discovered = await postSchedule({ action: "discover-all" });
+      const found = (discovered.groups || []).flatMap(group =>
+        (group.divisions || []).map(division => ({
+          ...division,
+          format: group.format,
+          day: group.day,
+        }))
+      );
+      setDiagnostic(discovered.diagnostic || { totals: discovered.totals, errors: discovered.errors });
 
       setSelected(
         Object.fromEntries(
-          found.map((d) => [d.value || d.label, true])
+          found.map((d) => [divisionKey(d), true])
         )
       );
 
       if (!found.length) {
         setError(
-          "IBA returned zero divisions for this format and night. Review the IBA response diagnostics below."
+          "IBA returned no divisions across the available formats and days. Review the IBA response diagnostics below."
         );
         return;
       }
@@ -87,22 +92,29 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       const fetched = {};
       const errors = [];
 
-      for (const division of found) {
-        const key = division.value || division.label;
-
-        try {
-          const data = await postSchedule({
-            action: "fetch",
-            format: season.format,
-            day: season.day,
-            division: division.value || division.label,
-          });
-          fetched[key] = data;
-          setRetrieveProgress(p => ({ ...p, current: p.current + 1 }));
-        } catch (e) {
-          setRetrieveProgress(p => ({ ...p, current: p.current + 1 }));
-          errors.push(`${division.label}: ${e?.message || "Unable to retrieve division schedule."}`);
+      // Fetch in small batches so a season with many format/day groups does
+      // not require dozens of sequential round trips to IBA.
+      for (let i = 0; i < found.length; i += 4) {
+        const batch = found.slice(i, i + 4);
+        const results = await Promise.all(batch.map(async division => {
+          const key = divisionKey(division);
+          try {
+            const data = await postSchedule({
+              action: "fetch",
+              format: division.format,
+              day: division.day,
+              division: division.value || division.label,
+            });
+            return { key, data, division };
+          } catch (e) {
+            return { key, division, error: e?.message || "Unable to retrieve division schedule." };
+          }
+        }));
+        for (const item of results) {
+          if (item.data) fetched[item.key] = item.data;
+          if (item.error) errors.push(`${item.division.label} (${item.division.format} · ${item.division.day}): ${item.error}`);
         }
+        setRetrieveProgress(progress => ({ ...progress, current: Math.min(found.length, progress.current + batch.length) }));
       }
 
       setDivisions(found);
@@ -119,15 +131,15 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   };
 
   const fetchPreview = async (division) => {
-    const key = division.value || division.label;
+    const key = divisionKey(division);
     setLoading(true);
     setError("");
 
     try {
       const data = await postSchedule({
         action: "fetch",
-        format: season.format,
-        day: season.day,
+        format: division.format,
+        day: division.day,
         division: division.value || division.label,
       });
       setPreviews(p => ({ ...p, [key]: data }));
@@ -140,7 +152,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   };
 
   const importSelected = async () => {
-    const chosen = (divisions || []).filter(d => selected[d.value || d.label]);
+    const chosen = (divisions || []).filter(d => selected[divisionKey(d)]);
     if (!chosen.length) return;
 
     setImporting(true);
@@ -153,14 +165,14 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       const skipped = [];
 
       for (const d of chosen) {
-        const key = d.value || d.label;
+        const key = divisionKey(d);
         let data = previews[key];
 
         if (!data) {
           data = await postSchedule({
             action: "fetch",
-            format: season.format,
-            day: season.day,
+            format: d.format,
+            day: d.day,
             division: d.value || d.label,
           });
           setPreviews(p => ({ ...p, [key]: data }));
@@ -176,6 +188,8 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         const importedDivision = await db.importIbaScheduleDivision(season.id, {
           num: divisionNum,
           name: d.label,
+          format: d.format,
+          day: d.day,
           teams: data.teams,
           weeks: data.weeks,
         });
@@ -262,7 +276,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       </div>
 
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>
-        Automatically checks the IBA schedule for <strong style={{ color: "#E0E0E0" }}>{season.format}</strong> on <strong style={{ color: "#E0E0E0" }}>{season.day}</strong>, discovers every published division, retrieves each division's teams and complete schedule, and imports them into this season.
+        Discovers published divisions across Masters, Advanced, and Open and all seven league nights, then imports each division's teams and schedule into this season with its own format/day context.
       </div>
 
       {!divisions && !result && statusReady && (
@@ -322,7 +336,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
             {divisions.map(d => {
-              const key = d.value || d.label;
+              const key = divisionKey(d);
               const data = previews[key];
               const open = expanded === key;
 
@@ -336,6 +350,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                     />
                     <div className="list-row__body" style={{ flex: 1 }}>
                       <span className="list-row__name">{d.label}</span>
+                      <span className="list-row__sub">{d.format} · {d.day}</span>
                       <span className="list-row__sub">
                         {data ? `${data.teams?.length ?? 0} teams · ${data.weeks?.length ?? 0} weeks · ${data.weeks?.reduce((n, w) => n + (w.pairings?.length || 0), 0) ?? 0} matchups` : "Schedule unavailable"}
                       </span>

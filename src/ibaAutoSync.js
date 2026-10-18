@@ -22,27 +22,67 @@ function currentWeekTag(schedule) {
   return { weekKey, label: `Week ${current.week} · ${current.date}` };
 }
 
-export function ibaCodesForSeason(season) {
-  const format = String(season?.format || "").toLowerCase();
-  const day = String(season?.day || "").toLowerCase();
+const REPORT_TYPES = ["rost", "div", "mvp"];
+const FORMAT_LABELS = { mast: "Masters", adv: "Advanced", open: "Open" };
+const DAY_LABELS = { mon: "Monday", tues: "Tuesday", wed: "Wednesday", thur: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
+
+function contextCodes(context) {
+  const format = String(context?.format || "").toLowerCase();
+  const day = String(context?.day || "").toLowerCase();
   return { leagueType: FORMAT_TO_CODE[format] || null, day: DAY_TO_CODE[day] || null };
 }
 
+export function ibaCodesForSeason(season) {
+  const contexts = [...new Map((season?.divisions || [])
+    .map(division => ({ ...contextCodes(division), format: division.format, dayName: division.day }))
+    .filter(context => context.leagueType && context.day)
+    .map(context => [`${context.leagueType}:${context.day}`, context])).values()];
+  if (contexts.length) return { ...contexts[0], contexts };
+  if (Array.isArray(season?.divisions) && season.divisions.length === 0) {
+    return { leagueType: null, day: null, contexts: [] };
+  }
+  const legacy = contextCodes(season);
+  return { ...legacy, contexts: legacy.leagueType && legacy.day ? [{ ...legacy, format: season?.format, dayName: season?.day }] : [] };
+}
+
 export async function fetchIbaReports(season, reportType = null) {
-  const { leagueType, day } = ibaCodesForSeason(season);
-  if (!leagueType || !day) throw new Error("The selected season must have a supported format and day.");
+  const { contexts } = ibaCodesForSeason(season);
+  if (!contexts.length) throw new Error("The selected season has no divisions with a valid IBA format and day. Import its IBA schedule first.");
+  const requestedTypes = reportType ? [reportType] : REPORT_TYPES;
+  const reportsToFetch = contexts.flatMap(context =>
+    requestedTypes.map(type => ({ leagueType: context.leagueType, day: context.day, reportType: type }))
+  );
   const response = await fetch("/api/iba-reports", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(reportType ? { reports: [{ leagueType, day, reportType }] } : { leagueType, day }),
+    body: JSON.stringify({ reports: reportsToFetch }),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || "Could not retrieve IBA reports.");
-  return { ...body, leagueType, day };
+  const reports = (body.reports || []).map(report => ({
+    ...report,
+    formatLabel: FORMAT_LABELS[report.leagueType] || report.leagueType,
+    dayLabel: DAY_LABELS[report.day] || report.day,
+  }));
+  return { ...body, reports, contexts };
 }
 
 const ALL_LEAGUE_TYPES = ["mast", "adv", "open"];
 const ALL_DAYS = ["mon", "tues", "wed", "thur", "fri", "sat", "sun"];
 const REPORT_TYPE_LABELS = { rost: "Roster & ratings", div: "Team standings", mvp: "MVP standings" };
+
+export function ibaReportMatchesSeasonContext(report, season) {
+  return (season?.divisions || []).some(division => {
+    const codes = contextCodes(division);
+    return codes.leagueType === report?.leagueType && codes.day === report?.day;
+  });
+}
+
+export function scopeIbaReportsToSeason(reports, season, reportType = "all") {
+  return (reports || []).filter(report =>
+    (reportType === "all" || report.reportType === reportType) &&
+    ibaReportMatchesSeasonContext(report, season)
+  );
+}
 
 export async function fetchAllIbaReports(onProgress = () => {}) {
   const groups = ALL_LEAGUE_TYPES.flatMap(leagueType =>
@@ -106,7 +146,12 @@ export async function validateIbaReports(reports, season, options = {}) {
     const teams = await db.listTeams(division.id);
     const scheduledWeeks = await db.listSchedule(division.id, teams);
     const historyResult = await db.listIbaReportImportHistory(season.id, division.id);
-    for (const report of (reports ?? []).filter(item => item.status === "ok")) {
+    const divisionCodes = contextCodes(division);
+    for (const report of (reports ?? []).filter(item =>
+      item.status === "ok" &&
+      item.leagueType === divisionCodes.leagueType &&
+      item.day === divisionCodes.day
+    )) {
       const reportMetadata = {
         reportWeek: extractIbaReportWeek(report.text),
         reportWeeksByDivision: extractIbaReportWeeksByDivision(report.text),
@@ -119,9 +164,28 @@ export async function validateIbaReports(reports, season, options = {}) {
         history: historyResult.error ? null : historyResult.data,
         contentSha256: report.sha256,
       });
+      const divisionTeamNums = new Set((teams || [])
+        .map(team => String(team.teamNum ?? "").trim())
+        .filter(Boolean));
+      let parsedRowCount = 0;
+      if (report.reportType === "rost") {
+        const parsed = parseLeagueRoster(report.text);
+        const playerNums = new Set(Object.entries(parsed.rosters || {})
+          .filter(([teamNum]) => divisionTeamNums.has(String(teamNum).trim()))
+          .flatMap(([, nums]) => nums.map(num => String(num))));
+        parsedRowCount = [...playerNums].filter(num => parsed.registry?.[num]).length;
+      } else if (report.reportType === "div") {
+        parsedRowCount = parseStandingsImport(report.text)
+          .filter(row => divisionTeamNums.has(String(row.teamNum ?? "").trim())).length;
+      } else if (report.reportType === "mvp") {
+        parsedRowCount = parseMvpImport(report.text)
+          .filter(row => divisionTeamNums.has(String(row.teamNum ?? "").trim())).length;
+      }
       const scheduledWeek = scheduledWeeks.find(item => Number(item.week) === Number(classification.week?.weekNumber));
-      let status = classification.status;
-      let reason = classification.reason;
+      let status = parsedRowCount === 0 ? "blocked_zero_rows" : classification.status;
+      let reason = parsedRowCount === 0
+        ? "The report contains zero records for this division; import is blocked."
+        : classification.reason;
       let weekTag = null;
       if (status === "ready") {
         weekTag = getValidatedScheduleWeekTag(classification.week.weekNumber, scheduledWeek?.date);
@@ -134,11 +198,15 @@ export async function validateIbaReports(reports, season, options = {}) {
       }
       checks.push({
         key: `${report.reportType}:${division.id}`,
+        reportKey: report.key,
+        leagueType: report.leagueType,
+        day: report.day,
         reportType: report.reportType,
         divisionId: division.id,
         divisionNum: String(division.num),
         divisionName: division.name,
         weekNumber: classification.week?.weekNumber ?? null,
+        parsedRowCount,
         status,
         reason,
         weekTag,
@@ -150,7 +218,10 @@ export async function validateIbaReports(reports, season, options = {}) {
   return {
     checks,
     weekTagsByReportDivision,
-    canImport: allChecksReady && reportFailures.length === 0,
+    // A missing PDF is normal when a format/day is not playing this week.
+    // Other independently validated format/day groups may still be imported.
+    // Actual fetch errors and empty PDFs remain fail-closed.
+    canImport: allChecksReady && reportFailures.every(failure => failure.status === "missing"),
     reportFailures: reportFailures.map(report => ({
       reportType: report.reportType,
       status: report.status,
@@ -160,26 +231,107 @@ export async function validateIbaReports(reports, season, options = {}) {
 }
 
 export async function buildIbaPreview(reports) {
-  const byType = Object.fromEntries((reports ?? []).map(r => [r.reportType, r]));
-  const preview = { reports: [], roster: null, standings: null, mvp: null, errors: [] };
-  for (const r of reports ?? []) {
-    preview.reports.push({ key: r.key, reportType: r.reportType, status: r.status, pages: r.pages, bytes: r.bytes, message: r.message, reportWeek: r.status === "ok" ? extractIbaReportWeek(r.text) : null, reportWeeksByDivision: r.status === "ok" ? extractIbaReportWeeksByDivision(r.text) : null });
+  const preview = { reports: [], sections: [], roster: null, standings: null, mvp: null, errors: [] };
+  const rosterSections = [];
+  const standingsSections = [];
+  const mvpSections = [];
+
+  for (const report of reports ?? []) {
+    const section = {
+      key: report.key,
+      reportType: report.reportType,
+      leagueType: report.leagueType,
+      day: report.day,
+      formatLabel: report.formatLabel || FORMAT_LABELS[report.leagueType] || report.leagueType,
+      dayLabel: report.dayLabel || DAY_LABELS[report.day] || report.day,
+      status: report.status,
+      reportWeek: report.status === "ok" ? extractIbaReportWeek(report.text) : null,
+      reportWeeksByDivision: report.status === "ok" ? extractIbaReportWeeksByDivision(report.text) : null,
+    };
+    if (report.status === "ok") {
+      if (report.reportType === "rost") {
+        section.parsed = parseLeagueRoster(report.text);
+        section.teamCount = Object.keys(section.parsed.rosters || {}).length;
+        section.playerCount = Object.keys(section.parsed.registry || {}).length;
+        rosterSections.push(section);
+      } else if (report.reportType === "div") {
+        section.rows = parseStandingsImport(report.text);
+        standingsSections.push(section);
+      } else if (report.reportType === "mvp") {
+        section.rows = parseMvpImport(report.text);
+        mvpSections.push(section);
+      }
+    }
+    preview.reports.push({
+      key: section.key,
+      reportType: section.reportType,
+      status: section.status,
+      pages: report.pages,
+      bytes: report.bytes,
+      message: report.message,
+      reportWeek: section.reportWeek,
+      reportWeeksByDivision: section.reportWeeksByDivision,
+      formatLabel: section.formatLabel,
+      dayLabel: section.dayLabel,
+      detectedRows: section.reportType === "rost" ? section.playerCount : section.rows?.length,
+      teamCount: section.teamCount,
+    });
+    preview.sections.push(section);
   }
-  if (byType.rost?.status === "ok") {
-    const parsed = parseLeagueRoster(byType.rost.text);
-    preview.roster = { parsed, teamCount: Object.keys(parsed.rosters).length, playerCount: Object.keys(parsed.registry).length };
+
+  const mergeRosterSections = sections => {
+    const parsed = { registry: {}, rosters: {}, teams: {}, needsRating: [], ambiguousRoster: [] };
+    let playerCount = 0;
+    let teamCount = 0;
+    for (const section of sections) {
+      const current = section.parsed;
+      if (!current) continue;
+      playerCount += Object.keys(current.registry || {}).length;
+      teamCount += Object.keys(current.rosters || {}).length;
+      Object.assign(parsed.registry, current.registry || {});
+      Object.assign(parsed.teams, current.teams || {});
+      for (const [teamNum, players] of Object.entries(current.rosters || {})) {
+        parsed.rosters[teamNum] = [...new Set([...(parsed.rosters[teamNum] || []), ...players])];
+      }
+      parsed.needsRating.push(...(current.needsRating || []));
+      parsed.ambiguousRoster.push(...(current.ambiguousRoster || []));
+    }
+    return { parsed, playerCount, teamCount };
+  };
+  if (rosterSections.length) {
+    const merged = mergeRosterSections(rosterSections);
+    preview.roster = { ...merged, sections: rosterSections };
   }
-  if (byType.div?.status === "ok") preview.standings = { rows: parseStandingsImport(byType.div.text) };
-  if (byType.mvp?.status === "ok") preview.mvp = { rows: parseMvpImport(byType.mvp.text) };
+  if (standingsSections.length) {
+    preview.standings = { rows: standingsSections.flatMap(section => section.rows || []), sections: standingsSections };
+  }
+  if (mvpSections.length) {
+    preview.mvp = { rows: mvpSections.flatMap(section => section.rows || []), sections: mvpSections };
+  }
   return preview;
 }
 
 export async function importIbaReports(reports, season, schedule, preflight) {
   if (!preflight?.canImport) throw new Error("Import blocked: complete the per-division validation checks before writing any data.");
-  const weekTag = currentWeekTag(schedule);
-  const importedDivisionIdsByType = { rost: [], div: [], mvp: [] };
+  const fallbackWeekTag = currentWeekTag(schedule);
+  const result = {
+    weekTag: fallbackWeekTag,
+    roster: { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], warnings: [] },
+    standings: { imported: 0, skipped: [] },
+    mvp: { imported: 0, skipped: [] },
+    warnings: [],
+    skippedDuplicateDivisions: preflight.checks
+      .filter(check => check.status === "duplicate")
+      .map(check => `${check.reportType.toUpperCase()} · Division ${check.divisionNum} · Week ${check.weekNumber}`),
+  };
+
   const recordHistory = async (report, reportType, divisionIds) => {
-    const checks = preflight.checks.filter(check => check.reportType === reportType && divisionIds.includes(check.divisionId));
+    const checks = preflight.checks.filter(check =>
+      check.reportKey === report.key &&
+      check.reportType === reportType &&
+      divisionIds.includes(check.divisionId) &&
+      check.status === "ready"
+    );
     for (const check of checks) {
       const saved = await db.recordIbaReportImportHistory({
         seasonId: season.id,
@@ -193,74 +345,100 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       if (!saved.ok) throw new Error(`Data was saved, but import history could not be recorded for division ${check.divisionNum}: ${saved.error}`);
     }
   };
-  const result = { weekTag, roster: null, standings: null, mvp: null, warnings: [], skippedDuplicateDivisions: preflight.checks.filter(check => check.status === "duplicate").map(check => `${check.reportType.toUpperCase()} · Division ${check.divisionNum} · Week ${check.weekNumber}`) };
-  const byType = Object.fromEntries((reports ?? []).map(r => [r.reportType, r]));
 
-  if (byType.rost?.status === "ok") {
-    const parsed = parseLeagueRoster(byType.rost.text);
-    const readyRosterDivisions = new Set(preflight.checks.filter(check => check.reportType === "rost" && check.status === "ready").map(check => check.divisionId));
-    const allRosterTeamNums = Object.keys(parsed.rosters ?? {});
-    const rosterRouting = await db.listActiveTeamsByNumbers(allRosterTeamNums);
-    const eligibleTeamNums = new Set(allRosterTeamNums.filter(teamNum => {
-      const matches = rosterRouting.byNum[teamNum] || [];
-      return matches.length === 1 && readyRosterDivisions.has(matches[0].divisionId);
+  const successfulReports = (reports ?? []).filter(report => report.status === "ok");
+  const teamNums = [...new Set(successfulReports.flatMap(report => {
+    if (report.reportType === "rost") return Object.keys(parseLeagueRoster(report.text).rosters || {});
+    if (report.reportType === "div") return parseStandingsImport(report.text).map(row => row.teamNum);
+    if (report.reportType === "mvp") return parseMvpImport(report.text).map(row => row.teamNum);
+    return [];
+  }))];
+  const routing = await db.listActiveTeamsByNumbers(teamNums);
+  // Restrict team-number routing to the explicitly selected season. Team
+  // numbers may repeat across seasons as well as across IBA format/day groups.
+  const seasonDivisionIds = new Set((season?.divisions || []).map(division => String(division.id)));
+  const routingForReport = report => Object.fromEntries(Object.entries(routing.byNum || {}).map(([teamNum, matches]) => [
+    teamNum,
+    matches.filter(team => {
+      const codes = contextCodes(team);
+      return seasonDivisionIds.has(String(team.divisionId)) &&
+        codes.leagueType === report.leagueType &&
+        codes.day === report.day;
+    }),
+  ]));
+
+  for (const report of successfulReports.filter(item => item.reportType === "rost")) {
+    const parsed = parseLeagueRoster(report.text);
+    const checks = preflight.checks.filter(check => check.reportKey === report.key && check.reportType === "rost");
+    const readyDivisionIds = new Set(checks.filter(check => check.status === "ready").map(check => check.divisionId));
+    const reportRouting = routingForReport(report);
+    const eligibleTeamNums = new Set(Object.keys(parsed.rosters || {}).filter(teamNum => {
+      const matches = reportRouting[teamNum] || [];
+      return matches.length === 1 && readyDivisionIds.has(matches[0].divisionId);
     }));
+    const ambiguousTeamNums = Object.keys(parsed.rosters || {}).filter(teamNum => {
+      const matches = reportRouting[teamNum] || [];
+      return matches.length > 1 && matches.some(team => readyDivisionIds.has(team.divisionId));
+    });
+    if (ambiguousTeamNums.length) result.warnings.push(`${report.key}: ${ambiguousTeamNums.length} roster team numbers matched multiple active divisions and were skipped.`);
     const eligiblePlayerNums = new Set([...eligibleTeamNums].flatMap(teamNum => parsed.rosters[teamNum] || []));
     const filteredParsed = {
       ...parsed,
-      rosters: Object.fromEntries(Object.entries(parsed.rosters ?? {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
-      teams: Object.fromEntries(Object.entries(parsed.teams ?? {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
-      registry: Object.fromEntries(Object.entries(parsed.registry ?? {}).filter(([, player]) => eligiblePlayerNums.has(player.num))),
-      needsRating: (parsed.needsRating ?? []).filter(player => eligiblePlayerNums.has(player.num)),
+      rosters: Object.fromEntries(Object.entries(parsed.rosters || {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
+      teams: Object.fromEntries(Object.entries(parsed.teams || {}).filter(([teamNum]) => eligibleTeamNums.has(teamNum))),
+      registry: Object.fromEntries(Object.entries(parsed.registry || {}).filter(([, player]) => eligiblePlayerNums.has(player.num))),
+      needsRating: (parsed.needsRating || []).filter(player => eligiblePlayerNums.has(player.num)),
+      ambiguousRoster: (parsed.ambiguousRoster || []).filter(item => eligiblePlayerNums.has(item.playerNum || item.num)),
     };
-    result.roster = eligibleTeamNums.size
-      ? await db.bulkImportPlayers(filteredParsed, { byReportDivision: preflight.weekTagsByReportDivision, fallback: weekTag })
-      : { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], skippedDuplicates: true };
-    importedDivisionIdsByType.rost = (result.roster?.updatedDivisions ?? []).map(item => item.divisionId);
-    if (importedDivisionIdsByType.rost.length) await recordHistory(byType.rost, "rost", importedDivisionIdsByType.rost);
-    if (parsed.ambiguousRoster?.length) result.warnings.push(`${parsed.ambiguousRoster.length} roster assignments need review.`);
-    if (result.roster?.ambiguousTeamIds?.length) result.warnings.push(`${result.roster.ambiguousTeamIds.length} team numbers matched more than one active division.`);
-    if (result.roster?.unmatchedTeams?.length) result.warnings.push(`${result.roster.unmatchedTeams.length} team numbers were not matched to an active team.`);
+    if (!eligibleTeamNums.size) continue;
+    const imported = await db.bulkImportPlayers(filteredParsed, {
+      byReportDivision: preflight.weekTagsByReportDivision,
+      allowedDivisionIds: [...readyDivisionIds],
+      fallback: fallbackWeekTag,
+    });
+    result.roster.updatedDivisions.push(...(imported?.updatedDivisions || []));
+    result.roster.unmatchedTeams.push(...(imported?.unmatchedTeams || []));
+    result.roster.ambiguousTeamIds.push(...(imported?.ambiguousTeamIds || []));
+    result.roster.warnings.push(...(imported?.warnings || []));
+    const updatedIds = (imported?.updatedDivisions || []).map(item => item.divisionId);
+    if (updatedIds.length) await recordHistory(report, "rost", updatedIds);
   }
 
-  const teamNums = [
-    ...(byType.div?.status === "ok" ? parseStandingsImport(byType.div.text).map(r => r.teamNum) : []),
-    ...(byType.mvp?.status === "ok" ? parseMvpImport(byType.mvp.text).map(r => r.teamNum) : []),
-  ];
-  const routing = await db.listActiveTeamsByNumbers([...new Set(teamNums)]);
-
-  if (byType.div?.status === "ok") {
-    const rows = parseStandingsImport(byType.div.text);
-    const grouped = groupByDivision(rows, routing.byNum);
-    result.standings = { imported: 0, skipped: grouped.skipped };
+  for (const report of successfulReports.filter(item => item.reportType === "div")) {
+    const grouped = groupByDivision(parseStandingsImport(report.text), routingForReport(report));
+    result.standings.skipped.push(...grouped.skipped);
+    const importedDivisionIds = [];
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
-      if (!preflight.checks.some(check => check.reportType === "div" && check.divisionId === divisionId)) continue;
-      if (preflight.checks.some(check => check.reportType === "div" && check.divisionId === divisionId && check.status === "duplicate")) continue;
-      const divisionWeekTag = preflight.weekTagsByReportDivision[`div:${divisionId}`];
-      if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} standings.`);
-      const ok = await db.importStandingsForWeek(divisionId, group.rows, group.teams, divisionWeekTag);
+      const check = preflight.checks.find(item => item.reportKey === report.key && item.reportType === "div" && item.divisionId === divisionId);
+      if (!check || check.status === "duplicate") continue;
+      if (check.status !== "ready") throw new Error(`Import blocked: division ${check.divisionNum} standings were not validated.`);
+      const tag = preflight.weekTagsByReportDivision[`div:${divisionId}`];
+      if (!tag) throw new Error(`Import blocked: no validated report week for division ${divisionId} standings.`);
+      const ok = await db.importStandingsForWeek(divisionId, group.rows, group.teams, tag);
       if (!ok) throw new Error(`Could not save standings for division ${divisionId}.`);
       result.standings.imported += group.rows.length;
-      if (group.rows.length) importedDivisionIdsByType.div.push(divisionId);
+      if (group.rows.length) importedDivisionIds.push(divisionId);
     }
-    if (importedDivisionIdsByType.div.length) await recordHistory(byType.div, "div", importedDivisionIdsByType.div);
+    if (importedDivisionIds.length) await recordHistory(report, "div", importedDivisionIds);
   }
 
-  if (byType.mvp?.status === "ok") {
-    const rows = parseMvpImport(byType.mvp.text);
-    const grouped = groupByDivision(rows, routing.byNum);
-    result.mvp = { imported: 0, skipped: grouped.skipped };
+  for (const report of successfulReports.filter(item => item.reportType === "mvp")) {
+    const grouped = groupByDivision(parseMvpImport(report.text), routingForReport(report));
+    result.mvp.skipped.push(...grouped.skipped);
+    const importedDivisionIds = [];
     for (const [divisionId, group] of Object.entries(grouped.groups)) {
-      if (!preflight.checks.some(check => check.reportType === "mvp" && check.divisionId === divisionId)) continue;
-      if (preflight.checks.some(check => check.reportType === "mvp" && check.divisionId === divisionId && check.status === "duplicate")) continue;
-      const divisionWeekTag = preflight.weekTagsByReportDivision[`mvp:${divisionId}`];
-      if (!divisionWeekTag) throw new Error(`Import blocked: no validated report week for division ${divisionId} MVP standings.`);
-      const ok = await db.importMvpForWeek(divisionId, group.rows, divisionWeekTag);
+      const check = preflight.checks.find(item => item.reportKey === report.key && item.reportType === "mvp" && item.divisionId === divisionId);
+      if (!check || check.status === "duplicate") continue;
+      if (check.status !== "ready") throw new Error(`Import blocked: division ${check.divisionNum} MVP standings were not validated.`);
+      const tag = preflight.weekTagsByReportDivision[`mvp:${divisionId}`];
+      if (!tag) throw new Error(`Import blocked: no validated report week for division ${divisionId} MVP standings.`);
+      const ok = await db.importMvpForWeek(divisionId, group.rows, tag);
       if (!ok) throw new Error(`Could not save MVP standings for division ${divisionId}.`);
       result.mvp.imported += group.rows.length;
-      if (group.rows.length) importedDivisionIdsByType.mvp.push(divisionId);
+      if (group.rows.length) importedDivisionIds.push(divisionId);
     }
-    if (importedDivisionIdsByType.mvp.length) await recordHistory(byType.mvp, "mvp", importedDivisionIdsByType.mvp);
+    if (importedDivisionIds.length) await recordHistory(report, "mvp", importedDivisionIds);
   }
+
   return result;
 }

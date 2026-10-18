@@ -47,7 +47,7 @@ export async function getProfile(userId) {
   if (!data) return data;
   const { data: memberships } = await supabase
     .from("profile_team_memberships")
-    .select("id, team_id, joined_at, ended_at, teams(id, name, team_num, division_id, venue, is_bye, divisions(id, num, name, season_id, seasons(id, type, year, format, day, is_active)))")
+    .select("id, team_id, joined_at, ended_at, teams(id, name, team_num, division_id, venue, is_bye, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active)))")
     .eq("profile_id", userId)
     .is("ended_at", null)
     .order("joined_at", { ascending: true });
@@ -198,13 +198,17 @@ export async function generateChampionshipBracket(divisionId) {
 // awkward small one. Returned as a proposal for the manager to review/edit
 // before committing -- nothing is written yet.
 export async function previewConsolationBrackets(divisionId) {
-  const { data: thisDivision } = await supabase.from("divisions").select("id, season_id, seasons(format, day)").eq("id", divisionId).single();
+  const { data: thisDivision } = await supabase.from("divisions")
+    .select("id, season_id, format, day").eq("id", divisionId).single();
   if (!thisDivision) return { error: "Division not found.", brackets: [] };
 
   const { data: sisterDivisions } = await supabase.from("divisions")
-    .select("id").eq("season_id", thisDivision.season_id);
-  // Only divisions sharing this division's season (same format+day, since
-  // it's one season_id per format/day combo in how seasons are modeled here).
+    .select("id")
+    .eq("season_id", thisDivision.season_id)
+    .eq("format", thisDivision.format)
+    .eq("day", thisDivision.day);
+  // Only divisions sharing this season and IBA format/day context can share
+  // consolation bracket slots.
   const divisionIds = (sisterDivisions ?? []).map(d => d.id);
 
   const pools = await Promise.all(divisionIds.map(async (divId) => {
@@ -439,8 +443,10 @@ export async function getIbaScheduleImportStatus(seasonId) {
 
   const { data: divisions, error: divisionError } = await supabase
     .from("divisions")
-    .select("id, num, name")
+    .select("id, num, name, format, day")
     .eq("season_id", seasonId)
+    .order("format")
+    .order("day")
     .order("num");
 
   if (divisionError) return { divisions: [], totals: { divisions: 0, teams: 0, weeks: 0, pairings: 0 }, error: divisionError.message };
@@ -478,6 +484,8 @@ export async function getIbaScheduleImportStatus(seasonId) {
       id: d.id,
       num: d.num,
       name: d.name,
+      format: d.format,
+      day: d.day,
       teamCount: teamCounts[d.id] ?? 0,
       weekCount: weekCounts[d.id] ?? 0,
       pairingCount: pairingCounts[d.id] ?? 0,
@@ -518,16 +526,17 @@ export async function setPlayoffsStartDate(seasonId, date) {
 }
 
 // ─── Divisions ──────────────────────────────────────────────────────────────
-export async function addDivision(seasonId, num, name) {
-  const { data, error } = await supabase.from("divisions").insert({ season_id: seasonId, num, name }).select().single();
+export async function addDivision(seasonId, num, name, format, day) {
+  if (!seasonId || !String(format || "").trim() || !String(day || "").trim()) return null;
+  const { data, error } = await supabase.from("divisions").insert({ season_id: seasonId, num, name, format, day }).select().single();
   return error ? null : data;
 }
 export async function removeDivision(divisionId) {
   const { error } = await supabase.from("divisions").delete().eq("id", divisionId);
   return !error;
 }
-export async function updateDivision(divisionId, num, name) {
-  const { error } = await supabase.from("divisions").update({ num, name }).eq("id", divisionId);
+export async function updateDivision(divisionId, num, name, format, day) {
+  const { error } = await supabase.from("divisions").update({ num, name, format, day }).eq("id", divisionId);
   return !error;
 }
 // Lightweight team counts per division -- used by the Seasons page to know
@@ -563,7 +572,7 @@ export async function listActiveTeamsByNumbers(teamNums = []) {
 
   const { data, error } = await supabase
     .from('teams')
-    .select('id, name, team_num, division_id, divisions(num, name, seasons(is_active))')
+    .select('id, name, team_num, division_id, divisions(num, name, format, day, seasons(is_active))')
     .in('team_num', nums);
 
   if (error) throw new Error(error.message);
@@ -580,6 +589,8 @@ export async function listActiveTeamsByNumbers(teamNums = []) {
       divisionId: row.division_id,
       divisionNum: row.divisions?.num ?? null,
       divisionName: row.divisions?.name ?? null,
+      format: row.divisions?.format ?? null,
+      day: row.divisions?.day ?? null,
     });
   }
 
@@ -657,16 +668,22 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
   const divisionName = String(name ?? "").trim();
 
   if (!seasonId) return { ok: false, error: "A season is required." };
+  const format = String(payload.format || "").trim();
+  const day = String(payload.day || "").trim();
   if (!divisionNum) return { ok: false, error: "An IBA division number is required." };
   if (!divisionName) return { ok: false, error: "An IBA division name is required." };
+  if (!["Masters", "Advanced", "Open"].includes(format)) return { ok: false, error: "A valid IBA format is required for this division." };
+  if (!["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].includes(day)) return { ok: false, error: "A valid IBA day is required for this division." };
   if (!importedTeams.length) return { ok: false, error: "IBA returned no teams for this division." };
   if (!importedWeeks.length) return { ok: false, error: "IBA returned no schedule weeks for this division." };
 
   try {
     let { data: division, error: divisionLookupError } = await supabase
       .from("divisions")
-      .select("id, num, name, season_id")
+      .select("id, num, name, season_id, format, day")
       .eq("season_id", seasonId)
+      .eq("format", format)
+      .eq("day", day)
       .eq("num", divisionNum)
       .maybeSingle();
 
@@ -677,7 +694,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
     if (division) {
       const { data: updated, error } = await supabase
         .from("divisions")
-        .update({ name: divisionName })
+        .update({ name: divisionName, format, day })
         .eq("id", division.id)
         .select()
         .single();
@@ -686,7 +703,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
     } else {
       const { data: created, error } = await supabase
         .from("divisions")
-        .insert({ season_id: seasonId, num: divisionNum, name: divisionName })
+        .insert({ season_id: seasonId, num: divisionNum, name: divisionName, format, day })
         .select()
         .single();
 
@@ -695,9 +712,11 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
         // insert, re-read it rather than leaving the import half-complete.
         const { data: existing } = await supabase
           .from("divisions")
-          .select("id, num, name, season_id")
+          .select("id, num, name, season_id, format, day")
           .eq("season_id", seasonId)
-          .eq("num", divisionNum)
+          .eq("format", format)
+      .eq("day", day)
+      .eq("num", divisionNum)
           .maybeSingle();
         if (!existing) return { ok: false, error: error?.message || "Could not create the division." };
         division = existing;
@@ -1134,10 +1153,16 @@ export async function bulkImportPlayers(parsed, weekTag) {
   const teamNums = Object.keys(parsed.rosters ?? {});
   const { data: teamRows, error: teamLookupError } = await supabase
     .from("teams")
-    .select("id, division_id, team_num, divisions(seasons(is_active))")
+    .select("id, division_id, team_num, divisions(format, day, seasons(is_active))")
     .in("team_num", teamNums);
   if (teamLookupError) throw new Error(`Could not resolve roster teams: ${teamLookupError.message}`);
-  const activeRows = (teamRows ?? []).filter(r => r.divisions?.seasons?.is_active);
+  const allowedDivisionIds = Array.isArray(weekTag?.allowedDivisionIds)
+    ? new Set(weekTag.allowedDivisionIds.map(String))
+    : null;
+  const activeRows = (teamRows ?? []).filter(r =>
+    r.divisions?.seasons?.is_active &&
+    (!allowedDivisionIds || allowedDivisionIds.has(String(r.division_id)))
+  );
 
   const byNum = {};
   const ambiguousTeamIds = [];
@@ -2224,7 +2249,7 @@ export async function listAllDivisionsFlat() {
   for (const s of seasons) {
     for (const d of (s.divisions ?? [])) {
       divs.push({ id: d.id, num: d.num, name: d.name, isActive: s.is_active,
-        seasonLabel: `${s.type} ${s.year} · ${s.format} · ${s.day}` });
+        seasonLabel: `${s.type} ${s.year}` });
     }
   }
   return divs;
@@ -2274,7 +2299,7 @@ export async function listPlayerTeamHistory(playerNum) {
   const teamIds = [...new Set((rosterRows ?? []).map(r => r.team_id))];
   if (teamIds.length === 0) return [];
   const { data: teamRows } = await supabase.from("teams")
-    .select("id, name, team_num, division_id, divisions(id, num, name, season_id, seasons(id, type, year, format, day, is_active))")
+    .select("id, name, team_num, division_id, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active))")
     .in("id", teamIds);
   return (teamRows ?? []).map(t => {
     const d = t.divisions, s = d?.seasons;
@@ -2282,7 +2307,7 @@ export async function listPlayerTeamHistory(playerNum) {
       teamId: t.id, teamName: t.name, teamNum: t.team_num,
       divisionId: d?.id ?? null, divisionNum: d?.num ?? null, divisionName: d?.name ?? "",
       seasonId: s?.id ?? null, seasonType: s?.type ?? "", seasonYear: s?.year ?? null,
-      seasonFormat: s?.format ?? "", seasonDay: s?.day ?? "", isActive: !!s?.is_active,
+      seasonFormat: d?.format ?? "", seasonDay: d?.day ?? "", isActive: !!s?.is_active,
     };
   }).sort((a, b) => (b.isActive - a.isActive) || ((b.seasonYear ?? 0) - (a.seasonYear ?? 0)));
 }
