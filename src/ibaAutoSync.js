@@ -164,17 +164,27 @@ export async function validateIbaReports(reports, season, options = {}) {
         history: historyResult.error ? null : historyResult.data,
         contentSha256: report.sha256,
       });
-      const parsedRowCount = report.reportType === "rost"
-        ? Object.keys(parseLeagueRoster(report.text).registry || {}).length
-        : report.reportType === "div"
-          ? parseStandingsImport(report.text).length
-          : report.reportType === "mvp"
-            ? parseMvpImport(report.text).length
-            : 0;
+      const divisionTeamNums = new Set((teams || [])
+        .map(team => String(team.teamNum ?? "").trim())
+        .filter(Boolean));
+      let parsedRowCount = 0;
+      if (report.reportType === "rost") {
+        const parsed = parseLeagueRoster(report.text);
+        const playerNums = new Set(Object.entries(parsed.rosters || {})
+          .filter(([teamNum]) => divisionTeamNums.has(String(teamNum).trim()))
+          .flatMap(([, nums]) => nums.map(num => String(num))));
+        parsedRowCount = [...playerNums].filter(num => parsed.registry?.[num]).length;
+      } else if (report.reportType === "div") {
+        parsedRowCount = parseStandingsImport(report.text)
+          .filter(row => divisionTeamNums.has(String(row.teamNum ?? "").trim())).length;
+      } else if (report.reportType === "mvp") {
+        parsedRowCount = parseMvpImport(report.text)
+          .filter(row => divisionTeamNums.has(String(row.teamNum ?? "").trim())).length;
+      }
       const scheduledWeek = scheduledWeeks.find(item => Number(item.week) === Number(classification.week?.weekNumber));
       let status = parsedRowCount === 0 ? "blocked_zero_rows" : classification.status;
       let reason = parsedRowCount === 0
-        ? "The report parsed to zero records; import is blocked."
+        ? "The report contains zero records for this division; import is blocked."
         : classification.reason;
       let weekTag = null;
       if (status === "ready") {
@@ -196,6 +206,7 @@ export async function validateIbaReports(reports, season, options = {}) {
         divisionNum: String(division.num),
         divisionName: division.name,
         weekNumber: classification.week?.weekNumber ?? null,
+        parsedRowCount,
         status,
         reason,
         weekTag,
