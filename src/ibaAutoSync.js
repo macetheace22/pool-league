@@ -70,6 +70,20 @@ const ALL_LEAGUE_TYPES = ["mast", "adv", "open"];
 const ALL_DAYS = ["mon", "tues", "wed", "thur", "fri", "sat", "sun"];
 const REPORT_TYPE_LABELS = { rost: "Roster & ratings", div: "Team standings", mvp: "MVP standings" };
 
+export function ibaReportMatchesSeasonContext(report, season) {
+  return (season?.divisions || []).some(division => {
+    const codes = contextCodes(division);
+    return codes.leagueType === report?.leagueType && codes.day === report?.day;
+  });
+}
+
+export function scopeIbaReportsToSeason(reports, season, reportType = "all") {
+  return (reports || []).filter(report =>
+    (reportType === "all" || report.reportType === reportType) &&
+    ibaReportMatchesSeasonContext(report, season)
+  );
+}
+
 export async function fetchAllIbaReports(onProgress = () => {}) {
   const groups = ALL_LEAGUE_TYPES.flatMap(leagueType =>
     ALL_DAYS.map(day => ({ leagueType, day }))
