@@ -1763,7 +1763,26 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                     </div>
                     {isExpanded && (
                       <div className="season-card__body">
-                        {divs.map((d) => (
+                        <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
+
+                        {divs.length > 0 && (
+                          <div className="field" style={{gap:6}}>
+                            <Label>Configured Divisions</Label>
+                            {divs.map(d => (
+                              <div key={d.id} className="div-row">
+                                <span className="div-row__num">Div {d.num}</span>
+                                <span className="div-row__name">{d.name || "—"}</span>
+                                <span className="div-row__name" style={{fontSize:10,color:"#8A8A8A"}}>{d.format || "Format required"} · {d.day || "Day required"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <details style={{border:"1px solid #3A3A3A",borderRadius:10,padding:12,marginTop:8}}>
+                          <summary style={{cursor:"pointer",fontWeight:700,fontSize:12.5,color:"#F59E0B"}}>Manual Division Setup (fallback)</summary>
+                          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+                            <div style={{fontSize:11.5,color:"#9A9A9A"}}>Use this only when you need to add, edit, or remove a division manually. Automatic IBA discovery above is the normal setup path.</div>
+{divs.map((d) => (
                           editingDivId === d.id ? (
                             <div key={d.id} className="div-row div-row--edit" style={{flexWrap:"wrap"}}>
                               <input className="edit-input" style={{width:70,flex:"none"}} placeholder="Div #" value={editDivNum}
@@ -1793,7 +1812,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           <select className="input" value={newDivisionDay} onChange={e=>setNewDivisionDay(e.target.value)} aria-label="New division IBA day" style={{minWidth:120}}><option value="">Select day…</option>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
                           <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim() || !newDivisionFormat || !newDivisionDay}><Plus size={13}/></button>
                         </div>
-                        <IbaScheduleImportPanel season={s} onImported={onImportIbaSchedule} />
+                          </div>
+                        </details>
                          
                         <div className="field" style={{marginTop:10}}>
                           <Label>Playoffs Start Date</Label>
