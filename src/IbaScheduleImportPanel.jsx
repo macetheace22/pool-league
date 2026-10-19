@@ -352,7 +352,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                       <span className="list-row__name">{d.label}</span>
                       <span className="list-row__sub">{d.format} · {d.day}</span>
                       <span className="list-row__sub">
-                        {data ? `${data.teams?.length ?? 0} teams · ${data.weeks?.length ?? 0} weeks · ${data.weeks?.reduce((n, w) => n + (w.pairings?.length || 0), 0) ?? 0} matchups` : "Schedule unavailable"}
+                        {!data ? "Schedule unavailable — select Preview to retry" : (!data.hasSchedule || !data.teams?.length || !data.weeks?.length) ? "Review needed: IBA returned no usable team and schedule data" : `${data.teams?.length ?? 0} teams · ${data.weeks?.length ?? 0} weeks · ${data.weeks?.reduce((n, w) => n + (w.pairings?.length || 0), 0) ?? 0} matchups`}
                       </span>
                     </div>
                     <button className="btn-sm" onClick={() => data ? setExpanded(open ? null : key) : fetchPreview(d)} disabled={loading || importing}>
@@ -374,7 +374,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         </>
       )}
 
-      {result && !statusReady && (
+      {result && (
         <div className="import-warning-block" style={{ background: "#0F2D1F", borderColor: "#1F6B4A", marginTop: 10 }}>
           <div className="import-warning-block__title" style={{ color: "#5FCF9E" }}>
             <Check size={12}/> IBA schedule sync complete
