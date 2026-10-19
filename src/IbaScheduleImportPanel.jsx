@@ -359,7 +359,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           )}
           <button className="btn-sm" onClick={discover} disabled={loading || importing} style={{ marginTop: 8 }}>Rediscover all divisions</button>
         </div>
-      )}}
+      )}
     </div>
     </>
   );
