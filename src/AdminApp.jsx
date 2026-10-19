@@ -498,7 +498,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
-            onSeasonCreated={()=>setSeasonsSubTab("inactive")}
+            onSeasonCreated={(created)=>setSeasonsSubTab(created?.is_active ? "active" : "inactive")}
             onImportIbaSchedule={refreshSeasons} />
         </div>
       </>
@@ -1772,7 +1772,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         
                         <button className={`btn-sm ${isAct?"btn-sm--warn":"btn-sm--accent"}`}
-                          onClick={e=>{e.stopPropagation();onToggleActive(s);if(!isAct)setExpandedSeason(s.id);}}>
+                          onClick={async e=>{e.stopPropagation();await onToggleActive(s);setSubTab(!isAct ? "active" : "inactive");if(!isAct)setExpandedSeason(s.id);}}>
                           {isAct?"Deactivate":"Set Active"}
                         </button>
                         {!isAct && <button className="btn-icon btn-icon--danger" onClick={e=>{e.stopPropagation();deleteSeason(s);}}><Trash2 size={13}/></button>}
@@ -1797,9 +1797,9 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                         )}
 
                         <details style={{border:"1px solid #3A3A3A",borderRadius:10,padding:12,marginTop:8}}>
-                          <summary style={{cursor:"pointer",fontWeight:700,fontSize:12.5,color:"#F59E0B"}}>Manual Division Setup (fallback)</summary>
+                          <summary style={{cursor:"pointer",fontWeight:700,fontSize:12.5,color:"#F59E0B"}}>Advanced: Add or Edit Divisions (only if needed)</summary>
                           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
-                            <div style={{fontSize:11.5,color:"#9A9A9A"}}>Use this only when you need to add, edit, or remove a division manually. Automatic IBA discovery above is the normal setup path.</div>
+                            <div style={{fontSize:11.5,color:"#9A9A9A"}}>This is not an import option. Use it only to add, rename, correct, or remove division records. To import teams and schedules, use Sync from IBA or Manual Import: Teams & Schedule above.</div>
 {divs.map((d) => (
                           editingDivId === d.id ? (
                             <div key={d.id} className="div-row div-row--edit" style={{flexWrap:"wrap"}}>
