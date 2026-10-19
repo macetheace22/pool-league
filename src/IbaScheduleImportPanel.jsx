@@ -132,83 +132,42 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
   const fetchPreview = async (division) => {
     const key = divisionKey(division);
-    setLoading(true);
-    setError("");
-
+    setLoading(true); setError("");
     try {
-      const data = await postSchedule({
-        action: "fetch",
-        format: division.format,
-        day: division.day,
-        division: division.value || division.label,
-      });
-      setPreviews(p => ({ ...p, [key]: data }));
-      setExpanded(key);
-    } catch (e) {
-      setError(e?.message || `Could not retrieve ${division.label}.`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const importSelected = async () => {
-    const chosen = (divisions || []).filter(d => selected[divisionKey(d)]);
-    if (!chosen.length) return;
-
-    setImporting(true);
-    setError("");
-    setResult(null);
-    setImportProgress({ current: 0, total: chosen.length });
-
-    try {
-      const imported = [];
-      const skipped = [];
-
-      for (const d of chosen) {
-        const key = divisionKey(d);
-        let data = previews[key];
-
-        if (!data) {
-          data = await postSchedule({
-            action: "fetch",
-            format: d.format,
-            day: d.day,
-            division: d.value || d.label,
-          });
-          setPreviews(p => ({ ...p, [key]: data }));
-        }
-
-        if (!data.hasSchedule || !data.teams?.length || !data.weeks?.length) {
-          skipped.push(`${d.label}: no schedule data returned`);
-          setImportProgress(p => ({ ...p, current: p.current + 1 }));
-          continue;
-        }
-
-        const divisionNum = extractDivisionNum(d);
-        const importedDivision = await db.importIbaScheduleDivision(season.id, {
-          num: divisionNum,
-          name: d.label,
-          format: d.format,
-          day: d.day,
-          teams: data.teams,
-          weeks: data.weeks,
-        });
-
-        if (importedDivision.ok) imported.push(importedDivision);
-        else skipped.push(`${d.label}: ${importedDivision.error || "import failed"}`);
-        setImportProgress(p => ({ ...p, current: p.current + 1 }));
+      const data = await postSchedule({ action: "fetch", format: division.format, day: division.day, division: division.value || division.label });
+      setPreviews(p => ({ ...p, [key]: data })); setExpanded(key);
+      if (result?.skipped?.some(item => item.key === key)) {
+        const usable = data.hasSchedule && data.teams?.length && data.weeks?.length;
+        setResult(current => current ? { ...current, recoveredKeys: usable ? [...new Set([...(current.recoveredKeys || []), key])] : (current.recoveredKeys || []).filter(existingKey => existingKey !== key) } : current);
       }
-
-      setResult({ imported, skipped });
-      await refreshImportStatus();
-      if (onImported) await onImported();
-    } catch (e) {
-      setError(e?.message || "Unable to import the selected schedules.");
-    } finally {
-      setImporting(false);
-    }
+    } catch (e) { setError(e?.message || ("Could not retrieve " + division.label + ".")); }
+    finally { setLoading(false); }
   };
 
+  const importSelected = async (onlyKeys = null) => {
+    const chosen = (divisions || []).filter(d => onlyKeys ? onlyKeys.includes(divisionKey(d)) : selected[divisionKey(d)]);
+    if (!chosen.length) return;
+    const previousResult = result;
+    setImporting(true); setError(""); setImportProgress({ current: 0, total: chosen.length });
+    const imported = []; const skipped = [];
+    for (const d of chosen) {
+      const key = divisionKey(d);
+      try {
+        let data = previews[key];
+        if (!data) { data = await postSchedule({ action: "fetch", format: d.format, day: d.day, division: d.value || d.label }); setPreviews(p => ({ ...p, [key]: data })); }
+        if (!data.hasSchedule || !data.teams?.length || !data.weeks?.length) { skipped.push({ key, label: d.label, reason: "IBA returned no usable team and schedule data" }); continue; }
+        const importedDivision = await db.importIbaScheduleDivision(season.id, { num: extractDivisionNum(d), name: d.label, format: d.format, day: d.day, teams: data.teams, weeks: data.weeks });
+        if (importedDivision.ok) imported.push(importedDivision); else skipped.push({ key, label: d.label, reason: importedDivision.error || "Import failed" });
+      } catch (e) { skipped.push({ key, label: d.label, reason: e?.message || "Unable to retrieve or import this division" }); }
+      finally { setImportProgress(p => ({ ...p, current: p.current + 1 })); }
+    }
+    const previousImported = previousResult?.imported || [];
+    const remainingPreviousSkipped = (previousResult?.skipped || []).filter(item => !chosen.some(d => divisionKey(d) === item.key));
+    setResult({ imported: [...previousImported, ...imported], skipped: [...remainingPreviousSkipped, ...skipped], recoveredKeys: (previousResult?.recoveredKeys || []).filter(key => !chosen.some(d => divisionKey(d) === key)) });
+    try { await refreshImportStatus(); if (onImported) await onImported(); }
+    catch (e) { setError(e?.message || "Schedules were processed, but the season status could not be refreshed."); }
+    finally { setImporting(false); }
+  };
   const selectedCount = Object.values(selected).filter(Boolean).length;
   const totalTeams = result?.imported?.reduce((n, x) => n + (x.teamCount || 0), 0) || 0;
   const totalWeeks = result?.imported?.reduce((n, x) => n + (x.weekCount || 0), 0) || 0;
@@ -375,23 +334,32 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       )}
 
       {result && (
-        <div className="import-warning-block" style={{ background: "#0F2D1F", borderColor: "#1F6B4A", marginTop: 10 }}>
-          <div className="import-warning-block__title" style={{ color: "#5FCF9E" }}>
-            <Check size={12}/> IBA schedule sync complete
-          </div>
-          <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>
-            {result.imported.length} division{result.imported.length === 1 ? "" : "s"} imported · {totalTeams} teams · {totalWeeks} schedule weeks · {totalPairings} matchups
-          </div>
+        <div className="import-warning-block" style={{ background: result.skipped.length ? "#30230F" : "#0F2D1F", borderColor: result.skipped.length ? "#8A5A16" : "#1F6B4A", marginTop: 10 }}>
+          <div className="import-warning-block__title" style={{ color: result.skipped.length ? "#F59E0B" : "#5FCF9E" }}>{result.skipped.length ? <AlertCircle size={12}/> : <Check size={12}/>} {result.skipped.length ? "IBA schedule sync needs review" : "IBA schedule sync complete"}</div>
+          <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>{result.imported.length} division{result.imported.length === 1 ? "" : "s"} imported · {totalTeams} teams · {totalWeeks} schedule weeks · {totalPairings} matchups</div>
           {result.skipped.length > 0 && (
-            <div style={{ fontSize: 10.5, color: "#F59E0B", marginTop: 5 }}>
-              Review: {result.skipped.join(" · ")}
-            </div>
+            <>
+              <div style={{ fontSize: 11, color: "#E0E0E0", marginTop: 8 }}>Only the divisions listed here need attention. Successful imports are retained; you do not need to rediscover all divisions.</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                {result.skipped.map(item => {
+                  const division = (divisions || []).find(d => divisionKey(d) === item.key);
+                  const data = previews[item.key];
+                  const usable = !!(data?.hasSchedule && data.teams?.length && data.weeks?.length);
+                  const recovered = (result.recoveredKeys || []).includes(item.key);
+                  return <div key={item.key} style={{ border: "1px solid #5A421F", borderRadius: 7, padding: 8 }}>
+                    <div style={{ fontWeight: 700, color: "#FFFFFF" }}>{item.label}</div>
+                    <div style={{ fontSize: 10.5, color: "#C8C8C8", marginTop: 2 }}>{item.reason}</div>
+                    {recovered && usable && <div style={{ fontSize: 10.5, color: "#5FCF9E", marginTop: 4 }}>Schedule data retrieved. Ready to upload this division.</div>}
+                    <button className="btn-sm" style={{ marginTop: 6 }} disabled={loading || importing || !division} onClick={() => division && fetchPreview(division)}>{loading && expanded === item.key ? "Retrying…" : "Retry this division"}</button>
+                  </div>;
+                })}
+              </div>
+              {(result.recoveredKeys || []).length > 0 && <button className="btn-primary" style={{ marginTop: 8 }} disabled={loading || importing} onClick={() => importSelected(result.recoveredKeys)}>Upload recovered divisions</button>}
+            </>
           )}
-          <button className="btn-sm" onClick={() => { setResult(null); setDivisions(null); setPreviews({}); setSelected({}); }} style={{ marginTop: 7 }}>
-            Check Again
-          </button>
+          <button className="btn-sm" onClick={discover} disabled={loading || importing} style={{ marginTop: 8 }}>Rediscover all divisions</button>
         </div>
-      )}
+      )}}
     </div>
     </>
   );
