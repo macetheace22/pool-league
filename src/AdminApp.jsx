@@ -498,7 +498,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
-            onSeasonCreated={(created)=>setSeasonsSubTab(created?.is_active ? "active" : "inactive")}
+            onSeasonCreated={(_, makeActive)=>setSeasonsSubTab(makeActive ? "active" : "inactive")}
             onSeasonTabChange={setSeasonsSubTab}
             onImportIbaSchedule={refreshSeasons} />
         </div>
@@ -1668,7 +1668,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
       const created = await onCreateSeason({ type, year: parseInt(year), is_active: makeActive });
       if (!created) { setError("Could not create season."); return; }
       setError(""); setShowCreatePrompt(false); setSaved(true); setTimeout(() => setSaved(false), 1800);
-      onSeasonCreated?.(created);
+      onSeasonCreated?.(created, makeActive);
       setExpandedSeason(created.id);
     } finally {
       setCreatingSeason(false);
