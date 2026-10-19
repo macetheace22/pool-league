@@ -1640,6 +1640,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const [year, setYear]     = useState(CURRENT_YEAR);
    const [error, setError]   = useState("");
   const [saved, setSaved]   = useState(false);
+  const [showCreatePrompt, setShowCreatePrompt] = useState(false);
+  const [creatingSeason, setCreatingSeason] = useState(false);
   const [divNum, setDivNum] = useState("");
   const [divName, setDivName] = useState("");
   const [newDivisionFormat, setNewDivisionFormat] = useState("");
@@ -1657,14 +1659,19 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   // (e.g. the Create a Season form).
   useEffect(() => { setError(""); }, [subTab]);
 
-  const createSeason = async () => {
+  const createSeason = async (makeActive) => {
     const exists = seasons.find(x => x.type === type && Number(x.year) === Number(year));
-    if (exists) { setError("That season already exists."); return; }
-    const created = await onCreateSeason({ type, year: parseInt(year) });
-    if (!created) { setError("Could not create season."); return; }
-    setError(""); setSaved(true); setTimeout(() => setSaved(false), 1800);
-    onSeasonCreated?.(created);
-    setExpandedSeason(created.id);
+    if (exists) { setError("That season already exists."); setShowCreatePrompt(false); return; }
+    setCreatingSeason(true);
+    try {
+      const created = await onCreateSeason({ type, year: parseInt(year), is_active: makeActive });
+      if (!created) { setError("Could not create season."); return; }
+      setError(""); setShowCreatePrompt(false); setSaved(true); setTimeout(() => setSaved(false), 1800);
+      onSeasonCreated?.(created);
+      setExpandedSeason(created.id);
+    } finally {
+      setCreatingSeason(false);
+    }
   };
 
   const deleteSeason = async (s) => {
@@ -1729,9 +1736,20 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
           <div className="season-preview">
             <Star size={11} color="#F59E0B" /> {type} · {year}
           </div>
-          <button className="btn-primary" onClick={createSeason}>
+          <button className="btn-primary" onClick={() => { setError(""); setShowCreatePrompt(true); }}>
             {saved ? <><Check size={13}/> Created!</> : "Create Season"}
           </button>
+          {showCreatePrompt && (
+            <div role="presentation" onClick={() => !creatingSeason && setShowCreatePrompt(false)} style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.72)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+              <div role="dialog" aria-modal="true" aria-labelledby="create-season-prompt-title" onClick={e => e.stopPropagation()} style={{width:"min(420px,100%)",background:"#1C1C1C",border:"1.5px solid #3A3A3A",borderRadius:14,padding:20,display:"flex",flexDirection:"column",gap:12,boxShadow:"0 20px 60px rgba(0,0,0,.55)"}}>
+                <div id="create-season-prompt-title" style={{fontSize:16,fontWeight:800,color:"#FFF"}}>Make this season active now?</div>
+                <div style={{fontSize:12.5,lineHeight:1.6,color:"#B0B0B0"}}>You're creating {type} {year}. Choose whether it should be active immediately or stay inactive while you finish setup.</div>
+                <button className="btn-primary" disabled={creatingSeason} onClick={() => createSeason(true)}>{creatingSeason ? "Creating…" : "Create and Make Active"}</button>
+                <button className="btn-secondary" disabled={creatingSeason} onClick={() => createSeason(false)}>Create as Inactive</button>
+                <button className="btn-ghost" disabled={creatingSeason} onClick={() => setShowCreatePrompt(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
