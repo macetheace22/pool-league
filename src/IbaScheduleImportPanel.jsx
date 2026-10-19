@@ -272,11 +272,11 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
     <div className="card" style={{ marginTop: 10, borderColor: "#3A235F" }}>
       <div className="card__title" style={{ display: "flex", alignItems: "center", gap: 7 }}>
-        <Calendar size={14}/> IBA Schedule Sync
+        <Calendar size={14}/> Import Teams & Schedules
       </div>
 
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>
-        Discovers published divisions across Masters, Advanced, and Open and all seven league nights, then imports each division's teams and schedule into this season with its own format/day context.
+        Choose one of two ways to import this season's data: sync divisions, teams, and schedules directly from IBA, or manually import teams and schedules. Use Advanced: Add or Edit Divisions below only to maintain division records—not to import teams or schedules.
       </div>
 
       {!divisions && !result && statusReady && (
@@ -296,7 +296,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             </button>
             {season.is_active && (
               <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
-                Manually Import Teams & Schedule
+                Manual Import: Teams & Schedule
               </button>
             )}
           </div>
@@ -310,7 +310,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           </button>
           {season.is_active && (
             <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
-              Manually Import Teams & Schedule
+              Manual Import: Teams & Schedule
             </button>
           )}
         </div>
@@ -367,7 +367,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
 
           <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
             <button className="btn-primary" onClick={importSelected} disabled={importing || selectedCount === 0}>
-              {importing ? "Syncing all selected divisions…" : `Sync ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
+              {importing ? "Uploading selected divisions…" : `Upload ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
             </button>
             <button className="btn-sm" onClick={discover} disabled={loading || importing}>Refresh IBA Data</button>
           </div>
