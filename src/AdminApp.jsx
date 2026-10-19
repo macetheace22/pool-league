@@ -499,6 +499,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
             onSeasonCreated={(created)=>setSeasonsSubTab(created?.is_active ? "active" : "inactive")}
+            onSeasonTabChange={setSeasonsSubTab}
             onImportIbaSchedule={refreshSeasons} />
         </div>
       </>
@@ -1634,7 +1635,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 }
 
 // ─── Seasons Tab ──────────────────────────────────────────────────────────────
-function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSeasonCreated, onImportIbaSchedule }) {
+function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule }) {
   const navigate = useNavigate();
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
@@ -1772,7 +1773,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
                         
                         <button className={`btn-sm ${isAct?"btn-sm--warn":"btn-sm--accent"}`}
-                          onClick={async e=>{e.stopPropagation();await onToggleActive(s);setSubTab(!isAct ? "active" : "inactive");if(!isAct)setExpandedSeason(s.id);}}>
+                          onClick={async e=>{e.stopPropagation();await onToggleActive(s);onSeasonTabChange(!isAct ? "active" : "inactive");if(!isAct)setExpandedSeason(s.id);}}>
                           {isAct?"Deactivate":"Set Active"}
                         </button>
                         {!isAct && <button className="btn-icon btn-icon--danger" onClick={e=>{e.stopPropagation();deleteSeason(s);}}><Trash2 size={13}/></button>}
