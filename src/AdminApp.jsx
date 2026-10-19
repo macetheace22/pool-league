@@ -1744,8 +1744,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
               <div role="dialog" aria-modal="true" aria-labelledby="create-season-prompt-title" onClick={e => e.stopPropagation()} style={{width:"min(420px,100%)",background:"#1C1C1C",border:"1.5px solid #3A3A3A",borderRadius:14,padding:20,display:"flex",flexDirection:"column",gap:12,boxShadow:"0 20px 60px rgba(0,0,0,.55)"}}>
                 <div id="create-season-prompt-title" style={{fontSize:16,fontWeight:800,color:"#FFF"}}>Make this season active now?</div>
                 <div style={{fontSize:12.5,lineHeight:1.6,color:"#B0B0B0"}}>You're creating {type} {year}. Choose whether it should be active immediately or stay inactive while you finish setup.</div>
-                <button className="btn-primary" disabled={creatingSeason} onClick={() => createSeason(true)}>{creatingSeason ? "Creating…" : "Create and Make Active"}</button>
-                <button className="btn-secondary" disabled={creatingSeason} onClick={() => createSeason(false)}>Create as Inactive</button>
+                <button className="btn-primary" style={{ fontSize: 14, fontWeight: 700 }} disabled={creatingSeason} onClick={() => createSeason(true)}>{creatingSeason ? "Creating…" : "Create and Make Active"}</button>
+                <button className="btn-secondary" style={{ fontSize: 14, fontWeight: 700 }} disabled={creatingSeason} onClick={() => createSeason(false)}>Create as Inactive</button>
                 <button className="btn-ghost" disabled={creatingSeason} onClick={() => setShowCreatePrompt(false)}>Cancel</button>
               </div>
             </div>
