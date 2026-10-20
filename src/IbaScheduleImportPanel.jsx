@@ -47,6 +47,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const [diagnostic, setDiagnostic] = useState(null);
   const [retrieveProgress, setRetrieveProgress] = useState({ current: 0, total: 0 });
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [currentImportLabel, setCurrentImportLabel] = useState("");
   const [existingStatus, setExistingStatus] = useState(null);
   const [statusLoading, setStatusLoading] = useState(true);
 
@@ -176,9 +177,11 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     if (!chosen.length) return;
     const previousResult = result;
     setImporting(true); setError(""); setImportProgress({ current: 0, total: chosen.length });
+    setCurrentImportLabel(chosen[0]?.label || "");
     const imported = []; const skipped = [];
     for (const d of chosen) {
       const key = divisionKey(d);
+      setCurrentImportLabel(`${d.label} · ${d.format} · ${d.day}`);
       try {
         let data = previews[key];
         if (!data) { data = await postSchedule({ action: "fetch", format: d.format, day: d.day, division: d.value || d.label }); setPreviews(p => ({ ...p, [key]: data })); }
@@ -200,7 +203,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setResult({ imported: [...previousImported, ...imported], skipped: [...remainingPreviousSkipped, ...skipped], recoveredKeys: (previousResult?.recoveredKeys || []).filter(key => !chosen.some(d => divisionKey(d) === key)) });
     try { await refreshImportStatus(); if (onImported) await onImported(); }
     catch (e) { setError(e?.message || "Schedules were processed, but the season status could not be refreshed."); }
-    finally { setImporting(false); }
+    finally { setImporting(false); setCurrentImportLabel(""); }
   };
   const selectedCount = Object.values(selected).filter(Boolean).length;
   const totalTeams = result?.imported?.reduce((n, x) => n + (x.teamCount || 0), 0) || 0;
@@ -236,13 +239,13 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           }}>
             <RefreshCw size={30} color="#5FCF9E" style={{ animation: "spin 1s linear infinite", marginBottom: 12 }} />
             <div style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 800, color: "#FFFFFF" }}>
-              {importingSchedules ? "Syncing IBA Schedule" : "Retrieving IBA Schedule Data"}
+              {importingSchedules ? "Importing IBA Divisions" : "Retrieving IBA Schedule Data"}
             </div>
             <div style={{ margin: "0 0 18px", fontSize: 12, lineHeight: 1.5, color: "#BDBDBD" }}>
-              {importingSchedules ? "Saving the selected divisions to this season. Please wait." : "Retrieving schedule information from IBA. Please wait."}
+              {importingSchedules ? `Saving division ${Math.min(importProgress.current + 1, importProgress.total)} of ${importProgress.total}: ${currentImportLabel || "Preparing import"}. Please keep this page open.` : "Retrieving schedule information from IBA. Please wait."}
             </div>
             <div style={{ fontSize: 14, fontWeight: 800, color: "#FFFFFF", marginBottom: 10 }}>
-              {importingSchedules ? `${importProgress.current} of ${importProgress.total} divisions imported` : `${retrieveProgress.current} of ${retrieveProgress.total} divisions retrieved`}
+              {importingSchedules ? `${importProgress.current} of ${importProgress.total} divisions processed` : `${retrieveProgress.current} of ${retrieveProgress.total} divisions retrieved`}
             </div>
             <div style={{
               width: "100%",
@@ -367,11 +370,15 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             })}
           </div>
 
-          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-            <button className="btn-primary" onClick={importSelected} disabled={importing || selectedCount === 0}>
-              {importing ? "Uploading selected divisions…" : `Upload ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
+          <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+            <button className="btn-primary" onClick={importSelected} disabled={loading || importing || selectedCount === 0}>
+              {importing ? `Importing ${Math.min(importProgress.current + 1, importProgress.total)} of ${importProgress.total}…` : `Upload ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
             </button>
             <button className="btn-sm" onClick={discover} disabled={loading || importing}>Refresh IBA Data</button>
+          </div>
+          {importing && <div role="status" aria-live="polite" style={{marginTop:8,padding:"9px 10px",border:"1px solid #315B48",background:"#10251B",borderRadius:8,fontSize:12,color:"#D9FBE8",lineHeight:1.5}}>
+            <strong>Import in progress</strong> — {importProgress.current} of {importProgress.total} divisions processed.
+            <div style={{color:"#B6D8C5",marginTop:3}}>Current division: {currentImportLabel || "Preparing import"}. Keep this page open until the results appear.</div>
           </div>
         </>
       )}
