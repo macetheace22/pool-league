@@ -685,7 +685,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                   <button type="button" key={option.key} className="weekly-data-tile" onClick={() => chooseReport(option.key)} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                     <div className="weekly-data-tile__title">{option.title}</div>
                     <div className="weekly-data-tile__desc">{option.description}</div>
-                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>{weeklyMode === "auto" ? "Scan all formats and days →" : "Upload one PDF →"}</div>
+                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>{weeklyMode === "auto" ? "Select report →" : "Choose PDF →"}</div>
                   </button>
                 ))}
               </div>
