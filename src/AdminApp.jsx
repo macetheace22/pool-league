@@ -788,7 +788,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           {!viewingDiv
             ? <div className="empty-state">Pick a division above to see standings & match history.</div>
             : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingSeason?.playoffs_start_date} myProfile={profile}
-                seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
+                seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabelFor(viewingSeason) : null} />
           }
         </div>
       </>
@@ -1590,7 +1590,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
       <div className="season-banner__row" onClick={() => setOpen(v => !v)}>
         <div>
           <div className="season-banner__label">{isActive ? "Active" : "Viewing (read-only)"}</div>
-          <div className="season-banner__name">{viewingSeason ? seasonLabel(viewingSeason) : "No season selected"}</div>
+          <div className="season-banner__name">{viewingSeason ? seasonLabelFor(viewingSeason) : "No season selected"}</div>
           {viewingDiv && <div className="season-banner__div">{divName}</div>}
         </div>
         <ChevronDown size={14} color="#9A9A9A" style={{transform: open?"rotate(180deg)":"none", transition:"0.2s", flexShrink:0}} />
@@ -1888,7 +1888,7 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
     seasonId: activeSeason?.id ?? null,
     format: String(viewingDiv?.format || "").toLowerCase(),
     venue: match.homeTeam.venue || "",
-    seasonLabel: activeSeason ? seasonLabel(activeSeason) : null,
+    seasonLabel: activeSeason ? seasonLabelFor(activeSeason) : null,
     divisionId: viewingDiv?.id ?? null,
     divNum: viewingDiv?.num ?? null,
     divName: viewingDiv?.name ?? null,
