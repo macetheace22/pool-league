@@ -220,6 +220,27 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     catch (e) { setError(e?.message || "Schedules were processed, but the season status could not be refreshed."); }
     finally { setImporting(false); setCurrentImportLabel(""); }
   };
+  const canImportDivision = (division) => {
+    const key = divisionKey(division);
+    const data = previews[key];
+    return !!data && hasUsableSchedule(data) && !rowErrors[key] && !data.error && !data.message;
+  };
+  const selectableDivisions = (divisions || []).filter(canImportDivision);
+  const allSelectableSelected = selectableDivisions.length > 0
+    && selectableDivisions.every(division => !!selected[divisionKey(division)]);
+  const toggleAllSelectable = () => {
+    const nextValue = !allSelectableSelected;
+    setSelected(current => {
+      const next = { ...current };
+      for (const division of selectableDivisions) {
+        next[divisionKey(division)] = nextValue;
+      }
+      if (!nextValue) {
+        for (const division of divisions || []) next[divisionKey(division)] = false;
+      }
+      return next;
+    });
+  };
   const selectedCount = Object.values(selected).filter(Boolean).length;
   const totalTeams = result?.imported?.reduce((n, x) => n + (x.teamCount || 0), 0) || 0;
   const totalWeeks = result?.imported?.reduce((n, x) => n + (x.weekCount || 0), 0) || 0;
@@ -341,7 +362,21 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             <strong style={{ color: "#E0E0E0" }}>{divisions.length}</strong> IBA division{divisions.length === 1 ? "" : "s"} discovered and schedule data retrieved. All are selected for import.
           </div>
 
-          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <div style={{ fontSize: 11, color: "#BDBDBD" }}>
+              {selectableDivisions.length} division{selectableDivisions.length === 1 ? "" : "s"} ready to import · divisions with errors or unusable schedules are excluded from Select All
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn-sm" onClick={toggleAllSelectable} disabled={loading || importing || selectableDivisions.length === 0}>
+                {allSelectableSelected ? "Deselect All" : "Select All"}
+              </button>
+              <button className="btn-sm" onClick={() => setSelected({})} disabled={loading || importing || selectedCount === 0}>
+                Deselect All
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
             {divisions.map(d => {
               const key = divisionKey(d);
               const data = previews[key];
