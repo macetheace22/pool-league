@@ -32,7 +32,7 @@ const css = `
 .schedule-team--away{text-align:right;}
 .schedule-team__venue{font-size:9.5px;font-weight:600;color:#6F6F6F;margin-top:3px;}
 .schedule-vs{font-size:9px;font-weight:800;color:#555;text-transform:uppercase;}
-.schedule-match__venue{display:flex;align-items:center;justify-content:center;text-align:center;gap:4px;font-size:9.5px;color:#777;margin-top:7px;}
+.schedule-match__venue{display:block;width:100%;box-sizing:border-box;text-align:center;font-size:9.5px;color:#777;margin-top:7px;line-height:1.4;}
 .schedule-empty{padding:22px 10px;text-align:center;color:#6A6A6A;font-size:11px;}
 .schedule-note{margin-top:10px;font-size:10px;color:#666;display:flex;align-items:center;gap:5px;}
 @media(min-width:640px){.schedules-controls{grid-template-columns:1fr 1fr}.schedule-match__teams{grid-template-columns:1fr 70px 1fr;}}
