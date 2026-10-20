@@ -53,7 +53,7 @@ function DirtySaveButtonBehavior() {
       const field = event.target;
       if (!(field instanceof HTMLElement) || !field.matches('input,select,textarea,[contenteditable="true"]')) return;
       const button = nearestSaveButton(field);
-      if (button && !button.disabled) button.classList.add('save-button--dirty');
+      if (button) button.classList.add('save-button--dirty');
     };
     const onButtonClick = (event) => {
       const button = event.target instanceof Element ? event.target.closest('button') : null;
