@@ -310,6 +310,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>
         Choose one of two ways to import this season's data: automatically import divisions, teams, and schedules directly from IBA, or manually import teams and schedules through pasting reports.
       </div>
+      <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5, marginTop: 5 }}>Division records are managed on the separate Manage Divisions page.</div>
 
       {!divisions && !result && statusReady && (
         <div className="import-warning-block" style={{ background: "#0F2D1F", borderColor: "#1F6B4A", marginTop: 10 }}>
