@@ -626,9 +626,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   if (page === "weekly") {
     if (!isManager) return <><PageHeader title="Weekly Import Page"/><div className="tab-content"><AccessDenied/></div></>;
     const reportOptions = [
-      { key: "ratings", title: "Roster & Ratings", description: "Import player rosters and current ratings from the IBA roster report.", code: "rost" },
-      { key: "standings", title: "Team Standings", description: "Import the IBA team-standings report.", code: "div" },
-      { key: "mvp", title: "MVP Standings", description: "Import the IBA MVP report.", code: "mvp" },
+      { key: "ratings", title: "Roster & Ratings", description: "Player rosters and current ratings.", code: "rost" },
+      { key: "standings", title: "Team Standings", description: "Team standings from IBA.", code: "div" },
+      { key: "mvp", title: "MVP Standings", description: "MVP standings from IBA.", code: "mvp" },
     ];
     const chooseReport = (category) => {
       setWeeklyCategory(category);
@@ -652,13 +652,13 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               <div className="weekly-data-tiles">
                 <button type="button" className="weekly-data-tile" onClick={() => { setWeeklyMode("auto"); setWeeklyCategory("all"); setWeeklyStage("scope"); }} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                   <div className="weekly-data-tile__title">Automatic Import</div>
-                  <div className="weekly-data-tile__desc">Retrieve reports directly from IBA across formats and days, review the extracted data, validate it, then choose when to import.</div>
-                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Best for a full weekly update or an automatic report-category scan →</div>
+                  <div className="weekly-data-tile__desc">Fetch available IBA reports across all configured formats and days.</div>
+                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Review before importing →</div>
                 </button>
                 <button type="button" className="weekly-data-tile" onClick={() => { setWeeklyMode("manual"); setWeeklyCategory("ratings"); setWeeklyStage("scope"); }} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                   <div className="weekly-data-tile__title">Manual PDF Import</div>
-                  <div className="weekly-data-tile__desc">Upload one PDF at a time when you want to control the exact report, format, and day being processed.</div>
-                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Best for a specific PDF or a partial weekly update →</div>
+                  <div className="weekly-data-tile__desc">Upload one PDF for a specific report, format, and day.</div>
+                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Best for partial updates or individual reports →</div>
                 </button>
               </div>
             </section>
@@ -669,7 +669,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               <div className="weekly-data-workspace__heading">
                 <div>
                   <div className="weekly-data-workspace__title" id="weekly-scope-title">{weeklyMode === "auto" ? "Choose the automatic import scope" : "Choose the PDF report type"}</div>
-                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>{weeklyMode === "auto" ? "The scan checks all 3 formats × 7 days. You can review all report categories together or focus on one category." : "Choose one category, then upload a single PDF for its format and day."}</div>
+                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>{weeklyMode === "auto" ? "Choose all weekly reports or scan a single report category." : "Choose the report type you want to upload."}</div>
                 </div>
                 <button type="button" className="btn-sm" onClick={() => setWeeklyStage("method")}>← Change import method</button>
               </div>
@@ -677,15 +677,15 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                 {weeklyMode === "auto" && (
                   <button type="button" className="weekly-data-tile" onClick={() => chooseReport("all")} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                     <div className="weekly-data-tile__title">All Weekly Reports</div>
-                    <div className="weekly-data-tile__desc">Scan all 21 format/day groups for roster & ratings, team standings, and MVP reports. Review and validate the full batch before importing.</div>
-                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>3 report categories · 21 format/day groups →</div>
+                    <div className="weekly-data-tile__desc">Roster & ratings, team standings, and MVP reports across all formats and days.</div>
+                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>3 categories · Review the full batch →</div>
                   </button>
                 )}
                 {reportOptions.map(option => (
                   <button type="button" key={option.key} className="weekly-data-tile" onClick={() => chooseReport(option.key)} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                     <div className="weekly-data-tile__title">{option.title}</div>
                     <div className="weekly-data-tile__desc">{option.description}</div>
-                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>{weeklyMode === "auto" ? "Scan this report category across all formats and days →" : "Upload one PDF for this report category →"}</div>
+                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>{weeklyMode === "auto" ? "Scan all formats and days →" : "Upload one PDF →"}</div>
                   </button>
                 ))}
               </div>
@@ -701,8 +701,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                   </div>
                   <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:4}}>
                     {weeklyMode === "auto"
-                      ? "Automatic scan is read-only until you validate and confirm an import."
-                      : "Manual import processes one uploaded PDF at a time; no data is written during extraction and preview."}
+                      ? "Review and validate the data before importing."
+                      : "Review and validate the data before importing."}
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
