@@ -15,7 +15,7 @@ let tablesChecked = 0;
 for (const file of files) {
   const sql = readFileSync(file, 'utf8');
   const createTablePattern =
-    /create\s+table\s+(?:if\s+not\s+exists\s+)?(?:(public)\s*\.\s*)?("?([a-zA-Z_][\w$]*)"?)/gi;
+    /create\s+table\s+(?:if\s+not\s+exists\s+)?(?:(?:"?([a-zA-Z_][\w$]*)"?)\s*\.\s*)?("?([a-zA-Z_][\w$]*)"?)/gi;
   let match;
 
   while ((match = createTablePattern.exec(sql)) !== null) {
@@ -55,7 +55,7 @@ if (failures.length > 0) {
   console.error('Supabase Data API access checks failed:');
   for (const failure of failures) console.error('- ' + failure);
   console.error(
-    '\\nFor each new public table, explicitly enable RLS, revoke default PUBLIC/anon table access, and grant only the operations needed by intended roles in the same SQL migration.',
+    '\nFor each new public table, explicitly enable RLS, revoke default PUBLIC/anon table access, and grant only the operations needed by intended roles in the same SQL migration.',
   );
   process.exit(1);
 }
