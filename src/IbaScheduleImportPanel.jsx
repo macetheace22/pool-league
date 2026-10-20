@@ -379,7 +379,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           {importing && <div role="status" aria-live="polite" style={{marginTop:8,padding:"9px 10px",border:"1px solid #315B48",background:"#10251B",borderRadius:8,fontSize:12,color:"#D9FBE8",lineHeight:1.5}}>
             <strong>Import in progress</strong> — {importProgress.current} of {importProgress.total} divisions processed.
             <div style={{color:"#B6D8C5",marginTop:3}}>Current division: {currentImportLabel || "Preparing import"}. Keep this page open until the results appear.</div>
-          </div>
+          </div>}
         </>
       )}
 
