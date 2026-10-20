@@ -214,7 +214,7 @@ function parseTeams(html = "") {
       const name = norm(row[1] || "");
       const venue = norm(row[2] || "");
 
-      if (!/^\d{3,8}$/.test(teamNum) || !name || /^name$/i.test(name)) continue;
+      if (!/^(?=.*\d)[A-Z0-9]{3,8}$/i.test(teamNum) || !name || /^name$/i.test(name)) continue;
       if (teams.some(team => team.teamNum === teamNum)) continue;
 
       teams.push({
@@ -235,7 +235,7 @@ function parseTeams(html = "") {
       .replace(/\s+/g, " ")
       .trim();
 
-    const re = /\b(\d{5,8})\s+([A-Za-z][^|\n]{1,70}?)(?=\s+\d{5,8}\s+|\s+Team\s*#|$)/g;
+    const re = /\b([A-Z0-9]{5,8})\s+([A-Za-z][^|\n]{1,70}?)(?=\s+[A-Z0-9]{5,8}\s+|\s+Team\s*#|$)/gi;
     let match;
     while ((match = re.exec(text))) {
       const name = norm(match[2]);

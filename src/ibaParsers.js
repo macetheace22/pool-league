@@ -55,6 +55,11 @@ function extractIbaReportWeeksByDivision(raw) {
   };
 }
 
+function isValidIbaTeamNumber(value) {
+  const teamNum = String(value ?? "").trim();
+  return /^(?=.*\d)[A-Z0-9]{3,8}$/i.test(teamNum);
+}
+
 function parseStandingsImport(raw) {
   const rows = [];
   const lines = String(raw || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean);
@@ -67,7 +72,7 @@ function parseStandingsImport(raw) {
       totalPoints = parseInt(parts[3], 10) || 0;
       setsPlayed = parseInt(parts[4], 10) || 0;
     } else {
-      const m = trimmed.match(/^(\d{5})\s+(.+?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+)\s+(\d+)(?:\s+[\d.]+)?$/);
+      const m = trimmed.match(/^([A-Z0-9]{5})\s+(.+?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+)\s+(\d+)(?:\s+[\d.]+)?$/i);
       if (!m) continue;
       teamNum = m[1]; teamName = m[2];
       pointsLastWk = parseFloat(m[3]) || 0;
@@ -82,7 +87,7 @@ function parseStandingsImport(raw) {
   // token joins points-last-week (in tenths) and sets played, e.g. 95924 = 95.9, 24.
   const compactRows = [];
   for (let i = 0; i < lines.length - 4; i++) {
-    if (!/^\d{5}$/.test(lines[i]) || !/^[-\d.]+$/.test(lines[i + 1])) continue;
+    if (!isValidIbaTeamNumber(lines[i]) || !/^[-\d.]+$/.test(lines[i + 1])) continue;
     const teamNum = lines[i], teamName = lines[i + 2];
     if (!teamName || /^\d+$/.test(teamName) || /^(Team|Division|Printed|Fall Season|Week|Wed|Sun|Mon|Tue|Thu|Fri|Sat)\b/i.test(teamName)) continue;
     if (!/^\d{3,5}$/.test(lines[i + 3]) || !/^\d{4,6}$/.test(lines[i + 4])) continue;
@@ -114,7 +119,7 @@ function parseMvpImport(raw) {
       if (playerNum && playerName && teamNum) rows.push({ playerNum, playerName, teamNum, wins, losses, pointsScored, mvpRankingPoints });
       continue;
     }
-    const m = trimmed.match(/^(\d{5})\s+(.+?)\s+(\d{5})\s+(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)$/);
+    const m = trimmed.match(/^(\d{5})\s+(.+?)\s+([A-Z0-9]{5})\s+(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)$/i);
     if (m) {
       rows.push({ playerNum:m[1], playerName:m[2], teamNum:m[3], wins:parseInt(m[4],10)||0, losses:parseInt(m[5],10)||0, pointsScored:parseInt(m[6],10)||0, mvpRankingPoints:parseInt(m[7],10)||0 });
       continue;
@@ -123,7 +128,7 @@ function parseMvpImport(raw) {
     const start = trimmed.match(/^(\d{5})(.*)$/);
     if (!start) continue;
     const playerNumCompact = start[1], remainder = start[2];
-    const teamMatches = [...remainder.matchAll(/(15\d{3})/g)];
+    const teamMatches = [...remainder.matchAll(/([A-Z0-9]{5})(?=\d)/gi)];
     let parsed = null;
     for (const tm of teamMatches) {
       const playerNameCompact = remainder.slice(0, tm.index).trim();
@@ -226,13 +231,13 @@ function addPlayer(registry, rosters, teamId, num, fullName, rate, needsRating) 
 function detectTeamHeader(line) {
   if (/^\d{1,3}\s+\d{5}/.test(line)) return null; // a player row, not a header
   if (/^\d{5}\s+[^\dO]*[\dO]+\.?\s+[\dO]/.test(line)) return null; // player row
-  const inline = line.match(/^\s*Team\s*(\d{5})\b\s*(.*)$/i);
+  const inline = line.match(/^\s*Team\s*([A-Z0-9]{5})\b\s*(.*)$/i);
   if (inline) return { id: inline[1], name: inline[2].replace(/\s*Team\s*$/i, '').trim() };
   // Bare "<id> <team name>" header. Team names can start with a digit
   // (e.g. "8 Ball Donkeys"), so we can't require a leading letter -- we
   // rely on the two negative checks above to already have ruled out
   // anything that looks like a player row.
-  const bare = line.match(/^(\d{5})\s+(\S.{0,})$/);
+  const bare = line.match(/^([A-Z0-9]{5})\s+(\S.{0,})$/i);
   if (bare) return { id: bare[1], name: bare[2].replace(/\s*Team\s*$/i, '').trim() };
   return null;
 }
@@ -254,7 +259,7 @@ function parseLeagueRoster(raw) {
   // layout-specific parser runs. This deliberately leaves team/venue text
   // intact rather than guessing where those names should be split.
   const normalizedRaw = String(raw || "")
-    .replace(/Team(?=\d{5})/gi, "Team ")
+    .replace(/Team(?=[A-Z0-9]{5}\b)/gi, "Team ")
     // Restore common venue boundaries so the existing team-header parser
     // keeps team name and venue separate.
     .replace(/\s+(Twin City Billiards|C\.?R\.?['’]?s Sports Bar|Two Stooges Sports Bar|Shooter['’]?s Billiards|Turtle['’]?s Bar\s*&\s*Grill|Pullman Club)\s+(?=Num\s*Play|NumPlay|Rate\s*Num)/gi, "\n$1\n")
@@ -287,7 +292,7 @@ function parseLeagueRoster(raw) {
   for (const s of sections) {
     const lines = s.split('\n').map(l => l.trim()).filter(Boolean);
     for (const line of lines) {
-      const inlineTeams = [...line.matchAll(/\bTeam\s*(\d{5})\b/gi)];
+      const inlineTeams = [...line.matchAll(/\bTeam\s*([A-Z0-9]{5})\b/gi)];
       if (inlineTeams.length >= 2) {
         learnedColumns = Math.max(learnedColumns || 0, inlineTeams.length);
       }
@@ -316,7 +321,7 @@ function parseSection(section, registry, rosters, teams, needsRating, ambiguousR
   const lines = section.split('\n').map(l => l.trim()).filter(Boolean);
 
   const hasMultiColumnLine = lines.some(
-    l => [...l.matchAll(/\bTeam\s+(\d{5})\b/gi)].length >= 2
+    l => [...l.matchAll(/\bTeam\s+([A-Z0-9]{5})\b/gi)].length >= 2
   );
 
   if (hasMultiColumnLine) {
@@ -352,7 +357,7 @@ function parseMultiColumnRateFirst(lines, registry, rosters, teams, needsRating,
 
     if (isNoiseLine(line)) continue;
 
-    const inlineTeams = [...line.matchAll(/\bTeam\s+(\d{5})\b/gi)];
+    const inlineTeams = [...line.matchAll(/\bTeam\s+([A-Z0-9]{5})\b/gi)];
     if (inlineTeams.length >= 2) {
       currentTeams = inlineTeams.map(m => m[1]);
       inlineTeams.forEach((m, i) => {
