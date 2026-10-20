@@ -289,6 +289,9 @@ export default function Schedules() {
           </>
         )}
 
+        <div className="schedule-note" style={{ marginTop: 10, color: "#9A9A9A" }}>
+          <Calendar size={11}/> Playoff start date: {division?.playoffs_start_date || "Not set for this division"}
+        </div>
         <div className="schedule-note">
           <Trophy size={11}/> Schedules are imported from IBA and can be refreshed by league management.
         </div>
