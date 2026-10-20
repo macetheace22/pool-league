@@ -362,7 +362,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   };
   const handleAddDivision = async (season, num, name, format, day) => {
     await db.addDivision(season.id, num, name, format, day);
-    await refreshSeasons();
+    return await refreshSeasons();
   };
   const handleUpdateDivision = async (divisionId, num, name, format, day) => {
     const ok = await db.updateDivision(divisionId, num, name, format, day);
@@ -1664,6 +1664,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 // ─── Seasons Tab ──────────────────────────────────────────────────────────────
 function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSetPlayoffsDate, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
    const [error, setError]   = useState("");
@@ -1674,8 +1675,9 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const [divName, setDivName] = useState("");
   const [newDivisionFormat, setNewDivisionFormat] = useState("");
   const [newDivisionDay, setNewDivisionDay] = useState("");
+  const [newDivisionPlayoffsDate, setNewDivisionPlayoffsDate] = useState("");
   const [addingDivision, setAddingDivision] = useState(false);
-  const [expandedSeason, setExpandedSeason] = useState(null);
+  const [expandedSeason, setExpandedSeason] = useState(() => searchParams.get("season") || null);
   const [editingDivId, setEditingDivId] = useState(null);
   const [editDivNum, setEditDivNum] = useState("");
   const [editDivName, setEditDivName] = useState("");
@@ -1718,7 +1720,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   };
 
   const resetNewDivision = () => {
-    setDivNum(""); setDivName(""); setNewDivisionFormat(""); setNewDivisionDay("");
+    setDivNum(""); setDivName(""); setNewDivisionFormat(""); setNewDivisionDay(""); setNewDivisionPlayoffsDate("");
     setAddingDivision(false); setError("");
   };
   const addDivision = async (s) => {
@@ -1727,7 +1729,18 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
     if (!newDivisionFormat || !newDivisionDay) { setError("Select the division IBA format and day."); return; }
     if (divs.find(d => String(d.num) === divNum.trim() && d.format === newDivisionFormat && d.day === newDivisionDay)) { setError("That division number already exists for this format and day."); return; }
     try {
-      await onAddDivision(s, divNum.trim(), divName.trim(), newDivisionFormat, newDivisionDay);
+      const refreshed = await onAddDivision(s, divNum.trim(), divName.trim(), newDivisionFormat, newDivisionDay);
+      if (newDivisionPlayoffsDate) {
+        const updatedSeason = (refreshed || []).find(item => item.id === s.id);
+        const addedDivision = updatedSeason?.divisions?.find(item => String(item.num) === divNum.trim() && item.format === newDivisionFormat && item.day === newDivisionDay);
+        if (addedDivision) {
+          const dateSaved = await onSetPlayoffsDate?.(addedDivision.id, newDivisionPlayoffsDate);
+          if (!dateSaved) {
+            setError("Division was added, but its playoff date could not be saved. Edit the division to set the date.");
+            return;
+          }
+        }
+      }
       resetNewDivision();
     } catch (e) {
       setError(e?.message || "Could not add the division. Check the details and try again.");
@@ -1905,6 +1918,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                             ))}
                           </div>
                         )}
+                        <div style={{ marginTop: 10, fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>To add, edit, or remove division records, use the separate Manage Divisions page. Importing teams and schedules is handled here.</div>
 
                       </div>
                     )}
@@ -5746,6 +5760,19 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .division-form-actions .btn-primary,.division-form-actions .btn-secondary{min-width:92px;justify-content:center;}
 .division-add-trigger{align-self:flex-start;display:flex;align-items:center;gap:6px;margin-top:2px;}
 .division-add-form{background:#1B1B1B !important;border-color:#3A3A3A !important;}
+.division-fields-form{display:grid;grid-template-columns:minmax(120px,0.7fr) minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr);gap:10px;align-items:start;}
+.division-field{display:flex;flex-direction:column;gap:5px;min-width:0;color:#A0A0A0;font-size:10px;font-weight:700;}
+.division-field--number{grid-column:1;}
+.division-field--name{grid-column:2;}
+.division-field:nth-of-type(3){grid-column:1 / span 2;}
+.division-field:nth-of-type(4){grid-column:3;}
+.division-field:nth-of-type(5){grid-column:4 / span 2;}
+.division-field input,.division-field select{width:100%;height:38px;min-height:38px;box-sizing:border-box;font-size:12px;font-weight:500;padding:8px 10px;}
+.division-field input.edit-input{font-weight:500;}
+.division-form-actions{grid-column:1 / -1;display:flex;justify-content:flex-end;gap:6px;padding-top:9px;border-top:1px solid #303030;margin-top:2px;}
+.division-form-actions .btn-sm{min-width:70px;padding:6px 10px;font-size:11px;justify-content:center;}
+@media(max-width:520px){.division-fields-form{grid-template-columns:minmax(90px,0.7fr) minmax(0,1.3fr);}.division-field--number{grid-column:1;}.division-field--name{grid-column:2;}.division-field:nth-of-type(3),.division-field:nth-of-type(4),.division-field:nth-of-type(5){grid-column:1 / -1;}}
+
 .player-nickname{font-size:11px;color:#6A6A6A;font-style:italic;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .seg-control{display:flex;gap:4px;}
