@@ -732,7 +732,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
         venue: String(team.venue ?? "").trim(),
         isBye: !!team.isBye,
       }))
-      .filter(team => /^\d{3,8}$/.test(team.teamNum) && team.name);
+      .filter(team => /^(?=.*\d)[A-Z0-9]{3,8}$/i.test(team.teamNum) && team.name);
 
     if (!normalizedTeams.length) {
       return { ok: false, error: `${divisionName}: no valid teams were parsed.` };
