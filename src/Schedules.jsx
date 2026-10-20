@@ -270,12 +270,10 @@ export default function Schedules() {
                       <div className="schedule-match__teams">
                         <div className="schedule-team">
                           {p.home?.name || "Home TBD"}
-                          {p.home?.venue && <div className="schedule-team__venue">{p.home.venue}</div>}
                         </div>
                         <div className="schedule-vs">vs</div>
                         <div className="schedule-team schedule-team--away">
                           {p.away?.name || "Away TBD"}
-                          {p.away?.venue && <div className="schedule-team__venue">{p.away.venue}</div>}
                         </div>
                       </div>
                       {p.home?.venue && <div className="schedule-match__venue"><MapPin size={10}/> {p.home.venue}</div>}
