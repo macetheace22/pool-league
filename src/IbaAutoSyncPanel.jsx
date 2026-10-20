@@ -229,19 +229,19 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <Download size={14}/> {manualMode ? `Manual PDF Import · ${reportLabels[reportType] || reportType}` : reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
       </div>
       <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>
-        {manualMode ? "Upload a PDF for the selected report type. Choose only a format/day represented by this season; the report week and schedule are validated before import." : <>Checks IBA reports for every format/day represented by this season's imported divisions{reportType ? ` for ${selectedReportLabel}` : " across roster/ratings, team standings, and MVP standings"}. Each report is validated against the matching division schedule before import. A report may be missing when that league is not playing.</>}
+        {manualMode ? "Upload a PDF for the selected report type. Choose only a format/day represented by this season; the report week and schedule are validated before import." : <>Checks IBA reports across all configured formats and days{reportType ? ` for ${selectedReportLabel}` : " across roster/ratings, team standings, and MVP standings"}. Each report is validated against the matching division schedule before import. A report may be missing when that league is not playing.</>}
       </div>
       {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
         <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
       </div>}
       {!manualMode && (
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
-          <div style={{ fontSize: 12, fontWeight: 700 }}>All-format report discovery</div>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>Scan all formats and days</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-            Scan Masters, Advanced, and Open for all seven days (21 format/day groups; up to 63 PDFs). Discovery is read-only; review the matching reports together across the selected season, or filter to a single report category across all of its format/day groups.
+            Scan Masters, Advanced, and Open across all seven days. Discovery is read-only; review matching reports for the selected season, either together or by report category.
           </div>
           <button className="btn-sm" onClick={scanAllReports} disabled={scanningAll} style={{ marginTop: 8 }}>
-            {scanningAll ? <><RefreshCw size={12} className="spin" /> Scanning {scanProgress?.completedGroups || 0}/{scanProgress?.totalGroups || 21} groups…</> : "Scan All IBA Formats & Days"}
+            {scanningAll ? <><RefreshCw size={12} className="spin" /> Scanning {scanProgress?.completedGroups || 0}/{scanProgress?.totalGroups || 21} format/day combinations…</> : "Scan All IBA Formats & Days"}
           </button>
           {scanError && <div className="error-msg" style={{ marginTop: 8 }}>{scanError}</div>}
           {allScan && (
@@ -256,7 +256,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
               <section style={{ margin: "10px 0", padding: 10, border: "1px solid #3A3A3A", borderRadius: 7 }}>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>Review & import across the selected season</div>
                 <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-                  Select a season and either import all three report categories together or focus on one category across every matching format/day. The review maps each discovered PDF to that season's divisions, validates each division's report week against its schedule and import history, and ignores unrelated format/day groups. Missing PDFs are normal; extraction errors and zero-row reports block the batch.
+                  Review all three report categories together or focus on one category across all matching formats and days. Each report is matched to the season's divisions and checked against its schedule and import history. Missing PDFs are normal; extraction errors and zero-row reports block the batch.
                 </div>
                 <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
