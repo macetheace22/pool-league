@@ -493,6 +493,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SubTabBtn active={seasonsSubTab==="create"} onClick={()=>setSeasonsSubTab("create")}>Create a Season</SubTabBtn>
           <SubTabBtn active={seasonsSubTab==="active"} onClick={()=>setSeasonsSubTab("active")}>Active Seasons</SubTabBtn>
           <SubTabBtn active={seasonsSubTab==="inactive"} onClick={()=>setSeasonsSubTab("inactive")}>Inactive Seasons</SubTabBtn>
+          <SubTabBtn active={seasonsSubTab==="divisions"} onClick={()=>setSeasonsSubTab("divisions")}>Manage Divisions</SubTabBtn>
         </SubTabBar>
         <div className="tab-content">
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
@@ -1716,10 +1717,50 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   };
 
   const list = subTab === "inactive" ? seasons.filter(s => !s.is_active) : seasons.filter(s => s.is_active);
+  const divisionSeason = seasons.find(s => s.id === expandedSeason) || seasons.find(s => s.is_active) || seasons[0] || null;
 
   return (
     <>
       {error && <ErrorMsg>{error}</ErrorMsg>}
+
+      {subTab === "divisions" && (
+        <div className="card">
+          <div className="card__title">Manage Season Divisions</div>
+          <div style={{ color: "#AAA", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>Division records are setup data, separate from importing teams and schedules from IBA. Choose a season to add, edit, or remove its divisions.</div>
+          <label className="field">
+            <Label>Season</Label>
+            <select className="input" value={divisionSeason?.id || ""} onChange={e => setExpandedSeason(e.target.value)} style={{ width: "100%" }}>
+              {seasons.map(s => <option key={s.id} value={s.id}>{seasonLabel(s)} · {s.is_active ? "Active" : "Inactive"}</option>)}
+            </select>
+          </label>
+          {!divisionSeason ? <div className="empty-state">Create a season before adding divisions.</div> : <>
+            <SectionHeader title={String(seasonLabel(divisionSeason)) + " · " + (divisionSeason.divisions || []).length + " divisions"} />
+            {(divisionSeason.divisions || []).map(d => editingDivId === d.id ? (
+              <div key={d.id} className="div-row div-row--edit" style={{ flexWrap: "wrap" }}>
+                <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" value={editDivNum} onChange={e => setEditDivNum(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
+                <input className="edit-input" style={{ flex: 1, minWidth: 120 }} placeholder="Name (e.g. North)" value={editDivName} onChange={e => setEditDivName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
+                <select className="input" value={editDivFormat} onChange={e => setEditDivFormat(e.target.value)} aria-label="Division IBA format" style={{ minWidth: 120 }}><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select>
+                <select className="input" value={editDivDay} onChange={e => setEditDivDay(e.target.value)} aria-label="Division IBA day" style={{ minWidth: 120 }}><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select>
+                <button className="btn-icon btn-icon--confirm" onClick={() => saveEditDivision(divisionSeason)}><Check size={13}/></button>
+                <button className="btn-icon btn-icon--cancel" onClick={cancelEditDivision}><X size={13}/></button>
+              </div>
+            ) : <div key={d.id} className="div-row">
+              <span className="div-row__num">Div {d.num}</span><span className="div-row__name">{d.name || "—"}</span>
+              <span className="div-row__name" style={{ fontSize: 10, color: "#8A8A8A" }}>{d.format || "Format required"} · {d.day || "Day required"}</span>
+              <button className="btn-icon" onClick={() => startEditDivision(d)} aria-label={"Edit division " + d.num}><Edit2 size={11}/></button>
+              <button className="btn-icon btn-icon--danger" onClick={() => onRemoveDivision(d.id)} aria-label={"Remove division " + d.num}><Trash2 size={11}/></button>
+            </div>)}
+            {editDivError && <ErrorMsg>{editDivError}</ErrorMsg>}
+            <div className="div-add-row" style={{ flexWrap: "wrap", marginTop: 10 }}>
+              <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" value={divNum} onChange={e => setDivNum(e.target.value)} />
+              <input className="edit-input" style={{ flex: 1, minWidth: 120 }} placeholder="Name (e.g. North)" value={divName} onChange={e => setDivName(e.target.value)} />
+              <select className="input" value={newDivisionFormat} onChange={e => setNewDivisionFormat(e.target.value)} aria-label="New division IBA format" style={{ minWidth: 120 }}><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select>
+              <select className="input" value={newDivisionDay} onChange={e => setNewDivisionDay(e.target.value)} aria-label="New division IBA day" style={{ minWidth: 120 }}><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select>
+              <button className="btn-icon btn-icon--confirm" onClick={() => addDivision(divisionSeason)} disabled={!divNum.trim() || !newDivisionFormat || !newDivisionDay}><Plus size={13}/></button>
+            </div>
+          </>}
+        </div>
+      )}
 
       {subTab === "create" && (
         <div className="card">
@@ -1797,42 +1838,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                           </div>
                         )}
 
-                        <details style={{border:"1px solid #3A3A3A",borderRadius:10,padding:12,marginTop:8}}>
-                          <summary style={{cursor:"pointer",fontWeight:700,fontSize:12.5,color:"#F59E0B"}}>Advanced: Add or Edit Divisions (only if needed)</summary>
-                          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
-                            <div style={{fontSize:11.5,color:"#9A9A9A"}}>This is not an import option. Use it only to add, rename, correct, or remove division records. To import teams and schedules, use Sync from IBA or Manual Import: Teams & Schedule above.</div>
-{divs.map((d) => (
-                          editingDivId === d.id ? (
-                            <div key={d.id} className="div-row div-row--edit" style={{flexWrap:"wrap"}}>
-                              <input className="edit-input" style={{width:70,flex:"none"}} placeholder="Div #" value={editDivNum}
-                                onChange={e=>setEditDivNum(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") saveEditDivision(s); }} />
-                              <input className="edit-input" style={{flex:1}} placeholder="Name (e.g. North)" value={editDivName}
-                                onChange={e=>setEditDivName(e.target.value)} onKeyDown={e=>{ if (e.key==="Enter") saveEditDivision(s); }} />
-                              <select className="input" value={editDivFormat} onChange={e=>setEditDivFormat(e.target.value)} aria-label="Division IBA format" style={{minWidth:120}}><option value="">Select format…</option>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
-                              <select className="input" value={editDivDay} onChange={e=>setEditDivDay(e.target.value)} aria-label="Division IBA day" style={{minWidth:120}}><option value="">Select day…</option>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
-                              <button className="btn-icon btn-icon--confirm" onClick={()=>saveEditDivision(s)}><Check size={13}/></button>
-                              <button className="btn-icon btn-icon--cancel" onClick={cancelEditDivision}><X size={13}/></button>
-                            </div>
-                          ) : (
-                            <div key={d.id} className="div-row">
-                              <span className="div-row__num">Div {d.num}</span>
-                              <span className="div-row__name">{d.name || "—"}</span>
-                              <span className="div-row__name" style={{fontSize:10,color:"#8A8A8A"}}>{d.format || "Format required"} · {d.day || "Day required"}</span>
-                              <button className="btn-icon" onClick={()=>startEditDivision(d)}><Edit2 size={11}/></button>
-                              <button className="btn-icon btn-icon--danger" onClick={()=>onRemoveDivision(d.id)}><Trash2 size={11}/></button>
-                            </div>
-                          )
-                        ))}
-                        {editDivError && <ErrorMsg>{editDivError}</ErrorMsg>}
-                        <div className="div-add-row" style={{flexWrap:"wrap"}}>
-                          <input className="edit-input" style={{width:70,flex:"none"}} placeholder="Div #" value={divNum} onChange={e=>setDivNum(e.target.value)}/>
-                          <input className="edit-input" style={{flex:1,minWidth:120}} placeholder="Name (e.g. North)" value={divName} onChange={e=>setDivName(e.target.value)}/>
-                          <select className="input" value={newDivisionFormat} onChange={e=>setNewDivisionFormat(e.target.value)} aria-label="New division IBA format" style={{minWidth:120}}><option value="">Select format…</option>{IBA_FORMATS.map(f=><option key={f} value={f}>{f}</option>)}</select>
-                          <select className="input" value={newDivisionDay} onChange={e=>setNewDivisionDay(e.target.value)} aria-label="New division IBA day" style={{minWidth:120}}><option value="">Select day…</option>{IBA_DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
-                          <button className="btn-icon btn-icon--confirm" onClick={()=>addDivision(s)} disabled={!divNum.trim() || !newDivisionFormat || !newDivisionDay}><Plus size={13}/></button>
-                        </div>
-                          </div>
-                        </details>
+                        <div style={{ marginTop: 10, fontSize: 11.5, color: "#9A9A9A" }}>Need to change division records? Use the Manage Divisions tab above. Division setup is separate from importing IBA schedules.</div>
+
                          
                         <div className="field" style={{marginTop:10}}>
                           <Label>Playoffs Start Date</Label>
