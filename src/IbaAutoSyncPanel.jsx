@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Download, RefreshCw, AlertCircle, ChevronDown, ChevronUp, FileUp } from "lucide-react";
 import { fetchIbaReports, fetchAllIbaReports, buildIbaPreview, validateIbaReports, importIbaReports, ibaCodesForSeason, scopeIbaReportsToSeason, ibaReportMatchesSeasonContext } from "./ibaAutoSync";
 import * as db from "./db";
 
@@ -16,6 +16,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [scanningAll, setScanningAll] = useState(false);
   const [scanError, setScanError] = useState("");
   const [manualFile, setManualFile] = useState(null);
+  const manualFileInputRef = useRef(null);
   const [manualFormat, setManualFormat] = useState("");
   const [manualDay, setManualDay] = useState("");
   const [manualError, setManualError] = useState("");
@@ -214,12 +215,15 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   return (
     <div className="card" style={{marginBottom:12}}>
       <style>{`
-        .manual-pdf-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:10px;align-items:end}
+        .manual-pdf-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:10px;align-items:start}
         .manual-pdf-field{display:grid;gap:5px;min-width:0;font-size:11px;color:#CCC}
         .manual-pdf-field select{min-height:38px}
-        .manual-pdf-file input{width:100%;min-width:0;box-sizing:border-box;font-size:11px;color:#CCC;padding:8px;border:1px solid #3A3A3A;border-radius:7px;background:#191919}
-        .manual-pdf-filename{font-size:10.5px;color:#AAA;overflow-wrap:anywhere}
-        @media(min-width:760px){.manual-pdf-controls{grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) minmax(220px,1.6fr)}}
+        .manual-pdf-choose-button{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-width:0;min-height:38px;box-sizing:border-box;cursor:pointer;font:inherit;color:#E0E0E0;text-align:center}
+        .manual-pdf-choose-button:hover:not(:disabled){border-color:#5FCF9E;color:#5FCF9E}
+        .manual-pdf-native-input{display:none}
+        .manual-pdf-filename{font-size:10.5px;color:#AAA;overflow-wrap:anywhere;min-height:14px}
+        .manual-pdf-filename--empty{color:#666}
+        @media(min-width:760px){.manual-pdf-controls{grid-template-columns:repeat(3,minmax(0,1fr))}}
       `}</style>
       <div className="card__title" style={{display:"flex",alignItems:"center",gap:7}}>
         <Download size={14}/> {manualMode ? `Manual PDF Import · ${reportLabels[reportType] || reportType}` : reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
@@ -387,11 +391,22 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                 {manualDayOptions.map(day => <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>)}
               </select>
             </label>
-            <label className="manual-pdf-field manual-pdf-file">
-              <span>Choose PDF</span>
-              <input type="file" accept="application/pdf,.pdf" onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }} />
-              {manualFile && <span className="manual-pdf-filename">{manualFile.name} · {Math.ceil(manualFile.size / 1024).toLocaleString()} KB</span>}
-            </label>
+            <div className="manual-pdf-field manual-pdf-file">
+              <span>PDF File</span>
+              <input
+                ref={manualFileInputRef}
+                className="manual-pdf-native-input"
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }}
+              />
+              <button type="button" className="input manual-pdf-choose-button" onClick={() => manualFileInputRef.current?.click()}>
+                <FileUp size={14} /> Choose PDF…
+              </button>
+              <span className={`manual-pdf-filename ${manualFile ? "" : "manual-pdf-filename--empty"}`}>
+                {manualFile ? `${manualFile.name} · ${Math.ceil(manualFile.size / 1024).toLocaleString()} KB` : "No file selected"}
+              </span>
+            </div>
           </div>
           <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual || !supported || !manualFormatOptions.length || !manualDayOptions.length} style={{ marginTop: 10 }}>
             {uploadingManual ? <><RefreshCw size={12} className="spin" /> Extracting PDF…</> : "Extract & Preview PDF"}
