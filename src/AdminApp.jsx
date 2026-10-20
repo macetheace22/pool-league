@@ -5757,7 +5757,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .div-row__num{font-family:'JetBrains Mono',monospace;font-size:10px;color:#5A5A5A;min-width:48px;}
 .div-row__name{font-size:12px;font-weight:600;color:#E0E0E0;flex:1;}
 .div-add-row{display:flex;align-items:center;gap:6px;margin-top:2px;}
-.division-fields-form{display:grid;grid-template-columns:minmax(120px,0.7fr) minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr);gap:10px;align-items:start;}
+.division-fields-form{display:grid;grid-template-columns:minmax(110px,0.65fr) minmax(0,2.25fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr);gap:10px;align-items:start;}
 .division-field{display:flex;flex-direction:column;gap:5px;min-width:0;color:#A0A0A0;font-size:10px;font-weight:700;}
 .division-field--number{grid-column:1;}
 .division-field--name{grid-column:2;}
@@ -5768,7 +5768,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .division-field input.edit-input{font-weight:500;}
 .division-form-actions{grid-column:1 / -1;display:flex;justify-content:flex-end;gap:6px;padding-top:9px;border-top:1px solid #303030;margin-top:2px;}
 .division-form-actions .btn-sm{min-width:70px;padding:6px 10px;font-size:11px;justify-content:center;}
-@media(max-width:520px){.division-fields-form{grid-template-columns:minmax(90px,0.7fr) minmax(0,1.3fr);}.division-field--number{grid-column:1;}.division-field--name{grid-column:2;}.division-field:nth-of-type(3),.division-field:nth-of-type(4),.division-field:nth-of-type(5){grid-column:1 / -1;}}
+@media(max-width:520px){.division-fields-form{grid-template-columns:minmax(90px,0.65fr) minmax(0,1.65fr);}.division-field--number{grid-column:1;}.division-field--name{grid-column:2;}.division-field:nth-of-type(3),.division-field:nth-of-type(4),.division-field:nth-of-type(5){grid-column:1 / -1;}}
 
 .division-manager-list{margin-top:16px;padding:14px;background:#171717;border:1px solid #303030;border-radius:12px;display:flex;flex-direction:column;gap:10px;}
 .division-manager-list .div-row{background:#111;border:1px solid #292929;}
