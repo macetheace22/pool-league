@@ -1733,12 +1733,14 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
       if (newDivisionPlayoffsDate) {
         const updatedSeason = (refreshed || []).find(item => item.id === s.id);
         const addedDivision = updatedSeason?.divisions?.find(item => String(item.num) === divNum.trim() && item.format === newDivisionFormat && item.day === newDivisionDay);
-        if (addedDivision) {
-          const dateSaved = await onSetPlayoffsDate?.(addedDivision.id, newDivisionPlayoffsDate);
-          if (!dateSaved) {
-            setError("Division was added, but its playoff date could not be saved. Edit the division to set the date.");
-            return;
-          }
+        if (!addedDivision) {
+          setError("Division was added, but its saved record could not be found to set the playoff date. Reopen Manage Divisions and edit the date.");
+          return;
+        }
+        const dateSaved = await onSetPlayoffsDate?.(addedDivision.id, newDivisionPlayoffsDate);
+        if (!dateSaved) {
+          setError("Division was added, but its playoff date could not be saved. Edit the division to set the date.");
+          return;
         }
       }
       resetNewDivision();
