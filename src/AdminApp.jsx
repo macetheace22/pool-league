@@ -625,24 +625,24 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               <div className="weekly-data-tile__title">Roster & Ratings</div>
               <div className="weekly-data-tile__desc">Update team rosters and player ratings from the IBA roster report, or import and maintain them manually.</div>
               <div className="weekly-data-tile__actions">
-                <button className={weeklyCategory==="ratings" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("auto");}}>Automatic Sync</button>
-                <button className={weeklyCategory==="ratings" && weeklyMode==="manual" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("manual");}}>Manual Import</button>
+                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("auto");}}>Automatic Sync</button>
+                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("manual");}}>Manual Import</button>
               </div>
             </div>
             <div className={`weekly-data-tile ${weeklyCategory==="standings" ? "weekly-data-tile--active" : ""}`}>
               <div className="weekly-data-tile__title">Team Standings</div>
               <div className="weekly-data-tile__desc">Import the IBA team-standings report automatically or use the manual standings importer.</div>
               <div className="weekly-data-tile__actions">
-                <button className={weeklyCategory==="standings" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("auto");}}>Automatic Sync</button>
-                <button className={weeklyCategory==="standings" && weeklyMode==="manual" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("manual");}}>Manual Import</button>
+                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("auto");}}>Automatic Sync</button>
+                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("manual");}}>Manual Import</button>
               </div>
             </div>
             <div className={`weekly-data-tile ${weeklyCategory==="mvp" ? "weekly-data-tile--active" : ""}`}>
               <div className="weekly-data-tile__title">MVP Standings</div>
               <div className="weekly-data-tile__desc">Import the IBA MVP report automatically or use the manual MVP standings importer.</div>
               <div className="weekly-data-tile__actions">
-                <button className={weeklyCategory==="mvp" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("auto");}}>Automatic Sync</button>
-                <button className={weeklyCategory==="mvp" && weeklyMode==="manual" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("manual");}}>Manual Import</button>
+                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("auto");}}>Automatic Sync</button>
+                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("manual");}}>Manual Import</button>
               </div>
             </div>
           </div>
