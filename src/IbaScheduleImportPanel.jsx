@@ -187,7 +187,8 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   };
 
   const importSelected = async (onlyKeys = null) => {
-    const chosen = (divisions || []).filter(d => onlyKeys ? onlyKeys.includes(divisionKey(d)) : selected[divisionKey(d)]);
+    const targetedKeys = Array.isArray(onlyKeys) ? onlyKeys : null;
+    const chosen = (divisions || []).filter(d => targetedKeys ? targetedKeys.includes(divisionKey(d)) : selected[divisionKey(d)]);
     if (!chosen.length) return;
     const previousResult = result;
     setImporting(true); setError(""); setImportProgress({ current: 0, total: chosen.length });
@@ -381,7 +382,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           </div>
 
           <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-            <button className="btn-primary" onClick={importSelected} disabled={loading || importing || selectedCount === 0}>
+            <button className="btn-primary" onClick={() => importSelected()} disabled={loading || importing || selectedCount === 0}>
               {importing ? `Importing ${Math.min(importProgress.current + 1, importProgress.total)} of ${importProgress.total}…` : `Upload ${selectedCount} Division${selectedCount === 1 ? "" : "s"}`}
             </button>
             <button className="btn-sm" onClick={discover} disabled={loading || importing}>Refresh IBA Data</button>
