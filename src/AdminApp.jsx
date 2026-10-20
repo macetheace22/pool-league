@@ -646,19 +646,19 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               <div className="weekly-data-workspace__heading">
                 <div>
                   <div className="weekly-data-workspace__title" id="weekly-method-title">How would you like to import this week's data?</div>
-                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>Choose a workflow first. The next step will show only the options for that method.</div>
+                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>Select how you want to bring in the data.</div>
                 </div>
               </div>
               <div className="weekly-data-tiles">
                 <button type="button" className="weekly-data-tile" onClick={() => { setWeeklyMode("auto"); setWeeklyCategory("all"); setWeeklyStage("scope"); }} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                   <div className="weekly-data-tile__title">Automatic Import</div>
-                  <div className="weekly-data-tile__desc">Fetch available IBA reports across all configured formats and days.</div>
-                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Review before importing →</div>
+                  <div className="weekly-data-tile__desc">Find available reports and review them before importing.</div>
+                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Continue →</div>
                 </button>
                 <button type="button" className="weekly-data-tile" onClick={() => { setWeeklyMode("manual"); setWeeklyCategory("ratings"); setWeeklyStage("scope"); }} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                   <div className="weekly-data-tile__title">Manual PDF Import</div>
-                  <div className="weekly-data-tile__desc">Upload one PDF for a specific report, format, and day.</div>
-                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Best for partial updates or individual reports →</div>
+                  <div className="weekly-data-tile__desc">Choose a report type, format, and day.</div>
+                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Continue →</div>
                 </button>
               </div>
             </section>
@@ -668,8 +668,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             <section className="weekly-data-workspace" aria-labelledby="weekly-scope-title">
               <div className="weekly-data-workspace__heading">
                 <div>
-                  <div className="weekly-data-workspace__title" id="weekly-scope-title">{weeklyMode === "auto" ? "Choose the automatic import scope" : "Choose the PDF report type"}</div>
-                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>{weeklyMode === "auto" ? "Choose all weekly reports or scan a single report category." : "Choose the report type you want to upload."}</div>
+                  <div className="weekly-data-workspace__title" id="weekly-scope-title">{weeklyMode === "auto" ? "Choose what to scan" : "Choose the PDF report type"}</div>
+                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>{weeklyMode === "auto" ? "Scan all report types or choose one." : "Choose which report to upload."}</div>
                 </div>
                 <button type="button" className="btn-sm" onClick={() => setWeeklyStage("method")}>← Change import method</button>
               </div>
@@ -677,8 +677,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                 {weeklyMode === "auto" && (
                   <button type="button" className="weekly-data-tile" onClick={() => chooseReport("all")} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                     <div className="weekly-data-tile__title">All Weekly Reports</div>
-                    <div className="weekly-data-tile__desc">Roster & ratings, team standings, and MVP reports across all formats and days.</div>
-                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>3 categories · Review the full batch →</div>
+                    <div className="weekly-data-tile__desc">Roster & ratings, team standings, and MVP.</div>
+                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Review all 3 categories →</div>
                   </button>
                 )}
                 {reportOptions.map(option => (
