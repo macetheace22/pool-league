@@ -6,7 +6,7 @@ describe("IBA parsers", () => {
     expect(parseStandingsImport("15101\tRoom 40\t10\t123\t15\t8.20")[0]).toMatchObject({ teamNum:"15101", teamName:"Room 40", totalPoints:123, setsPlayed:15 });
     expect(parseStandingsImport("15101 Room 40 10 123 15 8.20")[0]).toMatchObject({ teamNum:"15101", teamName:"Room 40", totalPoints:123, setsPlayed:15 });
     expect(parseStandingsImport("76A01 Eliminators 10 123 15 8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators", totalPoints:123, setsPlayed:15 });
-    expect(parseStandingsImport("76A01\\tEliminators\\t10\\t123\\t15\\t8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators" });
+    expect(parseStandingsImport("76A01\tEliminators\t10\t123\t15\t8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators" });
   });
 
   it("keeps MVP compatible with tab-delimited paste and supports PDF space extraction", () => {
@@ -94,7 +94,7 @@ describe("IBA parsers", () => {
       "Team 76A02 NO eQUsEs",
       "Two Stooges Sports Bar",
       "116 14768 2 1 Barrett, Scott",
-    ].join("\\n"));
+    ].join("\n"));
     expect(result.teams["76A01"]).toMatchObject({ name: "Eliminators", location: "Two Stooges Sports Bar" });
     expect(result.teams["76A02"]).toMatchObject({ name: "NO eQUsEs" });
     expect(result.rosters["76A01"]).toEqual(["34240"]);
