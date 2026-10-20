@@ -443,7 +443,7 @@ export async function getIbaScheduleImportStatus(seasonId) {
 
   const { data: divisions, error: divisionError } = await supabase
     .from("divisions")
-    .select("id, num, name, format, day")
+    .select("id, num, name, format, day, playoffs_start_date")
     .eq("season_id", seasonId)
     .order("format")
     .order("day")
@@ -486,6 +486,7 @@ export async function getIbaScheduleImportStatus(seasonId) {
       name: d.name,
       format: d.format,
       day: d.day,
+      playoffs_start_date: d.playoffs_start_date || null,
       teamCount: teamCounts[d.id] ?? 0,
       weekCount: weekCounts[d.id] ?? 0,
       pairingCount: pairingCounts[d.id] ?? 0,
