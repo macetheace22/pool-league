@@ -37,7 +37,12 @@ const US_STATE_CODES = [
   "WV","WI","WY",
 ];
 
-function seasonLabel(s) { return `${s.type} · ${s.year}`; }
+function seasonLabel(s) {
+  const type = s?.type ?? s?.seasonType ?? s?.season_type;
+  const year = s?.year ?? s?.seasonYear ?? s?.season_year;
+  const parts = [type, year].filter(value => value !== null && value !== undefined && String(value).trim() !== "");
+  return parts.length ? parts.join(" · ") : "Unnamed season";
+}
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 const ROLES = {
@@ -594,7 +599,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         </SubTabBar>
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
-            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
+            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} seasonOnly />
           {manageSubTab==="teams" && (
             <TeamsTab key={viewingDiv?.id ?? "none"} teams={viewTeams}
               onSave={isViewingActive && viewingDiv ? handleSaveTeams : null}
@@ -668,16 +673,14 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                 </div>
                 <button type="button" className="btn-sm" onClick={() => setWeeklyStage("method")}>← Change import method</button>
               </div>
-              {weeklyMode === "auto" && (
-                <div className="weekly-data-tiles">
+              <div className="weekly-data-tiles weekly-data-tiles--reports">
+                {weeklyMode === "auto" && (
                   <button type="button" className="weekly-data-tile" onClick={() => chooseReport("all")} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                     <div className="weekly-data-tile__title">All Weekly Reports</div>
                     <div className="weekly-data-tile__desc">Scan all 21 format/day groups for roster & ratings, team standings, and MVP reports. Review and validate the full batch before importing.</div>
                     <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>3 report categories · 21 format/day groups →</div>
                   </button>
-                </div>
-              )}
-              <div className="weekly-data-tiles">
+                )}
                 {reportOptions.map(option => (
                   <button type="button" key={option.key} className="weekly-data-tile" onClick={() => chooseReport(option.key)} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
                     <div className="weekly-data-tile__title">{option.title}</div>
@@ -704,8 +707,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                   <div className="weekly-data-workspace__mode">{weeklyMode==="auto" ? "AUTOMATIC IMPORT" : "MANUAL PDF IMPORT"}</div>
-                  <button type="button" className="btn-sm" onClick={() => setWeeklyStage("scope")}>← Change report selection</button>
-                  <button type="button" className="btn-sm" onClick={() => setWeeklyStage("method")}>Change import method</button>
+                  <button type="button" className="btn-sm" onClick={() => setWeeklyStage(weeklyStage === "workspace" ? "scope" : "method")}>← Back</button>
                 </div>
               </div>
               {weeklyMode === "auto"
@@ -937,7 +939,7 @@ function FilterChips({ options, value, onChange }) {
 }
 
 function seasonLabelFor(row) {
-  return `${row.seasonType}`;
+  return seasonLabel(row);
 }
 
 // ─── Player Stats Profile (shared) ─────────────────────────────────────────
@@ -1634,7 +1636,7 @@ function TeamLookupPage() {
 }
 
 // ─── Season + Division Banner ─────────────────────────────────────────────────
-function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, onView, readOnly }) {
+function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, onView, readOnly, seasonOnly = false }) {
   const [open, setOpen] = useState(false);
   const isActive = !!viewingSeason?.is_active;
   const divName = viewingDiv ? `Div ${viewingDiv.num}${viewingDiv.name ? " · " + viewingDiv.name : ""} · ${viewingDiv.format || "Format required"} · ${viewingDiv.day || "Day required"}` : "No division";
@@ -1653,6 +1655,14 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
         <div className="season-picker">
           {seasons.map((s) => {
             const divs = s.divisions ?? [];
+            if (seasonOnly) {
+              return (
+                <button key={s.id} className={`season-picker__btn season-picker__btn--div ${viewingSeason?.id === s.id ? "season-picker__btn--active" : ""}`}
+                  onClick={() => { onView(s, divs[0] ?? null); setOpen(false); }}>
+                  {seasonLabelFor(s)}{s.is_active ? " · Active" : " · Inactive"}{divs.length === 0 ? " · No divisions" : ""}
+                </button>
+              );
+            }
             return (
               <div key={s.id}>
                 <div className={`season-picker__season-header ${s.is_active?"season-picker__season-header--active":""}`}>
@@ -1682,7 +1692,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
       {readOnly && !isActive && (
         <div className="readonly-bar">Read-only — switch to an active season to make changes</div>
       )}
-      {isActive && !viewingDiv && (
+      {!seasonOnly && isActive && !viewingDiv && (
         <div className="readonly-bar">No division selected — add a division in the Season tab to enable imports</div>
       )}
     </div>
@@ -5641,6 +5651,8 @@ html,body{width:100%;overflow-x:hidden;}
 .weekly-data-global-action__desc{font-size:10.5px;color:#9A9A9A;line-height:1.4;margin-top:3px;}
 .weekly-data-global-action button{flex:0 0 auto;max-width:48%;white-space:normal;line-height:1.2;}
 .weekly-data-tiles{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:0 0 16px;}
+ .weekly-data-tiles--reports{grid-template-columns:minmax(0,1fr);align-items:stretch;}
+ .weekly-data-tiles--reports .weekly-data-tile{height:100%;text-align:left;}
 .weekly-data-tile{display:flex;flex-direction:column;gap:8px;min-width:0;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:12px;padding:13px;}
 .weekly-data-tile--active{border-color:#28634C;background:#17251F;}
 .weekly-data-tile__title{font-size:13px;font-weight:800;color:#F4F4F4;}
@@ -5654,7 +5666,8 @@ html,body{width:100%;overflow-x:hidden;}
 .weekly-data-workspace__heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .weekly-data-workspace__title{font-size:14px;font-weight:800;color:#F4F4F4;}
 .weekly-data-workspace__mode{font-size:9px;font-weight:800;letter-spacing:.06em;color:#9FC4B4;text-align:right;}
-@media (min-width:700px){.weekly-data-tiles{grid-template-columns:repeat(3,minmax(0,1fr));}.weekly-data-tile{padding:14px;}}
+@media (min-width:700px){.weekly-data-tiles{grid-template-columns:repeat(2,minmax(0,1fr));}.weekly-data-tiles--reports{grid-template-columns:repeat(2,minmax(0,1fr));}.weekly-data-tile{padding:14px;}}
+ @media (min-width:1100px){.weekly-data-tiles{grid-template-columns:repeat(2,minmax(0,1fr));}.weekly-data-tiles--reports{grid-template-columns:repeat(4,minmax(0,1fr));}}
 .sub-tab-bar{display:flex;gap:6px;margin-bottom:4px;}
 .sub-tab{flex:1;padding:8px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:8px;font-family:'Archivo',sans-serif;font-size:11.5px;font-weight:700;color:#6A6A6A;cursor:pointer;}
 .sub-tab--active{background:#0B3D2E;border-color:#0B3D2E;color:#5FCF9E;}
