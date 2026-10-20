@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './AuthContext.jsx';
@@ -9,9 +9,74 @@ import { Home, LeaguesDashboard, LeagueOffice, SeasonManagementHub, TournamentsP
 import Practice from './Practice.jsx';
 import Schedules from './Schedules.jsx';
 
+// Shared save-button feedback: once a field changes, the nearest Save/Update
+// action turns green until it is clicked. This keeps the behavior consistent
+// across existing forms without requiring every screen to implement its own state.
+function DirtySaveButtonBehavior() {
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.dataset.dirtySaveBehavior = 'true';
+    style.textContent = `
+      button.save-button--dirty {
+        background: #126B46 !important;
+        border-color: #5FCF9E !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 0 0 1px rgba(95, 207, 158, 0.28) !important;
+      }
+      button.save-button--dirty:hover:not(:disabled) {
+        background: #188357 !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    const isSaveButton = (button) => {
+      const label = (button.innerText || button.getAttribute('aria-label') || button.title || '').trim();
+      return /^(save|update|apply changes|save changes|save and continue|update password|update profile|save game|save role|save username|save phone number|save player number|save division|save season)\b/i.test(label)
+        || button.classList.contains('btn-icon--confirm');
+    };
+
+    const nearestSaveButton = (field) => {
+      let node = field.parentElement;
+      while (node && node !== document.body) {
+        const candidates = Array.from(node.querySelectorAll('button')).filter(isSaveButton);
+        if (candidates.length === 1) return candidates[0];
+        if (candidates.length > 1) {
+          const fieldCount = node.querySelectorAll('input,select,textarea,[contenteditable="true"]').length;
+          if (fieldCount <= 1) return candidates[0];
+        }
+        node = node.parentElement;
+      }
+      return null;
+    };
+
+    const onFieldChange = (event) => {
+      const field = event.target;
+      if (!(field instanceof HTMLElement) || !field.matches('input,select,textarea,[contenteditable="true"]')) return;
+      const button = nearestSaveButton(field);
+      if (button && !button.disabled) button.classList.add('save-button--dirty');
+    };
+    const onButtonClick = (event) => {
+      const button = event.target instanceof Element ? event.target.closest('button') : null;
+      if (button && isSaveButton(button)) button.classList.remove('save-button--dirty');
+    };
+
+    document.addEventListener('input', onFieldChange, true);
+    document.addEventListener('change', onFieldChange, true);
+    document.addEventListener('click', onButtonClick, true);
+    return () => {
+      document.removeEventListener('input', onFieldChange, true);
+      document.removeEventListener('change', onFieldChange, true);
+      document.removeEventListener('click', onButtonClick, true);
+      style.remove();
+    };
+  }, []);
+  return null;
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+      <DirtySaveButtonBehavior />
       <NavHistoryProvider>
         <AuthProvider>
           <Routes>
