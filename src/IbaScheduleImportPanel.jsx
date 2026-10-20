@@ -25,6 +25,14 @@ function divisionKey(division) {
   return `${division?.format || ""}:${division?.day || ""}:${division?.value || division?.label || ""}`;
 }
 
+function scheduleMatchupCount(data) {
+  return (data?.weeks || []).reduce((total, week) => total + (week.pairings?.length || 0), 0);
+}
+
+function hasUsableSchedule(data) {
+  return !!(data?.hasSchedule && data.teams?.length && data.weeks?.length && scheduleMatchupCount(data) > 0);
+}
+
 export default function IbaScheduleImportPanel({ season, onImported, compact = false }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -33,6 +41,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const [divisions, setDivisions] = useState(null);
   const [selected, setSelected] = useState({});
   const [previews, setPreviews] = useState({});
+  const [rowErrors, setRowErrors] = useState({});
   const [expanded, setExpanded] = useState(null);
   const [result, setResult] = useState(null);
   const [diagnostic, setDiagnostic] = useState(null);
@@ -49,7 +58,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   };
 
   useEffect(() => {
-    setDivisions(null); setSelected({}); setPreviews({}); setExpanded(null); setResult(null);
+    setDivisions(null); setSelected({}); setPreviews({}); setRowErrors({}); setExpanded(null); setResult(null);
     setError(""); setDiagnostic(null); setRetrieveProgress({ current: 0, total: 0 });
     setImportProgress({ current: 0, total: 0 });
     refreshImportStatus();
@@ -62,6 +71,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setResult(null);
     setDiagnostic(null);
     setPreviews({});
+    setRowErrors({});
     setRetrieveProgress({ current: 0, total: 0 });
 
     try {
@@ -91,6 +101,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       setRetrieveProgress({ current: 0, total: found.length });
       const fetched = {};
       const errors = [];
+      const rowErrorsFound = {};
 
       // Fetch in small batches so a season with many format/day groups does
       // not require dozens of sequential round trips to IBA.
@@ -112,13 +123,21 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         }));
         for (const item of results) {
           if (item.data) fetched[item.key] = item.data;
-          if (item.error) errors.push(`${item.division.label} (${item.division.format} · ${item.division.day}): ${item.error}`);
+          if (item.error) {
+            rowErrorsFound[item.key] = item.error;
+            errors.push(`${item.division.label} (${item.division.format} · ${item.division.day}): ${item.error}`);
+          }
         }
         setRetrieveProgress(progress => ({ ...progress, current: Math.min(found.length, progress.current + batch.length) }));
       }
 
       setDivisions(found);
       setPreviews(fetched);
+      setRowErrors(rowErrorsFound);
+      setSelected(Object.fromEntries(found.map(d => {
+        const key = divisionKey(d);
+        return [key, hasUsableSchedule(fetched[key])];
+      })));
 
       if (errors.length) {
         setError(errors.join(" · "));
@@ -135,12 +154,20 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     setLoading(true); setError("");
     try {
       const data = await postSchedule({ action: "fetch", format: division.format, day: division.day, division: division.value || division.label });
-      setPreviews(p => ({ ...p, [key]: data })); setExpanded(key);
+      setPreviews(p => ({ ...p, [key]: data }));
+      setRowErrors(p => { const next = { ...p }; delete next[key]; return next; });
+      setSelected(p => ({ ...p, [key]: hasUsableSchedule(data) }));
+      setExpanded(key);
       if (result?.skipped?.some(item => item.key === key)) {
-        const usable = data.hasSchedule && data.teams?.length && data.weeks?.length;
+        const usable = hasUsableSchedule(data);
         setResult(current => current ? { ...current, recoveredKeys: usable ? [...new Set([...(current.recoveredKeys || []), key])] : (current.recoveredKeys || []).filter(existingKey => existingKey !== key) } : current);
       }
-    } catch (e) { setError(e?.message || ("Could not retrieve " + division.label + ".")); }
+    } catch (e) {
+      const message = e?.message || ("Could not retrieve " + division.label + ".");
+      setRowErrors(p => ({ ...p, [key]: message }));
+      setSelected(p => ({ ...p, [key]: false }));
+      setError(message);
+    }
     finally { setLoading(false); }
   };
 
@@ -155,10 +182,17 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       try {
         let data = previews[key];
         if (!data) { data = await postSchedule({ action: "fetch", format: d.format, day: d.day, division: d.value || d.label }); setPreviews(p => ({ ...p, [key]: data })); }
-        if (!data.hasSchedule || !data.teams?.length || !data.weeks?.length) { skipped.push({ key, label: d.label, reason: "IBA returned no usable team and schedule data" }); continue; }
+        if (!hasUsableSchedule(data)) {
+          skipped.push({ key, label: d.label, reason: scheduleMatchupCount(data) === 0 ? "No matchups found — this division was not imported." : "IBA returned no usable team and schedule data." });
+          continue;
+        }
         const importedDivision = await db.importIbaScheduleDivision(season.id, { num: extractDivisionNum(d), name: d.label, format: d.format, day: d.day, teams: data.teams, weeks: data.weeks });
         if (importedDivision.ok) imported.push(importedDivision); else skipped.push({ key, label: d.label, reason: importedDivision.error || "Import failed" });
-      } catch (e) { skipped.push({ key, label: d.label, reason: e?.message || "Unable to retrieve or import this division" }); }
+      } catch (e) {
+        const reason = e?.message || "Unable to retrieve or import this division";
+        setRowErrors(p => ({ ...p, [key]: reason }));
+        skipped.push({ key, label: d.label, reason });
+      }
       finally { setImportProgress(p => ({ ...p, current: p.current + 1 })); }
     }
     const previousImported = previousResult?.imported || [];
@@ -251,7 +285,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
               View Schedules
             </button>
             <button className="btn-primary" onClick={discover} disabled={loading || importing}>
-              {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
+              {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Automatic Import: Sync from IBA"}
             </button>
             {season.is_active && (
               <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
@@ -265,7 +299,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       {!divisions && !result && !statusReady && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
           <button className="btn-primary" onClick={discover} disabled={loading || importing}>
-            {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Sync from IBA"}
+            {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Automatic Import: Sync from IBA"}
           </button>
           {season.is_active && (
             <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
@@ -305,18 +339,27 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                     <input
                       type="checkbox"
                       checked={!!selected[key]}
+                      disabled={!!data && !hasUsableSchedule(data)}
                       onChange={e => setSelected(p => ({ ...p, [key]: e.target.checked }))}
                     />
                     <div className="list-row__body" style={{ flex: 1 }}>
                       <span className="list-row__name">{d.label}</span>
                       <span className="list-row__sub">{d.format} · {d.day}</span>
                       <span className="list-row__sub">
-                        {!data ? "Schedule unavailable — select Preview to retry" : (!data.hasSchedule || !data.teams?.length || !data.weeks?.length) ? "Review needed: IBA returned no usable team and schedule data" : `${data.teams?.length ?? 0} teams · ${data.weeks?.length ?? 0} weeks · ${data.weeks?.reduce((n, w) => n + (w.pairings?.length || 0), 0) ?? 0} matchups`}
+                        {!data ? (rowErrors[key] ? "Retrieval failed — retry to try again" : "Schedule not retrieved yet") : !hasUsableSchedule(data) ? (scheduleMatchupCount(data) === 0 ? "No matchups found — excluded from import" : "No usable schedule data — excluded from import") : `${data.teams?.length ?? 0} teams · ${data.weeks?.length ?? 0} weeks · ${scheduleMatchupCount(data)} matchups`}
                       </span>
+                      {(rowErrors[key] || data?.error || data?.message || (data && !hasUsableSchedule(data))) && (
+                        <span role="status" style={{ display: "block", marginTop: 4, fontSize: 11, color: "#F59E0B", lineHeight: 1.45 }}>
+                          {rowErrors[key] || data?.error || data?.message || (scheduleMatchupCount(data) === 0 ? "IBA returned no matchups for this division. It will not be imported." : "IBA did not return usable team and schedule data. It will not be imported.")}
+                        </span>
+                      )}
                     </div>
-                    <button className="btn-sm" onClick={() => data ? setExpanded(open ? null : key) : fetchPreview(d)} disabled={loading || importing}>
-                      {data ? (open ? <ChevronUp size={12}/> : <ChevronDown size={12}/>) : "Preview"}
-                    </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "stretch" }}>
+                      <button className="btn-sm" onClick={() => data ? setExpanded(open ? null : key) : fetchPreview(d)} disabled={loading || importing}>
+                        {data ? (open ? "Hide preview" : "Preview") : (rowErrors[key] ? "Retry retrieval" : "Retrieve preview")}
+                      </button>
+                      {data && <button className="btn-sm" onClick={() => fetchPreview(d)} disabled={loading || importing}>Retry from IBA</button>}
+                    </div>
                   </div>
                   {open && data && <SchedulePreview data={data}/>}
                 </div>
