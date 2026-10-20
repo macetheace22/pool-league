@@ -308,7 +308,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       </div>
 
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>
-        Choose one of two ways to import this season's data: sync divisions, teams, and schedules directly from IBA, or manually import teams and schedules. Use Advanced: Add or Edit Divisions below only to maintain division records—not to import teams or schedules.
+        Choose one of two ways to import this season's data: automatically import divisions, teams, and schedules directly from IBA, or manually import teams and schedules through pasting reports.
       </div>
 
       {!divisions && !result && statusReady && (
@@ -320,6 +320,9 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             {existingStatus.totals.divisions} divisions · {existingStatus.totals.teams} teams · {existingStatus.totals.weeks} schedule weeks · {existingStatus.totals.pairings} matchups
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+            <button className="btn-primary" onClick={() => navigate(`/manage-divisions?season=${encodeURIComponent(season.id)}`)}>
+              View Divisions
+            </button>
             <button className="btn-primary" onClick={() => navigate(`/schedules?season=${encodeURIComponent(season.id)}`)}>
               View Schedules
             </button>
@@ -434,6 +437,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         <div className="import-warning-block" style={{ background: result.skipped.length ? "#30230F" : "#0F2D1F", borderColor: result.skipped.length ? "#8A5A16" : "#1F6B4A", marginTop: 10 }}>
           <div className="import-warning-block__title" style={{ color: result.skipped.length ? "#F59E0B" : "#5FCF9E" }}>{result.skipped.length ? <AlertCircle size={12}/> : <Check size={12}/>} {result.skipped.length ? "IBA schedule sync needs review" : "IBA schedule sync complete"}</div>
           <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>{result.imported.length} division{result.imported.length === 1 ? "" : "s"} imported · {totalTeams} teams · {totalWeeks} schedule weeks · {totalPairings} matchups</div>
+          {result.imported.length > 0 && <button className="btn-primary" style={{ marginTop: 8 }} onClick={() => navigate(`/manage-divisions?season=${encodeURIComponent(season.id)}`)}>View Divisions</button>}
           {result.skipped.length > 0 && (
             <>
               <div style={{ fontSize: 11, color: "#E0E0E0", marginTop: 8 }}>Only the divisions listed here need attention. Successful imports are retained; you do not need to rediscover all divisions.</div>
