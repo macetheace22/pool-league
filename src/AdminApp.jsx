@@ -370,8 +370,13 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   };
   const handleSetPlayoffsDate = async (divisionId, date) => {
     const ok = await db.setDivisionPlayoffsStartDate(divisionId, date);
-    if (ok) await refreshSeasons();
-    return ok;
+    if (!ok) return false;
+    const list = await refreshSeasons();
+    const freshSeason = list.find(s => s.id === viewingSeason?.id);
+    const freshDivision = freshSeason?.divisions?.find(d => d.id === divisionId);
+    if (freshSeason) setViewingSeason(freshSeason);
+    if (freshDivision && viewingDiv?.id === divisionId) setViewingDiv(freshDivision);
+    return true;
   };
   const handleRemoveDivision = async (divisionId) => {
     await db.removeDivision(divisionId);
@@ -1886,7 +1891,6 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                         )}
 
                         <div style={{ marginTop: 10, fontSize: 11.5, color: "#9A9A9A" }}>Need to change division records? Use the Manage Divisions tab above. Division setup is separate from importing IBA schedules.</div>
-                       </div>
                       </div>
                     )}
                   </div>
