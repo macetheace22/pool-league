@@ -39,10 +39,16 @@ function DirtySaveButtonBehavior() {
       let node = field.parentElement;
       while (node && node !== document.body) {
         const candidates = Array.from(node.querySelectorAll('button')).filter(isSaveButton);
-        if (candidates.length === 1) return candidates[0];
-        if (candidates.length > 1) {
-          const fieldCount = node.querySelectorAll('input,select,textarea,[contenteditable="true"]').length;
-          if (fieldCount <= 1) return candidates[0];
+        if (candidates.length) {
+          if (candidates.length === 1) return candidates[0];
+          const fieldRect = field.getBoundingClientRect();
+          const fieldX = fieldRect.left + fieldRect.width / 2;
+          const fieldY = fieldRect.top + fieldRect.height / 2;
+          return candidates.reduce((closest, candidate) => {
+            const rect = candidate.getBoundingClientRect();
+            const distance = Math.hypot(fieldX - (rect.left + rect.width / 2), fieldY - (rect.top + rect.height / 2));
+            return !closest || distance < closest.distance ? { button: candidate, distance } : closest;
+          }, null)?.button ?? null;
         }
         node = node.parentElement;
       }
