@@ -1647,7 +1647,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
         <div>
           <div className="season-banner__label">{isActive ? "Active" : "Viewing (read-only)"}</div>
           <div className="season-banner__name">{viewingSeason ? seasonLabel(viewingSeason) : "No season selected"}</div>
-          {viewingDiv && <div className="season-banner__div">{divName}</div>}
+          {!seasonOnly && viewingDiv && <div className="season-banner__div">{divName}</div>}
         </div>
         <ChevronDown size={14} color="#9A9A9A" style={{transform: open?"rotate(180deg)":"none", transition:"0.2s", flexShrink:0}} />
       </div>
