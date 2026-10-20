@@ -31,12 +31,12 @@ jobs:
 
       - name: Check access controls on changed SQL tables
         env:
-          BASE_SHA: \${{ github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           mapfile -t SQL_FILES < <(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- '*.sql')
-          if [ "\${#SQL_FILES[@]}" -gt 0 ]; then
-            node scripts/check-supabase-table-access.mjs "\${SQL_FILES[@]}"
+          if [ "${#SQL_FILES[@]}" -gt 0 ]; then
+            node scripts/check-supabase-table-access.mjs "${SQL_FILES[@]}"
           else
             echo "No changed SQL files to inspect."
           fi
