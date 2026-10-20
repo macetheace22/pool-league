@@ -610,7 +610,14 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               onAddPairing={isViewingActive && viewingDiv ? handleAddPairing : null}
               onUpdatePairing={isViewingActive && viewingDiv ? handleUpdatePairing : null}
               onDeletePairing={isViewingActive && viewingDiv ? handleDeletePairing : null}
-              readOnly={!isViewingActive} onNext={nul  // ── Weekly league data — manager only ──
+              readOnly={!isViewingActive} onNext={null} />
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ── Weekly league data — manager only ──
   if (page === "weekly") {
     if (!isManager) return <><PageHeader title="Weekly Import Page"/><div className="tab-content"><AccessDenied/></div></>;
     const reportOptions = [
@@ -713,26 +720,14 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
                   : <div className="empty-state">Select an active season above before scanning weekly reports.</div>
                 : !isViewingActive || !viewingSeason
                   ? <div className="empty-state">Activate a season before importing weekly PDFs.</div>
-                  : <>
-                      <IbaAutoSyncPanel
-                        key={`${viewingSeason.id}-${weeklyCategory}-manual-pdf`}
-                        season={viewingSeason}
-                        schedule={viewSchedule}
-                        reportType={reportOptions.find(option => option.key === weeklyCategory)?.code}
-                        manualMode
-                        onComplete={refreshCurrentDivision}
-                      />
-                      {viewingDiv
-                        ? weeklyCategory==="ratings"
-                          ? <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
-                              divisionId={viewingDiv.id} onReconciled={refreshCurrentDivision}
-                              onBulkImport={handleBulkImport}
-                              onManualRating={handleManualRating}
-                              onMovePlayer={handleMovePlayer}
-                              lockedTeamId={null} readOnly={false} />
-                          : <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklyCategory} />
-                        : <div className="empty-state">The PDF import above works across the selected season. Select a division to use the separate in-app manual maintenance tools below.</div>}
-                    </>
+                  : <IbaAutoSyncPanel
+                      key={`${viewingSeason.id}-${weeklyCategory}-manual-pdf`}
+                      season={viewingSeason}
+                      schedule={viewSchedule}
+                      reportType={reportOptions.find(option => option.key === weeklyCategory)?.code}
+                      manualMode
+                      onComplete={refreshCurrentDivision}
+                    />
               }
             </div>
           )}
