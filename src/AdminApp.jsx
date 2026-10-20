@@ -1795,7 +1795,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
         </div>
       )}
 
-      {subTab !== "create" && (
+      {subTab !== "create" && subTab !== "divisions" && (
         <>
           <SectionHeader title={`${subTab==="inactive"?"Inactive":"Active"} Seasons (${list.length})`} />
           {list.length === 0
