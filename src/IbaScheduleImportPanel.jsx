@@ -308,7 +308,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       </div>
 
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5 }}>
-        Choose one of two ways to import this season's data: sync divisions, teams, and schedules directly from IBA, or manually import teams and schedules. Use Advanced: Add or Edit Divisions below only to maintain division records—not to import teams or schedules.
+        Choose one of two ways to import this season's data: automatically import divisions, teams, and schedules directly from IBA, or manually import teams and schedules through pasting reports.
       </div>
 
       {!divisions && !result && statusReady && (
@@ -320,6 +320,9 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             {existingStatus.totals.divisions} divisions · {existingStatus.totals.teams} teams · {existingStatus.totals.weeks} schedule weeks · {existingStatus.totals.pairings} matchups
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+            <button className="btn-primary" onClick={() => navigate(`/manage-divisions?season=${encodeURIComponent(season.id)}`)}>
+              View Divisions
+            </button>
             <button className="btn-primary" onClick={() => navigate(`/schedules?season=${encodeURIComponent(season.id)}`)}>
               View Schedules
             </button>
