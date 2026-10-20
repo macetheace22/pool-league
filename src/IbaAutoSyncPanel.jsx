@@ -23,7 +23,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
   const [discoverySeasons, setDiscoverySeasons] = useState([]);
   const [reviewGroupKey, setReviewGroupKey] = useState("");
   const [reviewSeasonId, setReviewSeasonId] = useState("");
-  const [reviewReportType, setReviewReportType] = useState("rost");
+  const [reviewReportType, setReviewReportType] = useState(reportType || "all");
   const [reviewValidation, setReviewValidation] = useState(null);
   const [reviewError, setReviewError] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -222,7 +222,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
         <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
       </div>}
-      {reportType === "rost" && !manualMode && (
+      {!manualMode && (
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>All-format report discovery</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
@@ -389,11 +389,6 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         </section>
       )}
       {!supported && <div className="import-warning-block"><div className="import-warning-block__title"><AlertCircle size={12}/> Import the IBA schedule for this season first so its divisions have format/day context.</div></div>}
-      {!manualMode && supported && !data && (
-        <button className="btn-primary" onClick={fetchReports} disabled={loading} style={{marginTop:8}}>
-          {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : reportType ? `Fetch & Preview ${reportLabels[reportType] || "IBA Report"}` : "Fetch & Preview IBA Reports"}
-        </button>
-      )}
 
       {error && <div style={{marginTop:8}}><div className="error-msg">{error}</div></div>}
 

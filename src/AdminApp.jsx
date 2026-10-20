@@ -281,8 +281,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const refreshLocations = () => db.listLocations().then(setLocations);
 
   const [manageSubTab, setManageSubTab]   = useState(() => ["teams", "schedule", "players", "eligibility", "playoffs", "locations"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "teams");
-  const [weeklyCategory, setWeeklyCategory] = useState("ratings");
+  const [weeklyCategory, setWeeklyCategory] = useState("all");
   const [weeklyMode, setWeeklyMode] = useState("auto");
+  const [weeklyStage, setWeeklyStage] = useState("method");
   const [infoSubTab, setInfoSubTab]       = useState("teams");
   const [accessSubTab, setAccessSubTab]   = useState("users");
   const [accessCounts, setAccessCounts]   = useState({ users: 0, codes: 0 });
@@ -619,90 +620,117 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Weekly league data — manager only ──
   if (page === "weekly") {
     if (!isManager) return <><PageHeader title="Weekly Import Page"/><div className="tab-content"><AccessDenied/></div></>;
+    const reportOptions = [
+      { key: "ratings", title: "Roster & Ratings", description: "Import player rosters and current ratings from the IBA roster report.", code: "rost" },
+      { key: "standings", title: "Team Standings", description: "Import the IBA team-standings report.", code: "div" },
+      { key: "mvp", title: "MVP Standings", description: "Import the IBA MVP report.", code: "mvp" },
+    ];
+    const chooseReport = (category) => {
+      setWeeklyCategory(category);
+      setWeeklyStage("workspace");
+    };
     return (
       <>
-        <PageHeader title="Weekly Import Page" />
+        <PageHeader title="Weekly League Data" />
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
-          <div className="weekly-data-global-action">
-            <div><div className="weekly-data-global-action__title">Need to update everything?</div><div className="weekly-data-global-action__desc">Check all three IBA weekly reports in one shared sync.</div></div>
-            <button className={weeklyCategory==="all" && weeklyMode==="auto" ? "btn-primary" : "btn-sm"} onClick={()=>{setWeeklyCategory("all");setWeeklyMode("auto");}}>Open Combined Sync</button>
-          </div>
-          <div className="weekly-data-tiles">
-            <div className={`weekly-data-tile ${weeklyCategory==="ratings" ? "weekly-data-tile--active" : ""}`}>
-              <div className="weekly-data-tile__title">Roster & Ratings</div>
-              <div className="weekly-data-tile__desc">Update team rosters and player ratings from the IBA roster report, or import and maintain them manually.</div>
-              <div className="weekly-data-tile__actions">
-                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("auto");}}>Automatic Sync</button>
-                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("manual");}}>Manual Import</button>
+
+          {weeklyStage === "method" && (
+            <section className="weekly-data-workspace" aria-labelledby="weekly-method-title">
+              <div className="weekly-data-workspace__heading">
+                <div>
+                  <div className="weekly-data-workspace__title" id="weekly-method-title">How would you like to import this week's data?</div>
+                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>Choose a workflow first. The next step will show only the options for that method.</div>
+                </div>
               </div>
-            </div>
-            <div className={`weekly-data-tile ${weeklyCategory==="standings" ? "weekly-data-tile--active" : ""}`}>
-              <div className="weekly-data-tile__title">Team Standings</div>
-              <div className="weekly-data-tile__desc">Import the IBA team-standings report automatically or use the manual standings importer.</div>
-              <div className="weekly-data-tile__actions">
-                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("auto");}}>Automatic Sync</button>
-                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("standings");setWeeklyMode("manual");}}>Manual Import</button>
+              <div className="weekly-data-tiles">
+                <button type="button" className="weekly-data-tile" onClick={() => { setWeeklyMode("auto"); setWeeklyCategory("all"); setWeeklyStage("scope"); }} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
+                  <div className="weekly-data-tile__title">Automatic Import</div>
+                  <div className="weekly-data-tile__desc">Retrieve reports directly from IBA across formats and days, review the extracted data, validate it, then choose when to import.</div>
+                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Best for a full weekly update or an automatic report-category scan →</div>
+                </button>
+                <button type="button" className="weekly-data-tile" onClick={() => { setWeeklyMode("manual"); setWeeklyCategory("ratings"); setWeeklyStage("scope"); }} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
+                  <div className="weekly-data-tile__title">Manual PDF Import</div>
+                  <div className="weekly-data-tile__desc">Upload one PDF at a time when you want to control the exact report, format, and day being processed.</div>
+                  <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>Best for a specific PDF or a partial weekly update →</div>
+                </button>
               </div>
-            </div>
-            <div className={`weekly-data-tile ${weeklyCategory==="mvp" ? "weekly-data-tile--active" : ""}`}>
-              <div className="weekly-data-tile__title">MVP Standings</div>
-              <div className="weekly-data-tile__desc">Import the IBA MVP report automatically or use the manual MVP standings importer.</div>
-              <div className="weekly-data-tile__actions">
-                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("auto");}}>Automatic Sync</button>
-                <button className={"btn-primary"} onClick={()=>{setWeeklyCategory("mvp");setWeeklyMode("manual");}}>Manual Import</button>
+            </section>
+          )}
+
+          {weeklyStage === "scope" && (
+            <section className="weekly-data-workspace" aria-labelledby="weekly-scope-title">
+              <div className="weekly-data-workspace__heading">
+                <div>
+                  <div className="weekly-data-workspace__title" id="weekly-scope-title">{weeklyMode === "auto" ? "Choose the automatic import scope" : "Choose the PDF report type"}</div>
+                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:5}}>{weeklyMode === "auto" ? "The scan checks all 3 formats × 7 days. You can review all report categories together or focus on one category." : "Choose one category, then upload a single PDF for its format and day."}</div>
+                </div>
+                <button type="button" className="btn-sm" onClick={() => setWeeklyStage("method")}>← Change import method</button>
               </div>
-            </div>
-          </div>
-          <div className="weekly-data-workspace">
-            <div className="weekly-data-workspace__heading">
-              <div className="weekly-data-workspace__title">
-                {weeklyCategory==="all" ? "All Weekly Data" : weeklyCategory==="ratings" ? "Roster & Ratings" : weeklyCategory==="standings" ? "Team Standings" : "MVP Standings"}
-              </div>
-              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                <div className="weekly-data-workspace__mode">{weeklyMode==="auto" ? "AUTOMATIC IBA SYNC" : "MANUAL IMPORT"}</div>
-                {weeklyCategory==="all" && weeklyMode==="auto" && (
-                  <button className="btn-sm" onClick={()=>{setWeeklyCategory("ratings");setWeeklyMode("auto");}}>
-                    Back to report options
+              {weeklyMode === "auto" && (
+                <div className="weekly-data-tiles">
+                  <button type="button" className="weekly-data-tile" onClick={() => chooseReport("all")} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
+                    <div className="weekly-data-tile__title">All Weekly Reports</div>
+                    <div className="weekly-data-tile__desc">Scan all 21 format/day groups for roster & ratings, team standings, and MVP reports. Review and validate the full batch before importing.</div>
+                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>3 report categories · 21 format/day groups →</div>
                   </button>
-                )}
+                </div>
+              )}
+              <div className="weekly-data-tiles">
+                {reportOptions.map(option => (
+                  <button type="button" key={option.key} className="weekly-data-tile" onClick={() => chooseReport(option.key)} style={{textAlign:"left",cursor:"pointer",color:"inherit",font:"inherit"}}>
+                    <div className="weekly-data-tile__title">{option.title}</div>
+                    <div className="weekly-data-tile__desc">{option.description}</div>
+                    <div style={{fontSize:11,color:"#5FCF9E",fontWeight:700,marginTop:12}}>{weeklyMode === "auto" ? "Scan this report category across all formats and days →" : "Upload one PDF for this report category →"}</div>
+                  </button>
+                ))}
               </div>
-            </div>
-            {weeklyMode==="auto"
-              ? isViewingActive && viewingSeason
-                ? <IbaAutoSyncPanel
-                    key={`${viewingSeason.id}-${weeklyCategory}`}
-                    season={viewingSeason}
-                    schedule={viewSchedule}
-                    reportType={weeklyCategory==="all" ? null : weeklyCategory==="ratings" ? "rost" : weeklyCategory==="standings" ? "div" : "mvp"}
-                    onComplete={refreshCurrentDivision}
-                  />
-                : <div className="empty-state">Select an active season to sync its weekly IBA report.</div>
-              : !isViewingActive || !viewingSeason
-                ? <div className="empty-state">Activate a season to import weekly data.</div>
-                : <>
-                    <IbaAutoSyncPanel
+            </section>
+          )}
+
+          {weeklyStage === "workspace" && (
+            <div className="weekly-data-workspace">
+              <div className="weekly-data-workspace__heading">
+                <div>
+                  <div className="weekly-data-workspace__title">
+                    {weeklyCategory==="all" ? "All Weekly Reports" : reportOptions.find(option => option.key === weeklyCategory)?.title}
+                  </div>
+                  <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginTop:4}}>
+                    {weeklyMode === "auto"
+                      ? "Automatic scan is read-only until you validate and confirm an import."
+                      : "Manual import processes one uploaded PDF at a time; no data is written during extraction and preview."}
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <div className="weekly-data-workspace__mode">{weeklyMode==="auto" ? "AUTOMATIC IMPORT" : "MANUAL PDF IMPORT"}</div>
+                  <button type="button" className="btn-sm" onClick={() => setWeeklyStage("scope")}>← Change report selection</button>
+                  <button type="button" className="btn-sm" onClick={() => setWeeklyStage("method")}>Change import method</button>
+                </div>
+              </div>
+              {weeklyMode === "auto"
+                ? isViewingActive && viewingSeason
+                  ? <IbaAutoSyncPanel
+                      key={`${viewingSeason.id}-${weeklyCategory}-automatic`}
+                      season={viewingSeason}
+                      schedule={viewSchedule}
+                      reportType={weeklyCategory==="all" ? null : reportOptions.find(option => option.key === weeklyCategory)?.code}
+                      onComplete={refreshCurrentDivision}
+                    />
+                  : <div className="empty-state">Select an active season above before scanning weekly reports.</div>
+                : !isViewingActive || !viewingSeason
+                  ? <div className="empty-state">Activate a season before importing weekly PDFs.</div>
+                  : <IbaAutoSyncPanel
                       key={`${viewingSeason.id}-${weeklyCategory}-manual-pdf`}
                       season={viewingSeason}
                       schedule={viewSchedule}
-                      reportType={weeklyCategory==="ratings" ? "rost" : weeklyCategory==="standings" ? "div" : "mvp"}
+                      reportType={reportOptions.find(option => option.key === weeklyCategory)?.code}
                       manualMode
                       onComplete={refreshCurrentDivision}
                     />
-                    {viewingDiv
-                      ? weeklyCategory==="ratings"
-                        ? <PlayersTab teams={viewTeams} rosters={viewRosters} schedule={viewSchedule} eligByNum={playoffEligibility}
-                            divisionId={viewingDiv.id} onReconciled={refreshCurrentDivision}
-                            onBulkImport={handleBulkImport}
-                            onManualRating={handleManualRating}
-                            onMovePlayer={handleMovePlayer}
-                            lockedTeamId={null} readOnly={false} />
-                        : <WeeklyImportPanel divisionId={viewingDiv.id} teams={viewTeams} mode={weeklyCategory} />
-                      : <div className="empty-state">The PDF import above works across the selected season. Select a division to use the separate in-app manual maintenance tools below.</div>}
-                  </>
-            }
-          </div>
+              }
+            </div>
+          )}
         </div>
       </>
     );
