@@ -4689,8 +4689,8 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
               {!readOnly && editId===team.id ? (
                 <div className="list-row__edit" style={{flexDirection:"column",alignItems:"stretch",gap:8}}>
                   <div style={{display:"flex",gap:6}}>
-                    <input className="edit-input" style={{maxWidth:70}} value={editData.teamNum} onChange={e=>setEditData(d=>({...d,teamNum:e.target.value}))}/>
-                    <input className="edit-input" style={{flex:1}} value={editData.name} onChange={e=>setEditData(d=>({...d,name:e.target.value}))}/>
+                    <input className="edit-input" style={{width:112,minWidth:112,flex:"0 0 112px"}} aria-label="Team number" value={editData.teamNum} onChange={e=>setEditData(d=>({...d,teamNum:e.target.value}))}/>
+                    <input className="edit-input" style={{flex:"1 1 0",minWidth:0,maxWidth:320}} aria-label="Team name" value={editData.name} onChange={e=>setEditData(d=>({...d,name:e.target.value}))}/>
                   </div>
                   <SearchableOptionSelect options={[...(editData.venue && !locations?.some(l=>l.name===editData.venue) ? [{value:editData.venue,label:`${editData.venue} (not in list)`,searchText:editData.venue}] : []), ...(locations ?? []).map(l=>({value:l.name,label:l.name,searchText:l.name}))]} value={editData.venue} onChange={value=>setEditData(d=>({...d,venue:value}))} placeholder="Choose a venue…" ariaLabel="Search team venues" className="edit-input edit-input--sub" clearLabel="Clear venue" />
                   {!team.isBye && onAssignCaptain && (
