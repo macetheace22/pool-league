@@ -1724,19 +1724,22 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
     setAddingDivision(false); setError("");
   };
   const addDivision = async (s) => {
-    if (!divNum.trim()) { setError("Division # is required."); return; }
+    setError("");
+    if (!divNum.trim()) { setError("Division Number is required."); return; }
+    if (!divName.trim()) { setError("Division Name is required."); return; }
+    if (!newDivisionFormat) { setError("Select a Format for this division."); return; }
+    if (!newDivisionDay) { setError("Select a Day for this division."); return; }
     const divs = s.divisions ?? [];
-    if (!newDivisionFormat || !newDivisionDay) { setError("Select the division IBA format and day."); return; }
     if (divs.find(d => String(d.num) === divNum.trim() && d.format === newDivisionFormat && d.day === newDivisionDay)) { setError("That division number already exists for this format and day."); return; }
     try {
       const refreshed = await onAddDivision(s, divNum.trim(), divName.trim(), newDivisionFormat, newDivisionDay);
+      const updatedSeason = (refreshed || []).find(item => item.id === s.id);
+      const addedDivision = updatedSeason?.divisions?.find(item => String(item.num) === divNum.trim() && item.format === newDivisionFormat && item.day === newDivisionDay);
+      if (!addedDivision) {
+        setError("Could not confirm the division was saved. Check the division list and try again.");
+        return;
+      }
       if (newDivisionPlayoffsDate) {
-        const updatedSeason = (refreshed || []).find(item => item.id === s.id);
-        const addedDivision = updatedSeason?.divisions?.find(item => String(item.num) === divNum.trim() && item.format === newDivisionFormat && item.day === newDivisionDay);
-        if (!addedDivision) {
-          setError("Division was added, but its saved record could not be found to set the playoff date. Reopen Manage Divisions and edit the date.");
-          return;
-        }
         const dateSaved = await onSetPlayoffsDate?.(addedDivision.id, newDivisionPlayoffsDate);
         if (!dateSaved) {
           setError("Division was added, but its playoff date could not be saved. Edit the division to set the date.");
@@ -1834,7 +1837,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                   <label className="division-field"><span>Playoff Date</span><input type="date" className="input" aria-label="New division playoff date" value={newDivisionPlayoffsDate} onChange={e => setNewDivisionPlayoffsDate(e.target.value)} /></label>
                   <div className="division-form-actions">
                     <button className="btn-sm" onClick={resetNewDivision}>Cancel</button>
-                    <button className="btn-sm" onClick={() => addDivision(divisionSeason)} disabled={!divNum.trim() || !newDivisionFormat || !newDivisionDay}>Save</button>
+                    <button className="btn-sm" onClick={() => addDivision(divisionSeason)}>Save</button>
                   </div>
                 </div>
               )}
