@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+
+const schedulePanelStateBySeason = new Map();
+
+export function clearIbaSchedulePanelState() {
+  schedulePanelStateBySeason.clear();
+}
 import { useNavigate } from "react-router-dom";
 import { Check, Calendar, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import * as db from "./db";
@@ -35,16 +41,17 @@ function hasUsableSchedule(data) {
 
 export default function IbaScheduleImportPanel({ season, onImported, compact = false }) {
   const navigate = useNavigate();
+  const cachedState = schedulePanelStateBySeason.get(season?.id) || {};
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
-  const [divisions, setDivisions] = useState(null);
-  const [selected, setSelected] = useState({});
-  const [previews, setPreviews] = useState({});
-  const [rowErrors, setRowErrors] = useState({});
-  const [expanded, setExpanded] = useState(null);
-  const [result, setResult] = useState(null);
-  const [diagnostic, setDiagnostic] = useState(null);
+  const [divisions, setDivisions] = useState(() => cachedState.divisions ?? null);
+  const [selected, setSelected] = useState(() => cachedState.selected ?? {});
+  const [previews, setPreviews] = useState(() => cachedState.previews ?? {});
+  const [rowErrors, setRowErrors] = useState(() => cachedState.rowErrors ?? {});
+  const [expanded, setExpanded] = useState(() => cachedState.expanded ?? null);
+  const [result, setResult] = useState(() => cachedState.result ?? null);
+  const [diagnostic, setDiagnostic] = useState(() => cachedState.diagnostic ?? null);
   const [retrieveProgress, setRetrieveProgress] = useState({ current: 0, total: 0 });
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [currentImportLabel, setCurrentImportLabel] = useState("");
@@ -59,12 +66,19 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   };
 
   useEffect(() => {
-    setDivisions(null); setSelected({}); setPreviews({}); setRowErrors({}); setExpanded(null); setResult(null);
-    setError(""); setDiagnostic(null); setRetrieveProgress({ current: 0, total: 0 });
-    setImportProgress({ current: 0, total: 0 });
     refreshImportStatus();
+    // The schedule discovery/preview/result view is cached for this season
+    // while the manager navigates between tabs within Create or Update Seasons.
+    // A deliberate Refresh IBA Data resets it; leaving the page clears the cache.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season?.id]);
+
+  useEffect(() => {
+    if (!season?.id) return;
+    schedulePanelStateBySeason.set(season.id, {
+      divisions, selected, previews, rowErrors, expanded, result, diagnostic,
+    });
+  }, [season?.id, divisions, selected, previews, rowErrors, expanded, result, diagnostic]);
 
   const discover = async () => {
     setLoading(true);
@@ -290,11 +304,9 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
             <button className="btn-primary" onClick={discover} disabled={loading || importing}>
               {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Automatic Import: Sync from IBA"}
             </button>
-            {season.is_active && (
-              <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
-                Manual Import: Teams & Schedule
-              </button>
-            )}
+            <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
+              Manual Import: Teams & Schedule
+            </button>
           </div>
         </div>
       )}
@@ -304,11 +316,9 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
           <button className="btn-primary" onClick={discover} disabled={loading || importing}>
             {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Automatic Import: Sync from IBA"}
           </button>
-          {season.is_active && (
-            <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
+          <button className="btn-primary" onClick={() => navigate(`/manual-season-import?season=${encodeURIComponent(season.id)}`)}>
               Manual Import: Teams & Schedule
             </button>
-          )}
         </div>
       )}
 

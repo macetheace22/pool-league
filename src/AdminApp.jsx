@@ -14,7 +14,7 @@ import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { parseStandingsImport, parseMvpImport, parseLeagueRoster } from "./ibaParsers";
 import IbaAutoSyncPanel from "./IbaAutoSyncPanel";
-import IbaScheduleImportPanel from "./IbaScheduleImportPanel";
+import IbaScheduleImportPanel, { clearIbaSchedulePanelState } from "./IbaScheduleImportPanel";
 // SetEntry is the exact same rack-by-rack (innings, safeties, timeouts)
 // entry component live scoring uses -- reused here (not re-implemented) so
 // manual match entry stays byte-for-byte consistent with live scoring math,
@@ -309,6 +309,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     });
     db.listTeamCaptains().then(setCaptainsByTeam);
     refreshLocations();
+    return () => clearIbaSchedulePanelState();
   }, []);
 
   const loadDivisionData = async (div) => {
