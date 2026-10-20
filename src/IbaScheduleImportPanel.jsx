@@ -241,7 +241,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       return next;
     });
   };
-  const selectedCount = Object.values(selected).filter(Boolean).length;
+  const selectedCount = selectableDivisions.filter(division => !!selected[divisionKey(division)]).length;
   const totalTeams = result?.imported?.reduce((n, x) => n + (x.teamCount || 0), 0) || 0;
   const totalWeeks = result?.imported?.reduce((n, x) => n + (x.weekCount || 0), 0) || 0;
   const totalPairings = result?.imported?.reduce((n, x) => n + (x.pairingCount || 0), 0) || 0;
@@ -359,18 +359,19 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       {divisions && !result && (
         <>
           <div style={{ marginTop: 10, padding: "8px 9px", background: "#101010", border: "1px solid #242424", borderRadius: 8, fontSize: 11, color: "#BDBDBD" }}>
-            <strong style={{ color: "#E0E0E0" }}>{divisions.length}</strong> IBA division{divisions.length === 1 ? "" : "s"} discovered and schedule data retrieved. All are selected for import.
+            <strong style={{ color: "#E0E0E0" }}>{divisions.length}</strong> IBA division{divisions.length === 1 ? "" : "s"} discovered.
           </div>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             <div style={{ fontSize: 11, color: "#BDBDBD" }}>
-              {selectableDivisions.length} division{selectableDivisions.length === 1 ? "" : "s"} ready to import · divisions with errors or unusable schedules are excluded from Select All
+              <strong style={{ color: "#E0E0E0" }}>{selectedCount}</strong> division{selectedCount === 1 ? "" : "s"} selected for import · {selectableDivisions.length} ready to import
+              {selectableDivisions.length < divisions.length ? " · divisions with errors or unusable schedules are excluded" : ""}
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <button className="btn-sm" onClick={toggleAllSelectable} disabled={loading || importing || selectableDivisions.length === 0}>
-                {allSelectableSelected ? "Deselect All" : "Select All"}
+              <button className="btn-sm" onClick={toggleAllSelectable} disabled={loading || importing || selectableDivisions.length === 0 || allSelectableSelected}>
+                Select All
               </button>
-              <button className="btn-sm" onClick={() => setSelected({})} disabled={loading || importing || selectedCount === 0}>
+              <button className="btn-sm" onClick={() => setSelected(Object.fromEntries((divisions || []).map(d => [divisionKey(d), false])))} disabled={loading || importing || selectedCount === 0}>
                 Deselect All
               </button>
             </div>
@@ -388,7 +389,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                     <input
                       type="checkbox"
                       checked={!!selected[key]}
-                      disabled={!!data && !hasUsableSchedule(data)}
+                      disabled={!canImportDivision(d)}
                       onChange={e => setSelected(p => ({ ...p, [key]: e.target.checked }))}
                     />
                     <div className="list-row__body" style={{ flex: 1 }}>
