@@ -368,9 +368,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     await refreshSeasons();
     return ok;
   };
-  const handleSetPlayoffsDate = async (seasonId, date) => {
-    await db.setPlayoffsStartDate(seasonId, date);
-    await refreshSeasons();
+  const handleSetPlayoffsDate = async (divisionId, date) => {
+    const ok = await db.setDivisionPlayoffsStartDate(divisionId, date);
+    if (ok) await refreshSeasons();
+    return ok;
   };
   const handleRemoveDivision = async (divisionId) => {
     await db.removeDivision(divisionId);
@@ -434,7 +435,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     // already set from an earlier import.
     if (viewingSeason) {
       const detected = detectPlayoffsStartDate(parsedWeeks);
-      if (detected) await handleSetPlayoffsDate(viewingSeason.id, detected);
+      if (detected && viewingDiv) await handleSetPlayoffsDate(viewingDiv.id, detected);
     }
   };
   const handleAddPairing = async (weekId, homeTeamId, awayTeamId) => {
@@ -493,6 +494,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonsTab seasons={seasons} subTab="divisions"
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
+            onSetPlayoffsDate={handleSetPlayoffsDate}
             onSeasonCreated={(_, makeActive)=>setSeasonsSubTab(makeActive ? "active" : "inactive")}
             onSeasonTabChange={setSeasonsSubTab}
             onImportIbaSchedule={refreshSeasons} />
@@ -516,6 +518,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
             onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
             onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
+            onSetPlayoffsDate={handleSetPlayoffsDate}
             onSeasonCreated={(_, makeActive)=>setSeasonsSubTab(makeActive ? "active" : "inactive")}
             onSeasonTabChange={setSeasonsSubTab}
             onImportIbaSchedule={refreshSeasons} />
@@ -804,7 +807,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} />
           {!viewingDiv
             ? <div className="empty-state">Pick a division above to see standings & match history.</div>
-            : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingSeason?.playoffs_start_date} myProfile={profile}
+            : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
                 seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
           }
         </div>
@@ -1653,7 +1656,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 }
 
 // ─── Seasons Tab ──────────────────────────────────────────────────────────────
-function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule }) {
+function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSetPlayoffsDate, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule }) {
   const navigate = useNavigate();
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
@@ -1672,6 +1675,9 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const [editDivFormat, setEditDivFormat] = useState("Masters");
   const [editDivDay, setEditDivDay] = useState("Wednesday");
   const [editDivError, setEditDivError] = useState("");
+  const [playoffDateDrafts, setPlayoffDateDrafts] = useState({});
+  const [savingPlayoffDate, setSavingPlayoffDate] = useState(null);
+  const [playoffDateError, setPlayoffDateError] = useState("");
 
   // Clear any leftover error banner when switching sub-tabs, so an error
   // from one context (e.g. deleting a season) doesn't linger into another
@@ -1768,6 +1774,30 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
               <button className="btn-icon btn-icon--danger" onClick={() => onRemoveDivision(d.id)} aria-label={"Remove division " + d.num}><Trash2 size={11}/></button>
             </div>)}
             {editDivError && <ErrorMsg>{editDivError}</ErrorMsg>}
+            <SectionHeader title="Playoff Start Dates" />
+            <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginBottom:8}}>Set the playoff start date separately for each division. The app uses this date to calculate that division's makeup-match deadline.</div>
+            {(divisionSeason.divisions || []).map(d => {
+              const draft = Object.prototype.hasOwnProperty.call(playoffDateDrafts, d.id)
+                ? playoffDateDrafts[d.id]
+                : (d.playoffs_start_date || "");
+              return <div key={`playoff-date-${d.id}`} className="div-row" style={{flexWrap:"wrap",gap:8}}>
+                <span className="div-row__num">Div {d.num}</span>
+                <span className="div-row__name" style={{minWidth:100}}>{d.name || "—"} · {d.format} · {d.day}</span>
+                <input type="date" className="input" aria-label={`Playoff start date for division ${d.num}`} value={draft}
+                  onChange={e => { setPlayoffDateDrafts(p => ({...p,[d.id]:e.target.value})); setPlayoffDateError(""); }} />
+                <button className="btn-sm" disabled={savingPlayoffDate===d.id || draft===(d.playoffs_start_date || "")}
+                  onClick={async () => {
+                    setSavingPlayoffDate(d.id); setPlayoffDateError("");
+                    try {
+                      const ok = await onSetPlayoffsDate?.(d.id, draft);
+                      if (!ok) setPlayoffDateError(`Could not save the playoff start date for division ${d.num}.`);
+                      else setPlayoffDateDrafts(p => { const next={...p}; delete next[d.id]; return next; });
+                    } catch (e) { setPlayoffDateError(e?.message || `Could not save the playoff start date for division ${d.num}.`); }
+                    finally { setSavingPlayoffDate(null); }
+                  }}>{savingPlayoffDate===d.id ? "Saving…" : "Save date"}</button>
+              </div>;
+            })}
+            {playoffDateError && <ErrorMsg>{playoffDateError}</ErrorMsg>}
             <div className="div-add-row" style={{ flexWrap: "wrap", marginTop: 10 }}>
               <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" value={divNum} onChange={e => setDivNum(e.target.value)} />
               <input className="edit-input" style={{ flex: 1, minWidth: 120 }} placeholder="Name (e.g. North)" value={divName} onChange={e => setDivName(e.target.value)} />
@@ -1856,21 +1886,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                         )}
 
                         <div style={{ marginTop: 10, fontSize: 11.5, color: "#9A9A9A" }}>Need to change division records? Use the Manage Divisions tab above. Division setup is separate from importing IBA schedules.</div>
-
-                         
-                        <div className="field" style={{marginTop:10}}>
-                          <Label>Playoffs Start Date</Label>
-                          <div style={{fontSize:12.5,color:s.playoffs_start_date?"#E0E0E0":"#6A6A6A",fontWeight:600}}>
-                            {s.playoffs_start_date
-                              ? new Date(s.playoffs_start_date+"T00:00:00").toLocaleDateString()
-                              : "Not yet set"}
-                          </div>
-                          <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>
-                            {s.playoffs_start_date
-                              ? `Makeups are due 2 weeks before this date — deadline ${new Date(new Date(s.playoffs_start_date+"T00:00:00").getTime() - 14*86400000).toLocaleDateString()}.`
-                              : "Detected automatically from the week marked \"Playoffs\" when this division's schedule is imported on Manage Season Data."}
-                          </div>
-                        </div>
+                       </div>
                       </div>
                     )}
                   </div>
@@ -1916,7 +1932,7 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
     // playoffsStartDate/weekDate (that pairing already separately powers
     // forfeit-point tiers and is left alone here).
     isPlayoff: !!currentWeek.isPlayoff,
-    playoffsStartDate: activeSeason?.playoffs_start_date ?? null,
+    playoffsStartDate: viewingDiv?.playoffs_start_date ?? null,
     teamHome: { id: match.homeTeam.id, name: match.homeTeam.name, roster: match.homeRoster.map(p=>({num:p.num,name:p.name,nickname:p.nickname,rating:p.rating,eligCode:eligByNum[p.num]?.code ?? null})) },
     teamAway: { id: match.awayTeam.id, name: match.awayTeam.name, roster: match.awayRoster.map(p=>({num:p.num,name:p.name,nickname:p.nickname,rating:p.rating,eligCode:eligByNum[p.num]?.code ?? null})) },
     sets: Array(5).fill(null).map((_, si) => ({
