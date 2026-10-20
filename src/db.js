@@ -520,8 +520,8 @@ export async function setSeasonActive(seasonId, isActive) {
   const { error } = await supabase.from("seasons").update({ is_active: isActive }).eq("id", seasonId);
   return !error;
 }
-export async function setPlayoffsStartDate(seasonId, date) {
-  const { error } = await supabase.from("seasons").update({ playoffs_start_date: date || null }).eq("id", seasonId);
+export async function setDivisionPlayoffsStartDate(divisionId, date) {
+  const { error } = await supabase.from("divisions").update({ playoffs_start_date: date || null }).eq("id", divisionId);
   return !error;
 }
 
@@ -785,7 +785,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
     const savedSchedule = await listSchedule(division.id, orderedTeams);
     const schedulePairingCount = savedSchedule.reduce((sum, week) => sum + (week.pairings?.length ?? 0), 0);
 
-    // If IBA exposes a playoff week, keep the season-level playoff date in sync.
+    // If IBA exposes a playoff week, keep this division's playoff date in sync.
     const playoffDates = normalizedWeeks
       .filter(week => /playoff/i.test(week.special || ""))
       .map(week => week.date)
@@ -799,7 +799,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
         .filter(Boolean)
         .sort()[0];
       if (parsed) {
-        await supabase.from("seasons").update({ playoffs_start_date: parsed }).eq("id", seasonId);
+        await supabase.from("divisions").update({ playoffs_start_date: parsed }).eq("id", division.id);
       }
     }
 
