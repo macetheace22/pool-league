@@ -37,7 +37,7 @@ const US_STATE_CODES = [
   "WV","WI","WY",
 ];
 
-function seasonLabel(s) { return `${s.type} · ${s.year}`; }
+function seasonLabelFor(s) { return `${s.type} · ${s.year}`; }
 
 // ─── Roles ────────────────────────────────────────────────────────────────────
 const ROLES = {
@@ -1602,7 +1602,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
             return (
               <div key={s.id}>
                 <div className={`season-picker__season-header ${s.is_active?"season-picker__season-header--active":""}`}>
-                  <span>{seasonLabel(s)}</span>
+                  <span>{seasonLabelFor(s)}</span>
                   {s.is_active && <span className="active-dot">● Active</span>}
                 </div>
                 {divs.length === 0 && (
@@ -1730,11 +1730,11 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
           <label className="field">
             <Label>Season</Label>
             <select className="input" value={divisionSeason?.id || ""} onChange={e => setExpandedSeason(e.target.value)} style={{ width: "100%" }}>
-              {seasons.map(s => <option key={s.id} value={s.id}>{seasonLabel(s)} · {s.is_active ? "Active" : "Inactive"}</option>)}
+              {seasons.map(s => <option key={s.id} value={s.id}>{seasonLabelFor(s)} · {s.is_active ? "Active" : "Inactive"}</option>)}
             </select>
           </label>
           {!divisionSeason ? <div className="empty-state">Create a season before adding divisions.</div> : <>
-            <SectionHeader title={String(seasonLabel(divisionSeason)) + " · " + (divisionSeason.divisions || []).length + " divisions"} />
+            <SectionHeader title={String(seasonLabelFor(divisionSeason)) + " · " + (divisionSeason.divisions || []).length + " divisions"} />
             {(divisionSeason.divisions || []).map(d => editingDivId === d.id ? (
               <div key={d.id} className="div-row div-row--edit" style={{ flexWrap: "wrap" }}>
                 <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" value={editDivNum} onChange={e => setEditDivNum(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
@@ -1808,7 +1808,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                   <div key={s.id} className={`season-card ${isAct?"season-card--active":""}`}>
                     <div className="season-card__header" onClick={()=>{setExpandedSeason(isExpanded?null:s.id);if(!isExpanded){setNewDivisionFormat(divs[0]?.format || s.format || "");setNewDivisionDay(divs[0]?.day || s.day || "");}}}>
                       <div>
-                        <div className="season-card__name">{seasonLabel(s)}</div>
+                        <div className="season-card__name">{seasonLabelFor(s)}</div>
                         <div className="season-card__meta">{divs.length} division{divs.length!==1?"s":""}{isAct?" · ● Active":""}</div>
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
