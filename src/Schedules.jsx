@@ -27,15 +27,16 @@ const css = `
 .schedule-badge--current{background:#0F2D1F;color:#5FCF9E;}
 .schedule-match{padding:11px 14px;border-bottom:1px solid #2A2A2A;}
 .schedule-match:last-child{border-bottom:none;}
-.schedule-match__teams{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;}
-.schedule-team{font-size:12px;font-weight:700;color:#E0E0E0;line-height:1.25;}
+.schedule-match__teams{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,max-content) minmax(0,1fr);gap:8px;align-items:center;}
+.schedule-team{font-size:12px;font-weight:700;color:#E0E0E0;line-height:1.25;min-width:0;}
 .schedule-team--away{text-align:right;}
 .schedule-team__venue{font-size:9.5px;font-weight:600;color:#6F6F6F;margin-top:3px;}
-.schedule-vs{font-size:9px;font-weight:800;color:#555;text-transform:uppercase;}
-.schedule-match__venue{display:flex;align-items:center;justify-content:center;text-align:center;gap:4px;font-size:9.5px;color:#777;margin-top:7px;}
+.schedule-match__center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;}
+.schedule-vs{font-size:9px;font-weight:800;color:#555;text-transform:uppercase;line-height:1.2;}
+.schedule-match__venue{display:block;width:max-content;max-width:min(42vw,240px);box-sizing:border-box;text-align:center;overflow-wrap:anywhere;font-size:9.5px;color:#777;margin-top:5px;line-height:1.3;}
 .schedule-empty{padding:22px 10px;text-align:center;color:#6A6A6A;font-size:11px;}
 .schedule-note{margin-top:10px;font-size:10px;color:#666;display:flex;align-items:center;gap:5px;}
-@media(min-width:640px){.schedules-controls{grid-template-columns:1fr 1fr}.schedule-match__teams{grid-template-columns:1fr 70px 1fr;}}
+@media(min-width:640px){.schedules-controls{grid-template-columns:1fr 1fr}.schedule-match__teams{grid-template-columns:minmax(0,1fr) minmax(70px,max-content) minmax(0,1fr);}.schedule-match__venue{max-width:220px;}}
 `;
 
 function seasonLabel(s) {
@@ -271,12 +272,14 @@ export default function Schedules() {
                         <div className="schedule-team">
                           {p.home?.name || "Home TBD"}
                         </div>
-                        <div className="schedule-vs">vs</div>
+                        <div className="schedule-match__center">
+                          <div className="schedule-vs">vs</div>
+                          {p.home?.venue && <div className="schedule-match__venue">@ {p.home.venue}</div>}
+                        </div>
                         <div className="schedule-team schedule-team--away">
                           {p.away?.name || "Away TBD"}
                         </div>
                       </div>
-                      {p.home?.venue && <div className="schedule-match__venue">@ {p.home.venue}</div>}
                     </div>
                   )) : <div className="schedule-empty">No matchups listed for this week.</div>}
                 </div>
