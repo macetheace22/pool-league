@@ -229,7 +229,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <Download size={14}/> {manualMode ? `Manual PDF Import · ${reportLabels[reportType] || reportType}` : reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
       </div>
       <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>
-        {manualMode ? "Upload a PDF for the selected report type. Choose only a format/day represented by this season; the report week and schedule are validated before import." : <>Checks IBA reports across all configured formats and days{reportType ? ` for ${selectedReportLabel}` : " across roster/ratings, team standings, and MVP standings"}. Each report is validated against the matching division schedule before import. A report may be missing when that league is not playing.</>}
+        {manualMode ? "Choose a PDF for this report type. The report week and division schedule are checked before import." : <>{reportType ? `Checks each ${selectedReportLabel} report against its division schedule before import.` : "Checks roster/ratings, team standings, and MVP reports against their division schedules before import."} Missing reports are allowed when a league is not playing.</>}
       </div>
       {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
         <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
@@ -238,10 +238,10 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>Scan all formats and days</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-            Scan Masters, Advanced, and Open across all seven days. Discovery is read-only; review matching reports for the selected season, either together or by report category.
+            Scanning is read-only. Review and validate the results before importing.
           </div>
           <button className="btn-sm" onClick={scanAllReports} disabled={scanningAll} style={{ marginTop: 8 }}>
-            {scanningAll ? <><RefreshCw size={12} className="spin" /> Scanning {scanProgress?.completedGroups || 0}/{scanProgress?.totalGroups || 21} format/day combinations…</> : "Scan All IBA Formats & Days"}
+            {scanningAll ? <><RefreshCw size={12} className="spin" /> Scanning {scanProgress?.completedGroups || 0}/{scanProgress?.totalGroups || 21} format/day combinations…</> : "Start scan"}
           </button>
           {scanError && <div className="error-msg" style={{ marginTop: 8 }}>{scanError}</div>}
           {allScan && (
@@ -376,7 +376,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>Upload PDF</div>
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
-            Upload a PDF for this report category to extract and preview it. This step does not write to the database. Import still uses the selected season and its validation checks. The consolidated review flow imports one report category at a time.
+            Choose the format, day, and PDF. Extraction is read-only; the report is validated before import.
           </div>
           <div className="manual-pdf-controls">
             <label className="manual-pdf-field">
