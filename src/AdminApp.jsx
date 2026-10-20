@@ -483,6 +483,24 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     );
   }
 
+  // ── Dedicated division maintenance page ──
+  if (page === "divisions") {
+    if (!isManager) return <><PageHeader title="Manage Divisions"/><div className="tab-content"><AccessDenied/></div></>;
+    return (
+      <>
+        <PageHeader title="Manage Divisions" />
+        <div className="tab-content">
+          <SeasonsTab seasons={seasons} subTab="divisions"
+            onCreateSeason={handleCreateSeason} onDeleteSeason={handleDeleteSeason} onToggleActive={handleToggleActive}
+            onAddDivision={handleAddDivision} onRemoveDivision={handleRemoveDivision} onUpdateDivision={handleUpdateDivision}
+            onSeasonCreated={(_, makeActive)=>setSeasonsSubTab(makeActive ? "active" : "inactive")}
+            onSeasonTabChange={setSeasonsSubTab}
+            onImportIbaSchedule={refreshSeasons} />
+        </div>
+      </>
+    );
+  }
+
   // ── Create or Update Seasons — manager only ──
   if (page === "seasons") {
     if (!isManager) return <><PageHeader title="Create or Update Seasons"/><div className="tab-content"><AccessDenied/></div></>;
@@ -493,7 +511,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SubTabBtn active={seasonsSubTab==="create"} onClick={()=>setSeasonsSubTab("create")}>Create a Season</SubTabBtn>
           <SubTabBtn active={seasonsSubTab==="active"} onClick={()=>setSeasonsSubTab("active")}>Active Seasons</SubTabBtn>
           <SubTabBtn active={seasonsSubTab==="inactive"} onClick={()=>setSeasonsSubTab("inactive")}>Inactive Seasons</SubTabBtn>
-          <SubTabBtn active={seasonsSubTab==="divisions"} onClick={()=>setSeasonsSubTab("divisions")}>Manage Divisions</SubTabBtn>
         </SubTabBar>
         <div className="tab-content">
           <SeasonsTab seasons={seasons} subTab={seasonsSubTab}
