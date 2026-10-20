@@ -1677,6 +1677,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const [newDivisionDay, setNewDivisionDay] = useState("");
   const [newDivisionPlayoffsDate, setNewDivisionPlayoffsDate] = useState("");
   const [addingDivision, setAddingDivision] = useState(false);
+  const [divisionAddError, setDivisionAddError] = useState("");
   const [expandedSeason, setExpandedSeason] = useState(() => searchParams.get("season") || null);
   const [editingDivId, setEditingDivId] = useState(null);
   const [editDivNum, setEditDivNum] = useState("");
@@ -1721,16 +1722,29 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
 
   const resetNewDivision = () => {
     setDivNum(""); setDivName(""); setNewDivisionFormat(""); setNewDivisionDay(""); setNewDivisionPlayoffsDate("");
-    setAddingDivision(false); setError("");
+    setAddingDivision(false); setError(""); setDivisionAddError("");
+  };
+  const validateDivisionFields = ({ num, name, format, day }) => {
+    const invalid = [];
+    if (!String(num ?? "").trim()) invalid.push("Division Number");
+    if (!String(name ?? "").trim()) invalid.push("Division Name");
+    if (!String(format ?? "").trim()) invalid.push("Format");
+    if (!String(day ?? "").trim()) invalid.push("Day");
+    return invalid;
+  };
+  const showDivisionValidation = (invalidFields, setInlineError) => {
+    setError("");
+    setInlineError(invalidFields.length
+      ? `Please complete the following required field${invalidFields.length === 1 ? "" : "s"}: ${invalidFields.join(", ")}.`
+      : "");
   };
   const addDivision = async (s) => {
     setError("");
-    if (!divNum.trim()) { setError("Division Number is required."); return; }
-    if (!divName.trim()) { setError("Division Name is required."); return; }
-    if (!newDivisionFormat) { setError("Select a Format for this division."); return; }
-    if (!newDivisionDay) { setError("Select a Day for this division."); return; }
+    const invalidFields = validateDivisionFields({ num: divNum, name: divName, format: newDivisionFormat, day: newDivisionDay });
+    if (invalidFields.length) { showDivisionValidation(invalidFields, setDivisionAddError); return; }
+    setDivisionAddError("");
     const divs = s.divisions ?? [];
-    if (divs.find(d => String(d.num) === divNum.trim() && d.format === newDivisionFormat && d.day === newDivisionDay)) { setError("That division number already exists for this format and day."); return; }
+    if (divs.find(d => String(d.num) === divNum.trim() && d.format === newDivisionFormat && d.day === newDivisionDay)) { setDivisionAddError("A division with this Division Number, Format, and Day already exists."); return; }
     try {
       const refreshed = await onAddDivision(s, divNum.trim(), divName.trim(), newDivisionFormat, newDivisionDay);
       const updatedSeason = (refreshed || []).find(item => item.id === s.id);
@@ -1766,11 +1780,13 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
     setEditDivError("");
   };
   const saveEditDivision = async (s) => {
-    if (!editDivNum.trim()) { setEditDivError("Division # is required."); return; }
-    if (!editDivFormat || !editDivDay) { setEditDivError("Select the division IBA format and day."); return; }
+    setEditDivError("");
+    setError("");
+    const invalidFields = validateDivisionFields({ num: editDivNum, name: editDivName, format: editDivFormat, day: editDivDay });
+    if (invalidFields.length) { showDivisionValidation(invalidFields, setEditDivError); return; }
     const divs = s.divisions ?? [];
     if (divs.find(d => d.id !== editingDivId && String(d.num) === editDivNum.trim() && d.format === editDivFormat && d.day === editDivDay)) {
-      setEditDivError("Another division already uses that number for this format and day."); return;
+      setEditDivError("A division with this Division Number, Format, and Day already exists."); return;
     }
     const currentDivision = divs.find(d => d.id === editingDivId);
     const ok = await onUpdateDivision(editingDivId, editDivNum.trim(), editDivName.trim(), editDivFormat, editDivDay);
@@ -1808,12 +1824,13 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
               <SectionHeader title={String(divisionSeason.type) + " " + String(divisionSeason.year) + " · " + (divisionSeason.divisions || []).length + " divisions"} />
               {[...(divisionSeason.divisions || [])].sort((a, b) => String(a.num ?? "").localeCompare(String(b.num ?? ""), undefined, { numeric: true, sensitivity: "base" }) || String(a.id).localeCompare(String(b.id))).map(d => editingDivId === d.id ? (
                 <div key={d.id} className="div-row div-row--edit division-fields-form">
-                  <label className="division-field division-field--number"><span>Division Number</span><input className="edit-input" aria-label="Division number" value={editDivNum} onChange={e => setEditDivNum(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} /></label>
-                  <label className="division-field division-field--name"><span>Division Name</span><input className="edit-input" aria-label="Division name" value={editDivName} onChange={e => setEditDivName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} /></label>
-                  <label className="division-field"><span>Format</span><select className="input" value={editDivFormat} onChange={e => setEditDivFormat(e.target.value)} aria-label="Division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
-                  <label className="division-field"><span>Day</span><select className="input" value={editDivDay} onChange={e => setEditDivDay(e.target.value)} aria-label="Division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
+                  <label className="division-field division-field--number"><span>Division Number</span><input className="edit-input" aria-label="Division number" value={editDivNum} onChange={e => { setEditDivNum(e.target.value); setEditDivError(""); }} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} /></label>
+                  <label className="division-field division-field--name"><span>Division Name</span><input className="edit-input" aria-label="Division name" value={editDivName} onChange={e => { setEditDivName(e.target.value); setEditDivError(""); }} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} /></label>
+                  <label className="division-field"><span>Format</span><select className="input" value={editDivFormat} onChange={e => { setEditDivFormat(e.target.value); setEditDivError(""); }} aria-label="Division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
+                  <label className="division-field"><span>Day</span><select className="input" value={editDivDay} onChange={e => { setEditDivDay(e.target.value); setEditDivError(""); }} aria-label="Division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
                   <label className="division-field"><span>Playoff Date</span><input type="date" className="input" aria-label={"Playoff date for division " + d.num} value={editDivPlayoffsDate} onChange={e => setEditDivPlayoffsDate(e.target.value)} /></label>
                   <div className="division-form-actions">
+                    {editDivError && <div className="division-inline-error" role="alert">{editDivError}</div>}
                     <button className="btn-sm" onClick={cancelEditDivision}>Cancel</button>
                     <button className="btn-sm" onClick={() => saveEditDivision(divisionSeason)}>Save</button>
                   </div>
@@ -1825,17 +1842,17 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 <button className="btn-icon" onClick={() => startEditDivision(d)} aria-label={"Edit division " + d.num} title="Edit division"><Edit2 size={11}/></button>
                 <button className="btn-icon btn-icon--danger" onClick={() => onRemoveDivision(d.id)} aria-label={"Remove division " + d.num} title="Remove division"><Trash2 size={11}/></button>
               </div>)}
-              {editDivError && <ErrorMsg>{editDivError}</ErrorMsg>}
               {!addingDivision ? (
                 <button className="btn-secondary division-add-trigger" onClick={() => { setError(""); setAddingDivision(true); setNewDivisionFormat(""); setNewDivisionDay(""); }}><Plus size={13}/> Add Division</button>
               ) : (
                 <div className="div-row div-row--edit division-fields-form division-add-form">
-                  <label className="division-field division-field--number"><span>Division Number</span><input className="edit-input" aria-label="New division number" value={divNum} onChange={e => setDivNum(e.target.value)} /></label>
-                  <label className="division-field division-field--name"><span>Division Name</span><input className="edit-input" aria-label="New division name" value={divName} onChange={e => setDivName(e.target.value)} /></label>
-                  <label className="division-field"><span>Format</span><select className="input" value={newDivisionFormat} onChange={e => setNewDivisionFormat(e.target.value)} aria-label="New division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
-                  <label className="division-field"><span>Day</span><select className="input" value={newDivisionDay} onChange={e => setNewDivisionDay(e.target.value)} aria-label="New division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
+                  <label className="division-field division-field--number"><span>Division Number</span><input className="edit-input" aria-label="New division number" value={divNum} onChange={e => { setDivNum(e.target.value); setDivisionAddError(""); }} /></label>
+                  <label className="division-field division-field--name"><span>Division Name</span><input className="edit-input" aria-label="New division name" value={divName} onChange={e => { setDivName(e.target.value); setDivisionAddError(""); }} /></label>
+                  <label className="division-field"><span>Format</span><select className="input" value={newDivisionFormat} onChange={e => { setNewDivisionFormat(e.target.value); setDivisionAddError(""); }} aria-label="New division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
+                  <label className="division-field"><span>Day</span><select className="input" value={newDivisionDay} onChange={e => { setNewDivisionDay(e.target.value); setDivisionAddError(""); }} aria-label="New division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
                   <label className="division-field"><span>Playoff Date</span><input type="date" className="input" aria-label="New division playoff date" value={newDivisionPlayoffsDate} onChange={e => setNewDivisionPlayoffsDate(e.target.value)} /></label>
                   <div className="division-form-actions">
+                    {divisionAddError && <div className="division-inline-error" role="alert">{divisionAddError}</div>}
                     <button className="btn-sm" onClick={resetNewDivision}>Cancel</button>
                     <button className="btn-sm" onClick={() => addDivision(divisionSeason)}>Save</button>
                   </div>
@@ -5767,6 +5784,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .division-field input,.division-field select{width:100%;height:38px;min-height:38px;box-sizing:border-box;font-size:12px;font-weight:500;padding:8px 10px;}
 .division-field input.edit-input{font-weight:500;}
 .division-form-actions{grid-column:1 / -1;display:flex;justify-content:flex-end;gap:6px;padding-top:9px;border-top:1px solid #303030;margin-top:2px;}
+.division-inline-error{color:#FF8C82;font-size:11px;line-height:1.4;text-align:left;flex:1 1 220px;min-width:0;}
+
 .division-form-actions .btn-sm{min-width:70px;padding:6px 10px;font-size:11px;justify-content:center;}
 @media(max-width:520px){.division-fields-form{grid-template-columns:minmax(90px,0.65fr) minmax(0,1.65fr);}.division-field--number{grid-column:1;}.division-field--name{grid-column:2;}.division-field:nth-of-type(3),.division-field:nth-of-type(4),.division-field:nth-of-type(5){grid-column:1 / -1;}}
 
