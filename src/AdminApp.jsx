@@ -1680,10 +1680,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   const [editDivName, setEditDivName] = useState("");
   const [editDivFormat, setEditDivFormat] = useState("Masters");
   const [editDivDay, setEditDivDay] = useState("Wednesday");
+  const [editDivPlayoffsDate, setEditDivPlayoffsDate] = useState("");
   const [editDivError, setEditDivError] = useState("");
-  const [playoffDateDrafts, setPlayoffDateDrafts] = useState({});
-  const [savingPlayoffDate, setSavingPlayoffDate] = useState(null);
-  const [playoffDateError, setPlayoffDateError] = useState("");
 
   // Clear any leftover error banner when switching sub-tabs, so an error
   // from one context (e.g. deleting a season) doesn't linger into another
@@ -1728,21 +1726,37 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
   };
 
   const startEditDivision = (d) => {
-    setEditingDivId(d.id); setEditDivNum(d.num ?? ""); setEditDivName(d.name ?? ""); setEditDivFormat(d.format || ""); setEditDivDay(d.day || ""); setEditDivError("");
+    setEditingDivId(d.id);
+    setEditDivNum(d.num ?? "");
+    setEditDivName(d.name ?? "");
+    setEditDivFormat(d.format || "");
+    setEditDivDay(d.day || "");
+    setEditDivPlayoffsDate(d.playoffs_start_date || "");
+    setEditDivError("");
   };
   const cancelEditDivision = () => {
-    setEditingDivId(null); setEditDivError("");
+    setEditingDivId(null);
+    setEditDivError("");
   };
   const saveEditDivision = async (s) => {
     if (!editDivNum.trim()) { setEditDivError("Division # is required."); return; }
     if (!editDivFormat || !editDivDay) { setEditDivError("Select the division IBA format and day."); return; }
     const divs = s.divisions ?? [];
-    if (divs.find(d => d.id !== editingDivId && d.num === editDivNum.trim() && d.format === editDivFormat && d.day === editDivDay)) {
+    if (divs.find(d => d.id !== editingDivId && String(d.num) === editDivNum.trim() && d.format === editDivFormat && d.day === editDivDay)) {
       setEditDivError("Another division already uses that number for this format and day."); return;
     }
+    const currentDivision = divs.find(d => d.id === editingDivId);
     const ok = await onUpdateDivision(editingDivId, editDivNum.trim(), editDivName.trim(), editDivFormat, editDivDay);
-    if (!ok) { setEditDivError("Could not save changes."); return; }
-    setEditingDivId(null); setEditDivError("");
+    if (!ok) { setEditDivError("Could not save division changes."); return; }
+    if ((currentDivision?.playoffs_start_date || "") !== editDivPlayoffsDate) {
+      const dateSaved = await onSetPlayoffsDate?.(editingDivId, editDivPlayoffsDate);
+      if (!dateSaved) {
+        setEditDivError("Division details saved, but the playoff start date could not be saved. Reopen this division and try again.");
+        return;
+      }
+    }
+    setEditingDivId(null);
+    setEditDivError("");
   };
 
   const list = subTab === "inactive" ? seasons.filter(s => !s.is_active) : seasons.filter(s => s.is_active);
@@ -1764,46 +1778,27 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
           </label>
           {!divisionSeason ? <div className="empty-state">Create a season before adding divisions.</div> : <>
             <SectionHeader title={String(divisionSeason.type) + " " + String(divisionSeason.year) + " · " + (divisionSeason.divisions || []).length + " divisions"} />
-            {(divisionSeason.divisions || []).map(d => editingDivId === d.id ? (
+            {[...(divisionSeason.divisions || [])].sort((a, b) => String(a.num ?? "").localeCompare(String(b.num ?? ""), undefined, { numeric: true, sensitivity: "base" }) || String(a.id).localeCompare(String(b.id))).map(d => editingDivId === d.id ? (
               <div key={d.id} className="div-row div-row--edit" style={{ flexWrap: "wrap" }}>
-                <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" value={editDivNum} onChange={e => setEditDivNum(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
-                <input className="edit-input" style={{ flex: 1, minWidth: 120 }} placeholder="Name (e.g. North)" value={editDivName} onChange={e => setEditDivName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
+                <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" aria-label="Division number" value={editDivNum} onChange={e => setEditDivNum(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
+                <input className="edit-input" style={{ flex: 1, minWidth: 120 }} placeholder="Name (e.g. North)" aria-label="Division name" value={editDivName} onChange={e => setEditDivName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
                 <select className="input" value={editDivFormat} onChange={e => setEditDivFormat(e.target.value)} aria-label="Division IBA format" style={{ minWidth: 120 }}><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select>
                 <select className="input" value={editDivDay} onChange={e => setEditDivDay(e.target.value)} aria-label="Division IBA day" style={{ minWidth: 120 }}><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select>
-                <button className="btn-icon btn-icon--confirm" onClick={() => saveEditDivision(divisionSeason)}><Check size={13}/></button>
-                <button className="btn-icon btn-icon--cancel" onClick={cancelEditDivision}><X size={13}/></button>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 150px", minWidth: 140, color: "#9A9A9A", fontSize: 10, fontWeight: 700 }}>
+                  Playoff start date
+                  <input type="date" className="input" aria-label={"Playoff start date for division " + d.num} value={editDivPlayoffsDate} onChange={e => setEditDivPlayoffsDate(e.target.value)} />
+                </label>
+                <button className="btn-icon btn-icon--confirm" onClick={() => saveEditDivision(divisionSeason)} aria-label={"Save division " + d.num} title="Save"><Check size={13}/></button>
+                <button className="btn-icon btn-icon--cancel" onClick={cancelEditDivision} aria-label={"Cancel editing division " + d.num} title="Cancel"><X size={13}/></button>
               </div>
-            ) : <div key={d.id} className="div-row">
+            ) : <div key={d.id} className="div-row" style={{ flexWrap: "wrap" }}>
               <span className="div-row__num">Div {d.num}</span><span className="div-row__name">{d.name || "—"}</span>
               <span className="div-row__name" style={{ fontSize: 10, color: "#8A8A8A" }}>{d.format || "Format required"} · {d.day || "Day required"}</span>
-              <button className="btn-icon" onClick={() => startEditDivision(d)} aria-label={"Edit division " + d.num}><Edit2 size={11}/></button>
-              <button className="btn-icon btn-icon--danger" onClick={() => onRemoveDivision(d.id)} aria-label={"Remove division " + d.num}><Trash2 size={11}/></button>
+              <span style={{ flex: "1 1 150px", minWidth: 130, fontSize: 10, color: d.playoffs_start_date ? "#BDBDBD" : "#6A6A6A" }}>Playoff: {d.playoffs_start_date || "Not set"}</span>
+              <button className="btn-icon" onClick={() => startEditDivision(d)} aria-label={"Edit division " + d.num} title="Edit division"><Edit2 size={11}/></button>
+              <button className="btn-icon btn-icon--danger" onClick={() => onRemoveDivision(d.id)} aria-label={"Remove division " + d.num} title="Remove division"><Trash2 size={11}/></button>
             </div>)}
             {editDivError && <ErrorMsg>{editDivError}</ErrorMsg>}
-            <SectionHeader title="Playoff Start Dates" />
-            <div style={{fontSize:12,color:"#AAA",lineHeight:1.5,marginBottom:8}}>Set the playoff start date separately for each division. The app uses this date to calculate that division's makeup-match deadline.</div>
-            {(divisionSeason.divisions || []).map(d => {
-              const draft = Object.prototype.hasOwnProperty.call(playoffDateDrafts, d.id)
-                ? playoffDateDrafts[d.id]
-                : (d.playoffs_start_date || "");
-              return <div key={`playoff-date-${d.id}`} className="div-row" style={{flexWrap:"wrap",gap:8}}>
-                <span className="div-row__num">Div {d.num}</span>
-                <span className="div-row__name" style={{minWidth:100}}>{d.name || "—"} · {d.format} · {d.day}</span>
-                <input type="date" className="input" aria-label={`Playoff start date for division ${d.num}`} value={draft}
-                  onChange={e => { setPlayoffDateDrafts(p => ({...p,[d.id]:e.target.value})); setPlayoffDateError(""); }} />
-                <button className="btn-sm" disabled={savingPlayoffDate===d.id || draft===(d.playoffs_start_date || "")}
-                  onClick={async () => {
-                    setSavingPlayoffDate(d.id); setPlayoffDateError("");
-                    try {
-                      const ok = await onSetPlayoffsDate?.(d.id, draft);
-                      if (!ok) setPlayoffDateError(`Could not save the playoff start date for division ${d.num}.`);
-                      else setPlayoffDateDrafts(p => { const next={...p}; delete next[d.id]; return next; });
-                    } catch (e) { setPlayoffDateError(e?.message || `Could not save the playoff start date for division ${d.num}.`); }
-                    finally { setSavingPlayoffDate(null); }
-                  }}>{savingPlayoffDate===d.id ? "Saving…" : "Save date"}</button>
-              </div>;
-            })}
-            {playoffDateError && <ErrorMsg>{playoffDateError}</ErrorMsg>}
             <div className="div-add-row" style={{ flexWrap: "wrap", marginTop: 10 }}>
               <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" value={divNum} onChange={e => setDivNum(e.target.value)} />
               <input className="edit-input" style={{ flex: 1, minWidth: 120 }} placeholder="Name (e.g. North)" value={divName} onChange={e => setDivName(e.target.value)} />
