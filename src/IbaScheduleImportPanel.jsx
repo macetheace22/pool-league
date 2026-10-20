@@ -375,7 +375,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
               <button className="btn-sm" onClick={toggleAllSelectable} disabled={loading || importing || selectableDivisions.length === 0 || allSelectableSelected}>
                 Select All
               </button>
-              <button className="btn-sm" onClick={() => setSelected(Object.fromEntries((divisions || []).map(d => [divisionKey(d), false])))} disabled={loading || importing || selectedCount === 0}>
+              <button className="btn-sm" onClick={() => setSelected(Object.fromEntries((divisions || []).map(d => [divisionKey(d), false])))} disabled={loading || importing || !(divisions || []).some(d => !!selected[divisionKey(d)])}>
                 Deselect All
               </button>
             </div>
