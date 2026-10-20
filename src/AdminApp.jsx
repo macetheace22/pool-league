@@ -1838,6 +1838,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                   </div>
                 </div>
               )}
+              <button className="btn-primary" style={{ marginTop: 16, alignSelf: "flex-start" }} onClick={() => navigate(`/schedules?season=${encodeURIComponent(divisionSeason.id)}`)} disabled={!divisionSeason}>View Schedules</button>
             </div>
           )}
         </div>
@@ -1871,7 +1872,6 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 <button className="btn-secondary" style={{ fontSize: 14, fontWeight: 700 }} disabled={creatingSeason} onClick={() => createSeason(false)}>Create as Inactive</button>
                 <button className="btn-ghost" disabled={creatingSeason} onClick={() => setShowCreatePrompt(false)}>Cancel</button>
               </div>
-              <button className="btn-primary" style={{ marginTop: 10, alignSelf: "flex-start" }} onClick={() => navigate(`/schedules?season=${encodeURIComponent(divisionSeason.id)}`)}>View Schedules</button>
             </div>
           )}
         </div>
