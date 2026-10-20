@@ -599,7 +599,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         </SubTabBar>
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
-            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} seasonOnly />
+            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           {manageSubTab==="teams" && (
             <TeamsTab key={viewingDiv?.id ?? "none"} teams={viewTeams}
               onSave={isViewingActive && viewingDiv ? handleSaveTeams : null}
@@ -639,7 +639,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         <PageHeader title="Weekly League Data" />
         <div className="tab-content">
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
-            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
+            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} seasonOnly />
 
           {weeklyStage === "method" && (
             <section className="weekly-data-workspace" aria-labelledby="weekly-method-title">
