@@ -5,11 +5,14 @@ describe("IBA parsers", () => {
   it("keeps standings compatible with tab-delimited paste and supports PDF space extraction", () => {
     expect(parseStandingsImport("15101\tRoom 40\t10\t123\t15\t8.20")[0]).toMatchObject({ teamNum:"15101", teamName:"Room 40", totalPoints:123, setsPlayed:15 });
     expect(parseStandingsImport("15101 Room 40 10 123 15 8.20")[0]).toMatchObject({ teamNum:"15101", teamName:"Room 40", totalPoints:123, setsPlayed:15 });
+    expect(parseStandingsImport("76A01 Eliminators 10 123 15 8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators", totalPoints:123, setsPlayed:15 });
+    expect(parseStandingsImport("76A01\\tEliminators\\t10\\t123\\t15\\t8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators" });
   });
 
   it("keeps MVP compatible with tab-delimited paste and supports PDF space extraction", () => {
     expect(parseMvpImport("12345\tBilly Macy\t15101\t4\t1\t250\t1050")[0]).toMatchObject({ playerNum:"12345", teamNum:"15101", wins:4, losses:1 });
     expect(parseMvpImport("12345 Billy Macy 15101 4 1 250 1050")[0]).toMatchObject({ playerNum:"12345", playerName:"Billy Macy", teamNum:"15101", wins:4, losses:1 });
+    expect(parseMvpImport("12345 Billy Macy 76A01 4 1 250 1050")[0]).toMatchObject({ playerNum:"12345", playerName:"Billy Macy", teamNum:"76A01", wins:4, losses:1 });
   });
 
   it("parses the current rate-first IBA roster layout and keeps team blocks before division headings", () => {
@@ -78,6 +81,24 @@ describe("IBA parsers", () => {
     expect(result.registry["25953"]).toMatchObject({ name:"Stewart, Ryan", rating:73 });
     expect(result.registry["18529"]).toMatchObject({ name:"Carlson, Doug", nickname:"DamnIt", rating:134 });
     expect(result.registry["01868"]).toMatchObject({ name:"Wylie, Wayne", num:"01868", rating:94 });
+  });
+
+  it("parses alphanumeric IBA team numbers in roster headers", () => {
+    const result = parseLeagueRoster([
+      "Division Roster and Handicap Report Thu Advanced",
+      "For Week: 17",
+      "Team 76A01 Eliminators",
+      "Two Stooges Sports Bar",
+      "Rate Num Play Win Name",
+      "105 34240 4 2 Marier, Dave",
+      "Team 76A02 NO eQUsEs",
+      "Two Stooges Sports Bar",
+      "116 14768 2 1 Barrett, Scott",
+    ].join("\\n"));
+    expect(result.teams["76A01"]).toMatchObject({ name: "Eliminators", location: "Two Stooges Sports Bar" });
+    expect(result.teams["76A02"]).toMatchObject({ name: "NO eQUsEs" });
+    expect(result.rosters["76A01"]).toEqual(["34240"]);
+    expect(result.rosters["76A02"]).toEqual(["14768"]);
   });
 
   it("parses a simple single-column roster without changing the existing output contract", () => {
