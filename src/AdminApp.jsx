@@ -1734,7 +1734,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
             </select>
           </label>
           {!divisionSeason ? <div className="empty-state">Create a season before adding divisions.</div> : <>
-            <SectionHeader title={String(seasonLabelFor(divisionSeason)) + " · " + (divisionSeason.divisions || []).length + " divisions"} />
+            <SectionHeader title={String(divisionSeason.type) + " " + String(divisionSeason.year) + " · " + (divisionSeason.divisions || []).length + " divisions"} />
             {(divisionSeason.divisions || []).map(d => editingDivId === d.id ? (
               <div key={d.id} className="div-row div-row--edit" style={{ flexWrap: "wrap" }}>
                 <input className="edit-input" style={{ width: 70, flex: "none" }} placeholder="Div #" value={editDivNum} onChange={e => setEditDivNum(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} />
