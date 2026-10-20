@@ -1730,7 +1730,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
           <label className="field">
             <Label>Season</Label>
             <select className="input" value={divisionSeason?.id || ""} onChange={e => setExpandedSeason(e.target.value)} style={{ width: "100%" }}>
-              {seasons.map(s => <option key={s.id} value={s.id}>{seasonLabelFor(s)} · {s.is_active ? "Active" : "Inactive"}</option>)}
+              {seasons.map(s => <option key={s.id} value={s.id}>{s.type} {s.year} · {s.is_active ? "Active" : "Inactive"}</option>)}
             </select>
           </label>
           {!divisionSeason ? <div className="empty-state">Create a season before adding divisions.</div> : <>
