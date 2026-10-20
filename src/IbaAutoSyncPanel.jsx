@@ -264,8 +264,27 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                 <div style={{ fontSize: 11, color: "#CCC", marginTop: 8 }}>
                   {reviewScopedReports.filter(report => report.status === "ok").length} extracted · {reviewReadyReports.length} eligible with rows · {reviewBlockedReports.length} zero-row blocked · {reviewMissingReports.length} missing (allowed) · {reviewErrorReports.length} extraction/fetch error(s)
                 </div>
-                <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 6 }}>
-                  {reviewScopedReports.map(report => <div key={report.key}>{report.formatLabel} · {report.dayLabel} · {report.reportLabel || report.reportType.toUpperCase()}: {report.status === "ok" ? `${report.detectedRows} rows${report.reportWeek?.weekNumber ? ` · Week ${report.reportWeek.weekNumber}` : ""}` : `${report.status} — ${report.message || "not available"}`}{report.status === "ok" && report.detectedRows === 0 ? " · BLOCKED" : ""}</div>)}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                  {reviewScopedReports.map(report => {
+                    const blocked = report.status === "ok" && report.detectedRows === 0;
+                    const failed = report.status !== "ok" && report.status !== "missing";
+                    const label = report.reportLabel || report.reportType.toUpperCase();
+                    const status = blocked ? "NOT IMPORTED · 0 ROWS" : failed ? "ERROR" : report.status === "missing" ? "MISSING · SKIPPED" : "READY";
+                    const detail = blocked
+                      ? "No usable rows were extracted. This report is blocked from import."
+                      : failed
+                        ? (report.message || "Report retrieval or extraction failed.")
+                        : report.status === "missing"
+                          ? "No report was returned for this format/day/category; missing reports are allowed."
+                          : `${report.detectedRows} rows${report.reportWeek?.weekNumber ? ` · Week ${report.reportWeek.weekNumber}` : ""}`;
+                    return <div key={report.key} role="status" style={{ border: `1px solid ${blocked || failed ? "#8A5A16" : "#3A3A3A"}`, borderRadius: 7, padding: "7px 9px", background: blocked || failed ? "#30230F" : "#1C1C1C" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 5 }}>
+                        <span style={{ color: "#F0F0F0", fontWeight: 700 }}>{report.formatLabel} · {report.dayLabel} · {label}</span>
+                        <span style={{ color: blocked || failed ? "#F59E0B" : report.status === "missing" ? "#AAA" : "#5FCF9E", fontWeight: 700 }}>{status}</span>
+                      </div>
+                      <div style={{ color: blocked || failed ? "#F0C27A" : "#AAA", marginTop: 3, lineHeight: 1.45 }}>{detail}</div>
+                    </div>;
+                  })}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                   <button className="btn-primary" disabled={!reviewSeason || reviewReadyReports.length === 0 || reviewBlockedReports.length > 0 || reviewErrorReports.length > 0 || reviewLoading || reviewImporting} onClick={async () => {
