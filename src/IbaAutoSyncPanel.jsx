@@ -213,6 +213,14 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
 
   return (
     <div className="card" style={{marginBottom:12}}>
+      <style>{`
+        .manual-pdf-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:10px;align-items:end}
+        .manual-pdf-field{display:grid;gap:5px;min-width:0;font-size:11px;color:#CCC}
+        .manual-pdf-field select{min-height:38px}
+        .manual-pdf-file input{width:100%;min-width:0;box-sizing:border-box;font-size:11px;color:#CCC;padding:8px;border:1px solid #3A3A3A;border-radius:7px;background:#191919}
+        .manual-pdf-filename{font-size:10.5px;color:#AAA;overflow-wrap:anywhere}
+        @media(min-width:760px){.manual-pdf-controls{grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) minmax(220px,1.6fr)}}
+      `}</style>
       <div className="card__title" style={{display:"flex",alignItems:"center",gap:7}}>
         <Download size={14}/> {manualMode ? `Manual PDF Import · ${reportLabels[reportType] || reportType}` : reportType ? `Automatic IBA Sync · ${reportLabels[reportType] || reportType}` : "Automatic IBA Report Sync"}
       </div>
@@ -366,23 +374,26 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           <div style={{ fontSize: 11, color: "#AAA", lineHeight: 1.5, marginTop: 4 }}>
             Upload a PDF for this report category to extract and preview it. This step does not write to the database. Import still uses the selected season and its validation checks. The consolidated review flow imports one report category at a time.
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-            <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
-              Format
-              <select className="input" value={manualFormat} onChange={e => { setManualFormat(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{ minWidth: 140, width: "100%" }}>
+          <div className="manual-pdf-controls">
+            <label className="manual-pdf-field">
+              <span>Format</span>
+              <select className="input" value={manualFormat} onChange={e => { setManualFormat(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{width:"100%"}}>
                 {manualFormatOptions.map(format => <option key={format} value={format}>{({ masters: "Masters", advanced: "Advanced", open: "Open" })[format] || format}</option>)}
               </select>
             </label>
-            <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
-              Day
-              <select className="input" value={manualDay} onChange={e => { setManualDay(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{ minWidth: 140, width: "100%" }}>
+            <label className="manual-pdf-field">
+              <span>Day</span>
+              <select className="input" value={manualDay} onChange={e => { setManualDay(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{width:"100%"}}>
                 {manualDayOptions.map(day => <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>)}
               </select>
             </label>
+            <label className="manual-pdf-field manual-pdf-file">
+              <span>Choose PDF</span>
+              <input type="file" accept="application/pdf,.pdf" onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }} />
+              {manualFile && <span className="manual-pdf-filename">{manualFile.name} · {Math.ceil(manualFile.size / 1024).toLocaleString()} KB</span>}
+            </label>
           </div>
-          <input type="file" accept="application/pdf,.pdf" onChange={e => { setManualFile(e.target.files?.[0] || null); setManualError(""); }} style={{ display: "block", maxWidth: "100%", marginTop: 8, fontSize: 11 }} />
-          {manualFile && <div style={{ fontSize: 10.5, color: "#AAA", marginTop: 4 }}>{manualFile.name} · {Math.ceil(manualFile.size / 1024).toLocaleString()} KB</div>}
-          <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual || !supported || !manualFormatOptions.length || !manualDayOptions.length} style={{ marginTop: 8 }}>
+          <button className="btn-primary" onClick={uploadManualPdf} disabled={!manualFile || uploadingManual || !supported || !manualFormatOptions.length || !manualDayOptions.length} style={{ marginTop: 10 }}>
             {uploadingManual ? <><RefreshCw size={12} className="spin" /> Extracting PDF…</> : "Extract & Preview PDF"}
           </button>
           {manualError && <div className="error-msg" style={{ marginTop: 8 }}>{manualError}</div>}
