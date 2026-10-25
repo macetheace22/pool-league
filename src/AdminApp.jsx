@@ -3979,7 +3979,7 @@ function LineupPlannerPanel({ teamId, profileId }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const refresh = async () => {
+  const refresh = async (isCancelled = () => false) => {
     setOverview(undefined);
     setError("");
     try {
@@ -3989,11 +3989,13 @@ function LineupPlannerPanel({ teamId, profileId }) {
         db.listTeamLineupPlans(teamId),
         db.listTeamUnavailability(teamId),
       ]);
+      if (isCancelled()) return;
       setOverview(ov ?? null);
       setRoster(r ?? []);
       setPlans(p ?? []);
       setUnavailability(u ?? []);
     } catch (e) {
+      if (isCancelled()) return;
       setError(e?.message || "Unable to load lineup planning data.");
       setOverview(null);
       setRoster([]);
@@ -4001,7 +4003,11 @@ function LineupPlannerPanel({ teamId, profileId }) {
       setUnavailability([]);
     }
   };
-  useEffect(() => { let cancelled = false; refresh(); return () => { cancelled = true; }; }, [teamId]);
+  useEffect(() => {
+    let cancelled = false;
+    refresh(() => cancelled);
+    return () => { cancelled = true; };
+  }, [teamId]);
 
   // Real schedule weeks only (a captain can only plan a week their team
   // actually has a pairing in) -- sorted chronologically, same parse-then-
