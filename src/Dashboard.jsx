@@ -14,11 +14,8 @@ import { getActiveTeamIds } from "./teamMembership";
 // throughout the rest of the app) -- an unparseable value is treated as
 // "no date" rather than guessing.
 function parseWeekDate(str) {
-  if (!str) return null;
-  const parts = str.split("/").map(Number);
-  if (parts.length < 3 || parts.some(n => Number.isNaN(n))) return null;
-  const [m, d, y] = parts;
-  return new Date(y, m - 1, d);
+  const timestamp = db.parseScheduleDate(str);
+  return timestamp == null ? null : new Date(timestamp);
 }
 function opponentName(pairing, teamId, teams) {
   const oppId = pairing.homeTeamId === teamId ? pairing.awayTeamId : pairing.homeTeamId;
