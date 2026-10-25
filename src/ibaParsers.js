@@ -29,16 +29,16 @@ function extractIbaReportWeek(raw) {
 // are treated as unavailable rather than guessing.
 function extractIbaReportPrintedOnDate(raw) {
   const text = String(raw || "");
-  const datePattern = "(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}\\/\\d{1,2}\\/\\d{4})";
+  const datePattern = "(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}/\\d{1,2}/\\d{4})";
   const regex = new RegExp("(?:report\\s+printed|printed\\s+on|print(?:ed)?\\s+date)\\s*:?\\s*" + datePattern, "gi");
   const normalized = new Set();
   let match;
   while ((match = regex.exec(text)) !== null) {
     const value = match[1];
-    let year, month, day, parts = value.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
+    let year, month, day, parts = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     if (parts) [, year, month, day] = parts;
     else {
-      parts = value.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
+      parts = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if (parts) [, month, day, year] = parts;
     }
     if (!parts) continue;
