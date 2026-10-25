@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, ChevronDown, RefreshCw, Trophy } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import * as db from "./db";
@@ -59,6 +59,7 @@ export default function Schedules() {
   const [teams, setTeams] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
+  const hasLoadedSeasons = useRef(false);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(true);
   const [error, setError] = useState("");
@@ -66,11 +67,12 @@ export default function Schedules() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (!hasLoadedSeasons.current) setLoading(true);
     db.listSeasons()
       .then(rows => {
         if (cancelled) return;
         setSeasons(rows);
+        hasLoadedSeasons.current = true;
 
         const memberships = (profile?.team_memberships ?? [])
           .map(m => m.teams)
