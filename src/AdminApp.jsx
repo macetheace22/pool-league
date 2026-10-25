@@ -273,6 +273,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [seasons, setSeasons] = useState([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
   const [initialLoadError, setInitialLoadError] = useState("");
+  const skipNextDivisionLoadRef = useRef(false);
 
   const [viewingSeason, setViewingSeason] = useState(null);
   const [viewingDiv, setViewingDiv]       = useState(null);
@@ -347,12 +348,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         const target = requested ?? list.find(s => s.is_active);
         const targetDivision = target?.divisions?.[0] ?? null;
 
-        setSeasons(list);
-        setCaptainsByTeam(captains);
-        setLocations(locations);
-        setViewingSeason(target ?? null);
-        setViewingDiv(targetDivision);
-
         if (targetDivision) {
           await loadDivisionData(targetDivision);
           if (cancelled) return;
@@ -362,6 +357,14 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           setViewRosters({});
           setPlayoffEligibility({});
         }
+        if (cancelled) return;
+
+        setSeasons(list);
+        setCaptainsByTeam(captains);
+        setLocations(locations);
+        skipNextDivisionLoadRef.current = true;
+        setViewingSeason(target ?? null);
+        setViewingDiv(targetDivision);
       } catch (e) {
         if (!cancelled) setInitialLoadError(e?.message || "Unable to load the page data. Please try again.");
       } finally {
@@ -377,6 +380,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   }, []);
 
   useEffect(() => {
+    if (skipNextDivisionLoadRef.current) {
+      skipNextDivisionLoadRef.current = false;
+      return;
+    }
     loadDivisionData(viewingDiv);
   }, [viewingSeason?.id, viewingDiv?.id]);
 
