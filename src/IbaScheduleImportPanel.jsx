@@ -245,6 +245,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const totalTeams = result?.imported?.reduce((n, x) => n + (x.teamCount || 0), 0) || 0;
   const totalWeeks = result?.imported?.reduce((n, x) => n + (x.weekCount || 0), 0) || 0;
   const totalPairings = result?.imported?.reduce((n, x) => n + (x.pairingCount || 0), 0) || 0;
+  const contextWarnings = result?.imported?.filter(item => item.warning) || [];
 
   const retrieving = loading && retrieveProgress.total > 0;
   const importingSchedules = importing && importProgress.total > 0;
@@ -438,6 +439,16 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         <div className="import-warning-block" style={{ background: result.skipped.length ? "#30230F" : "#0F2D1F", borderColor: result.skipped.length ? "#8A5A16" : "#1F6B4A", marginTop: 10 }}>
           <div className="import-warning-block__title" style={{ color: result.skipped.length ? "#F59E0B" : "#5FCF9E" }}>{result.skipped.length ? <AlertCircle size={12}/> : <Check size={12}/>} {result.skipped.length ? "IBA schedule sync needs review" : "IBA schedule sync complete"}</div>
           <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>{result.imported.length} division{result.imported.length === 1 ? "" : "s"} imported · {totalTeams} teams · {totalWeeks} schedule weeks · {totalPairings} matchups</div>
+          {contextWarnings.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+              {contextWarnings.map((item, index) => (
+                <div key={`${item.divisionId || item.divisionNum || "division"}-${index}`} className="import-warning-block" style={{ margin: 0 }}>
+                  <div className="import-warning-block__title"><AlertCircle size={12}/> Existing division updated</div>
+                  <div style={{ fontSize: 11, color: "#E0E0E0", lineHeight: 1.5 }}>{item.warning}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {result.imported.length > 0 && <button className="btn-primary" style={{ marginTop: 8 }} onClick={() => navigate(`/manage-divisions?season=${encodeURIComponent(season.id)}`)}>View Divisions</button>}
           {result.skipped.length > 0 && (
             <>
