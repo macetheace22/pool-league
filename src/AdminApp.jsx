@@ -1718,11 +1718,25 @@ function TeamLookupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const teamId = searchParams.get("team");
   const [allTeams, setAllTeams] = useState(undefined);
+  const [teamsLoadError, setTeamsLoadError] = useState("");
   const [query, setQuery] = useState("");
 
-  useEffect(() => { db.listAllTeamsWithContext().then(setAllTeams); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    db.listAllTeamsWithContext()
+      .then(rows => { if (!cancelled) setAllTeams(rows ?? []); })
+      .catch(e => { if (!cancelled) setTeamsLoadError(e?.message || "Unable to load teams."); });
+    return () => { cancelled = true; };
+  }, []);
 
   const team = teamId && allTeams ? allTeams.find(t => t.id === teamId) : null;
+
+  if (allTeams === undefined) {
+    return <><PageHeader title="Team Lookup" /><div className="tab-content"><Loader /></div></>;
+  }
+  if (teamsLoadError) {
+    return <><PageHeader title="Team Lookup" /><div className="tab-content"><div className="empty-state">{teamsLoadError}</div></div></>;
+  }
 
   if (teamId) {
     return (
@@ -1730,8 +1744,7 @@ function TeamLookupPage() {
         <PageHeader title="Team Lookup" subtitle={team ? `${team.name} · ${team.context}` : undefined} />
         <div className="tab-content">
           <button className="btn-secondary no-print" onClick={() => setSearchParams({})}>← All Teams</button>
-          {allTeams === undefined && <Loader />}
-          {allTeams && !team && <div className="empty-state">Team not found.</div>}
+          {!team && <div className="empty-state">Team not found.</div>}
           {team && <TeamDetailView team={team} />}
         </div>
       </>
@@ -1744,7 +1757,6 @@ function TeamLookupPage() {
     <>
       <PageHeader title="Team Lookup" />
       <div className="tab-content">
-        {allTeams === undefined && <Loader />}
         {allTeams && (
           <div className="card">
             <div className="card__title">Search Teams</div>
