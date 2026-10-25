@@ -217,20 +217,21 @@ function parsePlayoffEligibility(raw) {
 
 
 
-function parseDate(str) {
-  const [m, d, y] = str.split("/").map(Number);
-  return new Date(y, m - 1, d);
-}
 function findCurrentWeek(schedule) {
   const today = new Date(); today.setHours(0,0,0,0);
-  const real = schedule.filter(w => w.week && w.pairings.length > 0);
-  return real.find(w => parseDate(w.date) >= today) ?? real[real.length - 1] ?? null;
+  const real = db.sortScheduleWeeks((schedule ?? []).filter(w => w.week && (w.pairings?.length ?? 0) > 0));
+  return real.find(w => {
+    const timestamp = db.parseScheduleDate(w.date);
+    return timestamp != null && timestamp >= today.getTime();
+  }) ?? real[real.length - 1] ?? null;
 }
 
 // ─── Rating week helpers ────────────────────────────────────────────────────
-function isoDateKey(mmddyyyy) {
-  const [m, d, y] = mmddyyyy.split("/").map(Number);
-  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+function isoDateKey(value) {
+  const timestamp = db.parseScheduleDate(value);
+  if (timestamp == null) return null;
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 function todayIsoKey() {
   const t = new Date();
@@ -238,14 +239,14 @@ function todayIsoKey() {
 }
 function currentWeekTag(schedule) {
   const wk = findCurrentWeek(schedule ?? []);
-  if (wk && wk.week) return { weekKey: isoDateKey(wk.date), label: `Week ${wk.week} · ${wk.date}` };
+  const weekKey = wk?.week ? isoDateKey(wk.date) : null;
+  if (weekKey) return { weekKey, label: `Week ${wk.week} · ${wk.date}` };
   return { weekKey: todayIsoKey(), label: `As of ${new Date().toLocaleDateString()}` };
 }
 function scheduleWeekOptions(schedule) {
-  return (schedule ?? [])
-    .filter(w => w.week && w.pairings.length > 0)
-    .map(w => ({ weekKey: isoDateKey(w.date), label: `Week ${w.week} · ${w.date}` }))
-    .sort((a, b) => a.weekKey < b.weekKey ? -1 : 1);
+  return db.sortScheduleWeeks(schedule ?? [])
+    .filter(w => w.week && (w.pairings?.length ?? 0) > 0 && isoDateKey(w.date))
+    .map(w => ({ weekKey: isoDateKey(w.date), label: `Week ${w.week} · ${w.date}` }));
 }
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
@@ -5256,6 +5257,7 @@ function ScheduleTab({ schedule, teams, onSave, onAddPairing, onUpdatePairing, o
   const [expanded, setExpanded] = useState(null);
   const teamByIndex = (n) => teams[n-1]??null;
   const sortedTeams = [...teams].sort((a,b)=>a.name.localeCompare(b.name));
+  const sortedSchedule = db.sortScheduleWeeks(schedule);
 
   const handleParse  = () => { const r=parseSchedule(raw); if(!r.length){setParseErr("No weeks found.");return;} setParseErr("");setParsed(r); };
   const handleImport = async () => {
@@ -5276,7 +5278,7 @@ function ScheduleTab({ schedule, teams, onSave, onAddPairing, onUpdatePairing, o
       )}
       {(!pasteMode||readOnly) && schedule.length>0 && (
         <div className="list">
-          {schedule.map((week,i)=>{
+          {sortedSchedule.map((week,i)=>{
             const isExpanded=expanded===i, isSpecial=!!week.special&&!week.pairings.length;
             return (
               <div key={i} className={`list-row ${isSpecial?"list-row--special":""}`}>
