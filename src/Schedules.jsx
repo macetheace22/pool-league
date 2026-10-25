@@ -87,6 +87,8 @@ export default function Schedules() {
           || rows[0];
 
         if (preferred) {
+          setStatusLoading(true);
+          setScheduleLoading(false);
           setSeasonId(preferred.id);
           setParams(p => {
             p.set("season", preferred.id);
@@ -182,6 +184,7 @@ export default function Schedules() {
     setParams(p => { p.set("season", id); p.delete("division"); return p; }, { replace: true });
   };
   const setDivision = id => {
+    setScheduleLoading(true);
     setDivisionId(id);
     setParams(p => { p.set("season", seasonId); p.set("division", id); return p; }, { replace: true });
   };
