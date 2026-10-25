@@ -1013,6 +1013,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const [ratingHistory, setRatingHistory] = useState([]);
   const [rawEvents, setRawEvents] = useState(undefined); // undefined = loading, null = none tracked
   const [coreProfileLoading, setCoreProfileLoading] = useState(true);
+  const [loadedPlayerNum, setLoadedPlayerNum] = useState(null);
 
   const [scopeMode, setScopeMode] = useState("season"); // "career" | "season"
   const [selectedYear, setSelectedYear] = useState(null);
@@ -1072,7 +1073,10 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
       setTeamHistory([]);
       setScopeMode("career");
     }).finally(() => {
-      if (!cancelled) setCoreProfileLoading(false);
+      if (!cancelled) {
+        setLoadedPlayerNum(playerNum);
+        setCoreProfileLoading(false);
+      }
     });
 
     return () => { cancelled = true; };
@@ -1156,7 +1160,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (coreProfileLoading || teamHistory === undefined || rawEvents === undefined || seasonRecord === undefined || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
+  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || seasonRecord === undefined || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
 
   return (
     <>
