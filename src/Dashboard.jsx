@@ -51,12 +51,12 @@ export function Home() {
   useEffect(() => {
     if (!profile) return;
     setTeamOverviews(undefined);
-    db.getMyTeamsOverview(profile).then(setTeamOverviews);
+    db.getMyTeamsOverview(profile).then(setTeamOverviews).catch(() => setTeamOverviews([]));
   }, [profile?.team_memberships, profile?.player_num]);
 
   useEffect(() => {
     if (!profile?.id) return;
-    db.listMyPracticeGames(profile.id).then(games => setRecentPractice(games[0] ?? null));
+    db.listMyPracticeGames(profile.id).then(games => setRecentPractice(games[0] ?? null)).catch(() => setRecentPractice(null));
   }, [profile?.id]);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export function Home() {
         db.getPlayerMvpRankRow(profile.player_num, o.team.division_id),
       ]);
       return { teamId: o.team.id, teamName: o.team.name, teamRank, mvpRank };
-    })).then(setSnapshotStats);
+    })).then(setSnapshotStats).catch(() => setSnapshotStats([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamOverviews, profile?.player_num]);
 
@@ -93,6 +93,7 @@ export function Home() {
   const showTeamLabels = (teamOverviews ?? []).length > 1;
 
   const recentMatch = teamOverviews ? db.mostRecentCompletedMatch(teamOverviews) : undefined;
+  const homeLoading = !!profile && (teamOverviews === undefined || snapshotStats === undefined || recentPractice === undefined);
 
   const areas = [
     { key: "stats", label: "My Stats", desc: "Your record & stats", icon: BarChart3, path: "/my-stats" },
@@ -184,6 +185,7 @@ export function Home() {
             )}
           </DashCard>
         )}
+        </>}
       </div>
       <TabBar />
     </div>
