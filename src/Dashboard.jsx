@@ -203,8 +203,8 @@ export function LeaguesDashboard() {
     ? selectedTeamId
     : selectedTeamIds[0] ?? null;
   const [overview, setOverview] = useState(undefined); // undefined = loading, null = no team
-  const [lineupPlans, setLineupPlans] = useState([]); // captain's planned lineups for this team, if any -- read-only here
-  const [unavailability, setUnavailability] = useState([]); // every team member's marked weeks -- filtered to "mine" below for the self-service card
+  const [lineupPlans, setLineupPlans] = useState(undefined); // undefined until initial team context has loaded
+  const [unavailability, setUnavailability] = useState(undefined); // undefined until initial team context has loaded
   const [markingWeekId, setMarkingWeekId] = useState(null);
   const [reasonInput, setReasonInput] = useState("");
   const [view, setView] = useState("main"); // "main" | "upcoming" | "previous"
@@ -212,14 +212,38 @@ export function LeaguesDashboard() {
   const refreshUnavailability = () => { if (effectiveTeamId) db.listTeamUnavailability(effectiveTeamId).then(setUnavailability); };
 
   useEffect(() => {
-    if (!effectiveTeamId) { setOverview(null); return; }
+    let cancelled = false;
+    if (!effectiveTeamId) {
+      setOverview(null);
+      setLineupPlans([]);
+      setUnavailability([]);
+      return () => { cancelled = true; };
+    }
+
     setOverview(undefined);
-    db.getTeamScheduleOverview(effectiveTeamId).then(o => setOverview(o ?? null));
-    db.listTeamLineupPlans(effectiveTeamId).then(setLineupPlans);
-    refreshUnavailability();
+    setLineupPlans(undefined);
+    setUnavailability(undefined);
+    Promise.all([
+      db.getTeamScheduleOverview(effectiveTeamId),
+      db.listTeamLineupPlans(effectiveTeamId),
+      db.listTeamUnavailability(effectiveTeamId),
+    ]).then(([nextOverview, plans, unavailable]) => {
+      if (cancelled) return;
+      setOverview(nextOverview ?? null);
+      setLineupPlans(plans ?? []);
+      setUnavailability(unavailable ?? []);
+    }).catch(() => {
+      if (cancelled) return;
+      setOverview(null);
+      setLineupPlans([]);
+      setUnavailability([]);
+    });
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTeamId]);
 
+  const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcomingAll = overview ? overview.myWeeks
     .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
@@ -267,6 +291,7 @@ export function LeaguesDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Leagues" hideBack />
       <div className="tab-content">
+        {leaguesLoading ? <Loader /> : <>
         {/* League News -- fee/membership tracking not built yet */}
         <DashCard icon={Newspaper} title="League News">
           <div className="empty-state" style={{padding:14}}>Coming soon — league fees and IBA membership status will show here.</div>
@@ -390,6 +415,7 @@ export function LeaguesDashboard() {
             <ChevronRight size={16} />
           </Link>
         )}
+        </>}
       </div>
       <TabBar />
     </div>
