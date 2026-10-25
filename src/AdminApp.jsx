@@ -2423,6 +2423,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const [standingsAdj, setStandingsAdj] = useState([]);
   const [mvpAdj, setMvpAdj] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [resuming, setResuming] = useState(null);
   const [applyingForfeit, setApplyingForfeit] = useState(null);
@@ -2499,11 +2500,21 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
 
   const refresh = () => {
     setLoading(true);
+    setLoadError("");
     Promise.all([
       db.listCompletedMatches(divisionId),
       db.listStandingsAdjustments(divisionId),
       db.listMvpAdjustments(divisionId),
-    ]).then(([m, sa, ma]) => { setMatches(m); setStandingsAdj(sa); setMvpAdj(ma); setLoading(false); });
+    ]).then(([m, sa, ma]) => {
+      setMatches(m ?? []);
+      setStandingsAdj(sa ?? []);
+      setMvpAdj(ma ?? []);
+    }).catch(e => {
+      setLoadError(e?.message || "Unable to load match history.");
+      setMatches([]);
+      setStandingsAdj([]);
+      setMvpAdj([]);
+    }).finally(() => setLoading(false));
   };
   useEffect(refresh, [divisionId]);
 
@@ -3727,13 +3738,19 @@ function ManageMyTeamPage({ teamId, profileId }) {
   const refresh = async () => {
     if (!teamId) { setLoading(false); return; }
     setLoading(true);
-    const [teams, players, past] = await Promise.all([db.listAllTeamsWithContext(), db.listRosterForTeam(teamId), db.listPastCaptainedTeams(profileId)]);
-    const t = teams.find(x => x.id === teamId);
-    setTeam(t ?? null);
-    setNameInput(t?.name ?? "");
-    setRoster(players);
-    setPastTeams(past);
-    setLoading(false);
+    setError("");
+    try {
+      const [teams, players, past] = await Promise.all([db.listAllTeamsWithContext(), db.listRosterForTeam(teamId), db.listPastCaptainedTeams(profileId)]);
+      const t = (teams ?? []).find(x => x.id === teamId);
+      setTeam(t ?? null);
+      setNameInput(t?.name ?? "");
+      setRoster(players ?? []);
+      setPastTeams(past ?? []);
+    } catch (e) {
+      setError(e?.message || "Unable to load your team data.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { refresh(); }, [teamId]);
 
@@ -4397,6 +4414,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const [allTeams, setAllTeams] = useState([]);
   const [lastSignIns, setLastSignIns] = useState({});
   const [loading, setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [newRole, setNewRole]   = useState("captain");
   const [newTeamId, setNewTeamId] = useState("");
   const [inviteTeamSearch, setInviteTeamSearch] = useState("");
@@ -4412,10 +4430,18 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const [roleErr, setRoleErr]       = useState("");
 
   const refresh = async () => {
-    const [u, c, t, l] = await Promise.all([db.listProfiles(), db.listInviteCodes(), db.listAllTeamsWithContext(), db.listUserLastSignIns()]);
-    setUsers(u); setCodes(c); setAllTeams(t); setLastSignIns(l); setLoading(false);
-    const activeCount = c.filter(x=>!x.used_at&&(!x.expires_at||new Date(x.expires_at)>new Date())).length;
-    onCounts?.({ users: u.length, codes: activeCount });
+    setLoading(true);
+    setLoadError("");
+    try {
+      const [u, c, t, l] = await Promise.all([db.listProfiles(), db.listInviteCodes(), db.listAllTeamsWithContext(), db.listUserLastSignIns()]);
+      setUsers(u ?? []); setCodes(c ?? []); setAllTeams(t ?? []); setLastSignIns(l ?? {}); 
+      const activeCount = (c ?? []).filter(x=>!x.used_at&&(!x.expires_at||new Date(x.expires_at)>new Date())).length;
+      onCounts?.({ users: (u ?? []).length, codes: activeCount });
+    } catch (e) {
+      setLoadError(e?.message || "Unable to load account management data.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => {
     // Best-effort fallback for the 18-month auto-deactivation sweep, in case
@@ -4451,6 +4477,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   };
 
   if (loading) return <Loader/>;
+  if (loadError) return <div className="empty-state">{loadError}</div>;
 
   const activeCodes = codes.filter(c=>!c.used_at&&(!c.expires_at||new Date(c.expires_at)>new Date()));
   const usedCodes   = codes.filter(c=> c.used_at);
