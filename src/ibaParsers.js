@@ -24,6 +24,32 @@ function extractIbaReportWeek(raw) {
 // Extract week labels independently for division-scoped report sections. Some
 // PDFs print a week label per division, so a report-wide week must never be
 // assigned to every division when the source contains differing weeks.
+// Extract the date printed on the IBA report. Repeated headers across pages
+// are common, so repeated copies of the same date are fine; conflicting dates
+// are treated as unavailable rather than guessing.
+function extractIbaReportPrintedOnDate(raw) {
+  const text = String(raw || "");
+  const datePattern = "(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}\\/\\d{1,2}\\/\\d{4})";
+  const regex = new RegExp("(?:report\\s+printed|printed\\s+on|print(?:ed)?\\s+date)\\s*:?\\s*" + datePattern, "gi");
+  const normalized = new Set();
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const value = match[1];
+    let year, month, day, parts = value.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
+    if (parts) [, year, month, day] = parts;
+    else {
+      parts = value.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);
+      if (parts) [, month, day, year] = parts;
+    }
+    if (!parts) continue;
+    const y = Number(year), m = Number(month), d = Number(day);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) continue;
+    normalized.add(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  }
+  return normalized.size === 1 ? [...normalized][0] : null;
+}
+
 function extractIbaReportWeeksByDivision(raw) {
   const lines = String(raw || "").split(/\r?\n/);
   const divisionHeader = /^\s*(?:Division\s*#?\s*)?(\d{3})\s+(.{2,80}?)\s*$/i;
@@ -578,4 +604,4 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 }
 
 
-export { extractIbaReportWeek, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster };
+export { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster };
