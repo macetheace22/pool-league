@@ -25,10 +25,18 @@ export default function Practice() {
   const [phase, setPhase] = useState("landing"); // landing | opponent | gametype | format | config | play | done
   const [session, setSession] = useState(null);
   const [history, setHistory] = useState(undefined);
-  const [opponents, setOpponents] = useState([]);
+  const [opponents, setOpponents] = useState(undefined);
 
-  const refreshHistory = () => { if (profile) db.listMyPracticeGames(profile.id).then(setHistory); };
-  const refreshOpponents = () => { if (profile) db.listMyPracticeOpponents(profile.id).then(setOpponents); };
+  const refreshHistory = () => {
+    if (!profile) { setHistory([]); return; }
+    setHistory(undefined);
+    db.listMyPracticeGames(profile.id).then(setHistory).catch(() => setHistory([]));
+  };
+  const refreshOpponents = () => {
+    if (!profile) { setOpponents([]); return; }
+    setOpponents(undefined);
+    db.listMyPracticeOpponents(profile.id).then(setOpponents).catch(() => setOpponents([]));
+  };
   useEffect(() => { refreshHistory(); refreshOpponents(); }, [profile?.id]);
 
   const startSession = () => {
@@ -47,6 +55,10 @@ export default function Practice() {
       <TabBar />
     </div>
   );
+
+  if (phase === "landing" && profile && (history === undefined || opponents === undefined)) {
+    return wrap(<><PageHeader title="Practice" /><div className="tab-content"><Loader /></div></>);
+  }
 
   if (phase === "opponent") {
     return wrap(<OpponentStep profile={profile} session={session} setSession={setSession}
