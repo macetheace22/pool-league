@@ -272,6 +272,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   const [seasons, setSeasons] = useState([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
+  const [initialLoadError, setInitialLoadError] = useState("");
 
   const [viewingSeason, setViewingSeason] = useState(null);
   const [viewingDiv, setViewingDiv]       = useState(null);
@@ -302,36 +303,83 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     return list;
   };
 
+  const loadDivisionData = async (div) => {
+    if (!div) {
+      setViewTeams([]);
+      setViewSchedule([]);
+      setViewRosters({});
+      setPlayoffEligibility({});
+      setDivisionLoading(false);
+      return;
+    }
+    setDivisionLoading(true);
+    try {
+      const teams = await db.listTeams(div.id);
+      const [schedule, rostersByTeam, eligRows] = await Promise.all([
+        db.listSchedule(div.id, teams),
+        db.listRostersForTeams(teams.map(t => t.id)),
+        db.listPlayoffEligibility(div.id),
+      ]);
+      setViewTeams(teams);
+      setViewSchedule(schedule);
+      setViewRosters(rostersByTeam);
+      setPlayoffEligibility(db.eligibilityByPlayerNum(eligRows));
+    } finally {
+      setDivisionLoading(false);
+    }
+  };
+
   useEffect(() => {
-    refreshSeasons().then(list => {
-      const requestedId = searchParams.get("season");
-      const requested = requestedId ? list.find(s => s.id === requestedId) : null;
-      const target = requested ?? list.find(s => s.is_active);
-      if (target) {
-        setViewingSeason(target);
-        setViewingDiv(target.divisions?.[0] ?? null);
+    let cancelled = false;
+    const initializePage = async () => {
+      setSeasonsLoading(true);
+      setInitialLoadError("");
+      try {
+        const [list, captains, locations] = await Promise.all([
+          db.listSeasons(),
+          db.listTeamCaptains(),
+          db.listLocations(),
+        ]);
+        if (cancelled) return;
+
+        const requestedId = searchParams.get("season");
+        const requested = requestedId ? list.find(s => s.id === requestedId) : null;
+        const target = requested ?? list.find(s => s.is_active);
+        const targetDivision = target?.divisions?.[0] ?? null;
+
+        setSeasons(list);
+        setCaptainsByTeam(captains);
+        setLocations(locations);
+        setViewingSeason(target ?? null);
+        setViewingDiv(targetDivision);
+
+        if (targetDivision) {
+          await loadDivisionData(targetDivision);
+          if (cancelled) return;
+        } else {
+          setViewTeams([]);
+          setViewSchedule([]);
+          setViewRosters({});
+          setPlayoffEligibility({});
+        }
+      } catch (e) {
+        if (!cancelled) setInitialLoadError(e?.message || "Unable to load the page data. Please try again.");
+      } finally {
+        if (!cancelled) setSeasonsLoading(false);
       }
-      setSeasonsLoading(false);
-    });
-    db.listTeamCaptains().then(setCaptainsByTeam);
-    refreshLocations();
-    return () => clearIbaSchedulePanelState();
+    };
+
+    initializePage();
+    return () => {
+      cancelled = true;
+      clearIbaSchedulePanelState();
+    };
   }, []);
 
-  const loadDivisionData = async (div) => {
-    if (!div) { setViewTeams([]); setViewSchedule([]); setViewRosters({}); setPlayoffEligibility({}); return; }
-    setDivisionLoading(true);
-    const teams = await db.listTeams(div.id);
-    const [schedule, rostersByTeam, eligRows] = await Promise.all([
-      db.listSchedule(div.id, teams),
-      db.listRostersForTeams(teams.map(t => t.id)),
-      db.listPlayoffEligibility(div.id),
-    ]);
-    setViewTeams(teams);
-    setViewSchedule(schedule);
-    setViewRosters(rostersByTeam);
-    setPlayoffEligibility(db.eligibilityByPlayerNum(eligRows));
-    setDivisionLoading(false);
+  const refreshSeasons = async () => {
+    const list = await db.listSeasons();
+    setSeasons(list);
+    return list;
   };
 
   useEffect(() => {
@@ -485,6 +533,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const resolveRoster = (teamId) => (viewRosters[teamId] ?? []).filter(p => p.rating != null);
 
   if (seasonsLoading) return <><PageHeader title="IBA Admin"/><div className="tab-content"><Loader/></div></>;
+  if (initialLoadError) return <><PageHeader title="IBA Admin"/><div className="tab-content"><ErrorMsg>{initialLoadError}</ErrorMsg></div></>;
 
   // ── "me" — everyone, always allowed ──
   if (page === "me") {
