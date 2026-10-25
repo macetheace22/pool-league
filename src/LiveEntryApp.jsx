@@ -204,18 +204,36 @@ export default function LiveEntryApp() {
 
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const [syncErr, setSyncErr] = useState(false);
   const [activeSet, setActiveSet] = useState(0);
 
   useEffect(() => {
-    if (!pairingId) { setLoading(false); return; }
-    loadMatch(pairingId).then((m) => {
-      setMatch(m ?? emptyMatch());
+    let cancelled = false;
+    setLoading(true);
+    setLoadError("");
+    setMatch(null);
+    if (!pairingId) {
       setLoading(false);
+      return () => { cancelled = true; };
+    }
+    loadMatch(pairingId).then((m) => {
+      if (cancelled) return;
+      if (!m) {
+        setMatch(null);
+        setLoadError("This match could not be loaded. Return to Current League Matches and select it again.");
+        return;
+      }
+      setMatch(m);
       setLastSync(Date.now());
+    }).catch(() => {
+      if (!cancelled) setLoadError("Unable to load this match. Check your connection and try again.");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
+    return () => { cancelled = true; };
   }, [pairingId]);
 
   useEffect(() => {
@@ -351,7 +369,13 @@ export default function LiveEntryApp() {
     );
   }
 
-  if (loading || !match) return <div style={{ background: "#0E0E0E", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", fontFamily: "system-ui" }}>Loading…</div>;
+  if (loading) return <div style={{ background: "#0E0E0E", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", fontFamily: "system-ui" }}>Loading…</div>;
+  if (loadError || !match) return (
+    <div style={{ background: "#0E0E0E", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 24, color: "#FFF", fontFamily: "system-ui", textAlign: "center" }}>
+      <div>{loadError || "This match is unavailable."}</div>
+      <button className="btn-secondary" onClick={() => window.history.back()}>Back</button>
+    </div>
+  );
 
   const fmt = match.format ?? FALLBACK_FORMAT;
   const IS_MASTERS = fmt === "masters";
