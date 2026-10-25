@@ -376,12 +376,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     };
   }, []);
 
-  const refreshSeasons = async () => {
-    const list = await db.listSeasons();
-    setSeasons(list);
-    return list;
-  };
-
   useEffect(() => {
     loadDivisionData(viewingDiv);
   }, [viewingSeason?.id, viewingDiv?.id]);
