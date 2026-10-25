@@ -3980,22 +3980,35 @@ function LineupPlannerPanel({ teamId, profileId }) {
   const [success, setSuccess] = useState("");
 
   const refresh = async () => {
-    const [ov, r, p, u] = await Promise.all([
-      db.getTeamScheduleOverview(teamId),
-      db.listRosterForTeam(teamId),
-      db.listTeamLineupPlans(teamId),
-      db.listTeamUnavailability(teamId),
-    ]);
-    setOverview(ov ?? null);
-    setRoster(r);
-    setPlans(p);
-    setUnavailability(u);
+    setOverview(undefined);
+    setError("");
+    try {
+      const [ov, r, p, u] = await Promise.all([
+        db.getTeamScheduleOverview(teamId),
+        db.listRosterForTeam(teamId),
+        db.listTeamLineupPlans(teamId),
+        db.listTeamUnavailability(teamId),
+      ]);
+      setOverview(ov ?? null);
+      setRoster(r ?? []);
+      setPlans(p ?? []);
+      setUnavailability(u ?? []);
+    } catch (e) {
+      setError(e?.message || "Unable to load lineup planning data.");
+      setOverview(null);
+      setRoster([]);
+      setPlans([]);
+      setUnavailability([]);
+    }
   };
-  useEffect(() => { refresh(); }, [teamId]);
+  useEffect(() => { let cancelled = false; refresh(); return () => { cancelled = true; }; }, [teamId]);
 
   // Real schedule weeks only (a captain can only plan a week their team
   // actually has a pairing in) -- sorted chronologically, same parse-then-
   // sort convention used on the dashboards, since week_date is free text.
+  if (overview === undefined) return <Loader />;
+  if (error && overview === null) return <div className="empty-state">{error}</div>;
+
   const weekOptions = (overview?.myWeeks ?? [])
     .map(w => ({ ...w, _date: (() => { const parts = (w.date||"").split("/").map(Number); return parts.length>=3 && !parts.some(isNaN) ? new Date(parts[2], parts[0]-1, parts[1]) : null; })() }))
     .sort((a, b) => (a._date ?? 0) - (b._date ?? 0));
@@ -4134,6 +4147,7 @@ function TeamStatsPanel({ teamId, initialData = null }) {
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
   const [breakdown, setBreakdown] = useState(() => initialData?.breakdown ?? null);
+  const [breakdownLoading, setBreakdownLoading] = useState(!!initialData?.rawEvents);
 
   useEffect(() => {
     if (initialData) return;
@@ -4153,12 +4167,21 @@ function TeamStatsPanel({ teamId, initialData = null }) {
   const filteredEvents = (rawEvents ?? []).filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && matchesPlayType(e, playTypeFilter));
 
   useEffect(() => {
-    if (!rawEvents) { setBreakdown(null); return; }
-    db.computeTeamShotBreakdown(filteredEvents).then(setBreakdown);
+    if (!rawEvents) { setBreakdown(null); setBreakdownLoading(false); return; }
+    let cancelled = false;
+    setBreakdownLoading(true);
+    db.computeTeamShotBreakdown(filteredEvents).then(result => {
+      if (!cancelled) setBreakdown(result);
+    }).catch(() => {
+      if (!cancelled) setBreakdown(null);
+    }).finally(() => {
+      if (!cancelled) setBreakdownLoading(false);
+    });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawEvents, gameTypeFilter, playTypeFilter]);
 
-  if (rawEvents === undefined) return <Loader />;
+  if (rawEvents === undefined || breakdownLoading) return <Loader />;
   if (rawEvents === null) {
     return <div className="empty-state">No advanced stats tracked for this team yet — players can optionally use "Track a Rack" during a live match, manual entry, or practice.</div>;
   }
