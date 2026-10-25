@@ -51,12 +51,12 @@ export function Home() {
   useEffect(() => {
     if (!profile) return;
     setTeamOverviews(undefined);
-    db.getMyTeamsOverview(profile).then(setTeamOverviews);
+    db.getMyTeamsOverview(profile).then(setTeamOverviews).catch(() => setTeamOverviews([]));
   }, [profile?.team_memberships, profile?.player_num]);
 
   useEffect(() => {
     if (!profile?.id) return;
-    db.listMyPracticeGames(profile.id).then(games => setRecentPractice(games[0] ?? null));
+    db.listMyPracticeGames(profile.id).then(games => setRecentPractice(games[0] ?? null)).catch(() => setRecentPractice(null));
   }, [profile?.id]);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export function Home() {
         db.getPlayerMvpRankRow(profile.player_num, o.team.division_id),
       ]);
       return { teamId: o.team.id, teamName: o.team.name, teamRank, mvpRank };
-    })).then(setSnapshotStats);
+    })).then(setSnapshotStats).catch(() => setSnapshotStats([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamOverviews, profile?.player_num]);
 
@@ -93,6 +93,7 @@ export function Home() {
   const showTeamLabels = (teamOverviews ?? []).length > 1;
 
   const recentMatch = teamOverviews ? db.mostRecentCompletedMatch(teamOverviews) : undefined;
+  const homeLoading = !!profile && (teamOverviews === undefined || snapshotStats === undefined || recentPractice === undefined);
 
   const areas = [
     { key: "stats", label: "My Stats", desc: "Your record & stats", icon: BarChart3, path: "/my-stats" },
@@ -111,8 +112,7 @@ export function Home() {
       <style>{dashboardCss}</style>
       <PageHeader title="Home" subtitle={profile ? `Welcome, ${profile.username}` : undefined} hideBack />
       <div className="tab-content">
-        {teamOverviews === undefined && profile && (getActiveTeamIds(profile).length > 0 || profile.player_num) && <Loader />}
-
+        {homeLoading ? <Loader /> : <>
         {nextMatches.map(nm => (
           <Link key={nm.teamId} to="/leagues" className="next-match-card">
             <div className="next-match-card__eyebrow">
@@ -184,6 +184,7 @@ export function Home() {
             )}
           </DashCard>
         )}
+        </>}
       </div>
       <TabBar />
     </div>
@@ -202,8 +203,8 @@ export function LeaguesDashboard() {
     ? selectedTeamId
     : selectedTeamIds[0] ?? null;
   const [overview, setOverview] = useState(undefined); // undefined = loading, null = no team
-  const [lineupPlans, setLineupPlans] = useState([]); // captain's planned lineups for this team, if any -- read-only here
-  const [unavailability, setUnavailability] = useState([]); // every team member's marked weeks -- filtered to "mine" below for the self-service card
+  const [lineupPlans, setLineupPlans] = useState(undefined); // undefined until initial team context has loaded
+  const [unavailability, setUnavailability] = useState(undefined); // undefined until initial team context has loaded
   const [markingWeekId, setMarkingWeekId] = useState(null);
   const [reasonInput, setReasonInput] = useState("");
   const [view, setView] = useState("main"); // "main" | "upcoming" | "previous"
@@ -211,14 +212,38 @@ export function LeaguesDashboard() {
   const refreshUnavailability = () => { if (effectiveTeamId) db.listTeamUnavailability(effectiveTeamId).then(setUnavailability); };
 
   useEffect(() => {
-    if (!effectiveTeamId) { setOverview(null); return; }
+    let cancelled = false;
+    if (!effectiveTeamId) {
+      setOverview(null);
+      setLineupPlans([]);
+      setUnavailability([]);
+      return () => { cancelled = true; };
+    }
+
     setOverview(undefined);
-    db.getTeamScheduleOverview(effectiveTeamId).then(o => setOverview(o ?? null));
-    db.listTeamLineupPlans(effectiveTeamId).then(setLineupPlans);
-    refreshUnavailability();
+    setLineupPlans(undefined);
+    setUnavailability(undefined);
+    Promise.all([
+      db.getTeamScheduleOverview(effectiveTeamId),
+      db.listTeamLineupPlans(effectiveTeamId),
+      db.listTeamUnavailability(effectiveTeamId),
+    ]).then(([nextOverview, plans, unavailable]) => {
+      if (cancelled) return;
+      setOverview(nextOverview ?? null);
+      setLineupPlans(plans ?? []);
+      setUnavailability(unavailable ?? []);
+    }).catch(() => {
+      if (cancelled) return;
+      setOverview(null);
+      setLineupPlans([]);
+      setUnavailability([]);
+    });
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTeamId]);
 
+  const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcomingAll = overview ? overview.myWeeks
     .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
@@ -266,6 +291,7 @@ export function LeaguesDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Leagues" hideBack />
       <div className="tab-content">
+        {leaguesLoading ? <Loader /> : <>
         {/* League News -- fee/membership tracking not built yet */}
         <DashCard icon={Newspaper} title="League News">
           <div className="empty-state" style={{padding:14}}>Coming soon — league fees and IBA membership status will show here.</div>
@@ -389,6 +415,7 @@ export function LeaguesDashboard() {
             <ChevronRight size={16} />
           </Link>
         )}
+        </>}
       </div>
       <TabBar />
     </div>

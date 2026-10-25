@@ -272,6 +272,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   const [seasons, setSeasons] = useState([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
+  const [initialLoadError, setInitialLoadError] = useState("");
+  const skipNextDivisionLoadRef = useRef(false);
 
   const [viewingSeason, setViewingSeason] = useState(null);
   const [viewingDiv, setViewingDiv]       = useState(null);
@@ -302,39 +304,86 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     return list;
   };
 
-  useEffect(() => {
-    refreshSeasons().then(list => {
-      const requestedId = searchParams.get("season");
-      const requested = requestedId ? list.find(s => s.id === requestedId) : null;
-      const target = requested ?? list.find(s => s.is_active);
-      if (target) {
-        setViewingSeason(target);
-        setViewingDiv(target.divisions?.[0] ?? null);
-      }
-      setSeasonsLoading(false);
-    });
-    db.listTeamCaptains().then(setCaptainsByTeam);
-    refreshLocations();
-    return () => clearIbaSchedulePanelState();
-  }, []);
-
   const loadDivisionData = async (div) => {
-    if (!div) { setViewTeams([]); setViewSchedule([]); setViewRosters({}); setPlayoffEligibility({}); return; }
+    if (!div) {
+      setViewTeams([]);
+      setViewSchedule([]);
+      setViewRosters({});
+      setPlayoffEligibility({});
+      setDivisionLoading(false);
+      return;
+    }
     setDivisionLoading(true);
-    const teams = await db.listTeams(div.id);
-    const [schedule, rostersByTeam, eligRows] = await Promise.all([
-      db.listSchedule(div.id, teams),
-      db.listRostersForTeams(teams.map(t => t.id)),
-      db.listPlayoffEligibility(div.id),
-    ]);
-    setViewTeams(teams);
-    setViewSchedule(schedule);
-    setViewRosters(rostersByTeam);
-    setPlayoffEligibility(db.eligibilityByPlayerNum(eligRows));
-    setDivisionLoading(false);
+    try {
+      const teams = await db.listTeams(div.id);
+      const [schedule, rostersByTeam, eligRows] = await Promise.all([
+        db.listSchedule(div.id, teams),
+        db.listRostersForTeams(teams.map(t => t.id)),
+        db.listPlayoffEligibility(div.id),
+      ]);
+      setViewTeams(teams);
+      setViewSchedule(schedule);
+      setViewRosters(rostersByTeam);
+      setPlayoffEligibility(db.eligibilityByPlayerNum(eligRows));
+    } finally {
+      setDivisionLoading(false);
+    }
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const initializePage = async () => {
+      setSeasonsLoading(true);
+      setInitialLoadError("");
+      try {
+        const [list, captains, locations] = await Promise.all([
+          db.listSeasons(),
+          db.listTeamCaptains(),
+          db.listLocations(),
+        ]);
+        if (cancelled) return;
+
+        const requestedId = searchParams.get("season");
+        const requested = requestedId ? list.find(s => s.id === requestedId) : null;
+        const target = requested ?? list.find(s => s.is_active);
+        const targetDivision = target?.divisions?.[0] ?? null;
+
+        if (targetDivision) {
+          await loadDivisionData(targetDivision);
+          if (cancelled) return;
+        } else {
+          setViewTeams([]);
+          setViewSchedule([]);
+          setViewRosters({});
+          setPlayoffEligibility({});
+        }
+        if (cancelled) return;
+
+        setSeasons(list);
+        setCaptainsByTeam(captains);
+        setLocations(locations);
+        skipNextDivisionLoadRef.current = true;
+        setViewingSeason(target ?? null);
+        setViewingDiv(targetDivision);
+      } catch (e) {
+        if (!cancelled) setInitialLoadError(e?.message || "Unable to load the page data. Please try again.");
+      } finally {
+        if (!cancelled) setSeasonsLoading(false);
+      }
+    };
+
+    initializePage();
+    return () => {
+      cancelled = true;
+      clearIbaSchedulePanelState();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (skipNextDivisionLoadRef.current) {
+      skipNextDivisionLoadRef.current = false;
+      return;
+    }
     loadDivisionData(viewingDiv);
   }, [viewingSeason?.id, viewingDiv?.id]);
 
@@ -484,7 +533,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // player's rating. They still show up in the Players tab to be fixed by hand.
   const resolveRoster = (teamId) => (viewRosters[teamId] ?? []).filter(p => p.rating != null);
 
-  if (seasonsLoading) return <><PageHeader title="IBA Admin"/><div className="tab-content"><Loader/></div></>;
+  if (seasonsLoading || divisionLoading) return <><PageHeader title="IBA Admin"/><div className="tab-content"><Loader/></div></>;
+  if (initialLoadError) return <><PageHeader title="IBA Admin"/><div className="tab-content"><ErrorMsg>{initialLoadError}</ErrorMsg></div></>;
 
   // ── "me" — everyone, always allowed ──
   if (page === "me") {
@@ -565,7 +615,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             <div className="empty-state">Activate this season to import playoff eligibility.</div>
           )}
           {page === "playoffs" && viewingDiv && (
-            <PlayoffsTab divisionId={viewingDiv.id} teams={viewTeams} />
+            <PlayoffsTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} />
           )}
           {page === "playoffs" && !viewingDiv && (
             <div className="empty-state">Select a season and division to manage playoffs.</div>
@@ -802,8 +852,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         </SubTabBar>
         <div className="tab-content">
           {myTeamSubTab === "roster" && <ManageMyTeamPage teamId={primaryTeamId} profileId={profile.id} />}
-          {myTeamSubTab === "lineup" && <LineupPlannerPanel teamId={primaryTeamId} profileId={profile.id} />}
-          {myTeamSubTab === "stats" && <TeamStatsPanel teamId={primaryTeamId} />}
+          {myTeamSubTab === "lineup" && <LineupPlannerPanel key={primaryTeamId} teamId={primaryTeamId} profileId={profile.id} />}
+          {myTeamSubTab === "stats" && <TeamStatsPanel key={primaryTeamId} teamId={primaryTeamId} />}
         </div>
       </>
     );
@@ -843,7 +893,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} />
           {!viewingDiv
             ? <div className="empty-state">Pick a division above to see standings & match history.</div>
-            : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
+            : <HistoryTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
                 seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
           }
         </div>
@@ -962,6 +1012,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const [teamHistory, setTeamHistory] = useState(undefined); // undefined = loading
   const [ratingHistory, setRatingHistory] = useState([]);
   const [rawEvents, setRawEvents] = useState(undefined); // undefined = loading, null = none tracked
+  const [coreProfileLoading, setCoreProfileLoading] = useState(true);
+  const [loadedPlayerNum, setLoadedPlayerNum] = useState(null);
 
   const [scopeMode, setScopeMode] = useState("season"); // "career" | "season"
   const [selectedYear, setSelectedYear] = useState(null);
@@ -975,17 +1027,59 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const [headToHead, setHeadToHead] = useState([]);
 
   useEffect(() => {
-    if (!playerNum) return;
-    db.getPlayerNameMap([playerNum]).then(m => setNameInfo(m[playerNum] ?? { name: playerNum, nickname: "" }));
-    db.getPlayerRating(playerNum).then(setCurrentRating);
-    db.listRosterHistory(playerNum).then(setRatingHistory);
-    db.listMyShotEvents(playerNum).then(events => setRawEvents(events.length ? events : null));
-    db.listPlayerTeamHistory(playerNum).then(history => {
-      setTeamHistory(history);
-      const current = history.find(t => t.teamId === currentTeamId) ?? history[0];
-      if (current) { setScopeMode("season"); setSelectedYear(current.seasonYear); setSelectedSeasonId(current.seasonId); }
-      else setScopeMode("career");
+    let cancelled = false;
+    if (!playerNum) {
+      setCoreProfileLoading(false);
+      setTeamHistory([]);
+      setRawEvents(null);
+      return () => { cancelled = true; };
+    }
+
+    setCoreProfileLoading(true);
+    setTeamHistory(undefined);
+    setRawEvents(undefined);
+    setSeasonRecord(undefined);
+    setMvpRankRow(undefined);
+    setPlayoffElig(undefined);
+    setHeadToHead(undefined);
+
+    Promise.all([
+      db.getPlayerNameMap([playerNum]),
+      db.getPlayerRating(playerNum),
+      db.listRosterHistory(playerNum),
+      db.listMyShotEvents(playerNum),
+      db.listPlayerTeamHistory(playerNum),
+    ]).then(([nameMap, rating, ratings, events, history]) => {
+      if (cancelled) return;
+      setNameInfo(nameMap[playerNum] ?? { name: playerNum, nickname: "" });
+      setCurrentRating(rating);
+      setRatingHistory(ratings ?? []);
+      setRawEvents(events?.length ? events : null);
+      setTeamHistory(history ?? []);
+      const current = (history ?? []).find(t => t.teamId === currentTeamId) ?? (history ?? [])[0];
+      if (current) {
+        setScopeMode("season");
+        setSelectedYear(current.seasonYear);
+        setSelectedSeasonId(current.seasonId);
+      } else {
+        setScopeMode("career");
+      }
+    }).catch(() => {
+      if (cancelled) return;
+      setNameInfo({ name: playerNum, nickname: "" });
+      setCurrentRating(null);
+      setRatingHistory([]);
+      setRawEvents(null);
+      setTeamHistory([]);
+      setScopeMode("career");
+    }).finally(() => {
+      if (!cancelled) {
+        setLoadedPlayerNum(playerNum);
+        setCoreProfileLoading(false);
+      }
     });
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum]);
 
@@ -1007,7 +1101,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   useEffect(() => {
     if (teamHistory === undefined) return;
     setSeasonRecord(undefined);
-    db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord);
+    db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord).catch(() => setSeasonRecord(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, scopeMode, selectedSeasonId, teamHistory]);
 
@@ -1022,7 +1116,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     if (teamHistory === undefined) return;
     if (!singleScopedDivisionId) { setMvpRankRow(null); return; }
     setMvpRankRow(undefined);
-    db.getPlayerMvpRankRow(playerNum, singleScopedDivisionId).then(row => setMvpRankRow(row ?? null));
+    db.getPlayerMvpRankRow(playerNum, singleScopedDivisionId).then(row => setMvpRankRow(row ?? null)).catch(() => setMvpRankRow(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, singleScopedDivisionId, teamHistory]);
 
@@ -1030,7 +1124,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     if (teamHistory === undefined) return;
     if (!singleScopedDivisionId) { setPlayoffElig(null); return; }
     setPlayoffElig(undefined);
-    db.getPlayerPlayoffEligibility(playerNum, singleScopedDivisionId).then(row => setPlayoffElig(row ?? null));
+    db.getPlayerPlayoffEligibility(playerNum, singleScopedDivisionId).then(row => setPlayoffElig(row ?? null)).catch(() => setPlayoffElig(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, singleScopedDivisionId, teamHistory]);
 
@@ -1044,8 +1138,10 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const shotStats = rawEvents ? db.computeShotStats(filteredEvents) : null;
 
   useEffect(() => {
+    if (rawEvents === undefined) return;
     if (!rawEvents) { setHeadToHead([]); return; }
-    db.computeHeadToHead(filteredEvents).then(setHeadToHead);
+    setHeadToHead(undefined);
+    db.computeHeadToHead(filteredEvents).then(setHeadToHead).catch(() => setHeadToHead([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawEvents, gameTypeFilter, playTypeFilter, scopeMode, selectedSeasonId]);
 
@@ -1064,7 +1160,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (teamHistory === undefined) return <Loader />;
+  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || seasonRecord === undefined || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
 
   return (
     <>
@@ -1378,28 +1474,67 @@ function PlayerLookupPage() {
 // every season, never reused, so there's no single "team" to show history
 // across; this shows exactly the one season this team row belongs to.
 function TeamDetailView({ team }) {
-  const [overview, setOverview] = useState(undefined); // undefined = loading, null = no schedule
-  const [standingsRow, setStandingsRow] = useState(undefined);
-  const [roster, setRoster] = useState([]);
-  const [captain, setCaptain] = useState(null);
-  const [eligByPlayerNum, setEligByPlayerNum] = useState(null); // null = nothing imported for this division
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [detailError, setDetailError] = useState("");
 
   useEffect(() => {
-    db.getTeamScheduleOverview(team.id).then(o => setOverview(o ?? null));
-    db.listRosterForTeam(team.id).then(setRoster);
-    db.listTeamCaptains().then(map => setCaptain(map[team.id] ?? null));
+    let cancelled = false;
+    const load = async () => {
+      setDetailLoading(true);
+      setDetailError("");
+      setDetail(null);
+      try {
+        const [overviewResult, rosterResult, captainMap, allTeams, shotEvents] = await Promise.all([
+          db.getTeamScheduleOverview(team.id),
+          db.listRosterForTeam(team.id),
+          db.listTeamCaptains(),
+          db.listAllTeamsWithContext(),
+          db.listTeamShotEvents(team.id),
+        ]);
+        const overview = overviewResult ?? null;
+        let standingsRow = null;
+        let eligByPlayerNum = null;
+
+        if (overview) {
+          const [standingsResult, eligibilityRows] = await Promise.all([
+            db.getTeamStandingsRow(team.id, overview.team.division_id),
+            db.listPlayoffEligibilityForDivision(overview.team.division_id),
+          ]);
+          standingsRow = standingsResult ?? null;
+          eligByPlayerNum = eligibilityRows.length ? db.eligibilityByPlayerNum(eligibilityRows) : null;
+        }
+
+        const rawEvents = shotEvents.length ? shotEvents : null;
+        const [breakdown] = await Promise.all([
+          rawEvents ? db.computeTeamShotBreakdown(rawEvents) : Promise.resolve(null),
+        ]);
+        if (cancelled) return;
+        setDetail({
+          overview,
+          roster: rosterResult ?? [],
+          captain: captainMap[team.id] ?? null,
+          standingsRow,
+          eligByPlayerNum,
+          rawEvents,
+          teamContext: allTeams.find(t => t.id === team.id)?.context ?? "",
+          breakdown,
+        });
+      } catch (e) {
+        if (!cancelled) setDetailError(e?.message || "Unable to load this team's details.");
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, [team.id]);
 
-  useEffect(() => {
-    if (overview === undefined) return;
-    if (!overview) { setStandingsRow(null); setEligByPlayerNum(null); return; }
-    db.getTeamStandingsRow(team.id, overview.team.division_id).then(row => setStandingsRow(row ?? null));
-    db.listPlayoffEligibilityForDivision(overview.team.division_id).then(rows => {
-      if (!rows.length) { setEligByPlayerNum(null); return; }
-      setEligByPlayerNum(db.eligibilityByPlayerNum(rows));
-    });
-  }, [overview, team.id]);
+  if (detailLoading) return <Loader />;
+  if (detailError) return <div className="empty-state">{detailError}</div>;
+  if (!detail) return <div className="empty-state">Team details are unavailable.</div>;
 
+  const { overview, roster, captain, standingsRow, eligByPlayerNum } = detail;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcoming = (overview?.myWeeks ?? [])
     .map(w => { const parts = (w.date||"").split("/").map(Number); return { ...w, _date: parts.length>=3 && !parts.some(isNaN) ? new Date(parts[2],parts[0]-1,parts[1]) : null }; })
@@ -1540,7 +1675,7 @@ function TeamDetailView({ team }) {
         </div>
       )}
 
-      <TeamStatsPanel teamId={team.id} />
+      <TeamStatsPanel key={team.id} teamId={team.id} initialData={{ rawEvents: detail.rawEvents, teamContext: detail.teamContext, breakdown: detail.breakdown }} />
     </>
   );
 }
@@ -1583,11 +1718,25 @@ function TeamLookupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const teamId = searchParams.get("team");
   const [allTeams, setAllTeams] = useState(undefined);
+  const [teamsLoadError, setTeamsLoadError] = useState("");
   const [query, setQuery] = useState("");
 
-  useEffect(() => { db.listAllTeamsWithContext().then(setAllTeams); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    db.listAllTeamsWithContext()
+      .then(rows => { if (!cancelled) setAllTeams(rows ?? []); })
+      .catch(e => { if (!cancelled) setTeamsLoadError(e?.message || "Unable to load teams."); });
+    return () => { cancelled = true; };
+  }, []);
 
   const team = teamId && allTeams ? allTeams.find(t => t.id === teamId) : null;
+
+  if (allTeams === undefined) {
+    return <><PageHeader title="Team Lookup" /><div className="tab-content"><Loader /></div></>;
+  }
+  if (teamsLoadError) {
+    return <><PageHeader title="Team Lookup" /><div className="tab-content"><div className="empty-state">{teamsLoadError}</div></div></>;
+  }
 
   if (teamId) {
     return (
@@ -1595,8 +1744,7 @@ function TeamLookupPage() {
         <PageHeader title="Team Lookup" subtitle={team ? `${team.name} · ${team.context}` : undefined} />
         <div className="tab-content">
           <button className="btn-secondary no-print" onClick={() => setSearchParams({})}>← All Teams</button>
-          {allTeams === undefined && <Loader />}
-          {allTeams && !team && <div className="empty-state">Team not found.</div>}
+          {!team && <div className="empty-state">Team not found.</div>}
           {team && <TeamDetailView team={team} />}
         </div>
       </>
@@ -1609,7 +1757,6 @@ function TeamLookupPage() {
     <>
       <PageHeader title="Team Lookup" />
       <div className="tab-content">
-        {allTeams === undefined && <Loader />}
         {allTeams && (
           <div className="card">
             <div className="card__title">Search Teams</div>
@@ -2276,6 +2423,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const [standingsAdj, setStandingsAdj] = useState([]);
   const [mvpAdj, setMvpAdj] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [resuming, setResuming] = useState(null);
   const [applyingForfeit, setApplyingForfeit] = useState(null);
@@ -2352,11 +2500,21 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
 
   const refresh = () => {
     setLoading(true);
+    setLoadError("");
     Promise.all([
       db.listCompletedMatches(divisionId),
       db.listStandingsAdjustments(divisionId),
       db.listMvpAdjustments(divisionId),
-    ]).then(([m, sa, ma]) => { setMatches(m); setStandingsAdj(sa); setMvpAdj(ma); setLoading(false); });
+    ]).then(([m, sa, ma]) => {
+      setMatches(m ?? []);
+      setStandingsAdj(sa ?? []);
+      setMvpAdj(ma ?? []);
+    }).catch(e => {
+      setLoadError(e?.message || "Unable to load match history.");
+      setMatches([]);
+      setStandingsAdj([]);
+      setMvpAdj([]);
+    }).finally(() => setLoading(false));
   };
   useEffect(refresh, [divisionId]);
 
@@ -2494,6 +2652,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   }
 
   if (loading) return <Loader/>;
+  if (loadError) return <div className="empty-state">{loadError}</div>;
 
   const standings = db.computeStandings(matches, standingsAdj);
   const mvp = db.computeMvp(matches, mvpAdj);
@@ -3580,13 +3739,19 @@ function ManageMyTeamPage({ teamId, profileId }) {
   const refresh = async () => {
     if (!teamId) { setLoading(false); return; }
     setLoading(true);
-    const [teams, players, past] = await Promise.all([db.listAllTeamsWithContext(), db.listRosterForTeam(teamId), db.listPastCaptainedTeams(profileId)]);
-    const t = teams.find(x => x.id === teamId);
-    setTeam(t ?? null);
-    setNameInput(t?.name ?? "");
-    setRoster(players);
-    setPastTeams(past);
-    setLoading(false);
+    setError("");
+    try {
+      const [teams, players, past] = await Promise.all([db.listAllTeamsWithContext(), db.listRosterForTeam(teamId), db.listPastCaptainedTeams(profileId)]);
+      const t = (teams ?? []).find(x => x.id === teamId);
+      setTeam(t ?? null);
+      setNameInput(t?.name ?? "");
+      setRoster(players ?? []);
+      setPastTeams(past ?? []);
+    } catch (e) {
+      setError(e?.message || "Unable to load your team data.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => { refresh(); }, [teamId]);
 
@@ -3663,6 +3828,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
   if (!teamId) return <div className="empty-state">Your account isn't linked to a team yet — ask your league manager to assign one.</div>;
   if (loading) return <Loader/>;
+  if (error && !team) return <div className="empty-state">{error}</div>;
   if (!team) return <div className="empty-state">Team not found.</div>;
 
   return (
@@ -3844,23 +4010,42 @@ function LineupPlannerPanel({ teamId, profileId }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const refresh = async () => {
-    const [ov, r, p, u] = await Promise.all([
-      db.getTeamScheduleOverview(teamId),
-      db.listRosterForTeam(teamId),
-      db.listTeamLineupPlans(teamId),
-      db.listTeamUnavailability(teamId),
-    ]);
-    setOverview(ov ?? null);
-    setRoster(r);
-    setPlans(p);
-    setUnavailability(u);
+  const refresh = async (isCancelled = () => false) => {
+    setOverview(undefined);
+    setError("");
+    try {
+      const [ov, r, p, u] = await Promise.all([
+        db.getTeamScheduleOverview(teamId),
+        db.listRosterForTeam(teamId),
+        db.listTeamLineupPlans(teamId),
+        db.listTeamUnavailability(teamId),
+      ]);
+      if (isCancelled()) return;
+      setOverview(ov ?? null);
+      setRoster(r ?? []);
+      setPlans(p ?? []);
+      setUnavailability(u ?? []);
+    } catch (e) {
+      if (isCancelled()) return;
+      setError(e?.message || "Unable to load lineup planning data.");
+      setOverview(null);
+      setRoster([]);
+      setPlans([]);
+      setUnavailability([]);
+    }
   };
-  useEffect(() => { refresh(); }, [teamId]);
+  useEffect(() => {
+    let cancelled = false;
+    refresh(() => cancelled);
+    return () => { cancelled = true; };
+  }, [teamId]);
 
   // Real schedule weeks only (a captain can only plan a week their team
   // actually has a pairing in) -- sorted chronologically, same parse-then-
   // sort convention used on the dashboards, since week_date is free text.
+  if (overview === undefined) return <Loader />;
+  if (error && overview === null) return <div className="empty-state">{error}</div>;
+
   const weekOptions = (overview?.myWeeks ?? [])
     .map(w => ({ ...w, _date: (() => { const parts = (w.date||"").split("/").map(Number); return parts.length>=3 && !parts.some(isNaN) ? new Date(parts[2], parts[0]-1, parts[1]) : null; })() }))
     .sort((a, b) => (a._date ?? 0) - (b._date ?? 0));
@@ -3993,27 +4178,47 @@ function LineupPlannerPanel({ teamId, profileId }) {
 // column set at logging time. Same optional/supplemental nature as
 // everywhere else this data shows up: a team with nobody tracking shots
 // just shows an empty state, nothing else in the app depends on this.
-function TeamStatsPanel({ teamId }) {
-  const [rawEvents, setRawEvents] = useState(undefined); // undefined = loading, null = nothing tracked
-  const [teamContext, setTeamContext] = useState(""); // e.g. "Div 1 · Summer 2026" -- a team is permanently tied to one division/season, so this data is already scoped; this just makes that visible
+function TeamStatsPanel({ teamId, initialData = null }) {
+  const [rawEvents, setRawEvents] = useState(() => initialData ? initialData.rawEvents : undefined); // undefined = loading, null = nothing tracked
+  const [teamContext, setTeamContext] = useState(() => initialData?.teamContext ?? ""); // e.g. "Div 1 · Summer 2026"
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
-  const [breakdown, setBreakdown] = useState(null);
+  const [breakdown, setBreakdown] = useState(() => initialData?.breakdown ?? null);
+  const [breakdownLoading, setBreakdownLoading] = useState(!!initialData?.rawEvents);
 
   useEffect(() => {
-    db.listTeamShotEvents(teamId).then(events => setRawEvents(events.length ? events : null));
-    db.listAllTeamsWithContext().then(all => setTeamContext(all.find(t => t.id === teamId)?.context ?? ""));
-  }, [teamId]);
+    if (initialData) return;
+    let cancelled = false;
+    Promise.all([db.listTeamShotEvents(teamId), db.listAllTeamsWithContext()]).then(([events, all]) => {
+      if (cancelled) return;
+      setRawEvents(events.length ? events : null);
+      setTeamContext(all.find(t => t.id === teamId)?.context ?? "");
+    }).catch(() => {
+      if (cancelled) return;
+      setRawEvents(null);
+      setTeamContext("");
+    });
+    return () => { cancelled = true; };
+  }, [teamId, initialData]);
 
   const filteredEvents = (rawEvents ?? []).filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && matchesPlayType(e, playTypeFilter));
 
   useEffect(() => {
-    if (!rawEvents) { setBreakdown(null); return; }
-    db.computeTeamShotBreakdown(filteredEvents).then(setBreakdown);
+    if (!rawEvents) { setBreakdown(null); setBreakdownLoading(false); return; }
+    let cancelled = false;
+    setBreakdownLoading(true);
+    db.computeTeamShotBreakdown(filteredEvents).then(result => {
+      if (!cancelled) setBreakdown(result);
+    }).catch(() => {
+      if (!cancelled) setBreakdown(null);
+    }).finally(() => {
+      if (!cancelled) setBreakdownLoading(false);
+    });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawEvents, gameTypeFilter, playTypeFilter]);
 
-  if (rawEvents === undefined) return <Loader />;
+  if (rawEvents === undefined || breakdownLoading) return <Loader />;
   if (rawEvents === null) {
     return <div className="empty-state">No advanced stats tracked for this team yet — players can optionally use "Track a Rack" during a live match, manual entry, or practice.</div>;
   }
@@ -4079,6 +4284,9 @@ const LEADERBOARD_METRICS = [
 function LeaderboardPage() {
   const [rawEvents, setRawEvents] = useState(undefined);
   const [divisions, setDivisions] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [rankingLoading, setRankingLoading] = useState(false);
   const [divisionFilter, setDivisionFilter] = useState(""); // "" = All Divisions/Seasons
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
@@ -4086,8 +4294,20 @@ function LeaderboardPage() {
   const [ranked, setRanked] = useState([]);
 
   useEffect(() => {
-    db.listAllShotEvents().then(events => setRawEvents(events.length ? events : null));
-    db.listAllDivisionsFlat().then(setDivisions);
+    let cancelled = false;
+    Promise.all([db.listAllShotEvents(), db.listAllDivisionsFlat()])
+      .then(([events, divisionRows]) => {
+        if (cancelled) return;
+        setRawEvents(events.length ? events : null);
+        setDivisions(divisionRows ?? []);
+      })
+      .catch(e => {
+        if (!cancelled) setLoadError(e?.message || "Unable to load advanced stats.");
+      })
+      .finally(() => {
+        if (!cancelled) setInitialLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   // A division filter only makes sense for league play -- practice has no
@@ -4102,13 +4322,25 @@ function LeaderboardPage() {
   const metric = LEADERBOARD_METRICS.find(m => m.key === metricKey);
 
   useEffect(() => {
-    if (!rawEvents) { setRanked([]); return; }
+    if (initialLoading || rawEvents === undefined) return;
+    if (!rawEvents) { setRanked([]); setRankingLoading(false); return; }
+    let cancelled = false;
+    setRankingLoading(true);
     db.computeLeaderboard(filteredEvents).then(list => {
+      if (cancelled) return;
       const eligible = list.filter(p => (metric.minField ? metric.minField(p.stats) : p.stats.totalShots) >= metric.min);
       setRanked(eligible.sort((a, b) => metric.get(b.stats) - metric.get(a.stats)));
+    }).catch(e => {
+      if (!cancelled) {
+        setRanked([]);
+        setLoadError(e?.message || "Unable to calculate the leaderboard.");
+      }
+    }).finally(() => {
+      if (!cancelled) setRankingLoading(false);
     });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawEvents, gameTypeFilter, playTypeFilter, divisionFilter, metricKey]);
+  }, [initialLoading, rawEvents, gameTypeFilter, playTypeFilter, divisionFilter, metricKey]);
 
   const exportCSV = async () => {
     const names = await db.getPlayerNameMap(filteredEvents.flatMap(e => [e.player_num, e.opponent_player_num]));
@@ -4119,9 +4351,8 @@ function LeaderboardPage() {
     <>
       <PageHeader title="Advanced Stats Leaderboard" subtitle={divisionFilter ? "This division/season" : "Leaguewide · all-time"} />
       <div className="tab-content">
-        {rawEvents === undefined && <Loader />}
-        {rawEvents === null && <div className="empty-state">No advanced stats tracked yet leaguewide — once players start using "Track a Rack," rankings will show up here.</div>}
-        {rawEvents && (
+        {initialLoading || rankingLoading ? <Loader /> : loadError ? <ErrorMsg>{loadError}</ErrorMsg> : rawEvents === null && <div className="empty-state">No advanced stats tracked yet leaguewide — once players start using "Track a Rack," rankings will show up here.</div>}
+        {!initialLoading && !rankingLoading && !loadError && rawEvents && (
           <>
             <div className="card">
               <div className="field"><Label>Rank By</Label>
@@ -4185,6 +4416,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const [allTeams, setAllTeams] = useState([]);
   const [lastSignIns, setLastSignIns] = useState({});
   const [loading, setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [newRole, setNewRole]   = useState("captain");
   const [newTeamId, setNewTeamId] = useState("");
   const [inviteTeamSearch, setInviteTeamSearch] = useState("");
@@ -4200,10 +4432,18 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const [roleErr, setRoleErr]       = useState("");
 
   const refresh = async () => {
-    const [u, c, t, l] = await Promise.all([db.listProfiles(), db.listInviteCodes(), db.listAllTeamsWithContext(), db.listUserLastSignIns()]);
-    setUsers(u); setCodes(c); setAllTeams(t); setLastSignIns(l); setLoading(false);
-    const activeCount = c.filter(x=>!x.used_at&&(!x.expires_at||new Date(x.expires_at)>new Date())).length;
-    onCounts?.({ users: u.length, codes: activeCount });
+    setLoading(true);
+    setLoadError("");
+    try {
+      const [u, c, t, l] = await Promise.all([db.listProfiles(), db.listInviteCodes(), db.listAllTeamsWithContext(), db.listUserLastSignIns()]);
+      setUsers(u ?? []); setCodes(c ?? []); setAllTeams(t ?? []); setLastSignIns(l ?? {}); 
+      const activeCount = (c ?? []).filter(x=>!x.used_at&&(!x.expires_at||new Date(x.expires_at)>new Date())).length;
+      onCounts?.({ users: (u ?? []).length, codes: activeCount });
+    } catch (e) {
+      setLoadError(e?.message || "Unable to load account management data.");
+    } finally {
+      setLoading(false);
+    }
   };
   useEffect(() => {
     // Best-effort fallback for the 18-month auto-deactivation sweep, in case
@@ -4239,6 +4479,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   };
 
   if (loading) return <Loader/>;
+  if (loadError) return <div className="empty-state">{loadError}</div>;
 
   const activeCodes = codes.filter(c=>!c.used_at&&(!c.expires_at||new Date(c.expires_at)>new Date()));
   const usedCodes   = codes.filter(c=> c.used_at);
@@ -4461,8 +4702,20 @@ function PlayoffBracketView({ matches, teams }) {
 function PlayoffsHistoryView({ divisionId, teams }) {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { db.listPlayoffBrackets(divisionId).then(m => { setMatches(m); setLoading(false); }); }, [divisionId]);
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError("");
+    db.listPlayoffBrackets(divisionId).then(m => {
+      if (!cancelled) setMatches(m ?? []);
+    }).catch(e => {
+      if (!cancelled) setLoadError(e?.message || "Unable to load playoff history.");
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [divisionId]);
   if (loading) return <Loader/>;
+  if (loadError) return <div className="empty-state">{loadError}</div>;
   return <PlayoffBracketView matches={matches} teams={teams} />;
 }
 
@@ -4474,7 +4727,13 @@ function PlayoffsTab({ divisionId, teams }) {
   const [error, setError] = useState("");
   const [proposal, setProposal] = useState(null);
 
-  const refresh = () => { setLoading(true); db.listPlayoffBrackets(divisionId).then(m => { setMatches(m); setLoading(false); }); };
+  const refresh = () => {
+    setLoading(true);
+    setError("");
+    db.listPlayoffBrackets(divisionId).then(m => setMatches(m ?? []))
+      .catch(e => setError(e?.message || "Unable to load playoff brackets."))
+      .finally(() => setLoading(false));
+  };
   useEffect(refresh, [divisionId]);
 
   const hasChampionship = matches.some(m => m.bracket_type === "championship");

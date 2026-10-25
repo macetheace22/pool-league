@@ -22,6 +22,7 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
   const [open, setOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [category, setCategory] = useState("shot");
   const [outcome, setOutcome] = useState(null);
   const [distance, setDistance] = useState(null);
@@ -32,14 +33,24 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
   const [isMiscue, setIsMiscue] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const refresh = () => {
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
     setLoading(true);
+    setLoadError("");
     db.listShotEvents(contextType, contextId, setNum).then(all => {
-      setEvents(all.filter(e => e.player_num === player.num));
-      setLoading(false);
+      if (!cancelled) setEvents((all ?? []).filter(e => e.player_num === player.num));
+    }).catch(e => {
+      if (!cancelled) {
+        setEvents([]);
+        setLoadError(e?.message || "Unable to load shot history.");
+      }
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
-  };
-  useEffect(() => { if (open) refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, contextId, setNum]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, contextType, contextId, setNum, player.num]);
 
   const resetForm = () => {
     setCategory("shot"); setOutcome(null); setDistance(null); setCut(null);
@@ -96,6 +107,8 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
         <div className="shot-tracker__panel">
           {loading ? (
             <div style={{ fontSize: 11, color: "#6A6A6A" }}>Loading…</div>
+          ) : loadError ? (
+            <div style={{ fontSize: 11, color: "#F87171" }}>{loadError}</div>
           ) : (
             <>
               <div className="seg-control">
