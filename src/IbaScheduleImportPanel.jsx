@@ -312,7 +312,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       </div>
       <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.5, marginTop: 5 }}>Division records are managed on the separate Manage Divisions page.</div>
 
-      {!divisions && !result && statusReady && (
+      {!divisions && !result && !statusLoading && statusReady && (
         <div className="import-warning-block" style={{ background: "#0F2D1F", borderColor: "#1F6B4A", marginTop: 10 }}>
           <div className="import-warning-block__title" style={{ color: "#5FCF9E" }}>
             <Check size={12}/> IBA schedule already imported
@@ -337,7 +337,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         </div>
       )}
 
-      {!divisions && !result && !statusReady && (
+      {!divisions && !result && !statusLoading && !statusReady && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 9 }}>
           <button className="btn-primary" onClick={discover} disabled={loading || importing}>
             {loading ? <><RefreshCw size={13} className="spin"/> Checking IBA…</> : "Automatic Import: Sync from IBA"}
