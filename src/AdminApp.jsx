@@ -1012,6 +1012,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const [teamHistory, setTeamHistory] = useState(undefined); // undefined = loading
   const [ratingHistory, setRatingHistory] = useState([]);
   const [rawEvents, setRawEvents] = useState(undefined); // undefined = loading, null = none tracked
+  const [coreProfileLoading, setCoreProfileLoading] = useState(true);
 
   const [scopeMode, setScopeMode] = useState("season"); // "career" | "season"
   const [selectedYear, setSelectedYear] = useState(null);
@@ -1025,17 +1026,56 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const [headToHead, setHeadToHead] = useState([]);
 
   useEffect(() => {
-    if (!playerNum) return;
-    db.getPlayerNameMap([playerNum]).then(m => setNameInfo(m[playerNum] ?? { name: playerNum, nickname: "" }));
-    db.getPlayerRating(playerNum).then(setCurrentRating);
-    db.listRosterHistory(playerNum).then(setRatingHistory);
-    db.listMyShotEvents(playerNum).then(events => setRawEvents(events.length ? events : null));
-    db.listPlayerTeamHistory(playerNum).then(history => {
-      setTeamHistory(history);
-      const current = history.find(t => t.teamId === currentTeamId) ?? history[0];
-      if (current) { setScopeMode("season"); setSelectedYear(current.seasonYear); setSelectedSeasonId(current.seasonId); }
-      else setScopeMode("career");
+    let cancelled = false;
+    if (!playerNum) {
+      setCoreProfileLoading(false);
+      setTeamHistory([]);
+      setRawEvents(null);
+      return () => { cancelled = true; };
+    }
+
+    setCoreProfileLoading(true);
+    setTeamHistory(undefined);
+    setRawEvents(undefined);
+    setSeasonRecord(undefined);
+    setMvpRankRow(undefined);
+    setPlayoffElig(undefined);
+    setHeadToHead(undefined);
+
+    Promise.all([
+      db.getPlayerNameMap([playerNum]),
+      db.getPlayerRating(playerNum),
+      db.listRosterHistory(playerNum),
+      db.listMyShotEvents(playerNum),
+      db.listPlayerTeamHistory(playerNum),
+    ]).then(([nameMap, rating, ratings, events, history]) => {
+      if (cancelled) return;
+      setNameInfo(nameMap[playerNum] ?? { name: playerNum, nickname: "" });
+      setCurrentRating(rating);
+      setRatingHistory(ratings ?? []);
+      setRawEvents(events?.length ? events : null);
+      setTeamHistory(history ?? []);
+      const current = (history ?? []).find(t => t.teamId === currentTeamId) ?? (history ?? [])[0];
+      if (current) {
+        setScopeMode("season");
+        setSelectedYear(current.seasonYear);
+        setSelectedSeasonId(current.seasonId);
+      } else {
+        setScopeMode("career");
+      }
+    }).catch(() => {
+      if (cancelled) return;
+      setNameInfo({ name: playerNum, nickname: "" });
+      setCurrentRating(null);
+      setRatingHistory([]);
+      setRawEvents(null);
+      setTeamHistory([]);
+      setScopeMode("career");
+    }).finally(() => {
+      if (!cancelled) setCoreProfileLoading(false);
     });
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum]);
 
@@ -1057,7 +1097,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   useEffect(() => {
     if (teamHistory === undefined) return;
     setSeasonRecord(undefined);
-    db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord);
+    db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord).catch(() => setSeasonRecord(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, scopeMode, selectedSeasonId, teamHistory]);
 
@@ -1072,7 +1112,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     if (teamHistory === undefined) return;
     if (!singleScopedDivisionId) { setMvpRankRow(null); return; }
     setMvpRankRow(undefined);
-    db.getPlayerMvpRankRow(playerNum, singleScopedDivisionId).then(row => setMvpRankRow(row ?? null));
+    db.getPlayerMvpRankRow(playerNum, singleScopedDivisionId).then(row => setMvpRankRow(row ?? null)).catch(() => setMvpRankRow(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, singleScopedDivisionId, teamHistory]);
 
@@ -1080,7 +1120,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     if (teamHistory === undefined) return;
     if (!singleScopedDivisionId) { setPlayoffElig(null); return; }
     setPlayoffElig(undefined);
-    db.getPlayerPlayoffEligibility(playerNum, singleScopedDivisionId).then(row => setPlayoffElig(row ?? null));
+    db.getPlayerPlayoffEligibility(playerNum, singleScopedDivisionId).then(row => setPlayoffElig(row ?? null)).catch(() => setPlayoffElig(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, singleScopedDivisionId, teamHistory]);
 
@@ -1094,8 +1134,10 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const shotStats = rawEvents ? db.computeShotStats(filteredEvents) : null;
 
   useEffect(() => {
+    if (rawEvents === undefined) return;
     if (!rawEvents) { setHeadToHead([]); return; }
-    db.computeHeadToHead(filteredEvents).then(setHeadToHead);
+    setHeadToHead(undefined);
+    db.computeHeadToHead(filteredEvents).then(setHeadToHead).catch(() => setHeadToHead([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawEvents, gameTypeFilter, playTypeFilter, scopeMode, selectedSeasonId]);
 
@@ -1114,7 +1156,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (teamHistory === undefined) return <Loader />;
+  if (coreProfileLoading || teamHistory === undefined || rawEvents === undefined || seasonRecord === undefined || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
 
   return (
     <>
