@@ -154,12 +154,13 @@ export default function Schedules() {
         const nextTeams = await db.listTeams(divisionId);
         const nextSchedule = await db.listSchedule(divisionId, nextTeams);
         if (cancelled) return;
+        const orderedSchedule = db.sortScheduleWeeks(nextSchedule);
         setTeams(nextTeams);
-        setSchedule(nextSchedule);
+        setSchedule(orderedSchedule);
         const today = new Date(); today.setHours(0,0,0,0);
-        const dated = nextSchedule.map(w => ({...w, _date: db.parseScheduleDate(w.date)}));
-        const next = dated.find(w => w._date && w._date >= today) || dated.find(w => w.pairings?.length);
-        setSelectedWeekId(next?.id ?? nextSchedule[0]?.id ?? null);
+        const dated = orderedSchedule.map(w => ({...w, _date: db.parseScheduleDate(w.date)}));
+        const next = dated.find(w => w._date != null && w._date >= today.getTime()) || dated.find(w => w.pairings?.length);
+        setSelectedWeekId(next?.id ?? orderedSchedule[0]?.id ?? null);
       } catch (e) {
         if (!cancelled) setError(e?.message || "Unable to load the selected schedule.");
       } finally {
@@ -176,8 +177,8 @@ export default function Schedules() {
   const selectedWeek = schedule.find(w => w.id === selectedWeekId) || null;
   const currentWeekId = useMemo(() => {
     const today = new Date(); today.setHours(0,0,0,0);
-    const dated = schedule.map(w => ({...w, _date: db.parseScheduleDate(w.date)}));
-    return (dated.find(w => w._date && w._date >= today) || dated.find(w => w.pairings?.length))?.id || null;
+    const dated = db.sortScheduleWeeks(schedule).map(w => ({...w, _date: db.parseScheduleDate(w.date)}));
+    return (dated.find(w => w._date != null && w._date >= today.getTime()) || dated.find(w => w.pairings?.length))?.id || null;
   }, [schedule]);
 
   const setSeason = id => {
