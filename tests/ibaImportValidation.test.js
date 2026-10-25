@@ -1,10 +1,32 @@
 import { describe, it, expect } from "vitest";
+import { extractIbaReportPrintedOnDate } from "../src/ibaParsers.js";
 
 import {
   classifyIbaReportImport,
   getDivisionReportWeek,
   getValidatedScheduleWeekTag,
 } from "../src/ibaImportValidation.js";
+
+
+describe("extractIbaReportPrintedOnDate", () => {
+  it("normalizes a printed US date", () => {
+    expect(extractIbaReportPrintedOnDate("Report printed: 10/18/2026")).toBe("2026-10-18");
+  });
+
+  it("normalizes a printed ISO date", () => {
+    expect(extractIbaReportPrintedOnDate("Printed on 2026-10-18")).toBe("2026-10-18");
+  });
+
+  it("accepts repeated same-date page headers", () => {
+    expect(extractIbaReportPrintedOnDate("Report printed: 10/18/2026\\nReport printed: 10/18/2026")).toBe("2026-10-18");
+  });
+
+  it("returns null for missing, invalid, or conflicting printed dates", () => {
+    expect(extractIbaReportPrintedOnDate("Week 17")).toBeNull();
+    expect(extractIbaReportPrintedOnDate("Report printed: 02/30/2026")).toBeNull();
+    expect(extractIbaReportPrintedOnDate("Report printed: 10/18/2026\\nReport printed: 10/19/2026")).toBeNull();
+  });
+});
 
 const fingerprint = "a".repeat(64);
 const week17 = { weekNumber: 17, weekNumbers: [17], missing: false, ambiguous: false };
@@ -136,6 +158,47 @@ describe("classifyIbaReportImport", () => {
     expect(classify({
       history: [{ report_type: "rost", report_week: 17, content_sha256: "b".repeat(64) }],
     }).status).toBe("changed_content");
+  });
+
+
+  it("marks a report as duplicate when its week and printed date match prior history even if PDF bytes differ", () => {
+    expect(classify({
+      contentSha256: "b".repeat(64),
+      reportPrintedOnDate: "2026-10-18",
+      history: [{
+        report_type: "rost",
+        report_week: 17,
+        content_sha256: fingerprint,
+        metadata: { reportPrintedOnDate: "2026-10-18" },
+      }],
+    })).toMatchObject({
+      status: "duplicate",
+      reportPrintedOnDate: "2026-10-18",
+    });
+  });
+
+  it("holds the same week for review when its printed date differs", () => {
+    expect(classify({
+      reportPrintedOnDate: "2026-10-19",
+      history: [{
+        report_type: "rost",
+        report_week: 17,
+        content_sha256: "b".repeat(64),
+        metadata: { reportPrintedOnDate: "2026-10-18" },
+      }],
+    })).toMatchObject({ status: "changed_content" });
+  });
+
+  it("preserves exact-hash duplicate protection when printed date is absent", () => {
+    expect(classify({
+      reportPrintedOnDate: null,
+      history: [{
+        report_type: "rost",
+        report_week: 17,
+        content_sha256: fingerprint,
+        metadata: {},
+      }],
+    }).status).toBe("duplicate");
   });
 
   it("checks duplicate history by report type and week", () => {

@@ -41,6 +41,7 @@ export function classifyIbaReportImport({
   scheduledWeeks,
   history,
   contentSha256,
+  reportPrintedOnDate = null,
 }) {
   if (!VALID_REPORT_TYPES.has(String(reportType || "").toLowerCase())) {
     return { status: "blocked_invalid_report_type", reason: "Unsupported IBA report type." };
@@ -101,11 +102,25 @@ export function classifyIbaReportImport({
   if (matchingWeek.some(item => String(item?.content_sha256 ?? item?.contentSha256 ?? "").toLowerCase() === fingerprint)) {
     return { status: "duplicate", reason: "This exact report has already been imported for this division and week.", week };
   }
+  const printedDate = String(reportPrintedOnDate || "").trim();
+  if (printedDate && matchingWeek.some(item =>
+    String(item?.metadata?.reportPrintedOnDate ?? item?.metadata?.report_printed_on_date ?? "") === printedDate
+  )) {
+    return {
+      status: "duplicate",
+      reason: `Week ${week.weekNumber} with printed date ${printedDate} was already imported for this division and report category.`,
+      week,
+      reportPrintedOnDate: printedDate,
+    };
+  }
   if (matchingWeek.length > 0) {
     return {
       status: "changed_content",
-      reason: "A report for this division, report type, and week was imported before, but its content has changed. Review before importing again.",
+      reason: printedDate
+        ? `A report for week ${week.weekNumber} was imported before, but the printed date or content differs from this PDF (printed ${printedDate}). Review before importing again.`
+        : "A report for this division, report type, and week was imported before, but its content has changed. Review before importing again.",
       week,
+      reportPrintedOnDate: printedDate || null,
     };
   }
 

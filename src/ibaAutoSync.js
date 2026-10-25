@@ -1,6 +1,6 @@
 import * as db from "./db";
 import { classifyIbaReportImport, getValidatedScheduleWeekTag } from "./ibaImportValidation";
-import { extractIbaReportWeek, extractIbaReportWeeksByDivision, parseLeagueRoster, parseStandingsImport, parseMvpImport } from "./ibaParsers";
+import { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseLeagueRoster, parseStandingsImport, parseMvpImport } from "./ibaParsers";
 
 const FORMAT_TO_CODE = { masters: "mast", advanced: "adv", open: "open" };
 const DAY_TO_CODE = { monday: "mon", tuesday: "tues", wednesday: "wed", thursday: "thur", friday: "fri", saturday: "sat", sunday: "sun" };
@@ -154,6 +154,7 @@ export async function validateIbaReports(reports, season, options = {}) {
     )) {
       const reportMetadata = {
         reportWeek: extractIbaReportWeek(report.text),
+        reportPrintedOnDate: extractIbaReportPrintedOnDate(report.text),
         reportWeeksByDivision: extractIbaReportWeeksByDivision(report.text),
       };
       const classification = classifyIbaReportImport({
@@ -163,6 +164,7 @@ export async function validateIbaReports(reports, season, options = {}) {
         scheduledWeeks,
         history: historyResult.error ? null : historyResult.data,
         contentSha256: report.sha256,
+        reportPrintedOnDate: reportMetadata.reportPrintedOnDate,
       });
       const divisionTeamNums = new Set((teams || [])
         .map(team => String(team.teamNum ?? "").trim())
@@ -206,6 +208,7 @@ export async function validateIbaReports(reports, season, options = {}) {
         divisionNum: String(division.num),
         divisionName: division.name,
         weekNumber: classification.week?.weekNumber ?? null,
+        reportPrintedOnDate: reportMetadata.reportPrintedOnDate,
         parsedRowCount,
         status,
         reason,
@@ -340,7 +343,12 @@ export async function importIbaReports(reports, season, schedule, preflight) {
         reportWeek: check.weekNumber,
         contentSha256: report.sha256,
         source: report.source === "manual" ? "manual" : "automatic",
-        metadata: { reportKey: report.key, divisionNum: check.divisionNum, weekKey: check.weekTag?.weekKey },
+        metadata: {
+          reportKey: report.key,
+          divisionNum: check.divisionNum,
+          weekKey: check.weekTag?.weekKey,
+          reportPrintedOnDate: extractIbaReportPrintedOnDate(report.text),
+        },
       });
       if (!saved.ok) throw new Error(`Data was saved, but import history could not be recorded for division ${check.divisionNum}: ${saved.error}`);
     }
