@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Eye, EyeOff, ChevronRight, Check, Shield, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, ChevronRight, Check, AlertCircle } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 
