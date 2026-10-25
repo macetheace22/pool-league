@@ -679,12 +679,13 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
   if (!importedWeeks.length) return { ok: false, error: "IBA returned no schedule weeks for this division." };
 
   try {
+    // The IBA division number is the stable identity within a season. Do not
+    // include weekday or format in this lookup: an edited day must not cause a
+    // second division row to be created for the same IBA division number.
     let { data: division, error: divisionLookupError } = await supabase
       .from("divisions")
       .select("id, num, name, season_id, format, day")
       .eq("season_id", seasonId)
-      .eq("format", format)
-      .eq("day", day)
       .eq("num", divisionNum)
       .maybeSingle();
 
@@ -692,7 +693,10 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
       return { ok: false, error: divisionLookupError.message };
     }
 
+    let contextWarning = null;
     if (division) {
+      const previousContextChanged = division.format !== format || division.day !== day;
+      const previousContext = `${division.format || "Unknown format"} · ${division.day || "Unknown day"}`;
       const { data: updated, error } = await supabase
         .from("divisions")
         .update({ name: divisionName, format, day })
@@ -701,6 +705,9 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
         .single();
       if (error) return { ok: false, error: error.message };
       division = updated;
+      if (previousContextChanged) {
+        contextWarning = `Division ${divisionNum} already existed in this season as ${previousContext}. Updated that existing division to ${format} · ${day}; no duplicate division was created.`;
+      }
     } else {
       const { data: created, error } = await supabase
         .from("divisions")
@@ -709,18 +716,27 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
         .single();
 
       if (error || !created) {
-        // If another import created the same division between our lookup and
-        // insert, re-read it rather than leaving the import half-complete.
-        const { data: existing } = await supabase
+        // If another import created the same division between lookup and
+        // insert, re-read by season + IBA number regardless of day/format.
+        const { data: existing, error: existingError } = await supabase
           .from("divisions")
           .select("id, num, name, season_id, format, day")
           .eq("season_id", seasonId)
-          .eq("format", format)
-      .eq("day", day)
-      .eq("num", divisionNum)
+          .eq("num", divisionNum)
           .maybeSingle();
-        if (!existing) return { ok: false, error: error?.message || "Could not create the division." };
-        division = existing;
+        if (existingError || !existing) return { ok: false, error: error?.message || existingError?.message || "Could not create the division." };
+        const previousContext = `${existing.format || "Unknown format"} · ${existing.day || "Unknown day"}`;
+        const { data: updated, error: updateError } = await supabase
+          .from("divisions")
+          .update({ name: divisionName, format, day })
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (updateError || !updated) return { ok: false, error: updateError?.message || "Could not update the existing division." };
+        division = updated;
+        if (existing.format !== format || existing.day !== day) {
+          contextWarning = `Division ${divisionNum} already existed in this season as ${previousContext}. Updated that existing division to ${format} · ${day}; no duplicate division was created.`;
+        }
       } else {
         division = created;
       }
@@ -812,6 +828,7 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
       teamCount: savedTeams.length,
       weekCount: savedSchedule.length,
       pairingCount: schedulePairingCount,
+      warning: contextWarning,
     };
   } catch (error) {
     return {
