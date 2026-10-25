@@ -113,4 +113,17 @@ describe("schedule date parsing and sorting", () => {
     ];
     expect(sortScheduleWeeks(weeks).map(w => w.week_num)).toEqual([9, 1, 2]);
   });
+  it("sorts mixed ISO and US dates chronologically so holiday and playoff rows stay in date order", () => {
+    const weeks = [
+      { date: "2027-01-03", week: null, special: "Playoffs" },
+      { date: "11/25/2026", week: null, special: "Thanksgiving - No Matches" },
+      { date: "2026-11-18", week: 11 },
+      { date: "12/2/2026", week: null, special: "Holiday" },
+      { date: "not-a-date", week: 12 },
+    ];
+    expect(sortScheduleWeeks(weeks).map(w => w.date)).toEqual([
+      "2026-11-18", "11/25/2026", "12/2/2026", "2027-01-03", "not-a-date",
+    ]);
+  });
+
 });
