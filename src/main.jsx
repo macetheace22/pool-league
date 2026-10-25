@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './AuthContext.jsx';
 import AdminApp from './AdminApp.jsx';
 import LiveEntryApp from './LiveEntryApp.jsx';
@@ -8,6 +8,21 @@ import { NavHistoryProvider } from './Shell.jsx';
 import { Home, LeaguesDashboard, LeagueOffice, SeasonManagementHub, TournamentsPlaceholder } from './Dashboard.jsx';
 import Practice from './Practice.jsx';
 import Schedules from './Schedules.jsx';
+
+// Reset the document scroll position whenever the active route changes.
+// This covers links, bottom-tab navigation, and browser Back/Forward without
+// resetting scroll for in-page state changes such as filters or saves.
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [pathname]);
+
+  return null;
+}
 
 // Shared save-button feedback: once a field changes, the nearest Save/Update
 // action turns green until it is clicked. This keeps the behavior consistent
@@ -82,6 +97,7 @@ function DirtySaveButtonBehavior() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+      <ScrollToTop />
       <DirtySaveButtonBehavior />
       <NavHistoryProvider>
         <AuthProvider>
