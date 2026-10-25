@@ -615,7 +615,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             <div className="empty-state">Activate this season to import playoff eligibility.</div>
           )}
           {page === "playoffs" && viewingDiv && (
-            <PlayoffsTab divisionId={viewingDiv.id} teams={viewTeams} />
+            <PlayoffsTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} />
           )}
           {page === "playoffs" && !viewingDiv && (
             <div className="empty-state">Select a season and division to manage playoffs.</div>
@@ -852,8 +852,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         </SubTabBar>
         <div className="tab-content">
           {myTeamSubTab === "roster" && <ManageMyTeamPage teamId={primaryTeamId} profileId={profile.id} />}
-          {myTeamSubTab === "lineup" && <LineupPlannerPanel teamId={primaryTeamId} profileId={profile.id} />}
-          {myTeamSubTab === "stats" && <TeamStatsPanel teamId={primaryTeamId} />}
+          {myTeamSubTab === "lineup" && <LineupPlannerPanel key={primaryTeamId} teamId={primaryTeamId} profileId={profile.id} />}
+          {myTeamSubTab === "stats" && <TeamStatsPanel key={primaryTeamId} teamId={primaryTeamId} />}
         </div>
       </>
     );
@@ -893,7 +893,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} />
           {!viewingDiv
             ? <div className="empty-state">Pick a division above to see standings & match history.</div>
-            : <HistoryTab divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
+            : <HistoryTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
                 seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
           }
         </div>
