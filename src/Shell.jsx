@@ -232,11 +232,15 @@ export function PageHeader({ title, subtitle, hideBack }) {
     <>
       <div className="page-header">
         <div className="page-header__left">
+          <Link to="/" className="page-header__brand" aria-label="IBA Pool App Home" title="Go to Home">
+            <span className="page-header__brand-mark" aria-hidden="true">8</span>
+            <span className="page-header__brand-name">IBA Pool App</span>
+          </Link>
           {!hideBack && canGoBack && (
             <button className="btn-icon-sm" onClick={goBack} aria-label="Back"><ChevronLeft size={16} /></button>
           )}
           <button className="btn-icon-sm" onClick={() => setDrawerOpen(true)} aria-label="Open menu"><Menu size={15} /></button>
-          <div>
+          <div className="page-header__page-label">
             <div className="page-header__title">{title}</div>
             {subtitle && <div className="page-header__subtitle">{subtitle}</div>}
           </div>
@@ -266,7 +270,12 @@ export function AccessDenied() {
 // ─── Shared shell styling ───────────────────────────────────────────────────
 export const shellCss = `
 .page-header{background:#0B3D2E;background-image:radial-gradient(circle at 50% 0%,#0F4A37 0%,#0B3D2E 70%);padding:14px 16px;min-height:58px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;}
-.page-header__left{display:flex;align-items:center;gap:10px;}
+.page-header__left{display:flex;align-items:center;gap:10px;min-width:0;}
+.page-header__brand{display:flex;align-items:center;gap:7px;color:#FFF;text-decoration:none;flex-shrink:0;padding-right:10px;border-right:1px solid rgba(255,255,255,0.18);}
+.page-header__brand:hover{opacity:0.88;}
+.page-header__brand-mark{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#F5F0E4;color:#0B3D2E;border:2px solid #5FCF9E;font-family:'Archivo Black',sans-serif;font-size:16px;line-height:1;}
+.page-header__brand-name{font-family:'Archivo Black',sans-serif;font-size:11px;white-space:nowrap;color:#FFF;}
+.page-header__page-label{min-width:0;}
 .page-header__title{font-family:'Archivo Black',sans-serif;font-size:15px;color:#FFF;}
 .page-header__subtitle{font-size:10px;font-weight:700;color:#9FC4B4;letter-spacing:0.05em;margin-top:1px;}
 .page-header__right{display:flex;align-items:center;gap:8px;}
@@ -298,6 +307,15 @@ export const shellCss = `
 .tab-bar-nav__item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px 8px;background:none;border:none;color:#6A6A6A;font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;cursor:pointer;}
 .tab-bar-nav__item--active{color:#5FCF9E;}
 
+@media (max-width:520px){
+  .page-header{padding:10px 10px;gap:8px;}
+  .page-header__left{gap:7px;}
+  .page-header__brand{gap:5px;padding-right:7px;}
+  .page-header__brand-name{font-size:10px;}
+  .page-header__brand-mark{width:25px;height:25px;font-size:14px;}
+  .page-header__title{font-size:12px;white-space:normal;}
+  .page-header__subtitle{font-size:9px;}
+}
 @media (min-width:768px){
   .tab-bar-nav{max-width:640px;}
 }
