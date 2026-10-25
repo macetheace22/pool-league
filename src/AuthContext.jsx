@@ -83,10 +83,35 @@ export function AuthProvider({ children }) {
   );
 }
 
+function PoolBallMark({ size = 28 }) {
+  return (
+    <svg className="auth-pool-ball" width={size} height={size} viewBox="0 0 64 64" aria-label="Pool 8-ball" role="img">
+      <defs>
+        <radialGradient id="authBallShade" cx="27%" cy="20%" r="78%">
+          <stop offset="0%" stopColor="#686868" />
+          <stop offset="38%" stopColor="#252525" />
+          <stop offset="78%" stopColor="#080808" />
+          <stop offset="100%" stopColor="#000000" />
+        </radialGradient>
+        <linearGradient id="authBallRim" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#A7F3D0" />
+          <stop offset="50%" stopColor="#5FCF9E" />
+          <stop offset="100%" stopColor="#176B4A" />
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="32" r="29" fill="url(#authBallRim)" />
+      <circle cx="32" cy="32" r="26.5" fill="url(#authBallShade)" />
+      <ellipse cx="22" cy="15" rx="10" ry="5" fill="#FFFFFF" opacity=".13" transform="rotate(-28 22 15)" />
+      <circle cx="32" cy="32" r="13.2" fill="#F8F7F2" />
+      <text x="32" y="38" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="18" fontWeight="900" fill="#111111">8</text>
+    </svg>
+  );
+}
+
 function AuthHeader() {
   return (
     <div className="auth-header">
-      <Shield size={14} color="#5FCF9E" />
+      <PoolBallMark size={30} />
       <div className="auth-header__title">IBA Pool App</div>
     </div>
   );
@@ -122,7 +147,7 @@ function LoginScreen({ onRegister }) {
 
   return (
     <div className="auth-screen">
-      <div className="auth-screen__icon"><Lock size={26} color="#5FCF9E" /></div>
+      <div className="auth-screen__icon"><PoolBallMark size={76} /></div>
       <div className="auth-screen__title">Welcome to the IBA Pool League App</div>
       <div className="auth-screen__sub">Please sign in or register using the options below.</div>
       <div className="auth-screen__spacer" />
@@ -287,6 +312,7 @@ html,body{width:100%;overflow-x:hidden;}
 .auth-loader{display:flex;align-items:center;justify-content:center;min-height:100vh;color:#9A9A9A;font-size:13px;}
 .auth-empty{padding:40px 24px;text-align:center;color:#9A9A9A;font-size:13px;}
 .auth-header{display:flex;align-items:center;gap:10px;background:#0B3D2E;background-image:radial-gradient(circle at 50% 0%,#0F4A37 0%,#0B3D2E 70%);padding:14px 16px;}
+.auth-pool-ball{display:block;flex-shrink:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));}
 .auth-header__title{font-family:'Archivo Black',sans-serif;font-size:16px;color:#FFF;}
 .auth-screen{display:flex;flex-direction:column;gap:14px;padding:32px 20px 24px;}
 .auth-screen__icon{display:flex;justify-content:center;margin-bottom:4px;}
