@@ -9,6 +9,7 @@ import { dashboardCss } from "./Dashboard.jsx";
 
 const css = `
 .schedules-page{padding-bottom:86px;}
+.schedules-page--loading .schedules-controls,.schedules-page--loading .schedule-note{display:none;}
 .schedules-controls{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
 .schedule-control{display:flex;flex-direction:column;gap:4px;}
 .schedule-control__label{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8A8A8A;}
@@ -59,6 +60,7 @@ export default function Schedules() {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedWeekId, setSelectedWeekId] = useState(null);
 
@@ -104,8 +106,14 @@ export default function Schedules() {
   }, [profile]);
 
   useEffect(() => {
-    if (!seasonId) return;
+    if (!seasonId) {
+      setStatus(null);
+      setDivisionId("");
+      setStatusLoading(false);
+      return;
+    }
     let cancelled = false;
+    setStatusLoading(true);
     setStatus(null);
     setDivisionId("");
     setTeams([]);
@@ -116,15 +124,23 @@ export default function Schedules() {
       setStatus(next);
       const preferred = next.divisions?.find(d => d.id === requestedDivisionId) || next.divisions?.[0];
       if (preferred) {
+        setScheduleLoading(true);
         setDivisionId(preferred.id);
         setParams(p => { p.set("season", seasonId); p.set("division", preferred.id); return p; }, { replace: true });
       }
-    }).catch(e => !cancelled && setError(e?.message || "Unable to load schedule status."));
+    }).catch(e => !cancelled && setError(e?.message || "Unable to load schedule status."))
+      .finally(() => !cancelled && setStatusLoading(false));
     return () => { cancelled = true; };
   }, [seasonId]);
 
   useEffect(() => {
-    if (!divisionId) return;
+    if (!divisionId) {
+      setScheduleLoading(false);
+      setTeams([]);
+      setSchedule([]);
+      setSelectedWeekId(null);
+      return;
+    }
     let cancelled = false;
     setScheduleLoading(true);
     setError("");
@@ -160,6 +176,8 @@ export default function Schedules() {
   }, [schedule]);
 
   const setSeason = id => {
+    setStatusLoading(true);
+    setScheduleLoading(false);
     setSeasonId(id);
     setParams(p => { p.set("season", id); p.delete("division"); return p; }, { replace: true });
   };
@@ -178,7 +196,7 @@ export default function Schedules() {
     <div className="app">
       <style>{adminCss}</style><style>{dashboardCss}</style><style>{css}</style><style>{shellCss}</style>
       <PageHeader title="Schedules" />
-      <div className="tab-content schedules-page">
+      <div className={`tab-content schedules-page ${(loading || statusLoading || scheduleLoading) ? "schedules-page--loading" : ""}`}>
         <div className="schedules-controls">
           <div className="schedule-control">
             <div className="schedule-control__label">Season</div>
@@ -215,7 +233,7 @@ export default function Schedules() {
           </div>
         </div>
 
-        {loading || scheduleLoading ? (
+        {loading || statusLoading || scheduleLoading ? (
           <div className="empty-state"><RefreshCw size={16} className="spin" style={{verticalAlign:"middle",marginRight:6}}/> Loading schedule…</div>
         ) : error ? (
           <div className="import-warning-block"><div className="import-warning-block__title">{error}</div></div>
