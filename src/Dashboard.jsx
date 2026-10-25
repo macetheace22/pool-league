@@ -112,8 +112,7 @@ export function Home() {
       <style>{dashboardCss}</style>
       <PageHeader title="Home" subtitle={profile ? `Welcome, ${profile.username}` : undefined} hideBack />
       <div className="tab-content">
-        {teamOverviews === undefined && profile && (getActiveTeamIds(profile).length > 0 || profile.player_num) && <Loader />}
-
+        {homeLoading ? <Loader /> : <>
         {nextMatches.map(nm => (
           <Link key={nm.teamId} to="/leagues" className="next-match-card">
             <div className="next-match-card__eyebrow">
