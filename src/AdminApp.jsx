@@ -533,7 +533,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // player's rating. They still show up in the Players tab to be fixed by hand.
   const resolveRoster = (teamId) => (viewRosters[teamId] ?? []).filter(p => p.rating != null);
 
-  if (seasonsLoading) return <><PageHeader title="IBA Admin"/><div className="tab-content"><Loader/></div></>;
+  if (seasonsLoading || divisionLoading) return <><PageHeader title="IBA Admin"/><div className="tab-content"><Loader/></div></>;
   if (initialLoadError) return <><PageHeader title="IBA Admin"/><div className="tab-content"><ErrorMsg>{initialLoadError}</ErrorMsg></div></>;
 
   // ── "me" — everyone, always allowed ──
@@ -4224,6 +4224,9 @@ const LEADERBOARD_METRICS = [
 function LeaderboardPage() {
   const [rawEvents, setRawEvents] = useState(undefined);
   const [divisions, setDivisions] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [rankingLoading, setRankingLoading] = useState(false);
   const [divisionFilter, setDivisionFilter] = useState(""); // "" = All Divisions/Seasons
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
@@ -4231,8 +4234,20 @@ function LeaderboardPage() {
   const [ranked, setRanked] = useState([]);
 
   useEffect(() => {
-    db.listAllShotEvents().then(events => setRawEvents(events.length ? events : null));
-    db.listAllDivisionsFlat().then(setDivisions);
+    let cancelled = false;
+    Promise.all([db.listAllShotEvents(), db.listAllDivisionsFlat()])
+      .then(([events, divisionRows]) => {
+        if (cancelled) return;
+        setRawEvents(events.length ? events : null);
+        setDivisions(divisionRows ?? []);
+      })
+      .catch(e => {
+        if (!cancelled) setLoadError(e?.message || "Unable to load advanced stats.");
+      })
+      .finally(() => {
+        if (!cancelled) setInitialLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   // A division filter only makes sense for league play -- practice has no
@@ -4247,13 +4262,25 @@ function LeaderboardPage() {
   const metric = LEADERBOARD_METRICS.find(m => m.key === metricKey);
 
   useEffect(() => {
-    if (!rawEvents) { setRanked([]); return; }
+    if (initialLoading || rawEvents === undefined) return;
+    if (!rawEvents) { setRanked([]); setRankingLoading(false); return; }
+    let cancelled = false;
+    setRankingLoading(true);
     db.computeLeaderboard(filteredEvents).then(list => {
+      if (cancelled) return;
       const eligible = list.filter(p => (metric.minField ? metric.minField(p.stats) : p.stats.totalShots) >= metric.min);
       setRanked(eligible.sort((a, b) => metric.get(b.stats) - metric.get(a.stats)));
+    }).catch(e => {
+      if (!cancelled) {
+        setRanked([]);
+        setLoadError(e?.message || "Unable to calculate the leaderboard.");
+      }
+    }).finally(() => {
+      if (!cancelled) setRankingLoading(false);
     });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawEvents, gameTypeFilter, playTypeFilter, divisionFilter, metricKey]);
+  }, [initialLoading, rawEvents, gameTypeFilter, playTypeFilter, divisionFilter, metricKey]);
 
   const exportCSV = async () => {
     const names = await db.getPlayerNameMap(filteredEvents.flatMap(e => [e.player_num, e.opponent_player_num]));
@@ -4264,9 +4291,8 @@ function LeaderboardPage() {
     <>
       <PageHeader title="Advanced Stats Leaderboard" subtitle={divisionFilter ? "This division/season" : "Leaguewide · all-time"} />
       <div className="tab-content">
-        {rawEvents === undefined && <Loader />}
-        {rawEvents === null && <div className="empty-state">No advanced stats tracked yet leaguewide — once players start using "Track a Rack," rankings will show up here.</div>}
-        {rawEvents && (
+        {initialLoading || rankingLoading ? <Loader /> : loadError ? <ErrorMsg>{loadError}</ErrorMsg> : rawEvents === null && <div className="empty-state">No advanced stats tracked yet leaguewide — once players start using "Track a Rack," rankings will show up here.</div>}
+        {!initialLoading && !rankingLoading && !loadError && rawEvents && (
           <>
             <div className="card">
               <div className="field"><Label>Rank By</Label>
