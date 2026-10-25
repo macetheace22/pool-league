@@ -87,8 +87,9 @@ export default function Schedules() {
           || rows[0];
 
         if (preferred) {
-          setStatusLoading(true);
-          setScheduleLoading(false);
+          // The season-list request may rerun when the auth profile refreshes.
+          // Only the season-status effect should own statusLoading; setting it
+          // here can leave the page stuck if the selected season hasn't changed.
           setSeasonId(preferred.id);
           setParams(p => {
             p.set("season", preferred.id);
