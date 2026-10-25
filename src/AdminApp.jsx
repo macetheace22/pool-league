@@ -2652,6 +2652,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   }
 
   if (loading) return <Loader/>;
+  if (loadError) return <div className="empty-state">{loadError}</div>;
 
   const standings = db.computeStandings(matches, standingsAdj);
   const mvp = db.computeMvp(matches, mvpAdj);
@@ -3827,6 +3828,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
   if (!teamId) return <div className="empty-state">Your account isn't linked to a team yet — ask your league manager to assign one.</div>;
   if (loading) return <Loader/>;
+  if (error && !team) return <div className="empty-state">{error}</div>;
   if (!team) return <div className="empty-state">Team not found.</div>;
 
   return (
@@ -4700,8 +4702,20 @@ function PlayoffBracketView({ matches, teams }) {
 function PlayoffsHistoryView({ divisionId, teams }) {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { db.listPlayoffBrackets(divisionId).then(m => { setMatches(m); setLoading(false); }); }, [divisionId]);
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError("");
+    db.listPlayoffBrackets(divisionId).then(m => {
+      if (!cancelled) setMatches(m ?? []);
+    }).catch(e => {
+      if (!cancelled) setLoadError(e?.message || "Unable to load playoff history.");
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [divisionId]);
   if (loading) return <Loader/>;
+  if (loadError) return <div className="empty-state">{loadError}</div>;
   return <PlayoffBracketView matches={matches} teams={teams} />;
 }
 
@@ -4713,7 +4727,13 @@ function PlayoffsTab({ divisionId, teams }) {
   const [error, setError] = useState("");
   const [proposal, setProposal] = useState(null);
 
-  const refresh = () => { setLoading(true); db.listPlayoffBrackets(divisionId).then(m => { setMatches(m); setLoading(false); }); };
+  const refresh = () => {
+    setLoading(true);
+    setError("");
+    db.listPlayoffBrackets(divisionId).then(m => setMatches(m ?? []))
+      .catch(e => setError(e?.message || "Unable to load playoff brackets."))
+      .finally(() => setLoading(false));
+  };
   useEffect(refresh, [divisionId]);
 
   const hasChampionship = matches.some(m => m.bracket_type === "championship");
