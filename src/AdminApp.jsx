@@ -1474,28 +1474,67 @@ function PlayerLookupPage() {
 // every season, never reused, so there's no single "team" to show history
 // across; this shows exactly the one season this team row belongs to.
 function TeamDetailView({ team }) {
-  const [overview, setOverview] = useState(undefined); // undefined = loading, null = no schedule
-  const [standingsRow, setStandingsRow] = useState(undefined);
-  const [roster, setRoster] = useState([]);
-  const [captain, setCaptain] = useState(null);
-  const [eligByPlayerNum, setEligByPlayerNum] = useState(null); // null = nothing imported for this division
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [detailError, setDetailError] = useState("");
 
   useEffect(() => {
-    db.getTeamScheduleOverview(team.id).then(o => setOverview(o ?? null));
-    db.listRosterForTeam(team.id).then(setRoster);
-    db.listTeamCaptains().then(map => setCaptain(map[team.id] ?? null));
+    let cancelled = false;
+    const load = async () => {
+      setDetailLoading(true);
+      setDetailError("");
+      setDetail(null);
+      try {
+        const [overviewResult, rosterResult, captainMap, allTeams, shotEvents] = await Promise.all([
+          db.getTeamScheduleOverview(team.id),
+          db.listRosterForTeam(team.id),
+          db.listTeamCaptains(),
+          db.listAllTeamsWithContext(),
+          db.listTeamShotEvents(team.id),
+        ]);
+        const overview = overviewResult ?? null;
+        let standingsRow = null;
+        let eligByPlayerNum = null;
+
+        if (overview) {
+          const [standingsResult, eligibilityRows] = await Promise.all([
+            db.getTeamStandingsRow(team.id, overview.team.division_id),
+            db.listPlayoffEligibilityForDivision(overview.team.division_id),
+          ]);
+          standingsRow = standingsResult ?? null;
+          eligByPlayerNum = eligibilityRows.length ? db.eligibilityByPlayerNum(eligibilityRows) : null;
+        }
+
+        const rawEvents = shotEvents.length ? shotEvents : null;
+        const [breakdown] = await Promise.all([
+          rawEvents ? db.computeTeamShotBreakdown(rawEvents) : Promise.resolve(null),
+        ]);
+        if (cancelled) return;
+        setDetail({
+          overview,
+          roster: rosterResult ?? [],
+          captain: captainMap[team.id] ?? null,
+          standingsRow,
+          eligByPlayerNum,
+          rawEvents,
+          teamContext: allTeams.find(t => t.id === team.id)?.context ?? "",
+          breakdown,
+        });
+      } catch (e) {
+        if (!cancelled) setDetailError(e?.message || "Unable to load this team's details.");
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, [team.id]);
 
-  useEffect(() => {
-    if (overview === undefined) return;
-    if (!overview) { setStandingsRow(null); setEligByPlayerNum(null); return; }
-    db.getTeamStandingsRow(team.id, overview.team.division_id).then(row => setStandingsRow(row ?? null));
-    db.listPlayoffEligibilityForDivision(overview.team.division_id).then(rows => {
-      if (!rows.length) { setEligByPlayerNum(null); return; }
-      setEligByPlayerNum(db.eligibilityByPlayerNum(rows));
-    });
-  }, [overview, team.id]);
+  if (detailLoading) return <Loader />;
+  if (detailError) return <div className="empty-state">{detailError}</div>;
+  if (!detail) return <div className="empty-state">Team details are unavailable.</div>;
 
+  const { overview, roster, captain, standingsRow, eligByPlayerNum } = detail;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcoming = (overview?.myWeeks ?? [])
     .map(w => { const parts = (w.date||"").split("/").map(Number); return { ...w, _date: parts.length>=3 && !parts.some(isNaN) ? new Date(parts[2],parts[0]-1,parts[1]) : null }; })
@@ -1636,7 +1675,7 @@ function TeamDetailView({ team }) {
         </div>
       )}
 
-      <TeamStatsPanel teamId={team.id} />
+      <TeamStatsPanel key={team.id} teamId={team.id} initialData={{ rawEvents: detail.rawEvents, teamContext: detail.teamContext, breakdown: detail.breakdown }} />
     </>
   );
 }
@@ -4089,17 +4128,27 @@ function LineupPlannerPanel({ teamId, profileId }) {
 // column set at logging time. Same optional/supplemental nature as
 // everywhere else this data shows up: a team with nobody tracking shots
 // just shows an empty state, nothing else in the app depends on this.
-function TeamStatsPanel({ teamId }) {
-  const [rawEvents, setRawEvents] = useState(undefined); // undefined = loading, null = nothing tracked
-  const [teamContext, setTeamContext] = useState(""); // e.g. "Div 1 · Summer 2026" -- a team is permanently tied to one division/season, so this data is already scoped; this just makes that visible
+function TeamStatsPanel({ teamId, initialData = null }) {
+  const [rawEvents, setRawEvents] = useState(() => initialData ? initialData.rawEvents : undefined); // undefined = loading, null = nothing tracked
+  const [teamContext, setTeamContext] = useState(() => initialData?.teamContext ?? ""); // e.g. "Div 1 · Summer 2026"
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
-  const [breakdown, setBreakdown] = useState(null);
+  const [breakdown, setBreakdown] = useState(() => initialData?.breakdown ?? null);
 
   useEffect(() => {
-    db.listTeamShotEvents(teamId).then(events => setRawEvents(events.length ? events : null));
-    db.listAllTeamsWithContext().then(all => setTeamContext(all.find(t => t.id === teamId)?.context ?? ""));
-  }, [teamId]);
+    if (initialData) return;
+    let cancelled = false;
+    Promise.all([db.listTeamShotEvents(teamId), db.listAllTeamsWithContext()]).then(([events, all]) => {
+      if (cancelled) return;
+      setRawEvents(events.length ? events : null);
+      setTeamContext(all.find(t => t.id === teamId)?.context ?? "");
+    }).catch(() => {
+      if (cancelled) return;
+      setRawEvents(null);
+      setTeamContext("");
+    });
+    return () => { cancelled = true; };
+  }, [teamId, initialData]);
 
   const filteredEvents = (rawEvents ?? []).filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && matchesPlayType(e, playTypeFilter));
 
