@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
+import SearchableOptionSelect from "./SearchableOptionSelect";
 import { getActiveTeamIds } from "./teamMembership";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
@@ -3237,12 +3238,12 @@ function AccountSettings({ profile, onProfileRefresh }) {
           <>
             <div className="field">
               <Label>Add Team Membership</Label>
-              <select className="input" value="" onChange={e => e.target.value && saveOwnTeam(e.target.value)} disabled={savingTeam}>
-                <option value="">Select an active team…</option>
-                {pickableTeams.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}{t.context ? ` — ${t.context}` : ""}</option>
-                ))}
-              </select>
+              <SearchableOptionSelect
+                options={pickableTeams.map(t => ({value:t.id,label:`${t.name}${t.context ? ` — ${t.context}` : ""}`,searchText:`${t.name} ${t.context ?? ""} ${t.teamNum ?? ""}`}))}
+                value="" onChange={value => value && saveOwnTeam(value)}
+                placeholder="Select an active team…" ariaLabel="Add team membership" disabled={savingTeam}
+                className="input input--select"
+              />
             </div>
           </>
         )}
@@ -4000,17 +4001,16 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     </select>
                     {editRole==="captain" && (
                       <div className="field" style={{margin:0}}>
-                        <input className="input" list="edit-role-team-options" value={editTeamInput} autoComplete="off"
-                          placeholder="Start typing a team name…"
-                          onChange={e=>{
-                            const val = e.target.value;
-                            setEditTeamInput(val);
-                            const match = activePickableTeams.find(t => `${t.name}${t.context?` — ${t.context}`:""}` === val);
-                            setEditTeamId(match ? match.id : "");
-                          }}/>
-                        <datalist id="edit-role-team-options">
-                          {activePickableTeams.map(t=><option key={t.id} value={`${t.name}${t.context?` — ${t.context}`:""}`} />)}
-                        </datalist>
+                        <SearchableOptionSelect
+                          options={activePickableTeams.map(t => ({value:t.id,label:`${t.name}${t.context ? ` — ${t.context}` : ""}`,searchText:`${t.name} ${t.context ?? ""} ${t.teamNum ?? ""}`}))}
+                          value={editTeamId}
+                          onChange={value => {
+                            const match = activePickableTeams.find(t => t.id === value);
+                            setEditTeamId(value);
+                            setEditTeamInput(match ? `${match.name}${match.context ? ` — ${match.context}` : ""}` : "");
+                          }}
+                          placeholder="Select a team…" ariaLabel="Assign captain team" className="input input--select"
+                        />
                       </div>
                     )}
                     {roleErr && <ErrorMsg>{roleErr}</ErrorMsg>}
@@ -4066,17 +4066,16 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             </div>
             {newRole==="captain" && (
               <div className="field"><Label>Assign Team</Label>
-                <input className="input" list="assign-team-options" value={teamInput} autoComplete="off"
-                  placeholder="Start typing a team name…"
-                  onChange={e=>{
-                    const val = e.target.value;
-                    setTeamInput(val);
-                    const match = activePickableTeams.find(t => `${t.name}${t.context?` — ${t.context}`:""}` === val);
-                    setNewTeamId(match ? match.id : "");
-                  }}/>
-                <datalist id="assign-team-options">
-                  {activePickableTeams.map(t=><option key={t.id} value={`${t.name}${t.context?` — ${t.context}`:""}`} />)}
-                </datalist>
+                <SearchableOptionSelect
+                  options={activePickableTeams.map(t => ({value:t.id,label:`${t.name}${t.context ? ` — ${t.context}` : ""}`,searchText:`${t.name} ${t.context ?? ""} ${t.teamNum ?? ""}`}))}
+                  value={newTeamId}
+                  onChange={value => {
+                    const match = activePickableTeams.find(t => t.id === value);
+                    setNewTeamId(value);
+                    setTeamInput(match ? `${match.name}${match.context ? ` — ${match.context}` : ""}` : "");
+                  }}
+                  placeholder="Select a team…" ariaLabel="Assign invite team" className="input input--select"
+                />
                 <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Captains are assigned a team here — they no longer pick one at registration.</div>
               </div>
             )}
@@ -4629,17 +4628,20 @@ function CaptainField({ team, allProfiles, captainsByTeam, onAssign, onRemove, o
         <button className={`seg-btn ${mode==="invite"?"seg-btn--active":""}`} onClick={()=>{setMode("invite");setErr("");}}>Invite New Captain</button>
       </div>
       {mode==="existing" ? (
-        <div style={{display:"flex",gap:6}}>
-          <input className="edit-input" style={{flex:1}} list={`captain-options-${team.id}`} value={search} autoComplete="off"
-            placeholder="Start typing a username…"
-            onChange={e=>{
-              const val = e.target.value; setSearch(val);
-              const match = candidates.find(p => labelFor(p) === val);
-              setPickedId(match ? match.id : "");
-            }} />
-          <datalist id={`captain-options-${team.id}`}>
-            {candidates.map(p => <option key={p.id} value={labelFor(p)} />)}
-          </datalist>
+        <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
+          <div style={{flex:1,minWidth:0}}>
+            <SearchableOptionSelect
+              options={candidates.map(p => ({value:p.id,label:labelFor(p),searchText:`${p.username ?? ""} ${p.phone_number ?? ""} ${p.role ?? ""}`}))}
+              value={pickedId}
+              onChange={value => {
+                const match = candidates.find(p => p.id === value);
+                setPickedId(value);
+                setSearch(match ? labelFor(match) : "");
+              }}
+              placeholder="Select a captain…" ariaLabel={`Assign captain to ${team.name}`}
+              className="edit-input"
+            />
+          </div>
           <button className="btn-icon btn-icon--confirm" onClick={assignExisting} disabled={!pickedId||saving}><Check size={13}/></button>
         </div>
       ) : (
