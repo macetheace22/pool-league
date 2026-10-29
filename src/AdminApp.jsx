@@ -5090,6 +5090,28 @@ function TeamsTab({ teams, onSave, onDeleteTeam, readOnly, onNext, hideReadOnlyB
 // captains because a manager forgot a manual cleanup step.
 function SearchableTeamSelect({ teams, value, onChange, search = "", onSearch, placeholder = "Select a team…", ariaLabel = "Search teams", className = "input input--select", disabled = false }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnOutsidePointer = event => {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false);
+        onSearch("");
+      }
+    };
+    const closeOnEscape = event => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        onSearch("");
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open, onSearch]);
   const query = search.trim().toLowerCase();
   const selected = (teams ?? []).find(t => t.id === value);
   const visibleTeams = (teams ?? []).filter(t =>
@@ -5102,7 +5124,7 @@ function SearchableTeamSelect({ teams, value, onChange, search = "", onSearch, p
     setOpen(true);
   };
   return (
-    <div style={{position:"relative",minWidth:0}}>
+    <div ref={rootRef} style={{position:"relative",minWidth:0}}>
       <div style={{position:"relative",display:"flex",alignItems:"center"}}>
         <input
           className={className}

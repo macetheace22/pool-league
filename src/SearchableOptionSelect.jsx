@@ -23,8 +23,8 @@ export default function SearchableOptionSelect({
         setQuery("");
       }
     };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
   const choose = option => {
