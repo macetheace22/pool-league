@@ -2381,15 +2381,6 @@ export async function getPlayerPlayoffEligibility(playerNum, divisionId) {
     .select("*").eq("division_id", divisionId).eq("player_num", playerNum).maybeSingle();
   return data;
 }
-// Every player's latest eligibility row for a division at once -- powers a
-// team roster view without one query per player. Rows with no resolved
-// player_num (an unmatched name from the import) are still included; callers
-// that key off player_num should filter those out themselves.
-export async function listPlayoffEligibilityForDivision(divisionId) {
-  const { data } = await supabase.from("player_playoff_eligibility_current").select("*").eq("division_id", divisionId);
-  return data ?? [];
-}
-
 // ─── Team-vs-team head-to-head ─────────────────────────────────────────────
 // Pure aggregation over a list of completed_matches rows (typically a
 // team's own getTeamScheduleOverview().myCompleted, already fetched) --

@@ -1500,7 +1500,7 @@ function TeamDetailView({ team }) {
         if (overview) {
           const [standingsResult, eligibilityRows] = await Promise.all([
             db.getTeamStandingsRow(team.id, overview.team.division_id),
-            db.listPlayoffEligibilityForDivision(overview.team.division_id),
+            db.listPlayoffEligibility(overview.team.division_id),
           ]);
           standingsRow = standingsResult ?? null;
           eligByPlayerNum = eligibilityRows.length ? db.eligibilityByPlayerNum(eligibilityRows) : null;

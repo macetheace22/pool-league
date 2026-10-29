@@ -117,15 +117,13 @@ function computeForfeitPoints(match, receivingPlayerRating) {
 // TonightTab's buildSeed in AdminApp.jsx) -- a player with no eligCode on a
 // playoff match roster is treated as eligible rather than blocked, since
 // "no data imported yet" isn't the same thing as "known ineligible."
-const ELIGIBILITY_REASONS = {
-  T: "Less than 4 sets played with this team",
-  A: "No membership application on file",
-  S: "Too few calculated scores in rating history",
-};
 function playoffIneligibleReason(match, player) {
   if (!match.isPlayoff) return null;
   if (!player?.eligCode || player.eligCode === "E") return null;
-  return ELIGIBILITY_REASONS[player.eligCode] ?? "Not eligible for playoffs";
+  const reason = db.ELIGIBILITY_REASONS[player.eligCode];
+  return reason
+    ? reason.replace(/^Ineligible\s*[—-]\s*/i, "").replace(/\.$/, "")
+    : "Not eligible for playoffs";
 }
 
 function usedPlayerNums(match) {
