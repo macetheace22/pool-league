@@ -257,9 +257,8 @@ export function PageHeader({ title, subtitle, hideBack }) {
     <>
       <div className="page-header">
         <div className="page-header__left">
-          <Link to="/" className="page-header__brand" aria-label="IBA Pool App Home" title="Go to Home">
+          <Link to="/" className="page-header__brand" aria-label="Home" title="Go to Home">
             <PoolBallMark size={28} />
-            <span className="page-header__brand-name">IBA Pool App</span>
           </Link>
           {!hideBack && canGoBack && (
             <button className="btn-icon-sm" onClick={goBack} aria-label="Back"><ChevronLeft size={16} /></button>
@@ -296,10 +295,9 @@ export function AccessDenied() {
 export const shellCss = `
 .page-header{background:#0B3D2E;background-image:radial-gradient(circle at 50% 0%,#0F4A37 0%,#0B3D2E 70%);padding:14px 16px;min-height:58px;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;}
 .page-header__left{display:flex;align-items:center;gap:10px;min-width:0;}
-.page-header__brand{display:flex;align-items:center;gap:7px;color:#FFF;text-decoration:none;flex-shrink:0;padding-right:10px;border-right:1px solid rgba(255,255,255,0.18);}
+.page-header__brand{display:flex;align-items:center;justify-content:center;color:#FFF;text-decoration:none;flex-shrink:0;padding-right:10px;border-right:1px solid rgba(255,255,255,0.18);}
 .page-header__brand:hover{opacity:0.88;}
 .pool-ball-mark{display:block;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));}
-.page-header__brand-name{font-family:'Archivo Black',sans-serif;font-size:11px;white-space:nowrap;color:#FFF;}
 .page-header__page-label{min-width:0;}
 .page-header__title{font-family:'Archivo Black',sans-serif;font-size:15px;color:#FFF;}
 .page-header__subtitle{font-size:10px;font-weight:700;color:#9FC4B4;letter-spacing:0.05em;margin-top:1px;}
@@ -335,8 +333,6 @@ export const shellCss = `
 @media (max-width:520px){
   .page-header{padding:10px 10px;gap:8px;}
   .page-header__left{gap:7px;}
-  .page-header__brand{gap:5px;padding-right:7px;}
-  .page-header__brand-name{font-size:10px;}
   .page-header__title{font-size:12px;white-space:normal;}
   .page-header__subtitle{font-size:9px;}
 }
