@@ -221,6 +221,31 @@ function RoleTag({ role }) {
 }
 
 // ─── Page header (hamburger + title + sign out) ────────────────────────────
+function PoolBallMark({ size = 28 }) {
+  return (
+    <svg className="pool-ball-mark" width={size} height={size} viewBox="0 0 64 64" aria-label="Pool 8-ball" role="img">
+      <defs>
+        <radialGradient id="headerBallShade" cx="27%" cy="20%" r="78%">
+          <stop offset="0%" stopColor="#686868" />
+          <stop offset="38%" stopColor="#252525" />
+          <stop offset="78%" stopColor="#080808" />
+          <stop offset="100%" stopColor="#000000" />
+        </radialGradient>
+        <linearGradient id="headerBallRim" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#A7F3D0" />
+          <stop offset="50%" stopColor="#5FCF9E" />
+          <stop offset="100%" stopColor="#176B4A" />
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="32" r="29" fill="url(#headerBallRim)" />
+      <circle cx="32" cy="32" r="26.5" fill="url(#headerBallShade)" />
+      <ellipse cx="22" cy="15" rx="10" ry="5" fill="#FFFFFF" opacity=".13" transform="rotate(-28 22 15)" />
+      <circle cx="32" cy="32" r="13.2" fill="#F8F7F2" />
+      <text x="32" y="38" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="18" fontWeight="900" fill="#111111">8</text>
+    </svg>
+  );
+}
+
 export function PageHeader({ title, subtitle, hideBack }) {
   const { profile, logout } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -233,7 +258,7 @@ export function PageHeader({ title, subtitle, hideBack }) {
       <div className="page-header">
         <div className="page-header__left">
           <Link to="/" className="page-header__brand" aria-label="IBA Pool App Home" title="Go to Home">
-            <span className="page-header__brand-mark" aria-hidden="true">8</span>
+            <PoolBallMark size={28} />
             <span className="page-header__brand-name">IBA Pool App</span>
           </Link>
           {!hideBack && canGoBack && (
@@ -273,7 +298,7 @@ export const shellCss = `
 .page-header__left{display:flex;align-items:center;gap:10px;min-width:0;}
 .page-header__brand{display:flex;align-items:center;gap:7px;color:#FFF;text-decoration:none;flex-shrink:0;padding-right:10px;border-right:1px solid rgba(255,255,255,0.18);}
 .page-header__brand:hover{opacity:0.88;}
-.page-header__brand-mark{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#F5F0E4;color:#0B3D2E;border:2px solid #5FCF9E;font-family:'Archivo Black',sans-serif;font-size:16px;line-height:1;}
+.pool-ball-mark{display:block;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));}
 .page-header__brand-name{font-family:'Archivo Black',sans-serif;font-size:11px;white-space:nowrap;color:#FFF;}
 .page-header__page-label{min-width:0;}
 .page-header__title{font-family:'Archivo Black',sans-serif;font-size:15px;color:#FFF;}
@@ -312,7 +337,6 @@ export const shellCss = `
   .page-header__left{gap:7px;}
   .page-header__brand{gap:5px;padding-right:7px;}
   .page-header__brand-name{font-size:10px;}
-  .page-header__brand-mark{width:25px;height:25px;font-size:14px;}
   .page-header__title{font-size:12px;white-space:normal;}
   .page-header__subtitle{font-size:9px;}
 }
