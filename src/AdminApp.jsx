@@ -4499,7 +4499,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             const isMe = u.id===currentUserId;
             const editing = editRoleId===u.id;
             return (
-              <div key={u.id} className="list-row" style={{flexDirection: editing ? "column" : "row", alignItems: editing ? "stretch" : "center", marginBottom: 8, borderRadius: 10, border: "1px solid #2E2E2E"}}>
+              <div key={u.id} className="list-row" style={{flexDirection: editing ? "column" : "row", alignItems: editing ? "stretch" : "center", marginBottom: 10, padding: 10, borderRadius: 10, border: "1px solid #2E2E2E", background: "transparent"}}>
                 {editing ? (
                   <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
                     <div style={{display:"flex",alignItems:"center",gap:7}}>
