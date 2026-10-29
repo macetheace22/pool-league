@@ -4001,16 +4001,19 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     </select>
                     {editRole==="captain" && (
                       <div className="field" style={{margin:0}}>
-                        <SearchableOptionSelect
-                          options={activePickableTeams.map(t => ({value:t.id,label:`${t.name}${t.context ? ` — ${t.context}` : ""}`,searchText:`${t.name} ${t.context ?? ""} ${t.teamNum ?? ""}`}))}
-                          value={editTeamId}
-                          onChange={value => {
-                            const match = activePickableTeams.find(t => t.id === value);
+                                                <select className="input input--select" aria-label="Assign captain team" value={editTeamId}
+                          onChange={e => {
+                            const value = e.target.value;
+                            const match = activePickableTeams.find(team => team.id === value);
                             setEditTeamId(value);
-                            setEditTeamInput(match ? `${match.name}${match.context ? ` — ${match.context}` : ""}` : "");
-                          }}
-                          placeholder="Select a team…" ariaLabel="Assign captain team" className="input input--select"
-                        />
+                            setEditTeamInput(match ? match.name + (match.context ? " — " + match.context : "") : "");
+                            setRoleErr("");
+                          }}>
+                          <option value="">Select a team…</option>
+                          {activePickableTeams.map(team => (
+                            <option key={team.id} value={team.id}>{team.name}{team.context ? " — " + team.context : ""}</option>
+                          ))}
+                        </select>
                       </div>
                     )}
                     {roleErr && <ErrorMsg>{roleErr}</ErrorMsg>}
@@ -4066,16 +4069,18 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             </div>
             {newRole==="captain" && (
               <div className="field"><Label>Assign Team</Label>
-                <SearchableOptionSelect
-                  options={activePickableTeams.map(t => ({value:t.id,label:`${t.name}${t.context ? ` — ${t.context}` : ""}`,searchText:`${t.name} ${t.context ?? ""} ${t.teamNum ?? ""}`}))}
-                  value={newTeamId}
-                  onChange={value => {
-                    const match = activePickableTeams.find(t => t.id === value);
+                                <select className="input input--select" aria-label="Assign invite team" value={newTeamId}
+                  onChange={e => {
+                    const value = e.target.value;
+                    const match = activePickableTeams.find(team => team.id === value);
                     setNewTeamId(value);
-                    setTeamInput(match ? `${match.name}${match.context ? ` — ${match.context}` : ""}` : "");
-                  }}
-                  placeholder="Select a team…" ariaLabel="Assign invite team" className="input input--select"
-                />
+                    setTeamInput(match ? match.name + (match.context ? " — " + match.context : "") : "");
+                  }}>
+                  <option value="">Select a team…</option>
+                  {activePickableTeams.map(team => (
+                    <option key={team.id} value={team.id}>{team.name}{team.context ? " — " + team.context : ""}</option>
+                  ))}
+                </select>
                 <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Captains are assigned a team here — they no longer pick one at registration.</div>
               </div>
             )}
