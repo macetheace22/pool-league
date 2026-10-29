@@ -6060,7 +6060,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .bracket-row__seed{font-family:'JetBrains Mono',monospace;font-size:10px;color:#5A5A5A;margin-right:3px;}
 .bracket-divider{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#5A5A5A;margin:8px 0 2px;}
 .bracket-champion{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;background:#0F2D1F;border-radius:8px;font-size:12px;font-weight:700;color:#5FCF9E;}
-.user-account-row{width:100%;min-width:0;box-sizing:border-box;}
+.user-account-row{display:flex;width:100%;min-width:0;box-sizing:border-box;}
 .user-account-row:not(.user-account-row--editing){gap:8px;}
 .user-account-row:not(.user-account-row--editing) .list-row__body{flex:1 1 auto;min-width:0;padding:4px 8px;}
 .user-account-row:not(.user-account-row--editing) .list-row__actions{margin-left:auto;flex:0 0 auto;align-self:center;padding:0 2px 0 8px;}
