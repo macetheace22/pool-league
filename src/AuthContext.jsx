@@ -147,7 +147,7 @@ function LoginScreen({ onRegister }) {
 
   return (
     <div className="auth-screen">
-      <div className="auth-screen__icon"><PoolBallMark size={76} /></div>
+      <div className="auth-screen__icon" aria-hidden="true" />
       <div className="auth-screen__title">Welcome to the IBA Pool League App</div>
       <div className="auth-screen__sub">Please sign in or register using the options below.</div>
       <div className="auth-screen__spacer" />
