@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  BarChart3, Trophy, Dumbbell, Award, ChevronRight, MapPin, Calendar,
+  BarChart3, Trophy, Dumbbell, Award, ChevronRight, MapPin, Calendar, Building2,
   Newspaper, Wrench, AlertCircle, Users, Check, TrendingUp, Settings2, Upload,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
@@ -189,6 +189,39 @@ export function Home() {
 }
 
 // ─── Leagues dashboard ──────────────────────────────────────────────────────
+export function TeamsPlayersDashboard() {
+  const navigate = useNavigate();
+  return (
+    <div className="app">
+      <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
+      <PageHeader title="Teams and Players" subtitle="Look up league players and teams." />
+      <div className="tab-content">
+        <div style={{display:"flex",flexDirection:"column",gap:12,maxWidth:620,margin:"0 auto"}}>
+          <button className="btn-secondary" onClick={() => navigate("/player-lookup")}
+            style={{display:"flex",alignItems:"center",gap:12,textAlign:"left",padding:16,minHeight:76,width:"100%"}}>
+            <Users size={22} color="#5FCF9E" />
+            <span style={{display:"flex",flexDirection:"column",gap:4,flex:1}}>
+              <strong style={{fontSize:14}}>Player Lookup</strong>
+              <span style={{fontSize:12,color:"#9A9A9A",fontWeight:400}}>Find players, ratings, and player history.</span>
+            </span>
+            <ChevronRight size={18} />
+          </button>
+          <button className="btn-secondary" onClick={() => navigate("/team-lookup")}
+            style={{display:"flex",alignItems:"center",gap:12,textAlign:"left",padding:16,minHeight:76,width:"100%"}}>
+            <Building2 size={22} color="#5FCF9E" />
+            <span style={{display:"flex",flexDirection:"column",gap:4,flex:1}}>
+              <strong style={{fontSize:14}}>Team Lookup</strong>
+              <span style={{fontSize:12,color:"#9A9A9A",fontWeight:400}}>Find teams and explore team details.</span>
+            </span>
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      </div>
+      <TabBar />
+    </div>
+  );
+}
+
 export function LeaguesDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Minus, Search, Check, ChevronRight, Trophy } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
@@ -22,6 +23,7 @@ function gameTypeLabel(key) { return GAME_TYPES.find(g => g.key === key)?.label 
 
 export default function Practice() {
   const { profile } = useAuth();
+  const location = useLocation();
   const [phase, setPhase] = useState("landing"); // landing | opponent | gametype | format | config | play | done
   const [session, setSession] = useState(null);
   const [history, setHistory] = useState(undefined);
@@ -46,6 +48,9 @@ export default function Practice() {
     });
     setPhase("opponent");
   };
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("start") === "1") startSession();
+  }, [location.search]);
   const cancelSession = () => { setSession(null); setPhase("landing"); };
 
   const wrap = (children) => (

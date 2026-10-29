@@ -138,18 +138,42 @@ const PRIMARY_NAV_ITEMS = [
   { key: "stats",       label: "My Stats",    path: "/my-stats",   icon: BarChart3 },
   { key: "leagues",     label: "Leagues",     path: "/leagues",    icon: Trophy },
   { key: "practice",    label: "Practice",    path: "/practice",   icon: Dumbbell },
+  { key: "teamsplayers", label: "Teams and Players", path: "/teams-and-players", icon: Users },
   { key: "tournaments", label: "Tournaments", path: "/tournaments", icon: Award },
 ];
 
 const LEAGUE_NAV_ITEMS = [
   { key: "schedules", label: "Schedules", path: "/schedules", icon: Calendar, roles: ["manager", "captain", "player"] },
+  { key: "matches", label: "Current League Matches", path: "/matches", icon: Trophy, roles: ["manager", "captain", "player"] },
+  { key: "teaminfo", label: "Team and Player Information", path: "/team-info", icon: Eye, roles: ["manager", "captain", "player"] },
+  { key: "matchlkp", label: "Match Lookup / History", path: "/match-lookup", icon: ClipboardList, roles: ["manager", "captain", "player"] },
+  { key: "myteam", label: "Manage My Team", path: "/my-team", icon: Users, roles: ["captain"] },
+  { key: "leaderboard", label: "Advanced Stats Leaderboard", path: "/leaderboard", icon: TrendingUp, roles: ["manager", "captain", "player"] },
+];
+
+const PRACTICE_NAV_ITEMS = [
+  { key: "new-practice", label: "New Practice Session", path: "/practice?start=1", icon: Dumbbell },
+  { key: "practice-history", label: "My Practice Sessions", path: "/practice", icon: Calendar },
+];
+
+const TEAMS_PLAYERS_NAV_ITEMS = [
+  { key: "players", label: "Player Lookup", path: "/player-lookup", icon: Search, roles: ["manager", "captain", "player"] },
+  { key: "teamlkp", label: "Team Lookup", path: "/team-lookup", icon: Building2, roles: ["manager", "captain", "player"] },
 ];
 
 export function NavDrawer({ open, onClose, profile, onLogout }) {
   const location = useLocation();
-  const officeItems = navItemsForRole(profile.role).filter(item => item.key !== "schedules");
+  const movedNavKeys = ["schedules", "myteam", "matches", "teaminfo", "players", "teamlkp", "matchlkp", "leaderboard"];
+  const officeItems = navItemsForRole(profile.role).filter(item => !movedNavKeys.includes(item.key));
   const leagueItems = LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + "/");
+  const teamsPlayersItems = TEAMS_PLAYERS_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
+  const isActive = (path) => {
+    const [pathname, query] = path.split("?");
+    if (location.pathname !== pathname && !location.pathname.startsWith(pathname + "/")) return false;
+    if (query) return location.search === `?${query}`;
+    if (pathname === "/practice") return location.search === "";
+    return true;
+  };
 
   return (
     <>
@@ -178,6 +202,24 @@ export function NavDrawer({ open, onClose, profile, onLogout }) {
                     <Link key={leagueItem.key} to={leagueItem.path} onClick={onClose}
                       className={`drawer__item drawer__item--sub ${isActive(leagueItem.path) ? "drawer__item--active" : ""}`}>
                       <LeagueIcon size={14} /><span>{leagueItem.label}</span>
+                    </Link>
+                  );
+                })}
+                {item.key === "practice" && PRACTICE_NAV_ITEMS.map(practiceItem => {
+                  const PracticeIcon = practiceItem.icon;
+                  return (
+                    <Link key={practiceItem.key} to={practiceItem.path} onClick={onClose}
+                      className={`drawer__item drawer__item--sub ${isActive(practiceItem.path) ? "drawer__item--active" : ""}`}>
+                      <PracticeIcon size={14} /><span>{practiceItem.label}</span>
+                    </Link>
+                  );
+                })}
+                {item.key === "teamsplayers" && teamsPlayersItems.map(lookupItem => {
+                  const LookupIcon = lookupItem.icon;
+                  return (
+                    <Link key={lookupItem.key} to={lookupItem.path} onClick={onClose}
+                      className={`drawer__item drawer__item--sub ${isActive(lookupItem.path) ? "drawer__item--active" : ""}`}>
+                      <LookupIcon size={14} /><span>{lookupItem.label}</span>
                     </Link>
                   );
                 })}
