@@ -261,13 +261,13 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                 <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
                     Import scope
-                    <select className="input" value={reviewReportType} onChange={e => { setReviewReportType(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                    <select className="input input--select" value={reviewReportType} onChange={e => { setReviewReportType(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
                       <option value="all">All categories — full season</option><option value="rost">Roster & ratings — full season</option><option value="div">Team standings — full season</option><option value="mvp">MVP standings — full season</option>
                     </select>
                   </label>
                   <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#CCC" }}>
                     Target season
-                    <select className="input" value={reviewSeasonId} onChange={e => { setReviewSeasonId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
+                    <select className="input input--select" value={reviewSeasonId} onChange={e => { setReviewSeasonId(e.target.value); setReviewValidation(null); setReviewResult(null); setReviewError(""); }} style={{ width: "100%" }}>
                       <option value="">Select target season…</option>
                       {reviewSeasonOptions.map(target => <option key={target.id} value={String(target.id)}>{target.type} {target.year} · {(target.divisions || []).length} division(s)</option>)}
                     </select>
@@ -381,13 +381,13 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
           <div className="manual-pdf-controls">
             <label className="manual-pdf-field">
               <span>Format</span>
-              <select className="input" value={manualFormat} onChange={e => { setManualFormat(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{width:"100%"}}>
+              <select className="input input--select" value={manualFormat} onChange={e => { setManualFormat(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{width:"100%"}}>
                 {manualFormatOptions.map(format => <option key={format} value={format}>{({ masters: "Masters", advanced: "Advanced", open: "Open" })[format] || format}</option>)}
               </select>
             </label>
             <label className="manual-pdf-field">
               <span>Day</span>
-              <select className="input" value={manualDay} onChange={e => { setManualDay(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{width:"100%"}}>
+              <select className="input input--select" value={manualDay} onChange={e => { setManualDay(e.target.value); setManualError(""); setData(null); setPreflight(null); setResult(null); setError(""); }} style={{width:"100%"}}>
                 {manualDayOptions.map(day => <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>)}
               </select>
             </label>

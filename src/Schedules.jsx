@@ -13,7 +13,7 @@ const css = `
 .schedules-controls{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
 .schedule-control{display:flex;flex-direction:column;gap:4px;}
 .schedule-control__label{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8A8A8A;}
-.schedule-select{width:100%;box-sizing:border-box;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:10px;color:#E0E0E0;padding:10px 36px 10px 12px;font-size:12px;font-weight:700;appearance:none;}
+.schedule-select{width:100%;box-sizing:border-box;padding-right:36px;appearance:none;}
 .schedule-select-wrap{position:relative;}
 .schedule-select-wrap svg{position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:#6A6A6A;}
 .schedule-summary{background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;padding:14px;margin-bottom:10px;}
@@ -208,7 +208,7 @@ export default function Schedules() {
           <div className="schedule-control">
             <div className="schedule-control__label">Season</div>
             <div className="schedule-select-wrap">
-              <select className="schedule-select" value={seasonId} onChange={e => setSeason(e.target.value)} disabled={loading}>
+              <select className="input input--select schedule-select" value={seasonId} onChange={e => setSeason(e.target.value)} disabled={loading}>
                 {!seasons.length && <option value="">Loading seasons…</option>}
                 {seasons.some(s => s.is_active) && (
                   <optgroup label="Active Seasons">

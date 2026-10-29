@@ -2015,14 +2015,14 @@ function ApplyForfeitPanel({ matchRow, onCancel, onDone }) {
             <div className="card__title">Table {s.setNum}</div>
             <div className="field">
               <Label>{shortTeamName} — forfeiting player (0 pts)</Label>
-              <select className="input" value={pick.forfeitingPlayer?.num ?? ""} onChange={e=>setPick(s.setNum,"forfeitingPlayer", shortAvailable.find(p=>p.num===e.target.value) ?? null)}>
+              <select className="input input--select" value={pick.forfeitingPlayer?.num ?? ""} onChange={e=>setPick(s.setNum,"forfeitingPlayer", shortAvailable.find(p=>p.num===e.target.value) ?? null)}>
                 <option value="">Select player…</option>
                 {shortAvailable.map(p => <option key={p.num} value={p.num}>{p.name}{p.nickname?` "${p.nickname}"`:""} ({p.rating})</option>)}
               </select>
             </div>
             <div className="field">
               <Label>{receivingTeamName} — receiving player</Label>
-              <select className="input" value={pick.receivingPlayer?.num ?? ""} onChange={e=>setPick(s.setNum,"receivingPlayer", receivingAvailable.find(p=>p.num===e.target.value) ?? null)}>
+              <select className="input input--select" value={pick.receivingPlayer?.num ?? ""} onChange={e=>setPick(s.setNum,"receivingPlayer", receivingAvailable.find(p=>p.num===e.target.value) ?? null)}>
                 <option value="">Select player…</option>
                 {receivingAvailable.map(p => <option key={p.num} value={p.num}>{p.name}{p.nickname?` "${p.nickname}"`:""} ({p.rating})</option>)}
               </select>
@@ -4279,7 +4279,7 @@ function PlayoffsTab({ divisionId, teams }) {
             {b.teams.map(t => (
               <div key={t.teamId} className="list-row">
                 <div className="list-row__body"><span className="list-row__name">{t.name}</span></div>
-                <select className="input" style={{maxWidth:160}} value={b.label} onChange={e=>moveTeam(t.teamId, b.label, e.target.value)}>
+                <select className="input input--select" style={{maxWidth:160}} value={b.label} onChange={e=>moveTeam(t.teamId, b.label, e.target.value)}>
                   {proposal.map(pb => <option key={pb.label} value={pb.label}>{pb.label}</option>)}
                 </select>
               </div>
