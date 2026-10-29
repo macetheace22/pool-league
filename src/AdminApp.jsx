@@ -4499,7 +4499,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             const isMe = u.id===currentUserId;
             const editing = editRoleId===u.id;
             return (
-              <div key={u.id} className="list-row" style={{flexDirection: editing ? "column" : "row", alignItems: editing ? "stretch" : "center", marginBottom: 10, padding: 10, borderRadius: 10, border: "1px solid #2E2E2E", background: "transparent"}}>
+              <div key={u.id} className={`list-row user-account-row${editing ? " user-account-row--editing" : ""}`} style={{flexDirection: editing ? "column" : "row", alignItems: editing ? "stretch" : "center", marginBottom: 10, padding: 10, borderRadius: 10, border: "1px solid #2E2E2E", background: "transparent"}}>
                 {editing ? (
                   <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
                     <div style={{display:"flex",alignItems:"center",gap:7}}>
@@ -4537,7 +4537,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                         {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        <RolePill role={u.role} small/>
+                        <RolePill role={u.role} small neutralText/>
                         {team && <span className="user-team-label">{team.name}</span>}
                       </div>
                       {u.email && <span className="list-row__sub">{u.email}</span>}
@@ -5851,10 +5851,10 @@ function PlayerRatingRow({ player, weekOptions, defaultTag, onManualRating, curr
   );
 }
 
-function RolePill({ role, small }) {
+function RolePill({ role, small, neutralText = false }) {
   const r = ROLES[role] ?? ROLES.player;
   return (
-    <span className={`role-pill ${small ? "role-pill--sm" : ""}`} style={{ color: r.color, background: r.bg, borderColor: r.border }}>
+    <span className={`role-pill ${small ? "role-pill--sm" : ""}`} style={{ color: neutralText ? "#9A9A9A" : r.color, background: r.bg, borderColor: r.border }}>
       {r.label}
     </span>
   );
@@ -6060,6 +6060,11 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .bracket-row__seed{font-family:'JetBrains Mono',monospace;font-size:10px;color:#5A5A5A;margin-right:3px;}
 .bracket-divider{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#5A5A5A;margin:8px 0 2px;}
 .bracket-champion{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;background:#0F2D1F;border-radius:8px;font-size:12px;font-weight:700;color:#5FCF9E;}
+.user-account-row{width:100%;min-width:0;box-sizing:border-box;}
+.user-account-row:not(.user-account-row--editing){gap:8px;}
+.user-account-row:not(.user-account-row--editing) .list-row__body{flex:1 1 auto;min-width:0;padding:4px 8px;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions{margin-left:auto;flex:0 0 auto;align-self:center;padding:0 2px 0 8px;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-icon{flex:0 0 auto;}
 .user-team-label{font-size:10px;color:#9A9A9A;font-weight:600;}
 .you-badge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;background:#2A1F00;color:#F59E0B;padding:2px 6px;border-radius:20px;}
 .save-flash{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#5FCF9E;padding:6px 10px;}
