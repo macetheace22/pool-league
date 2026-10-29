@@ -2001,7 +2001,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
           <div style={{ color: "#AAA", fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>Set up the divisions that belong to each season. IBA schedule and team imports are managed separately.</div>
           <label className="field">
             <Label>Season</Label>
-            <select className="input" value={divisionSeason?.id || ""} onChange={e => { setExpandedSeason(e.target.value); resetNewDivision(); setEditingDivId(null); setEditDivError(""); }} style={{ width: "100%" }}>
+            <select className="input input--select" value={divisionSeason?.id || ""} onChange={e => { setExpandedSeason(e.target.value); resetNewDivision(); setEditingDivId(null); setEditDivError(""); }} style={{ width: "100%" }}>
               {seasons.map(s => <option key={s.id} value={s.id}>{s.type} {s.year} · {s.is_active ? "Active" : "Inactive"}</option>)}
             </select>
           </label>
@@ -2012,8 +2012,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 <div key={d.id} className="div-row div-row--edit division-fields-form">
                   <label className="division-field division-field--number"><span>Division Number</span><input className="edit-input" aria-label="Division number" value={editDivNum} onChange={e => { setEditDivNum(e.target.value); setEditDivError(""); }} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} /></label>
                   <label className="division-field division-field--name"><span>Division Name</span><input className="edit-input" aria-label="Division name" value={editDivName} onChange={e => { setEditDivName(e.target.value); setEditDivError(""); }} onKeyDown={e => { if (e.key === "Enter") saveEditDivision(divisionSeason); }} /></label>
-                  <label className="division-field"><span>Format</span><select className="input" value={editDivFormat} onChange={e => { setEditDivFormat(e.target.value); setEditDivError(""); }} aria-label="Division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
-                  <label className="division-field"><span>Day</span><select className="input" value={editDivDay} onChange={e => { setEditDivDay(e.target.value); setEditDivError(""); }} aria-label="Division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
+                  <label className="division-field"><span>Format</span><select className="input input--select" value={editDivFormat} onChange={e => { setEditDivFormat(e.target.value); setEditDivError(""); }} aria-label="Division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
+                  <label className="division-field"><span>Day</span><select className="input input--select" value={editDivDay} onChange={e => { setEditDivDay(e.target.value); setEditDivError(""); }} aria-label="Division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
                   <label className="division-field"><span>Playoff Date</span><input type="date" className="input" aria-label={"Playoff date for division " + d.num} value={editDivPlayoffsDate} onChange={e => setEditDivPlayoffsDate(e.target.value)} /></label>
                   <div className="division-form-actions">
                     {editDivError && <div className="division-inline-error" role="alert">{editDivError}</div>}
@@ -2034,8 +2034,8 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 <div className="div-row div-row--edit division-fields-form division-add-form">
                   <label className="division-field division-field--number"><span>Division Number</span><input className="edit-input" aria-label="New division number" value={divNum} onChange={e => { setDivNum(e.target.value); setDivisionAddError(""); }} /></label>
                   <label className="division-field division-field--name"><span>Division Name</span><input className="edit-input" aria-label="New division name" value={divName} onChange={e => { setDivName(e.target.value); setDivisionAddError(""); }} /></label>
-                  <label className="division-field"><span>Format</span><select className="input" value={newDivisionFormat} onChange={e => { setNewDivisionFormat(e.target.value); setDivisionAddError(""); }} aria-label="New division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
-                  <label className="division-field"><span>Day</span><select className="input" value={newDivisionDay} onChange={e => { setNewDivisionDay(e.target.value); setDivisionAddError(""); }} aria-label="New division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
+                  <label className="division-field"><span>Format</span><select className="input input--select" value={newDivisionFormat} onChange={e => { setNewDivisionFormat(e.target.value); setDivisionAddError(""); }} aria-label="New division IBA format"><option value="">Select format…</option>{IBA_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}</select></label>
+                  <label className="division-field"><span>Day</span><select className="input input--select" value={newDivisionDay} onChange={e => { setNewDivisionDay(e.target.value); setDivisionAddError(""); }} aria-label="New division IBA day"><option value="">Select day…</option>{IBA_DAYS.map(d => <option key={d} value={d}>{d}</option>)}</select></label>
                   <label className="division-field"><span>Playoff Date</span><input type="date" className="input" aria-label="New division playoff date" value={newDivisionPlayoffsDate} onChange={e => setNewDivisionPlayoffsDate(e.target.value)} /></label>
                   <div className="division-form-actions">
                     {divisionAddError && <div className="division-inline-error" role="alert">{divisionAddError}</div>}
@@ -4505,11 +4505,17 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     <div style={{display:"flex",alignItems:"center",gap:7}}>
                       <span className="list-row__name">{u.username}</span>
                     </div>
-                    <select className="input input--select" value={editRole} onChange={e=>{setEditRole(e.target.value);setRoleErr("");}}>
-                      <option value="player">Player</option>
-                      <option value="captain">Team Captain</option>
-                      <option value="manager">League Manager</option>
-                    </select>
+                    <SearchableOptionSelect
+                      options={[
+                        {value:"player",label:"Player"},
+                        {value:"captain",label:"Team Captain"},
+                        {value:"manager",label:"League Manager"},
+                      ]}
+                      value={editRole}
+                      onChange={value=>{setEditRole(value);setRoleErr("");}}
+                      placeholder="Select a role…" ariaLabel="Edit user role"
+                      className="input input--select"
+                    />
                     {editRole==="captain" && (
                       <div className="field" style={{margin:0}}>
                         <SearchableTeamSelect teams={[...activePickableTeams, ...allTeams.filter(t=>t.id===editTeamId && !activePickableTeams.some(a=>a.id===t.id)).map(t=>({...t, context:`${t.context ? `${t.context} — ` : ""}current assignment`}))]} value={editTeamId} onChange={setEditTeamId} search={editTeamSearch} onSearch={setEditTeamSearch} placeholder="Select a team…" ariaLabel="Search teams for captain assignment" />
@@ -4577,11 +4583,17 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
           <div className="card">
             <div className="card__title">Generate Invite Code</div>
             <div className="field"><Label>Role</Label>
-              <select className="input input--select" value={newRole} onChange={e=>{setNewRole(e.target.value);setNewTeamId("");setInviteTeamSearch("");}}>
-                <option value="captain">Team Captain</option>
-                <option value="player">Player</option>
-                <option value="manager">League Manager</option>
-              </select>
+              <SearchableOptionSelect
+                options={[
+                  {value:"captain",label:"Team Captain"},
+                  {value:"player",label:"Player"},
+                  {value:"manager",label:"League Manager"},
+                ]}
+                value={newRole}
+                onChange={value=>{setNewRole(value);setNewTeamId("");setInviteTeamSearch("");}}
+                placeholder="Select a role…" ariaLabel="Invite user role"
+                className="input input--select"
+              />
             </div>
             {newRole==="captain" && (
               <div className="field">
@@ -4791,7 +4803,7 @@ function PlayoffsTab({ divisionId, teams }) {
             {b.teams.map(t => (
               <div key={t.teamId} className="list-row">
                 <div className="list-row__body"><span className="list-row__name">{t.name}</span></div>
-                <select className="input" style={{maxWidth:160}} value={b.label} onChange={e=>moveTeam(t.teamId, b.label, e.target.value)}>
+                <select className="input input--select" style={{maxWidth:160}} value={b.label} onChange={e=>moveTeam(t.teamId, b.label, e.target.value)}>
                   {proposal.map(pb => <option key={pb.label} value={pb.label}>{pb.label}</option>)}
                 </select>
               </div>
