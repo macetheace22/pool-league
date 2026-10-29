@@ -2657,21 +2657,6 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
 
   const standings = db.computeStandings(matches, standingsAdj);
   const mvp = db.computeMvp(matches, mvpAdj);
-  const nothingYet = matches.length === 0 && standings.length === 0 && mvp.length === 0;
-
-  if (nothingYet) {
-    return (
-      <>
-        <div className="empty-state">No completed matches yet for this division. Once both teams confirm a live match's final score, it'll show up here.</div>
-        {isManager && (
-          <button className="btn-secondary" onClick={()=>setManualEntryOpen(true)}>
-            <Plus size={13}/> Manually Record a Match
-          </button>
-        )}
-      </>
-    );
-  }
-
   return (
     <>
       <div className="sub-tab-bar">
@@ -2685,7 +2670,9 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
 
       {subTab==="standings" && (
         <>
-          <div className="list">
+          {standings.length === 0
+            ? <div className="empty-state">No team standings are available yet. Standings will appear after completed matches are recorded for this division.</div>
+            : <div className="list">
             {standings.map((t, i) => (
               <div key={t.teamId} className="list-row">
                 <div className="list-row__body">
@@ -2698,13 +2685,15 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </>
       )}
 
       {subTab==="mvp" && (
         <>
-          <div className="list">
+          {mvp.length === 0
+            ? <div className="empty-state">No MVP standings are available yet. Player rankings will appear after completed matches are recorded for this division.</div>
+            : <div className="list">
             {mvp.map((p, i) => (
               <div key={p.num} className="list-row">
                 <div className="list-row__body">
@@ -2717,7 +2706,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
           {isManager && <SeedMvpImport divisionId={divisionId} onImported={refresh} existingCount={mvpAdj.length} />}
         </>
       )}
