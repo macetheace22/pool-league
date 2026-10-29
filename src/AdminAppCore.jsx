@@ -3994,11 +3994,17 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     <div style={{display:"flex",alignItems:"center",gap:7}}>
                       <span className="list-row__name">@{u.username}</span>
                     </div>
-                    <select className="input input--select" value={editRole} onChange={e=>{setEditRole(e.target.value);setRoleErr("");}}>
-                      <option value="player">Player</option>
-                      <option value="captain">Team Captain</option>
-                      <option value="manager">League Manager</option>
-                    </select>
+                    <SearchableOptionSelect
+                      options={[
+                        {value:"player",label:"Player"},
+                        {value:"captain",label:"Team Captain"},
+                        {value:"manager",label:"League Manager"},
+                      ]}
+                      value={editRole}
+                      onChange={value=>{setEditRole(value);setRoleErr("");}}
+                      placeholder="Select a role…" ariaLabel="Edit user role"
+                      className="input input--select"
+                    />
                     {editRole==="captain" && (
                       <div className="field" style={{margin:0}}>
                                                 <select className="input input--select" aria-label="Assign captain team" value={editTeamId}
@@ -4061,11 +4067,17 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
           <div className="card">
             <div className="card__title">Generate Invite Code</div>
             <div className="field"><Label>Role</Label>
-              <select className="input input--select" value={newRole} onChange={e=>{setNewRole(e.target.value);setNewTeamId("");setTeamInput("");}}>
-                <option value="captain">Team Captain</option>
-                <option value="player">Player</option>
-                <option value="manager">League Manager</option>
-              </select>
+              <SearchableOptionSelect
+                options={[
+                  {value:"captain",label:"Team Captain"},
+                  {value:"player",label:"Player"},
+                  {value:"manager",label:"League Manager"},
+                ]}
+                value={newRole}
+                onChange={value=>{setNewRole(value);setNewTeamId("");setTeamInput("");}}
+                placeholder="Select a role…" ariaLabel="Invite user role"
+                className="input input--select"
+              />
             </div>
             {newRole==="captain" && (
               <div className="field"><Label>Assign Team</Label>
