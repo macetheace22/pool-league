@@ -4523,7 +4523,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     )}
                     {roleErr && <ErrorMsg>{roleErr}</ErrorMsg>}
                     <div style={{display:"flex",gap:6}}>
-                      <button className="btn-primary" onClick={()=>saveEditRole(u.id)} disabled={roleSaving}>{roleSaving?"Saving…":"Save Role"}</button>
+                      <button className="btn-primary" onClick={()=>saveEditRole(u.id)} disabled={roleSaving}>{roleSaving?"Saving…":editRole==="captain"?"Save Role & Team":"Save Role"}</button>
                       <button className="btn-sm" onClick={cancelEditRole}>Cancel</button>
                     </div>
                   </div>
