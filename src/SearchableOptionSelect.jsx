@@ -49,6 +49,7 @@ export default function SearchableOptionSelect({
           disabled={disabled}
           autoComplete="off"
           onFocus={() => {setQuery("");setOpen(true);setActiveIndex(-1);}}
+          onClick={() => {if (!open) {setQuery("");setOpen(true);setActiveIndex(-1);}}}
           onChange={event => {setQuery(event.target.value);setOpen(true);setActiveIndex(-1);}}
           onKeyDown={event => {
             if (event.key === "ArrowDown") {event.preventDefault();setOpen(true);setActiveIndex(i=>i < 0 ? 0 : Math.min(i+1,Math.max(filtered.length-1,0)));}

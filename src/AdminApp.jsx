@@ -5143,6 +5143,7 @@ function SearchableTeamSelect({ teams, value, onChange, search = "", onSearch, p
           style={{width:"100%",minWidth:0,boxSizing:"border-box",paddingRight:selected ? 38 : 12}}
           value={open ? search : (selected ? optionLabel(selected) : search)}
           onFocus={() => setOpen(true)}
+          onClick={() => { if (!open) { onSearch(""); setOpen(true); } }}
           onChange={e => { onSearch(e.target.value); setOpen(true); }}
           onKeyDown={e => {
             if (e.key === "Escape") { setOpen(false); onSearch(""); }
