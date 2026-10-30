@@ -57,7 +57,9 @@ export const LEAGUE_OFFICE_ITEMS = [
   { key: "teaminfo", label: "Team & Player Information",    path: "/team-info",    roles: ["manager", "captain", "player"], icon: Eye },
   { key: "players",  label: "Player Lookup / History",      path: "/player-lookup", roles: ["manager", "captain", "player"], icon: Search },
   { key: "teamlkp",  label: "Team Lookup / History",        path: "/team-lookup",  roles: ["manager", "captain", "player"], icon: Building2 },
-  { key: "matchlkp", label: "Match Lookup / History",       path: "/match-lookup", roles: ["manager", "captain", "player"], icon: ClipboardList },
+  { key: "teamstandings", label: "Team Standings", path: "/team-standings", roles: ["manager", "captain", "player"], icon: BarChart3 },
+  { key: "mvpstandings", label: "MVP Standings", path: "/mvp-standings", roles: ["manager", "captain", "player"], icon: Award },
+  { key: "matchlkp", label: "Match Lookup / History", path: "/match-lookup", roles: ["manager", "captain", "player"], icon: ClipboardList },
   { key: "leaderboard", label: "Advanced Stats Leaderboard", path: "/leaderboard", roles: ["manager", "captain", "player"], icon: TrendingUp },
 ];
 
@@ -146,6 +148,8 @@ const LEAGUE_NAV_ITEMS = [
   { key: "schedules", label: "Schedules", path: "/schedules", icon: Calendar, roles: ["manager", "captain", "player"] },
   { key: "matches", label: "Current League Matches", path: "/matches", icon: Trophy, roles: ["manager", "captain", "player"] },
   { key: "teaminfo", label: "Team and Player Information", path: "/team-info", icon: Eye, roles: ["manager", "captain", "player"] },
+  { key: "teamstandings", label: "Team Standings", path: "/team-standings", icon: BarChart3, roles: ["manager", "captain", "player"] },
+  { key: "mvpstandings", label: "MVP Standings", path: "/mvp-standings", icon: Award, roles: ["manager", "captain", "player"] },
   { key: "matchlkp", label: "Match Lookup / History", path: "/match-lookup", icon: ClipboardList, roles: ["manager", "captain", "player"] },
   { key: "myteam", label: "Manage My Team", path: "/my-team", icon: Users, roles: ["captain"] },
   { key: "leaderboard", label: "Advanced Stats Leaderboard", path: "/leaderboard", icon: TrendingUp, roles: ["manager", "captain", "player"] },
@@ -163,7 +167,7 @@ const TEAMS_PLAYERS_NAV_ITEMS = [
 
 export function NavDrawer({ open, onClose, profile, onLogout }) {
   const location = useLocation();
-  const movedNavKeys = ["schedules", "myteam", "matches", "teaminfo", "players", "teamlkp", "matchlkp", "leaderboard"];
+  const movedNavKeys = ["schedules", "myteam", "matches", "teaminfo", "players", "teamlkp", "teamstandings", "mvpstandings", "matchlkp", "leaderboard"];
   const officeItems = navItemsForRole(profile.role).filter(item => !movedNavKeys.includes(item.key));
   const leagueItems = LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
   const teamsPlayersItems = TEAMS_PLAYERS_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
