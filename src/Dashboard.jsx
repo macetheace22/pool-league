@@ -421,8 +421,10 @@ export function LeaguesDashboard() {
           <button className="btn-secondary" onClick={() => navigate("/schedules")}>View Full Schedule →</button>
         </DashCard>
 
-        <DashCard icon={BarChart3} title="League Stats">
-          <button className="btn-secondary" onClick={()=>navigate("/match-lookup")}>View Standings & MVP →</button>
+        <DashCard icon={BarChart3} title="League Standings & History">
+          <button className="btn-secondary" onClick={()=>navigate("/team-standings")}>View Team Standings →</button>
+          <button className="btn-secondary" onClick={()=>navigate("/mvp-standings")}>View MVP Standings →</button>
+          <button className="btn-secondary" onClick={()=>navigate("/match-lookup")}>Look Up Previous Matches →</button>
         </DashCard>
 
         {(isManager || isCaptain) && (
