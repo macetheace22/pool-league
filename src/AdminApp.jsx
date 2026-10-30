@@ -885,6 +885,24 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Coming-soon placeholders ──
   if (page === "players") return <PlayerLookupPage />;
   if (page === "teamlookup") return <TeamLookupPage />;
+  if (page === "standings" || page === "mvp") {
+    const isMvpPage = page === "mvp";
+    return (
+      <>
+        <PageHeader title={isMvpPage ? "MVP Standings" : "Team Standings"} />
+        <div className="tab-content">
+          <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
+            viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} />
+          {!viewingDiv
+            ? <div className="empty-state">Select a season and division to view {isMvpPage ? "MVP" : "team"} standings.</div>
+            : <HistoryTab key={`${viewingDiv.id}-${page}`} divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
+                seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null}
+                initialView={page} showTabs={false} />
+          }
+        </div>
+      </>
+    );
+  }
   if (page === "matchlkp") {
     return (
       <>
@@ -893,9 +911,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} />
           {!viewingDiv
-            ? <div className="empty-state">Pick a division above to see standings & match history.</div>
-            : <HistoryTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
-                seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null} />
+            ? <div className="empty-state">Select a season and division to view completed matches and scores.</div>
+            : <HistoryTab key={`${viewingDiv.id}-matches`} divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
+                seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null}
+                initialView="matches" showTabs={false} />
           }
         </div>
       </>
@@ -2417,9 +2436,9 @@ function ApplyForfeitPanel({ matchRow, onCancel, onDone }) {
   );
 }
 
-function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile, seasonFormat, seasonLabelText }) {
+function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile, seasonFormat, seasonLabelText, initialView = "standings", showTabs = true }) {
   const navigate = useNavigate();
-  const [subTab, setSubTab] = useState("standings");
+  const [subTab, setSubTab] = useState(initialView);
   const [matches, setMatches] = useState([]);
   const [standingsAdj, setStandingsAdj] = useState([]);
   const [mvpAdj, setMvpAdj] = useState([]);
@@ -2659,12 +2678,12 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const mvp = db.computeMvp(matches, mvpAdj);
   return (
     <>
-      <div className="sub-tab-bar">
+      {showTabs && <div className="sub-tab-bar">
         <button className={`sub-tab ${subTab==="standings"?"sub-tab--active":""}`} onClick={()=>setSubTab("standings")}>Standings</button>
         <button className={`sub-tab ${subTab==="mvp"?"sub-tab--active":""}`} onClick={()=>setSubTab("mvp")}>MVP</button>
         <button className={`sub-tab ${subTab==="matches"?"sub-tab--active":""}`} onClick={()=>setSubTab("matches")}>Matches ({matches.length})</button>
         <button className={`sub-tab ${subTab==="playoffs"?"sub-tab--active":""}`} onClick={()=>setSubTab("playoffs")}>Playoffs</button>
-      </div>
+      </div>}
 
       {subTab==="playoffs" && <PlayoffsHistoryView divisionId={divisionId} teams={teams} />}
 

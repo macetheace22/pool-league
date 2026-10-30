@@ -13,7 +13,10 @@ const css = `
 .schedules-controls{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:12px;}
 .schedule-control{display:flex;flex-direction:column;gap:4px;}
 .schedule-control__label{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#8A8A8A;}
-.schedule-select{width:100%;box-sizing:border-box;padding-right:36px;appearance:none;}
+.schedule-select{width:100%;box-sizing:border-box;min-height:42px;padding:10px 36px 10px 12px;appearance:none;background:#121212;border:1.5px solid #3A3A3A;border-radius:9px;font-family:"Archivo",sans-serif;font-size:16px;color:#FFF;color-scheme:dark;outline:none;cursor:pointer;}
+.schedule-select:focus{border-color:#5FCF9E;}
+.schedule-select:disabled{opacity:.55;cursor:not-allowed;}
+.schedule-select option,.schedule-select optgroup{background:#1C1C1C;color:#E0E0E0;}
 .schedule-select-wrap{position:relative;}
 .schedule-select-wrap svg{position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:#6A6A6A;}
 .schedule-summary{background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;padding:14px;margin-bottom:10px;}
@@ -231,7 +234,7 @@ export default function Schedules() {
           <div className="schedule-control">
             <div className="schedule-control__label">Division</div>
             <div className="schedule-select-wrap">
-              <select className="schedule-select" value={divisionId} onChange={e => setDivision(e.target.value)} disabled={!status?.divisions?.length}>
+              <select className="input input--select schedule-select" value={divisionId} onChange={e => setDivision(e.target.value)} disabled={!status?.divisions?.length}>
                 {!status?.divisions?.length && <option value="">No imported divisions</option>}
                 {(status?.divisions ?? []).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
@@ -257,7 +260,7 @@ export default function Schedules() {
               <div className="schedule-control__label">Week</div>
               <div className="schedule-select-wrap">
                 <select
-                  className="schedule-select"
+                  className="input input--select schedule-select"
                   value={selectedWeekId || ""}
                   onChange={e => setSelectedWeekId(e.target.value)}
                 >
