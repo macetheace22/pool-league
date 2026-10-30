@@ -123,6 +123,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/my-team" element={<AdminApp page="myteam" />} />
             <Route path="/player-lookup" element={<AdminApp page="players" />} />
             <Route path="/team-lookup" element={<AdminApp page="teamlookup" />} />
+            <Route path="/team-standings" element={<AdminApp page="standings" />} />
+            <Route path="/mvp-standings" element={<AdminApp page="mvp" />} />
             <Route path="/match-lookup" element={<AdminApp page="matchlkp" />} />
             <Route path="/leaderboard" element={<AdminApp page="leaderboard" />} />
             <Route path="/my-stats" element={<AdminApp page="stats" />} />
