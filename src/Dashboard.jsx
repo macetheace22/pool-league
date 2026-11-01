@@ -221,7 +221,9 @@ export function LeaguesDashboard() {
   const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
     ? selectedTeamId
     : selectedTeamIds[0] ?? null;
-  const [overview, setOverview] = useState(undefined); // undefined = loading, null = no team
+  const [overview, setOverview] = useState(undefined); // selected-team detail for captain tools
+  const [allTeamOverviews, setAllTeamOverviews] = useState(undefined);
+  const [myTeamStandings, setMyTeamStandings] = useState(undefined);
   const [lineupPlans, setLineupPlans] = useState(undefined); // undefined until initial team context has loaded
   const [unavailability, setUnavailability] = useState(undefined); // undefined until initial team context has loaded
   const [markingWeekId, setMarkingWeekId] = useState(null);
@@ -262,7 +264,35 @@ export function LeaguesDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTeamId]);
 
-  const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined;
+  useEffect(() => {
+    let cancelled = false;
+    if (!profile || selectedTeamIds.length === 0) {
+      setAllTeamOverviews([]);
+      setMyTeamStandings([]);
+      return () => { cancelled = true; };
+    }
+    setAllTeamOverviews(undefined);
+    setMyTeamStandings(undefined);
+    db.getMyTeamsOverview(profile).then(async overviews => {
+      if (cancelled) return;
+      const rows = await Promise.all((overviews ?? []).map(async o => ({
+        teamId: o.team.id,
+        teamName: o.team.name,
+        standing: await db.getTeamStandingsRow(o.team.id, o.team.division_id).catch(() => null),
+      })));
+      if (cancelled) return;
+      setAllTeamOverviews(overviews ?? []);
+      setMyTeamStandings(rows);
+    }).catch(() => {
+      if (cancelled) return;
+      setAllTeamOverviews([]);
+      setMyTeamStandings([]);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, profile?.team_memberships, profile?.player_num]);
+
+  const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined || allTeamOverviews === undefined || myTeamStandings === undefined;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcomingAll = overview && Array.isArray(overview.myWeeks) ? overview.myWeeks
     .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
@@ -421,35 +451,40 @@ export function LeaguesDashboard() {
         )}
 
         <DashCard icon={Calendar} title="League Schedule">
-          <button className="btn-secondary" onClick={() => navigate("/schedules")}>View Full Schedule →</button>
+          {(() => {
+            const upcomingForMyTeams = (allTeamOverviews ?? []).flatMap(teamOverview =>
+              (teamOverview.myWeeks ?? []).map(week => ({
+                week, overview: teamOverview, _date: parseWeekDate(week.date),
+              })).filter(item => item._date && item._date >= today)
+            ).sort((a, b) => a._date - b._date);
+            const showTeam = (allTeamOverviews ?? []).length > 1;
+            return upcomingForMyTeams.length === 0
+              ? <div className="dash-empty">No upcoming matches scheduled for your teams.</div>
+              : upcomingForMyTeams.slice(0, 5).map((item, index) => (
+                  <div key={`${item.overview.team.id}-${item.week.id ?? item.week.week ?? index}`} style={{marginBottom:6}}>
+                    {showTeam && <div className="match-row__meta" style={{fontWeight:700,marginBottom:2}}>{item.overview.team.name}</div>}
+                    <MatchRow item={item.week} overview={item.overview} isUpcoming clickable={false} />
+                  </div>
+                ));
+          })()}
         </DashCard>
 
-        <DashCard icon={BarChart3} title="League Standings & History">
-          <button className="btn-secondary" onClick={()=>navigate("/team-standings")}>View Team Standings →</button>
-          <button className="btn-secondary" onClick={()=>navigate("/mvp-standings")}>View MVP Standings →</button>
-          <button className="btn-secondary" onClick={()=>navigate("/match-lookup")}>Look Up Previous Matches →</button>
+        <DashCard icon={BarChart3} title="League Standings">
+          {(myTeamStandings ?? []).length === 0 ? (
+            <div className="dash-empty">Current standings for your teams are not available yet.</div>
+          ) : myTeamStandings.map(row => (
+            <div key={row.teamId} className="match-row">
+              <div className="match-row__opponent">{row.teamName}</div>
+              <div className="match-row__meta">
+                {row.standing
+                  ? `Ranked ${row.standing.rank} of ${row.standing.totalTeams}${row.standing.wins != null ? ` · ${row.standing.wins}W–${row.standing.losses ?? 0}L` : ""}`
+                  : "No standings recorded yet"}
+              </div>
+            </div>
+          ))}
         </DashCard>
 
-        {(isManager || isCaptain) && (
-          <Link to="/league-office" className="office-card">
-            <Wrench size={18} />
-            <div>
-              <div className="office-card__title">League Office</div>
-              <div className="office-card__desc">{isManager ? "Full league administration" : "Manage your team"}</div>
-            </div>
-            <ChevronRight size={16} />
-          </Link>
-        )}
-        {!isManager && !isCaptain && (
-          <Link to="/league-office" className="office-card">
-            <Wrench size={18} />
-            <div>
-              <div className="office-card__title">League Office</div>
-              <div className="office-card__desc">Team & player lookup tools</div>
-            </div>
-            <ChevronRight size={16} />
-          </Link>
-        )}
+
         </>}
       </div>
       <TabBar />

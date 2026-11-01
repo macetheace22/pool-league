@@ -52,7 +52,6 @@ export const LEAGUE_OFFICE_ITEMS = [
   { key: "season-workspace", label: "Season Setup & Management", path: "/season-management", roles: ["manager"], icon: Calendar },
   { key: "access", label: "Manage App Access", path: "/access", roles: ["manager"], icon: Key },
   { key: "myteam", label: "Manage My Team", path: "/my-team", roles: ["captain"], icon: Users },
-  { key: "matchlkp", label: "Match Lookup / History", path: "/match-lookup", roles: ["manager", "captain", "player"], icon: ClipboardList },
 ];
 
 export function navItemsForRole(role) {
