@@ -70,6 +70,8 @@ describe("manager and captain role separation", () => {
     expect(sql).toContain("perform public.remove_team_captain(v_team_id, p_profile_id)");
     expect(sql).toContain("revoke all on function public.assign_team_captain(uuid, uuid) from public, anon");
     expect(sql).toContain("grant execute on function public.claim_invite_code(text) to authenticated");
+    expect(sql).toContain("perform set_config('app.bypass_privilege_check', 'true', true)");
+    expect(sql).toContain("for update");
   });
 });
 
