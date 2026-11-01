@@ -99,6 +99,11 @@ begin
       );
     end if;
 
+  end if;
+
+  -- Consume every valid invite, including manager/player invites that do not
+  -- carry a team_id. Otherwise a team-less manager invite could be reused.
+  if v_invite.code is not null then
     update public.invite_codes
     set used_at = now(),
         used_by = new.id
