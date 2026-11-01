@@ -4358,7 +4358,7 @@ function LeaderboardPage() {
 
   return (
     <>
-      <PageHeader title="Advanced Stats Leaderboard" subtitle={divisionFilter ? "This division/season" : "Leaguewide · all-time"} />
+      <PageHeader title="Advanced Stats Leaderboard" />
       <div className="tab-content">
         {initialLoading || rankingLoading ? <Loader /> : loadError ? <ErrorMsg>{loadError}</ErrorMsg> : rawEvents === null && <div className="empty-state">No advanced stats tracked yet leaguewide — once players start using "Track a Rack," rankings will show up here.</div>}
         {!initialLoading && !rankingLoading && !loadError && rawEvents && (
