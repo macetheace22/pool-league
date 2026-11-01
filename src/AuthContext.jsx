@@ -261,7 +261,12 @@ function RegisterScreen({ onBack }) {
       options: { data: { invite_code: code.trim(), username: username.trim(), phone_number: phone.trim() } },
     });
     setLoading(false);
-    if (error) { setError(error.message); return; }
+    if (error) {
+      setError(error.message?.includes("PLAYER_ALREADY_CLAIMED")
+        ? "That player number is already linked to another account. Ask your league manager to verify the roster entry."
+        : error.message);
+      return;
+    }
     setError("");
     setNotice("Account created. Check your email to confirm, then sign in.");
   };
