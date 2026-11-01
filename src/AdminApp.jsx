@@ -281,7 +281,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => captainTeamIds.includes(team.id))); })
       .catch(() => { if (!cancelled) setCaptainTeams([]); });
     return () => { cancelled = true; };
-  }, [profile.id, isCaptain, isManager, captainTeamIds.join("|")]);
+  }, [profile.id, captainTeamIds.join("|")]);
 
   const [seasons, setSeasons] = useState([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
