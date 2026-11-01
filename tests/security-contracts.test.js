@@ -81,3 +81,23 @@ describe("captain navigation follows team assignments", () => {
     expect(shell).toContain("(profile.captain_team_ids ?? []).length > 0");
   });
 });
+
+
+describe("player identity linking requires trusted invites", () => {
+  it("does not accept user-editable player numbers at registration", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).not.toContain("player_num: playerNum.trim()");
+    expect(auth).toContain("invite_code: code.trim()");
+  });
+  it("limits direct player-number corrections to managers", () => {
+    const migration = read("supabase-schema-section-78-protect-player-number-linking.sql");
+    expect(migration).toContain("raw_user_meta_data->>'invite_code'");
+    expect(migration).not.toContain("raw_user_meta_data->>'player_num'");
+    expect(migration).toContain("pg_advisory_xact_lock(118004, 1)");
+    expect(migration).toContain("for update");
+    expect(migration).toContain("PLAYER_NUMBER_REQUIRES_MANAGER_OR_INVITE");
+    expect(migration).toContain("if v_invite.code is not null then");
+    const admin = read("src/AdminApp.jsx");
+    expect(admin).toContain('profile.role === "manager" ? (');
+  });
+});
