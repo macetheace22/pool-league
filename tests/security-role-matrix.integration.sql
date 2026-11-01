@@ -37,6 +37,7 @@ declare
   v_invite_code text;
   v_conflict_invite_code text;
   v_existing_player_num text;
+  v_invite_claimed boolean;
 begin
   select id into v_manager from public.profiles
     where role = 'manager' and is_active
@@ -327,6 +328,7 @@ begin
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_nonmember::text, 'role', 'authenticated')::text, true);
   perform public.claim_invite_code(v_invite_code);
   if (select player_num from public.profiles where id = v_nonmember) is distinct from v_test_player_num
+     or (select is_claimed from public.profiles where id = v_nonmember) is distinct from true
      or not exists (
        select 1 from public.profile_team_memberships
        where profile_id = v_nonmember and team_id = v_team_id and ended_at is null
@@ -337,6 +339,18 @@ begin
      ) then
     raise exception 'FAIL trusted player invite must link only its stored player number and team';
   end if;
+
+  -- The same invite is single-use after a successful claim.
+  perform set_config('request.jwt.claim.sub', v_player::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_player::text, 'role', 'authenticated')::text, true);
+  begin
+    perform public.claim_invite_code(v_invite_code);
+    raise exception 'FAIL a used player invite must not be redeemable twice';
+  exception when others then
+    if sqlerrm <> 'Invalid or expired invite code' then
+      raise;
+    end if;
+  end;
 
   -- An invite cannot link a player number already claimed by another
   -- profile, and the rejected invite remains unused.
