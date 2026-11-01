@@ -111,9 +111,18 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
 
   return (
     <>
-      <PageHeader title="Practice" hideBack />
+      <PageHeader title="Practice" />
       <div className="tab-content">
-        <button className="btn-primary" onClick={onStart}>+ New Practice Session</button>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
+          <button className="office-list-item" onClick={onStart}>
+            <Plus size={16} /><span>New Practice Session</span>
+            <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+          </button>
+          <button className="office-list-item" onClick={() => document.getElementById("practice-sessions")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+            <Trophy size={16} /><span>My Practice Sessions</span>
+            <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+          </button>
+        </div>
 
         {opponents.length > 0 && (
           <div className="card">
@@ -150,8 +159,8 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
           </div>
         )}
 
-        <div className="card">
-          <div className="card__title">{filterOpponent ? "Games vs This Opponent" : "Recent Games"}</div>
+        <div className="card" id="practice-sessions">
+          <div className="card__title">{filterOpponent ? "Games vs This Opponent" : "My Practice Sessions"}</div>
           {history === undefined && <Loader />}
           {history && visibleGames.length === 0 && <div className="dash-empty">No practice games yet.</div>}
           {history && visibleGames.map(g => (
