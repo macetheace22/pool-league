@@ -96,6 +96,9 @@ describe("player identity linking requires trusted invites", () => {
     expect(migration).toContain("pg_advisory_xact_lock(118004, 1)");
     expect(migration).toContain("for update");
     expect(migration).toContain("PLAYER_NUMBER_REQUIRES_MANAGER_OR_INVITE");
+    expect(migration).toContain("new.player_num := old.player_num");
+    expect(migration).toContain("set_config('app.bypass_privilege_check', 'true', true)");
+    expect(migration).toContain("create or replace function public.remove_player_from_team");
     expect(migration).toContain("if v_invite.code is not null then");
     const admin = read("src/AdminApp.jsx");
     expect(admin).toContain('profile.role === "manager" ? (');
