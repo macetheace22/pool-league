@@ -264,16 +264,18 @@ export function LeaguesDashboard() {
 
   const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined;
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const upcomingAll = overview ? overview.myWeeks
+  const upcomingAll = overview && Array.isArray(overview.myWeeks) ? overview.myWeeks
     .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
     .filter(w => w._date && w._date >= today)
     .sort((a, b) => a._date - b._date) : [];
-  const previousAll = overview?.myCompleted ?? [];
+  const previousAll = Array.isArray(overview?.myCompleted) ? overview.myCompleted : [];
   const myMakeups = previousAll.filter(m => m.is_makeup_pending);
   const upcomingWeekIds = new Set(upcomingAll.map(w => w.id));
-  const upcomingPlans = lineupPlans.filter(p => upcomingWeekIds.has(p.scheduleWeekId) && (p.players.length > 0 || p.note));
+  const safeLineupPlans = Array.isArray(lineupPlans) ? lineupPlans : [];
+  const safeUnavailability = Array.isArray(unavailability) ? unavailability : [];
+  const upcomingPlans = safeLineupPlans.filter(p => upcomingWeekIds.has(p.scheduleWeekId) && ((Array.isArray(p.players) && p.players.length > 0) || p.note));
   const myUnavailableByWeek = new Map(
-    unavailability.filter(u => u.playerNum === profile?.player_num).map(u => [u.scheduleWeekId, u])
+    safeUnavailability.filter(u => u.playerNum === profile?.player_num).map(u => [u.scheduleWeekId, u])
   );
   const markUnavailable = async (weekId) => {
     await db.setUnavailability(effectiveTeamId, weekId, profile.player_num, reasonInput, profile.id);
@@ -310,14 +312,14 @@ export function LeaguesDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Leagues" />
       <div className="tab-content">
-        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
           {LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile?.role)).map(item => {
             const Icon = item.icon;
             return (
-              <Link key={item.key} to={item.path} className="office-list-item">
-                <Icon size={16} />
-                <span>{item.label}</span>
-                <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+              <Link key={item.key} to={item.path} className="office-card">
+                <Icon size={20} color="#5FCF9E" />
+                <div style={{flex:1,minWidth:0}}><div className="office-card__title">{item.label}</div></div>
+                <ChevronRight size={16} color="#6A6A6A" />
               </Link>
             );
           })}
@@ -473,8 +475,8 @@ function DashCard({ icon: Icon, title, onMore, children }) {
 // informational only for now.
 function MatchRow({ item, overview, isUpcoming, clickable }) {
   if (isUpcoming) {
-    const p = item.pairings[0];
-    const opp = opponentName(p, overview.team.id, overview.teams);
+    const p = Array.isArray(item.pairings) ? item.pairings[0] : null;
+    const opp = p ? opponentName(p, overview.team.id, overview.teams) : "TBD";
     return (
       <div className="match-row">
         <div className="match-row__opponent">vs {opp}</div>
