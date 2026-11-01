@@ -254,7 +254,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 
   return (
     <>
-      <PageHeader title="Practice" subtitle="Who are you playing?" />
+      <PageHeader title="Practice" />
       <div className="tab-content">
         <div className="field">
           <div className="form-label" style={{display:"flex",alignItems:"center",gap:5}}><Search size={11}/> Search league players</div>

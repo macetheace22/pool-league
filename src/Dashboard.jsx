@@ -310,7 +310,7 @@ export function LeaguesDashboard() {
   return (
     <div className="app">
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
-      <PageHeader title="Leagues" />
+      <PageHeader title="Leagues" backFallback="/" />
       <div className="tab-content">
         <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
           {LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile?.role)).map(item => {

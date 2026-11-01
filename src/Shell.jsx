@@ -292,10 +292,15 @@ function PoolBallMark({ size = 28 }) {
   );
 }
 
-export function PageHeader({ title, subtitle, hideBack }) {
+export function PageHeader({ title, subtitle, hideBack, backFallback }) {
   const { profile, logout } = useAuth();
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { canGoBack, goBack } = useNavHistory();
+  const handleBack = () => {
+    if (canGoBack) goBack();
+    else if (backFallback) navigate(backFallback);
+  };
 
   if (!profile) return null;
 
@@ -306,8 +311,8 @@ export function PageHeader({ title, subtitle, hideBack }) {
           <Link to="/" className="page-header__brand" aria-label="Home" title="Go to Home">
             <PoolBallMark size={28} />
           </Link>
-          {!hideBack && canGoBack && (
-            <button className="btn-icon-sm" onClick={goBack} aria-label="Back"><ChevronLeft size={16} /></button>
+          {!hideBack && (canGoBack || backFallback) && (
+            <button className="btn-icon-sm" onClick={handleBack} aria-label="Back"><ChevronLeft size={16} /></button>
           )}
           <button className="btn-icon-sm" onClick={() => setDrawerOpen(true)} aria-label="Open menu"><Menu size={15} /></button>
           <div className="page-header__page-label">
