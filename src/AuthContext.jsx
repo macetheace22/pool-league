@@ -97,7 +97,7 @@ export function AuthProvider({ children }) {
     }}>
       {children}
       {previewProfile && (
-        <div style={{position:"fixed",zIndex:2000,top:"calc(8px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:"#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
+        <div style={{position:"fixed",zIndex:2000,top:"calc(66px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:"#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
           <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>Previewing {previewProfile.username} · Your manager account remains signed in</span>
           <button type="button" onClick={stopMimic} style={{border:0,borderRadius:8,padding:"8px 11px",background:"#F2C14E",color:"#241A05",fontSize:12,fontWeight:800,whiteSpace:"nowrap",cursor:"pointer"}}>Stop Mimicking</button>
         </div>
