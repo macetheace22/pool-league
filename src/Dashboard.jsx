@@ -216,12 +216,12 @@ export function LeaguesDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const isManager = profile?.role === "manager";
-  const isCaptainOfSelectedTeam = isCaptainOfTeam(profile, effectiveTeamId);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const selectedTeamIds = getActiveTeamIds(profile);
   const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
     ? selectedTeamId
     : selectedTeamIds[0] ?? null;
+  const isCaptainOfSelectedTeam = isCaptainOfTeam(profile, effectiveTeamId);
   const [overview, setOverview] = useState(undefined); // selected-team detail for captain tools
   const [allTeamOverviews, setAllTeamOverviews] = useState(undefined);
   const [myTeamStandings, setMyTeamStandings] = useState(undefined);
