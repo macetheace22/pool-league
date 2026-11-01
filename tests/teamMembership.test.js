@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getActiveTeamIds, hasActiveTeamMembership, getCaptainTeamIds, isCaptainOfTeam } from "../src/teamMembership";
+import { getActiveTeamIds, hasActiveTeamMembership, getCaptainTeamIds, isCaptainOfTeam, getCaptainMatchSlot } from "../src/teamMembership";
 
 describe("team membership context", () => {
   it("returns active memberships only", () => {
