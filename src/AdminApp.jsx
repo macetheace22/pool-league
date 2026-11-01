@@ -4420,6 +4420,7 @@ function formatLastSeen(iso) {
 
 // ─── Accounts Tab ─────────────────────────────────────────────────────────────
 function AccountsTab({ currentUserId, subTab, onCounts }) {
+  const { startMimic } = useAuth();
   const [users, setUsers]       = useState([]);
   const [codes, setCodes]       = useState([]);
   const [allTeams, setAllTeams] = useState([]);
