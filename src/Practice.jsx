@@ -502,7 +502,11 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
       try {
         let existing = await db.getPracticeGame(session.gameId, profile.id);
         if (!existing) {
+          // A second mount (for example React StrictMode) may race the first
+          // insert on the same UUID. Re-read after an insert conflict rather
+          // than creating a second parent row or failing a valid resume.
           existing = await db.createPracticeGame({ id: session.gameId, ...practiceGameRow(profile, session) });
+          if (!existing) existing = await db.getPracticeGame(session.gameId, profile.id);
         }
         if (!existing) throw new Error("The practice game could not be created or recovered.");
         if (!cancelled) setRecordStatus("ready");
@@ -666,12 +670,20 @@ function DoneStep({ profile, session, onSaved }) {
   const saveResult = async () => {
     setSaving(true);
     setError("");
-    const saved = session.gameId
-      ? await db.updatePracticeGame(session.gameId, profile.id, practiceGameRow(profile, session))
-      : null;
-    setSaving(false);
-    if (saved) onSaved();
-    else setError("The practice result could not be saved. Your shot log is still attached to this practice game; retry the result save.");
+    try {
+      const saved = session.gameId
+        ? await db.updatePracticeGame(session.gameId, profile.id, practiceGameRow(profile, session))
+        : null;
+      if (saved) {
+        onSaved();
+        return;
+      }
+      setError("The practice result could not be saved. Your shot log is still attached to this practice game; retry the result save.");
+    } catch (saveError) {
+      setError(saveError?.message || "The practice result could not be saved. Please retry.");
+    } finally {
+      setSaving(false);
+    }
   };
   useEffect(() => { saveResult(); }, []);
   return (
