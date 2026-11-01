@@ -278,7 +278,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!isCaptain || captainTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
+    if ((!isCaptain && !isManager) || captainTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
     db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => captainTeamIds.includes(team.id))); })
       .catch(() => { if (!cancelled) setCaptainTeams([]); });
     return () => { cancelled = true; };
@@ -855,7 +855,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   // ── Manage My Team — captain only ──
   if (page === "myteam") {
-    if (!isCaptain || captainTeamIds.length === 0) return <><PageHeader title="Manage My Team"/><div className="tab-content"><AccessDenied/></div></>;
+    if ((!isCaptain && !isManager) || captainTeamIds.length === 0) return <><PageHeader title="Manage My Team"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
         <PageHeader title="Manage My Team" />
