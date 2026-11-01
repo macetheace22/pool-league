@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation, useNavigationType } from "react-router-
 import {
   Menu, X, ChevronLeft, LogOut, UserCircle, Calendar, Settings2, Upload,
   Trophy, Eye, Users, Search, ClipboardList, Key, Building2,
-  Home, Dumbbell, Award, TrendingUp, Wrench, BarChart3,
+  Home, Dumbbell, Award, TrendingUp, Wrench, BarChart3, Newspaper,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 
@@ -51,6 +51,7 @@ export function NavHistoryProvider({ children }) {
 export const LEAGUE_OFFICE_ITEMS = [
   { key: "season-workspace", label: "Season Setup & Management", path: "/season-management", roles: ["manager"], icon: Calendar },
   { key: "access", label: "Manage App Access", path: "/access", roles: ["manager"], icon: Key },
+  { key: "league-news", label: "Manage League News", path: "/league-news", roles: ["manager"], icon: Newspaper },
   { key: "myteam", label: "Manage My Team", path: "/my-team", roles: ["captain"], icon: Users },
 ];
 

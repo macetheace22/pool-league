@@ -229,6 +229,7 @@ export function LeaguesDashboard() {
   const [markingWeekId, setMarkingWeekId] = useState(null);
   const [reasonInput, setReasonInput] = useState("");
   const [view, setView] = useState("main"); // "main" | "upcoming" | "previous"
+  const [leagueNews, setLeagueNews] = useState(undefined); // undefined until published announcements load
 
   const refreshUnavailability = () => { if (effectiveTeamId) db.listTeamUnavailability(effectiveTeamId).then(setUnavailability); };
 
@@ -292,7 +293,20 @@ export function LeaguesDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id, profile?.team_memberships, profile?.player_num]);
 
-  const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined || allTeamOverviews === undefined || myTeamStandings === undefined;
+  useEffect(() => {
+    let cancelled = false;
+    setLeagueNews(undefined);
+    if (!profile?.id) {
+      setLeagueNews([]);
+      return () => { cancelled = true; };
+    }
+    db.listPublishedLeagueNews()
+      .then(posts => { if (!cancelled) setLeagueNews(posts ?? []); })
+      .catch(() => { if (!cancelled) setLeagueNews([]); });
+    return () => { cancelled = true; };
+  }, [profile?.id]);
+
+  const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined || allTeamOverviews === undefined || myTeamStandings === undefined || leagueNews === undefined;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcomingAll = overview && Array.isArray(overview.myWeeks) ? overview.myWeeks
     .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
@@ -342,23 +356,20 @@ export function LeaguesDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Leagues" backFallback="/" />
       <div className="tab-content">
-        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
-          {LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile?.role)).map(item => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.key} to={item.path} className="office-card">
-                <Icon size={20} color="#5FCF9E" />
-                <div style={{flex:1,minWidth:0}}><div className="office-card__title">{item.label}</div></div>
-                <ChevronRight size={16} color="#6A6A6A" />
-              </Link>
-            );
-          })}
-        </div>
         {leaguesLoading ? <Loader /> : <>
-        {/* League News -- fee/membership tracking not built yet */}
-        <DashCard icon={Newspaper} title="League News">
-          <div className="empty-state" style={{padding:14}}>Coming soon — league fees and IBA membership status will show here.</div>
-        </DashCard>
+        {leagueNews.length > 0 && (
+          <DashCard icon={Newspaper} title="League News">
+            {leagueNews.map(post => (
+              <div key={post.id} className="match-row" style={{paddingTop:9,paddingBottom:9}}>
+                <div className="match-row__opponent">{post.title}</div>
+                <div className="match-row__meta" style={{marginTop:3}}>
+                  {post.published_at ? new Date(post.published_at).toLocaleDateString() : ""}
+                </div>
+                <div style={{fontSize:12,color:"#C8C8C8",lineHeight:1.55,whiteSpace:"pre-wrap",marginTop:6}}>{post.body}</div>
+              </div>
+            ))}
+          </DashCard>
+        )}
 
         {overview === undefined && <Loader />}
 
@@ -486,6 +497,18 @@ export function LeaguesDashboard() {
 
 
         </>}
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+          {LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile?.role)).map(item => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.key} to={item.path} className="office-card">
+                <Icon size={20} color="#5FCF9E" />
+                <div style={{flex:1,minWidth:0}}><div className="office-card__title">{item.label}</div></div>
+                <ChevronRight size={16} color="#6A6A6A" />
+              </Link>
+            );
+          })}
+        </div>
       </div>
       <TabBar />
     </div>
