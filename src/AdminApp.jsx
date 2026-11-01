@@ -7,7 +7,7 @@ import {
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import SearchableOptionSelect from "./SearchableOptionSelect";
-import { getActiveTeamIds, getCaptainTeamIds, isCaptainOfTeam } from "./teamMembership";
+import { getActiveTeamIds, getCaptainTeamIds, getCaptainMatchSlot, isCaptainOfTeam } from "./teamMembership";
 import TeamContextSelector from "./TeamContextSelector";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
@@ -2499,11 +2499,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
     if (m.confirmed_at && isSameCalendarDay(new Date(m.confirmed_at))) return true;
     return false;
   };
-  const mySlotInMatch = (m) => {
-    const captainTeamIds = getCaptainTeamIds(myProfile);
-    return captainTeamIds.includes(m.team_home_id) ? "home"
-      : captainTeamIds.includes(m.team_away_id) ? "away" : null;
-  };
+  const mySlotInMatch = (m) => getCaptainMatchSlot(myProfile, m);
   const isCaptainOfMatch = (m) => !!mySlotInMatch(m);
   const canReopen = (m) => !m.is_makeup_pending && !m.reopened_at && (m.team_home_total!=null || m.team_away_total!=null)
     && (isManager || (isCaptainOfMatch(m) && isMatchNight(m)));
