@@ -309,14 +309,13 @@ begin
   where not exists (select 1 from public.profiles p where p.player_num = pl.num)
   order by pl.num
   limit 1;
-  select pl.num into v_other_player_num
-  from public.players pl
-  where pl.num is distinct from v_test_player_num
-    and not exists (select 1 from public.profiles p where p.player_num = pl.num)
-  order by pl.num
+  select p.player_num into v_other_player_num
+  from public.profiles p
+  where p.id <> v_nonmember and p.player_num is not null
+  order by p.id
   limit 1;
   if v_test_player_num is null or v_other_player_num is null then
-    raise exception 'FIXTURES_REQUIRED: two unlinked player records are required for player-number authorization coverage';
+    raise exception 'FIXTURES_REQUIRED: one unlinked player record and one already-linked profile are required for player-number authorization coverage';
   end if;
 
   -- A player-specific invite links the server-stored number and team. The
@@ -339,16 +338,16 @@ begin
     raise exception 'FAIL trusted player invite must link only its stored player number and team';
   end if;
 
-  -- An invite for a different player number cannot silently replace an
-  -- already-linked identity, and the rejected invite remains unused.
+  -- An invite cannot link a player number already claimed by another
+  -- profile, and the rejected invite remains unused.
   v_conflict_invite_code := 'ROLE-' || substr(md5(random()::text || clock_timestamp()::text), 1, 12);
   insert into public.invite_codes(code, role, team_id, player_num, expires_at, label_name)
-  values (v_conflict_invite_code, 'player', v_team_id, v_other_player_num, now() + interval '1 day', 'role-matrix conflict');
+  values (v_conflict_invite_code, 'player', v_team_id, v_other_player_num, now() + interval '1 day', 'role-matrix claimed-number conflict');
   begin
     perform public.claim_invite_code(v_conflict_invite_code);
     raise exception 'FAIL a different player invite must not replace an existing player number';
   exception when others then
-    if sqlerrm <> 'PLAYER_NUMBER_ALREADY_LINKED' then
+    if sqlerrm <> 'PLAYER_ALREADY_CLAIMED' then
       raise;
     end if;
   end;
@@ -357,7 +356,7 @@ begin
        select 1 from public.invite_codes
        where code = v_conflict_invite_code and used_at is not null
      ) then
-    raise exception 'FAIL rejected player-number reassignment must preserve identity and leave invite unused';
+    raise exception 'FAIL invite for an already-claimed player number must preserve identity and leave invite unused';
   end if;
 
   perform set_config('request.jwt.claim.sub', v_manager::text, true);
