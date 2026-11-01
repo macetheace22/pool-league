@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { Plus, Minus, Search, Check, ChevronRight, Trophy } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
@@ -23,6 +23,7 @@ function gameTypeLabel(key) { return GAME_TYPES.find(g => g.key === key)?.label 
 
 export default function Practice() {
   const { profile } = useAuth();
+  const location = useLocation();
   const [phase, setPhase] = useState("landing"); // landing | opponent | gametype | format | config | play | done
   const [session, setSession] = useState(null);
   const [history, setHistory] = useState(undefined);
@@ -47,6 +48,9 @@ export default function Practice() {
     });
     setPhase("opponent");
   };
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
+  }, [location.search]);
   const cancelSession = () => { setSession(null); setPhase("landing"); };
 
   const wrap = (children) => (
@@ -93,6 +97,7 @@ export default function Practice() {
 function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const sessionsRef = useRef(null);
   const [filterOpponent, setFilterOpponent] = useState(null);
+  const [showAllSessions, setShowAllSessions] = useState(false);
   const [linkingKey, setLinkingKey] = useState(null);
 
   const opponentKey = (g) => g.opponent_player_num ? `p:${g.opponent_player_num}` : `o:${g.opponent_id}`;
@@ -103,7 +108,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
     if (g.winner === "me") byOpponent[key].wins++; else if (g.winner === "opponent") byOpponent[key].losses++;
   });
   const opponents = Object.values(byOpponent).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses));
-  const visibleGames = filterOpponent ? (history ?? []).filter(g => opponentKey(g) === filterOpponent) : (history ?? []).slice(0, 10);
+  const visibleGames = filterOpponent ? (history ?? []).filter(g => opponentKey(g) === filterOpponent) : showAllSessions ? (history ?? []) : (history ?? []).slice(0, 10);
   const rawById = Object.fromEntries((rawOpponents ?? []).map(o => [o.id, o]));
 
   return (
@@ -115,7 +120,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
             <Plus size={16} /><span>New Practice Session</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
           </button>
-          <button type="button" onClick={() => sessionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })} className="office-list-item">
+          <button type="button" onClick={() => { setShowAllSessions(true); sessionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="office-list-item" aria-controls="practice-sessions">
             <Trophy size={16} /><span>My Practice Sessions</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
           </button>
@@ -391,7 +396,7 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
 
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} />
+      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
           {!isMatch ? (
