@@ -26,7 +26,10 @@ export default function Practice() {
   const { profile } = useAuth();
   const location = useLocation();
   const { activeSession, setActiveSession, clearActiveSession } = useActiveSession();
-  const restoredPractice = activeSession?.type === "practice" ? activeSession.data : null;
+  const restoredPractice = activeSession?.type === "practice" && activeSession.data?.phase !== "done" ? activeSession.data : null;
+  useEffect(() => {
+    if (activeSession?.type === "practice" && activeSession.data?.phase === "done") clearActiveSession();
+  }, [activeSession?.type, activeSession?.data?.phase, clearActiveSession]);
   const [phase, setPhase] = useState(restoredPractice?.phase ?? "landing"); // landing | opponent | gametype | format | config | play | done
   const [session, setSessionState] = useState(restoredPractice?.session ?? null);
   const setSession = (next) => setSessionState((current) =>
@@ -65,7 +68,7 @@ export default function Practice() {
     };
     setSessionState(initial);
     setPhase("opponent");
-    setActiveSession({ type: "practice", route: "/practice", title: "Choose an opponent", subtitle: "Practice setup", data: { phase: "opponent", session: initial } });
+    setActiveSession({ type: "practice", ownerId: profile?.id, route: "/practice", title: "Choose an opponent", subtitle: "Practice setup", data: { phase: "opponent", session: initial } });
   };
   useEffect(() => {
     if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
@@ -508,7 +511,7 @@ function PlayStep({ session, setSession, onDone, onBack }) {
 
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${FORMATS.find(f=>f.key===session.format)?.label}`} hideBack />
+      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${FORMATS.find(f=>f.key===session.format)?.label}`} backFallback="/" />
       <div className="tab-content">
         <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Your session is saved as you go. You can leave this screen and resume from the active-session bar.</div>
         <div className="play-tally">
