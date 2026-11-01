@@ -70,3 +70,12 @@ describe("manager and captain role separation", () => {
     expect(sql).toContain("grant execute on function public.claim_invite_code(text) to authenticated");
   });
 });
+
+
+describe("captain navigation follows team assignments", () => {
+  it("shows Manage My Team to a manager or player with an explicit captain assignment", () => {
+    const shell = read("src/Shell.jsx");
+    expect(shell).toContain('item.key === "myteam"');
+    expect(shell).toContain("(profile.captain_team_ids ?? []).length > 0");
+  });
+});
