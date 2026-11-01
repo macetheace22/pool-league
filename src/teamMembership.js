@@ -25,3 +25,13 @@ export function getCaptainTeamIds(profile) {
 export function isCaptainOfTeam(profile, teamId) {
   return !!teamId && getCaptainTeamIds(profile).includes(teamId);
 }
+
+
+// Return the side of a match the profile captains. Player membership on the
+// opposing side must never grant captain-only match actions.
+export function getCaptainMatchSlot(profile, match) {
+  if (!match) return null;
+  const captainTeamIds = getCaptainTeamIds(profile);
+  return captainTeamIds.includes(match.team_home_id) ? "home"
+    : captainTeamIds.includes(match.team_away_id) ? "away" : null;
+}
