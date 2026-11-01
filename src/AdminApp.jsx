@@ -3658,7 +3658,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
         ) : (
           <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>
             {profile.player_num
-              ? <>Your linked league player number is <strong style={{color:"#E0E0E0"}}>{profile.player_num}</strong>. To correct an existing link, contact your league manager.</>
+              ? <>Your linked league player number is <strong style={{color:"#E0E0E0"}}>{profile.player_num}</strong>. To correct an existing link, ask your captain or league manager for a new player-specific invite code for the correct roster entry.</>
               : "Your player number is linked through an invite code associated with your roster entry. Ask your captain or league manager for a player-specific code, then redeem it below."}
           </div>
         )}
