@@ -144,7 +144,7 @@ const PRIMARY_NAV_ITEMS = [
   { key: "tournaments", label: "Tournaments", path: "/tournaments", icon: Award },
 ];
 
-const LEAGUE_NAV_ITEMS = [
+export const LEAGUE_NAV_ITEMS = [
   { key: "schedules", label: "Schedules", path: "/schedules", icon: Calendar, roles: ["manager", "captain", "player"] },
   { key: "matches", label: "Current League Matches", path: "/matches", icon: Trophy, roles: ["manager", "captain", "player"] },
   { key: "teaminfo", label: "Team and Player Information", path: "/team-info", icon: Eye, roles: ["manager", "captain", "player"] },
@@ -155,9 +155,9 @@ const LEAGUE_NAV_ITEMS = [
   { key: "leaderboard", label: "Advanced Stats Leaderboard", path: "/leaderboard", icon: TrendingUp, roles: ["manager", "captain", "player"] },
 ];
 
-const PRACTICE_NAV_ITEMS = [
+export const PRACTICE_NAV_ITEMS = [
   { key: "new-practice", label: "New Practice Session", path: "/practice?start=1", icon: Dumbbell },
-  { key: "practice-history", label: "My Practice Sessions", path: "/practice", icon: Calendar },
+  { key: "practice-history", label: "My Practice Sessions", path: "/practice#practice-sessions", icon: Calendar },
 ];
 
 const TEAMS_PLAYERS_NAV_ITEMS = [
@@ -189,7 +189,7 @@ export function NavDrawer({ open, onClose, profile, onLogout }) {
         </div>
         <div className="drawer__who">
           <RoleTag role={profile.role} />
-          <span className="drawer__username">@{profile.username}</span>
+          <span className="drawer__username">{String(profile.username || "").replace(/^@/, "")}</span>
         </div>
         <div className="drawer__items">
           {PRIMARY_NAV_ITEMS.map(item => {
