@@ -6,6 +6,7 @@ import { PageHeader, TabBar, shellCss } from "./Shell";
 import { css, Loader } from "./AdminApp";
 import { dashboardCss } from "./Dashboard";
 import * as db from "./db";
+import { useActiveSession } from "./ActiveSessionContext";
 
 const GAME_TYPES = [
   { key: "8ball", label: "8-Ball" },
@@ -24,8 +25,29 @@ function gameTypeLabel(key) { return GAME_TYPES.find(g => g.key === key)?.label 
 export default function Practice() {
   const { profile } = useAuth();
   const location = useLocation();
-  const [phase, setPhase] = useState("landing"); // landing | opponent | gametype | format | config | play | done
-  const [session, setSession] = useState(null);
+  const { activeSession, setActiveSession, clearActiveSession } = useActiveSession();
+  const restoredPractice = activeSession?.type === "practice" ? activeSession.data : null;
+  const [phase, setPhase] = useState(restoredPractice?.phase ?? "landing"); // landing | opponent | gametype | format | config | play | done
+  const [session, setSessionState] = useState(restoredPractice?.session ?? null);
+  const setSession = (next) => {
+    setSessionState((current) => {
+      const value = typeof next === "function" ? next(current) : next;
+      if (activeSession?.type === "practice" || phase !== "landing") {
+        setActiveSession((currentActive) => currentActive?.type === "practice"
+          ? { ...currentActive, data: { phase, session: value } }
+          : currentActive);
+      }
+      return value;
+    });
+  };
+  const changePhase = (nextPhase) => {
+    setPhase(nextPhase);
+    if (session && activeSession?.type === "practice") {
+      setActiveSession((current) => current?.type === "practice"
+        ? { ...current, data: { phase: nextPhase, session } }
+        : current);
+    }
+  };
   const [history, setHistory] = useState(undefined);
   const [opponents, setOpponents] = useState(undefined);
 
@@ -42,16 +64,18 @@ export default function Practice() {
   useEffect(() => { refreshHistory(); refreshOpponents(); }, [profile?.id]);
 
   const startSession = () => {
-    setSession({
+    const initial = {
       opponentType: null, opponentPlayerNum: null, opponentId: null, opponentName: "", opponentRating: null,
-      gameType: null, format: null, x: 5, myRating: null, myScore: 0, opponentScore: 0,
-    });
-    setPhase("opponent");
+      gameType: null, format: null, x: 5, myRating: null, myScore: 0, opponentScore: 0, gameLog: [], myPts: "", oppPts: "",
+    };
+    setSessionState(initial);
+    changePhase("opponent");
+    setActiveSession({ type: "practice", route: "/practice", title: "Choose an opponent", subtitle: "Practice setup", data: { phase: "opponent", session: initial } });
   };
   useEffect(() => {
     if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
   }, [location.search]);
-  const cancelSession = () => { setSession(null); setPhase("landing"); };
+  const cancelSession = () => { clearActiveSession(); setSessionState(null); setPhase("landing"); };
 
   const wrap = (children) => (
     <div className="app">
@@ -67,27 +91,27 @@ export default function Practice() {
 
   if (phase === "opponent") {
     return wrap(<OpponentStep profile={profile} session={session} setSession={setSession}
-      onNext={() => setPhase("gametype")} onCancel={cancelSession} />);
+      onNext={() => changePhase("gametype")} onCancel={cancelSession} />);
   }
   if (phase === "gametype") {
     return wrap(<GameTypeStep session={session} setSession={setSession}
-      onNext={() => setPhase("format")} onBack={() => setPhase("opponent")} />);
+      onNext={() => changePhase("format")} onBack={() => changePhase("opponent")} />);
   }
   if (phase === "format") {
     return wrap(<FormatStep session={session} setSession={setSession}
-      onNext={() => setPhase("config")} onBack={() => setPhase("gametype")} />);
+      onNext={() => changePhase("config")} onBack={() => changePhase("gametype")} />);
   }
   if (phase === "config") {
     return wrap(<ConfigStep profile={profile} session={session} setSession={setSession}
-      onNext={() => setPhase("play")} onBack={() => setPhase("format")} />);
+      onNext={() => changePhase("play")} onBack={() => changePhase("format")} />);
   }
   if (phase === "play") {
     return wrap(<PlayStep session={session} setSession={setSession}
-      onDone={(finalSession) => { setSession(finalSession); setPhase("done"); }} onBack={() => setPhase("config")} />);
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: finalSession } }); }} onBack={() => changePhase("config")} />);
   }
   if (phase === "done") {
     return wrap(<DoneStep profile={profile} session={session}
-      onSaved={() => { refreshHistory(); setPhase("landing"); setSession(null); }} />);
+      onSaved={() => { refreshHistory(); clearActiveSession(); setPhase("landing"); setSessionState(null); }} />);
   }
 
   return wrap(<LandingStep profile={profile} history={history} rawOpponents={opponents} onStart={startSession} onLinked={refreshOpponents} />);
@@ -436,11 +460,11 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
 
 // ─── Step 5: play (running tally) ───────────────────────────────────────────
 function PlayStep({ session, setSession, onDone, onBack }) {
-  const [myScore, setMyScore] = useState(0);
-  const [oppScore, setOppScore] = useState(0);
-  const [gameLog, setGameLog] = useState([]); // 8-ball only: [{myPoints, oppPoints, winner}, ...]
-  const [myPts, setMyPts] = useState("");
-  const [oppPts, setOppPts] = useState("");
+  const myScore = session.myScore ?? 0;
+  const oppScore = session.opponentScore ?? 0;
+  const gameLog = session.gameLog ?? [];
+  const myPts = session.myPts ?? "";
+  const oppPts = session.oppPts ?? "";
   const [err, setErr] = useState("");
 
   const isEightBall = session.gameType === "8ball";
@@ -453,8 +477,9 @@ function PlayStep({ session, setSession, onDone, onBack }) {
   const winner = myScore >= myTargetDisplay ? "me" : oppScore >= oppTarget ? "opponent" : null;
 
   const bump = (who, delta) => {
-    if (who === "me") setMyScore(s => Math.max(0, s + delta));
-    else setOppScore(s => Math.max(0, s + delta));
+    setSession(s => who === "me"
+      ? { ...s, myScore: Math.max(0, (s.myScore ?? 0) + delta) }
+      : { ...s, opponentScore: Math.max(0, (s.opponentScore ?? 0) + delta) });
   };
 
   const recordGame = () => {
@@ -463,17 +488,23 @@ function PlayStep({ session, setSession, onDone, onBack }) {
     if (myPts === "" || oppPts === "" || Number.isNaN(my) || Number.isNaN(opp)) { setErr("Enter both scores."); return; }
     if (my === opp) { setErr("Scores can't be tied — one side has to win the game."); return; }
     const gameWinner = my > opp ? "me" : "opponent";
-    setGameLog(log => [...log, { myPoints: my, oppPoints: opp, winner: gameWinner }]);
-    bump(gameWinner, 1);
-    setMyPts(""); setOppPts("");
+    setSession(s => ({
+      ...s,
+      gameLog: [...(s.gameLog ?? []), { myPoints: my, oppPoints: opp, winner: gameWinner }],
+      myScore: (s.myScore ?? 0) + (gameWinner === "me" ? 1 : 0),
+      opponentScore: (s.opponentScore ?? 0) + (gameWinner === "opponent" ? 1 : 0),
+      myPts: "", oppPts: "",
+    }));
   };
   const undoLastGame = () => {
-    setGameLog(log => {
-      if (log.length === 0) return log;
-      const last = log[log.length - 1];
-      bump(last.winner, -1);
-      return log.slice(0, -1);
-    });
+    if (gameLog.length === 0) return;
+    const last = gameLog[gameLog.length - 1];
+    setSession(s => ({
+      ...s,
+      gameLog: (s.gameLog ?? []).slice(0, -1),
+      myScore: Math.max(0, (s.myScore ?? 0) - (last.winner === "me" ? 1 : 0)),
+      opponentScore: Math.max(0, (s.opponentScore ?? 0) - (last.winner === "opponent" ? 1 : 0)),
+    }));
   };
 
   const finish = () => {
@@ -484,6 +515,7 @@ function PlayStep({ session, setSession, onDone, onBack }) {
     <>
       <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${FORMATS.find(f=>f.key===session.format)?.label}`} hideBack />
       <div className="tab-content">
+        <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Your session is saved as you go. You can leave this screen and resume from the active-session bar.</div>
         <div className="play-tally">
           <div className="play-tally__side">
             <div className="play-tally__name">You</div>
@@ -515,10 +547,10 @@ function PlayStep({ session, setSession, onDone, onBack }) {
             <div className="card__title">Record This Game's Score</div>
             <div style={{display:"flex",gap:10,alignItems:"flex-end",marginTop:6}}>
               <div className="field" style={{flex:1}}><div className="form-label">You</div>
-                <input className="input" type="number" value={myPts} onChange={e=>setMyPts(e.target.value)} placeholder="0" /></div>
+                <input className="input" type="number" value={myPts} onChange={e=>setSession(s=>({...s,myPts:e.target.value}))} placeholder="0" /></div>
               <div style={{fontSize:13,color:"#6A6A6A",paddingBottom:12}}>–</div>
               <div className="field" style={{flex:1}}><div className="form-label">{session.opponentName}</div>
-                <input className="input" type="number" value={oppPts} onChange={e=>setOppPts(e.target.value)} placeholder="0" /></div>
+                <input className="input" type="number" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="0" /></div>
             </div>
             {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
             <button className="btn-primary" style={{marginTop:10}} onClick={recordGame}>Submit Game Score</button>
