@@ -33,6 +33,9 @@ declare
   v_mixed_profile uuid;
   v_multi_captain uuid;
   v_test_player_num text;
+  v_other_player_num text;
+  v_invite_code text;
+  v_conflict_invite_code text;
   v_existing_player_num text;
 begin
   select id into v_manager from public.profiles
@@ -53,6 +56,7 @@ begin
   from public.profiles p
   where p.role = 'player' and p.is_active
     and p.id <> v_player
+    and p.player_num is null
     and not exists (
       select 1 from public.profile_team_memberships m
       where m.profile_id = p.id and m.ended_at is null
@@ -300,10 +304,64 @@ begin
   -- A non-manager cannot directly claim a player number. Player-number
   -- linking is performed through a trusted invite whose player_num is stored
   -- in the database, not through user-editable signup metadata.
-  select num into v_test_player_num from public.players order by num limit 1;
-  if v_test_player_num is null then
-    raise exception 'FIXTURES_REQUIRED: at least one player record is required for player-number authorization coverage';
+  select pl.num into v_test_player_num
+  from public.players pl
+  where not exists (select 1 from public.profiles p where p.player_num = pl.num)
+  order by pl.num
+  limit 1;
+  select pl.num into v_other_player_num
+  from public.players pl
+  where pl.num is distinct from v_test_player_num
+    and not exists (select 1 from public.profiles p where p.player_num = pl.num)
+  order by pl.num
+  limit 1;
+  if v_test_player_num is null or v_other_player_num is null then
+    raise exception 'FIXTURES_REQUIRED: two unlinked player records are required for player-number authorization coverage';
   end if;
+
+  -- A player-specific invite links the server-stored number and team. The
+  -- profile cannot supply a different number through editable signup metadata.
+  v_invite_code := 'ROLE-' || substr(md5(random()::text || clock_timestamp()::text), 1, 12);
+  insert into public.invite_codes(code, role, team_id, player_num, expires_at, label_name)
+  values (v_invite_code, 'player', v_team_id, v_test_player_num, now() + interval '1 day', 'role-matrix player link');
+  perform set_config('request.jwt.claim.sub', v_nonmember::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_nonmember::text, 'role', 'authenticated')::text, true);
+  perform public.claim_invite_code(v_invite_code);
+  if (select player_num from public.profiles where id = v_nonmember) is distinct from v_test_player_num
+     or not exists (
+       select 1 from public.profile_team_memberships
+       where profile_id = v_nonmember and team_id = v_team_id and ended_at is null
+     )
+     or not exists (
+       select 1 from public.invite_codes
+       where code = v_invite_code and used_by = v_nonmember and used_at is not null
+     ) then
+    raise exception 'FAIL trusted player invite must link only its stored player number and team';
+  end if;
+
+  -- An invite for a different player number cannot silently replace an
+  -- already-linked identity, and the rejected invite remains unused.
+  v_conflict_invite_code := 'ROLE-' || substr(md5(random()::text || clock_timestamp()::text), 1, 12);
+  insert into public.invite_codes(code, role, team_id, player_num, expires_at, label_name)
+  values (v_conflict_invite_code, 'player', v_team_id, v_other_player_num, now() + interval '1 day', 'role-matrix conflict');
+  begin
+    perform public.claim_invite_code(v_conflict_invite_code);
+    raise exception 'FAIL a different player invite must not replace an existing player number';
+  exception when others then
+    if sqlerrm <> 'PLAYER_NUMBER_ALREADY_LINKED' then
+      raise;
+    end if;
+  end;
+  if (select player_num from public.profiles where id = v_nonmember) is distinct from v_test_player_num
+     or exists (
+       select 1 from public.invite_codes
+       where code = v_conflict_invite_code and used_at is not null
+     ) then
+    raise exception 'FAIL rejected player-number reassignment must preserve identity and leave invite unused';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_manager::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_manager::text, 'role', 'authenticated')::text, true);
   begin
     perform public.set_own_player_number(v_test_player_num);
     raise exception 'FAIL non-manager must not self-assign a player number';
