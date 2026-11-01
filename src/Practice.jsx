@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { Plus, Minus, Search, Check, ChevronRight, Trophy } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
@@ -114,14 +114,14 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
       <PageHeader title="Practice" />
       <div className="tab-content">
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
-          <button className="office-list-item" onClick={onStart}>
+          <Link to="/practice?start=1" className="office-list-item">
             <Plus size={16} /><span>New Practice Session</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </button>
-          <button className="office-list-item" onClick={() => document.getElementById("practice-sessions")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+          </Link>
+          <Link to="/practice#practice-sessions" className="office-list-item">
             <Trophy size={16} /><span>My Practice Sessions</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </button>
+          </Link>
         </div>
 
         {opponents.length > 0 && (
