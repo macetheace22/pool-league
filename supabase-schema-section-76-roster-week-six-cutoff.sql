@@ -41,7 +41,7 @@ begin
   from public.schedule_weeks sw
   where sw.division_id = v_division_id
     and sw.week_num = 6
-    and trim(sw.date) ~ '^\\d{1,2}/\\d{1,2}/\\d{4}$'
+    and trim(sw.date) ~ '^\d{1,2}/\d{1,2}/\d{4}$'
   order by sw.created_at desc
   limit 1;
 
@@ -84,7 +84,7 @@ begin
   from public.schedule_weeks sw
   where sw.division_id = v_division_id
     and sw.week_num = 6
-    and trim(sw.date) ~ '^\\d{1,2}/\\d{1,2}/\\d{4}$'
+    and trim(sw.date) ~ '^\d{1,2}/\d{1,2}/\d{4}$'
   order by sw.created_at desc
   limit 1;
 
@@ -225,3 +225,35 @@ $$;
 -- call the private authorization/cutoff helper before touching roster data.
 grant execute on function public.add_player_to_team(uuid, text) to authenticated;
 grant execute on function public.remove_player_from_team(uuid, text) to authenticated;
+
+
+-- Enforce the same rule for direct table writes as well as RPC calls. RLS
+-- remains responsible for deciding which team a captain may access; this
+-- trigger adds the scheduled Week 6 cutoff to every roster insert/update/delete.
+create or replace function public.enforce_roster_change_cutoff()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'DELETE' then
+    perform public.assert_team_roster_change_allowed(old.team_id);
+    return old;
+  elsif tg_op = 'UPDATE' then
+    perform public.assert_team_roster_change_allowed(old.team_id);
+    perform public.assert_team_roster_change_allowed(new.team_id);
+    return new;
+  else
+    perform public.assert_team_roster_change_allowed(new.team_id);
+    return new;
+  end if;
+end;
+$$;
+
+revoke all on function public.enforce_roster_change_cutoff() from public, anon, authenticated;
+
+drop trigger if exists enforce_roster_change_cutoff on public.rosters;
+create trigger enforce_roster_change_cutoff
+before insert or update or delete on public.rosters
+for each row execute function public.enforce_roster_change_cutoff();
