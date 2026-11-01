@@ -78,3 +78,49 @@ describe("team membership context", () => {
     expect(getActiveTeamIds(profile)[0]).toBe("team-a");
   });
 });
+
+
+describe("team-specific captain context", () => {
+  it("keeps captain assignments separate from all active player memberships", () => {
+    const profile = {
+      role: "captain",
+      team_memberships: [
+        { team_id: "team-a", ended_at: null },
+        { team_id: "team-b", ended_at: null },
+        { team_id: "team-c", ended_at: null },
+      ],
+      captain_team_ids: ["team-b"],
+    };
+    expect(getActiveTeamIds(profile)).toEqual(["team-a", "team-b", "team-c"]);
+    expect(getCaptainTeamIds(profile)).toEqual(["team-b"]);
+    expect(isCaptainOfTeam(profile, "team-a")).toBe(false);
+    expect(isCaptainOfTeam(profile, "team-b")).toBe(true);
+    expect(isCaptainOfTeam(profile, "team-c")).toBe(false);
+  });
+
+  it("supports a player who captains more than one team", () => {
+    const profile = {
+      role: "captain",
+      team_memberships: [
+        { team_id: "team-a", ended_at: null },
+        { team_id: "team-b", ended_at: null },
+        { team_id: "team-c", ended_at: null },
+      ],
+      captain_team_ids: ["team-b", "team-c", "team-b"],
+    };
+    expect(getActiveTeamIds(profile)).toEqual(["team-a", "team-b", "team-c"]);
+    expect(getCaptainTeamIds(profile)).toEqual(["team-b", "team-c"]);
+    expect(isCaptainOfTeam(profile, "team-a")).toBe(false);
+    expect(isCaptainOfTeam(profile, "team-b")).toBe(true);
+    expect(isCaptainOfTeam(profile, "team-c")).toBe(true);
+  });
+
+  it("does not infer captain access from a global captain role", () => {
+    expect(isCaptainOfTeam({ role: "captain", team_memberships: [{team_id:"team-a"}] }, "team-a")).toBe(false);
+  });
+
+  it("does not treat historical captain IDs as current when no assignment is present", () => {
+    expect(getCaptainTeamIds({ role: "player", captain_team_ids: [] })).toEqual([]);
+    expect(isCaptainOfTeam({ role: "player", captain_team_ids: [] }, "team-a")).toBe(false);
+  });
+});
