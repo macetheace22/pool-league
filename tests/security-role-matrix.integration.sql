@@ -275,6 +275,25 @@ begin
     raise exception 'FAIL removing a manager captain seat must preserve manager role and player membership';
   end if;
 
+  -- An explicit account-level demotion to Player with no team selected removes
+  -- every captain seat, but does not remove the user's player memberships.
+  select public.assign_team_captain(v_team_a, v_manager) into v_ok;
+  select public.assign_team_captain(v_team_b, v_manager) into v_ok;
+  select public.set_profile_role(v_manager, 'player', null) into v_ok;
+  if v_ok is distinct from true
+     or public.current_role_name() is distinct from 'player'
+     or exists (select 1 from public.teams where captain_profile_id = v_manager)
+     or not exists (
+       select 1 from public.profile_team_memberships
+       where profile_id = v_manager and team_id = v_team_a and ended_at is null
+     )
+     or not exists (
+       select 1 from public.profile_team_memberships
+       where profile_id = v_manager and team_id = v_team_b and ended_at is null
+     ) then
+    raise exception 'FAIL account-level Player demotion must clear captain seats but retain all player memberships';
+  end if;
+
   raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, multiple captain assignments, and manager role retention';
 end;
 $test$;
