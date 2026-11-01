@@ -230,7 +230,7 @@ export default function LiveEntryApp() {
       setMatch(m);
       if (m.phase !== "archived") {
         setActiveSession({
-          type: "live", route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+          type: "live", ownerId: profile?.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
           title: `${m.teamHome?.name ?? "Home"} vs ${m.teamAway?.name ?? "Away"}`,
           subtitle: m.seasonLabel ? `${m.seasonLabel}${m.divNum ? " · Div " + m.divNum : ""}` : "Live scoring",
           data: { pairingId },
@@ -311,7 +311,7 @@ export default function LiveEntryApp() {
       subtitle: match.seasonLabel ? `${match.seasonLabel}${match.divNum ? " · Div " + match.divNum : ""}` : "Live scoring",
       data: { pairingId },
     });
-  }, [match?.phase, match?.teamHome?.name, match?.teamAway?.name, match?.seasonLabel, match?.divNum, pairingId, setActiveSession, clearActiveSession]);
+  }, [match?.phase, match?.teamHome?.name, match?.teamAway?.name, match?.seasonLabel, match?.divNum, pairingId, profile?.id, setActiveSession, clearActiveSession]);
 
   const refreshFromServer = useCallback(async () => {
     const fresh = await loadMatch(pairingId);
@@ -387,7 +387,7 @@ export default function LiveEntryApp() {
       <div className="app">
         <style>{css}</style>
         <style>{shellCss}</style>
-        <PageHeader title="Score Your Match" hideBack />
+        <PageHeader title="Score Your Match" backFallback="/matches" />
         <div className="screen"><div className="empty-state">No match selected. Go back to Current League Matches and pick a match to score.</div></div>
       </div>
     );
