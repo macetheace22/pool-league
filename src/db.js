@@ -37,6 +37,12 @@ export async function signInWithGoogle(redirectTo) {
 
 export async function claimInviteCode(code) {
   const { data, error } = await supabase.rpc("claim_invite_code", { p_code: code });
+  if (error?.message?.includes("PLAYER_ALREADY_CLAIMED")) {
+    return { error: "That player number is already linked to another account. Ask your league manager to verify the roster entry." };
+  }
+  if (error?.message?.includes("PLAYER_NUMBER_ALREADY_LINKED")) {
+    return { error: "Your account is already linked to a different player number. Ask your league manager for a player-specific invite for the correct roster entry." };
+  }
   if (error) return { error: error.message };
   return { role: data?.[0]?.role, team_id: data?.[0]?.team_id };
 }
