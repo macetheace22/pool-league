@@ -57,3 +57,14 @@ Use a completed match with a date that is not today and no confirmation date of 
 ## How to record the result
 
 For each attempt, record the actor role, RPC, returned result/error, and before/after database state. Verify unauthorized attempts leave `profile_team_memberships`, `teams.captain_profile_id`, `live_match`, and `completed_matches.reopened_at` unchanged. Do not use production accounts or production matches for negative tests.
+
+
+## Multi-team and mixed player/captain regression scenarios
+
+Add dedicated staging fixtures for:
+- **Player on Teams A and B** — both active memberships are returned; the Leagues dashboard selector includes both; switching teams changes match, lineup-plan, and availability context without exposing captain controls.
+- **Player on Team A, captain of Team B** — profile has active memberships A and B but captain assignment only for B. Team selector includes A and B; captain-management selector includes B only. Match-history captain actions are absent for Team A matches and available for Team B matches only when the existing match-night rule permits them.
+- **Captain of Teams B and C, player on Team A** — captain-management selector includes B and C, not A; match-history captain actions apply only to B/C matches.
+- **Manager who is also a player/captain** — manager permissions remain intact; player team context remains available; any captain-specific team selector is limited to explicit captain assignments.
+
+Verify both the visible UI and the database RPC/RLS result. A hidden or disabled button is not authorization; direct RPC attempts for a team the user does not captain must be denied. Preserve every active membership and historical match/stat record when a captain assignment or membership ends.
