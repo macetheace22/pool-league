@@ -144,7 +144,6 @@ export const LEAGUE_NAV_ITEMS = [
   { key: "teamlkp", label: "Team Lookup / History", path: "/team-lookup", icon: Building2, roles: ["manager", "captain", "player"] },
   { key: "teamstandings", label: "Team Standings", path: "/team-standings", icon: BarChart3, roles: ["manager", "captain", "player"] },
   { key: "mvpstandings", label: "MVP Standings", path: "/mvp-standings", icon: Award, roles: ["manager", "captain", "player"] },
-  { key: "matchlkp", label: "Match Lookup / History", path: "/match-lookup", icon: ClipboardList, roles: ["manager", "captain", "player"] },
   { key: "leaderboard", label: "Advanced Stats Leaderboard", path: "/leaderboard", icon: TrendingUp, roles: ["manager", "captain", "player"] },
   { key: "myteam", label: "Manage My Team", path: "/my-team", icon: Users, roles: ["captain"] },
 ];
@@ -161,7 +160,7 @@ const TEAMS_PLAYERS_NAV_ITEMS = [
 
 export function NavDrawer({ open, onClose, profile, onLogout }) {
   const location = useLocation();
-  const movedNavKeys = ["schedules", "myteam", "matches", "teaminfo", "players", "teamlkp", "teamstandings", "mvpstandings", "matchlkp", "leaderboard"];
+  const movedNavKeys = ["schedules", "myteam", "matches", "teaminfo", "players", "teamlkp", "teamstandings", "mvpstandings", "leaderboard"];
   const officeItems = navItemsForRole(profile.role).filter(item => !movedNavKeys.includes(item.key));
   const leagueItems = LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
   const teamsPlayersItems = TEAMS_PLAYERS_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
