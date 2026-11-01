@@ -598,7 +598,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
             ) : (
               <div className="dash-empty">Your league player profile is not linked, so shot tracking is unavailable for your account.</div>
             )}
-            {opponentPlayer && (
+            {opponentPlayer && myPlayer && (
               <ShotTracker contextType="practice_game" contextId={session.gameId} player={opponentPlayer}
                 opponentNum={myPlayer?.num ?? null} gameType={session.gameType} />
             )}
