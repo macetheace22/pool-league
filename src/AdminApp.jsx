@@ -266,6 +266,7 @@ export default function AdminApp({ page }) {
 // ─── Workspace App (page router driven by main.jsx routes) ────────────────────
 function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const isManager = profile.role === "manager";
+  const isCaptain = profile.role === "captain";
   const activeTeamIds = getActiveTeamIds(profile);
   const captainTeamIds = getCaptainTeamIds(profile);
   const primaryTeamId = activeTeamIds[0] ?? null;
