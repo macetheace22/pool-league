@@ -63,6 +63,8 @@ describe("manager and captain role separation", () => {
     expect(sql).toContain("set role = case when role = 'manager' then 'manager' else 'captain' end");
     expect(sql).toContain("set role = case when role = 'manager' then 'manager' else 'captain' end,");
     expect(sql).toContain("public.assign_team_captain(p_team_id, p_profile_id)");
+    expect(sql).toContain("public.remove_team_captain(p_team_id, v_current_captain)");
+    expect(sql).toContain("revoke all on function public.set_team_captain(uuid, uuid) from public, anon");
     expect(sql).toContain("public.teams");
     expect(sql).toContain("where captain_profile_id = p_profile_id");
     expect(sql).toContain("perform public.remove_team_captain(v_team_id, p_profile_id)");
