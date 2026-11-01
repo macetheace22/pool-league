@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Play, X } from "lucide-react";
+import { useAuth } from "./AuthContext";
 
 const STORAGE_KEY = "iba-active-session-v1";
 const ActiveSessionContext = createContext(null);
@@ -16,6 +17,8 @@ function readStoredSession() {
 
 export function ActiveSessionProvider({ children }) {
   const [activeSession, setActiveSessionState] = useState(readStoredSession);
+  const auth = useAuth();
+  const profileId = auth?.profile?.id ?? null;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -30,15 +33,15 @@ export function ActiveSessionProvider({ children }) {
   const clearActiveSession = useCallback(() => setActiveSession(null), [setActiveSession]);
 
   useEffect(() => {
-    if (activeSession?.type === "live" && activeSession.archived) clearActiveSession();
-  }, [activeSession?.archived, activeSession?.type]);
+    if (activeSession && profileId && activeSession.ownerId !== profileId) clearActiveSession();
+  }, [activeSession?.ownerId, profileId, clearActiveSession]);
 
   const value = useMemo(() => ({ activeSession, setActiveSession, clearActiveSession }), [activeSession, setActiveSession, clearActiveSession]);
   const isViewingSession = activeSession?.route?.split("?")[0] === location.pathname;
   return (
     <ActiveSessionContext.Provider value={value}>
       {children}
-      {activeSession && !isViewingSession && (
+      {activeSession && profileId && activeSession.ownerId === profileId && !isViewingSession && (
         <div style={{position:"fixed",zIndex:1000,left:12,right:12,bottom:"calc(76px + env(safe-area-inset-bottom, 0px))",maxWidth:620,margin:"0 auto",background:"#173A2B",border:"1px solid #3D8A67",borderRadius:14,boxShadow:"0 8px 28px rgba(0,0,0,.38)",padding:"10px 12px",display:"flex",alignItems:"center",gap:10,color:"#fff"}}>
           <div style={{width:34,height:34,borderRadius:10,background:"#24563F",display:"grid",placeItems:"center",flexShrink:0}}><Play size={16}/></div>
           <div style={{minWidth:0,flex:1}}>
