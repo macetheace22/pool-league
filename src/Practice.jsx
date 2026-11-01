@@ -29,25 +29,20 @@ export default function Practice() {
   const restoredPractice = activeSession?.type === "practice" ? activeSession.data : null;
   const [phase, setPhase] = useState(restoredPractice?.phase ?? "landing"); // landing | opponent | gametype | format | config | play | done
   const [session, setSessionState] = useState(restoredPractice?.session ?? null);
-  const setSession = (next) => {
-    setSessionState((current) => {
-      const value = typeof next === "function" ? next(current) : next;
-      if (activeSession?.type === "practice" || phase !== "landing") {
-        setActiveSession((currentActive) => currentActive?.type === "practice"
-          ? { ...currentActive, data: { phase, session: value } }
-          : currentActive);
-      }
-      return value;
-    });
-  };
-  const changePhase = (nextPhase) => {
-    setPhase(nextPhase);
-    if (session && activeSession?.type === "practice") {
+  const setSession = (next) => setSessionState((current) =>
+    typeof next === "function" ? next(current) : next
+  );
+  const changePhase = (nextPhase) => setPhase(nextPhase);
+
+  useEffect(() => {
+    if (session && activeSession?.type === "practice" && phase !== "landing" && phase !== "done") {
+      const gameType = session.gameType ? gameTypeLabel(session.gameType) : "Practice setup";
+      const score = session.gameType ? `${session.myScore ?? 0}–${session.opponentScore ?? 0}` : "";
       setActiveSession((current) => current?.type === "practice"
-        ? { ...current, data: { phase: nextPhase, session } }
+        ? { ...current, title: session.opponentName ? `vs ${session.opponentName}` : "Practice session", subtitle: [gameType, score].filter(Boolean).join(" · "), data: { phase, session } }
         : current);
     }
-  };
+  }, [phase, session]);
   const [history, setHistory] = useState(undefined);
   const [opponents, setOpponents] = useState(undefined);
 
@@ -69,7 +64,7 @@ export default function Practice() {
       gameType: null, format: null, x: 5, myRating: null, myScore: 0, opponentScore: 0, gameLog: [], myPts: "", oppPts: "",
     };
     setSessionState(initial);
-    changePhase("opponent");
+    setPhase("opponent");
     setActiveSession({ type: "practice", route: "/practice", title: "Choose an opponent", subtitle: "Practice setup", data: { phase: "opponent", session: initial } });
   };
   useEffect(() => {
