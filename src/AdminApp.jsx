@@ -7,7 +7,7 @@ import {
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import SearchableOptionSelect from "./SearchableOptionSelect";
-import { getActiveTeamIds } from "./teamMembership";
+import { getActiveTeamIds, getCaptainTeamIds, isCaptainOfTeam } from "./teamMembership";
 import TeamContextSelector from "./TeamContextSelector";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
@@ -268,20 +268,21 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const isManager = profile.role === "manager";
   const isCaptain = profile.role === "captain";
   const activeTeamIds = getActiveTeamIds(profile);
+  const captainTeamIds = getCaptainTeamIds(profile);
   const primaryTeamId = activeTeamIds[0] ?? null;
   const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState(primaryTeamId);
   const [captainTeams, setCaptainTeams] = useState([]);
-  const captainTeamId = activeTeamIds.includes(selectedCaptainTeamId) ? selectedCaptainTeamId : primaryTeamId;
+  const captainTeamId = captainTeamIds.includes(selectedCaptainTeamId) ? selectedCaptainTeamId : (captainTeamIds[0] ?? null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
     let cancelled = false;
-    if (!isCaptain || activeTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
-    db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => activeTeamIds.includes(team.id))); })
+    if (!isCaptain || captainTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
+    db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => captainTeamIds.includes(team.id))); })
       .catch(() => { if (!cancelled) setCaptainTeams([]); });
     return () => { cancelled = true; };
-  }, [profile.id, activeTeamIds.join("|")]);
+  }, [profile.id, captainTeamIds.join("|")]);
 
   const [seasons, setSeasons] = useState([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
@@ -854,11 +855,11 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   // ── Manage My Team — captain only ──
   if (page === "myteam") {
-    if (!isCaptain) return <><PageHeader title="Manage My Team"/><div className="tab-content"><AccessDenied/></div></>;
+    if (!isCaptain || captainTeamIds.length === 0) return <><PageHeader title="Manage My Team"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
         <PageHeader title="Manage My Team" />
-        {activeTeamIds.length > 1 && captainTeams.length > 1 && <div className="tab-content" style={{paddingBottom:0}}><TeamContextSelector teams={captainTeams} value={captainTeamId} onChange={setSelectedCaptainTeamId} /></div>}
+        {captainTeamIds.length > 1 && captainTeams.length > 1 && <div className="tab-content" style={{paddingBottom:0}}><TeamContextSelector teams={captainTeams} value={captainTeamId} onChange={setSelectedCaptainTeamId} /></div>}
         <SubTabBar>
           <SubTabBtn active={myTeamSubTab==="roster"} onClick={()=>setMyTeamSubTab("roster")}>Roster</SubTabBtn>
           <SubTabBtn active={myTeamSubTab==="lineup"} onClick={()=>setMyTeamSubTab("lineup")}>Lineup Planner</SubTabBtn>
@@ -2497,8 +2498,12 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
     if (m.confirmed_at && isSameCalendarDay(new Date(m.confirmed_at))) return true;
     return false;
   };
-  const mySlotInMatch = (m) => myProfile?.team_id === m.team_home_id ? "home" : myProfile?.team_id === m.team_away_id ? "away" : null;
-  const isCaptainOfMatch = (m) => myProfile?.role === "captain" && !!mySlotInMatch(m);
+  const mySlotInMatch = (m) => {
+    const captainTeamIds = getCaptainTeamIds(myProfile);
+    return captainTeamIds.includes(m.team_home_id) ? "home"
+      : captainTeamIds.includes(m.team_away_id) ? "away" : null;
+  };
+  const isCaptainOfMatch = (m) => !!mySlotInMatch(m);
   const canReopen = (m) => !m.is_makeup_pending && !m.reopened_at && (m.team_home_total!=null || m.team_away_total!=null)
     && (isManager || (isCaptainOfMatch(m) && isMatchNight(m)));
   const canRespondToPending = (m) => !!m.pending_correction
