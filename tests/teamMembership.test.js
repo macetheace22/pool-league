@@ -124,3 +124,25 @@ describe("team-specific captain context", () => {
     expect(isCaptainOfTeam({ role: "player", captain_team_ids: [] }, "team-a")).toBe(false);
   });
 });
+
+
+describe("captain match permissions", () => {
+  const profile = {
+    role: "captain",
+    team_memberships: [
+      { team_id: "team-a", ended_at: null },
+      { team_id: "team-b", ended_at: null },
+    ],
+    captain_team_ids: ["team-b"],
+  };
+  it("does not grant captain match actions for a team where the user is only a player", () => {
+    expect(getCaptainMatchSlot(profile, { team_home_id: "team-a", team_away_id: "team-c" })).toBeNull();
+  });
+  it("recognizes captain assignment on the home or away side", () => {
+    expect(getCaptainMatchSlot(profile, { team_home_id: "team-b", team_away_id: "team-c" })).toBe("home");
+    expect(getCaptainMatchSlot(profile, { team_home_id: "team-c", team_away_id: "team-b" })).toBe("away");
+  });
+  it("does not grant match actions for unrelated teams", () => {
+    expect(getCaptainMatchSlot(profile, { team_home_id: "team-c", team_away_id: "team-d" })).toBeNull();
+  });
+});
