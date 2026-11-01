@@ -8,7 +8,7 @@ import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, navItemsForRole, LEAGUE_NAV_ITEMS, shellCss, AccessDenied } from "./Shell";
 import { css, Loader } from "./AdminApp";
 import * as db from "./db";
-import { getActiveTeamIds } from "./teamMembership";
+import { getActiveTeamIds, isCaptainOfTeam } from "./teamMembership";
 import TeamContextSelector from "./TeamContextSelector";
 
 // Free-text schedule dates are typically M/D/YYYY (same format used
@@ -216,7 +216,7 @@ export function LeaguesDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const isManager = profile?.role === "manager";
-  const isCaptain = profile?.role === "captain";
+  const isCaptainOfSelectedTeam = isCaptainOfTeam(profile, effectiveTeamId);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const selectedTeamIds = getActiveTeamIds(profile);
   const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
@@ -357,7 +357,7 @@ export function LeaguesDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Leagues" backFallback="/" />
       <div className="tab-content">
-        {isCaptain && selectedTeamIds.length > 1 && allTeamOverviews?.length > 1 && <TeamContextSelector teams={allTeamOverviews.map(item => ({id:item.team.id,name:item.team.name,context:item.team.context ?? ""}))} value={effectiveTeamId} onChange={setSelectedTeamId} />}
+        {selectedTeamIds.length > 1 && allTeamOverviews?.length > 1 && <TeamContextSelector teams={allTeamOverviews.map(item => ({id:item.team.id,name:item.team.name,context:item.team.context ?? ""}))} value={effectiveTeamId} onChange={setSelectedTeamId} />}
         {leaguesLoading ? <Loader /> : <>
         {leagueNews.length > 0 && (
           <DashCard icon={Newspaper} title="League News">
@@ -445,7 +445,7 @@ export function LeaguesDashboard() {
                 : previousAll.slice(0, 3).map((m, i) => <MatchRow key={i} item={m} overview={overview} clickable={false} />)}
             </DashCard>
 
-            {(isCaptain || isManager) && (
+            {(isCaptainOfSelectedTeam || isManager) && (
               <DashCard icon={AlertCircle} title="Makeups">
                 {isManager ? (
                   <div className="dash-empty">Manager view — see all leaguewide makeups in Match Lookup / History.
