@@ -484,7 +484,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   };
   const handleRemoveCaptain = async (profileId, teamId) => {
     const ok = await db.removeTeamCaptain(teamId, profileId);
-    if (ok) await refreshCaptains();
+    if (ok) {
+      await refreshCaptains();
+      if (profileId === profile.id) await onProfileRefresh();
+    }
     return ok;
   };
   const handleGenerateCaptainInvite = async (teamId, labelName) => {
@@ -4516,7 +4519,9 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
     const ok = await db.setProfileRole(userId, editRole, editRole==="captain" ? editTeamId : editTeamId || null);
     setRoleSaving(false);
     if (!ok) { setRoleErr("Could not update role."); return; }
-    setEditRoleId(null); await refresh();
+    setEditRoleId(null);
+    await refresh();
+    if (userId === currentUserId) await onProfileRefresh();
   };
 
   if (loading) return <Loader/>;
