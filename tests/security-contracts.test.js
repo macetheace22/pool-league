@@ -55,3 +55,18 @@ describe("security migration contracts", () => {
     expect(db).toContain('supabase.rpc("remove_own_team_membership", { p_team_id: teamId })');
   });
 });
+
+
+describe("manager and captain role separation", () => {
+  it("preserves manager authority when captain assignments are added or claimed", () => {
+    const sql = read("supabase-schema-section-77-preserve-manager-role-during-captain-assignment.sql");
+    expect(sql).toContain("set role = case when role = 'manager' then 'manager' else 'captain' end");
+    expect(sql).toContain("set role = case when role = 'manager' then 'manager' else 'captain' end,");
+    expect(sql).toContain("public.assign_team_captain(p_team_id, p_profile_id)");
+    expect(sql).toContain("public.teams");
+    expect(sql).toContain("where captain_profile_id = p_profile_id");
+    expect(sql).toContain("perform public.remove_team_captain(v_team_id, p_profile_id)");
+    expect(sql).toContain("revoke all on function public.assign_team_captain(uuid, uuid) from public, anon");
+    expect(sql).toContain("grant execute on function public.claim_invite_code(text) to authenticated");
+  });
+});
