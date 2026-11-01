@@ -37,6 +37,12 @@ export async function signInWithGoogle(redirectTo) {
 
 export async function claimInviteCode(code) {
   const { data, error } = await supabase.rpc("claim_invite_code", { p_code: code });
+  if (error?.message?.includes("PLAYER_ALREADY_CLAIMED")) {
+    return { error: "That player number is already linked to another account. Ask your league manager to verify the roster entry." };
+  }
+  if (error?.message?.includes("PLAYER_NUMBER_ALREADY_LINKED")) {
+    return { error: "Your account is already linked to a different player number. Ask your league manager for a player-specific invite for the correct roster entry." };
+  }
   if (error) return { error: error.message };
   return { role: data?.[0]?.role, team_id: data?.[0]?.team_id };
 }
@@ -51,7 +57,15 @@ export async function getProfile(userId) {
     .eq("profile_id", userId)
     .is("ended_at", null)
     .order("joined_at", { ascending: true });
-  return { ...data, team_memberships: memberships ?? [], team_ids: (memberships ?? []).map(m => m.team_id) };
+  const { data: captainTeams, error: captainTeamsError } = await supabase
+    .from("teams").select("id").eq("captain_profile_id", userId);
+  const activeMemberships = memberships ?? [];
+  return {
+    ...data,
+    team_memberships: activeMemberships,
+    team_ids: activeMemberships.map(m => m.team_id),
+    captain_team_ids: captainTeamsError ? [] : (captainTeams ?? []).map(team => team.id),
+  };
 }
 export async function updateOwnUsername(userId, username) {
   const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);

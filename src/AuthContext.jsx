@@ -217,7 +217,6 @@ function RegisterScreen({ onBack }) {
   const [codeValid, setCodeValid] = useState(null); // { role, team_id, team_name } or a bootstrap stand-in
   const [username, setUsername] = useState("");
   const [phone, setPhone]       = useState("");
-  const [playerNum, setPlayerNum] = useState("");
   const [email, setEmail]       = useState("");
   const [password, setPassword]   = useState("");
   const [password2, setPassword2] = useState("");
@@ -259,10 +258,15 @@ function RegisterScreen({ onBack }) {
     if (taken) { setLoading(false); setError("Username taken."); return; }
     const { error } = await supabase.auth.signUp({
       email: email.trim(), password,
-      options: { data: { invite_code: code.trim(), username: username.trim(), phone_number: phone.trim(), player_num: playerNum.trim() } },
+      options: { data: { invite_code: code.trim(), username: username.trim(), phone_number: phone.trim() } },
     });
     setLoading(false);
-    if (error) { setError(error.message); return; }
+    if (error) {
+      setError(error.message?.includes("PLAYER_ALREADY_CLAIMED")
+        ? "That player number is already linked to another account. Ask your league manager to verify the roster entry."
+        : error.message);
+      return;
+    }
     setError("");
     setNotice("Account created. Check your email to confirm, then sign in.");
   };
@@ -302,10 +306,7 @@ function RegisterScreen({ onBack }) {
           <div className="field"><Label>Phone Number (optional)</Label>
             <input className="input" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(555) 555-5555" />
           </div>
-          <div className="field"><Label>Player Number (optional)</Label>
-            <input className="input" value={playerNum} onChange={e => setPlayerNum(e.target.value)} placeholder="If you already play in the league" />
-            <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Shows your league stats & history. Don't have one, or not sure? Leave blank — you can add it later from your profile.</div>
-          </div>
+          <div style={{fontSize:10.5,color:"#6A6A6A",lineHeight:1.5}}>Your player number is linked securely through a player-specific invite code. If you already play in the league, ask your captain or league manager for one.</div>
           <div className="field"><Label>Email</Label>
             <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoCapitalize="none" />
           </div>

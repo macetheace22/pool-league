@@ -7,7 +7,7 @@ import {
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import SearchableOptionSelect from "./SearchableOptionSelect";
-import { getActiveTeamIds } from "./teamMembership";
+import { getActiveTeamIds, getCaptainTeamIds, getCaptainMatchSlot } from "./teamMembership";
 import TeamContextSelector from "./TeamContextSelector";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
@@ -268,20 +268,21 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const isManager = profile.role === "manager";
   const isCaptain = profile.role === "captain";
   const activeTeamIds = getActiveTeamIds(profile);
+  const captainTeamIds = getCaptainTeamIds(profile);
   const primaryTeamId = activeTeamIds[0] ?? null;
-  const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState(primaryTeamId);
+  const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState(captainTeamIds[0] ?? null);
   const [captainTeams, setCaptainTeams] = useState([]);
-  const captainTeamId = activeTeamIds.includes(selectedCaptainTeamId) ? selectedCaptainTeamId : primaryTeamId;
+  const captainTeamId = captainTeamIds.includes(selectedCaptainTeamId) ? selectedCaptainTeamId : (captainTeamIds[0] ?? null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
     let cancelled = false;
-    if (!isCaptain || activeTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
-    db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => activeTeamIds.includes(team.id))); })
+    if (captainTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
+    db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => captainTeamIds.includes(team.id))); })
       .catch(() => { if (!cancelled) setCaptainTeams([]); });
     return () => { cancelled = true; };
-  }, [profile.id, activeTeamIds.join("|")]);
+  }, [profile.id, captainTeamIds.join("|")]);
 
   const [seasons, setSeasons] = useState([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
@@ -483,7 +484,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   };
   const handleRemoveCaptain = async (profileId, teamId) => {
     const ok = await db.removeTeamCaptain(teamId, profileId);
-    if (ok) await refreshCaptains();
+    if (ok) {
+      await refreshCaptains();
+      if (profileId === profile.id) await onProfileRefresh();
+    }
     return ok;
   };
   const handleGenerateCaptainInvite = async (teamId, labelName) => {
@@ -854,11 +858,11 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   // ── Manage My Team — captain only ──
   if (page === "myteam") {
-    if (!isCaptain) return <><PageHeader title="Manage My Team"/><div className="tab-content"><AccessDenied/></div></>;
+    if ((!isCaptain && !isManager) || captainTeamIds.length === 0) return <><PageHeader title="Manage My Team"/><div className="tab-content"><AccessDenied/></div></>;
     return (
       <>
         <PageHeader title="Manage My Team" />
-        {activeTeamIds.length > 1 && captainTeams.length > 1 && <div className="tab-content" style={{paddingBottom:0}}><TeamContextSelector teams={captainTeams} value={captainTeamId} onChange={setSelectedCaptainTeamId} /></div>}
+        {captainTeamIds.length > 1 && captainTeams.length > 1 && <div className="tab-content" style={{paddingBottom:0}}><TeamContextSelector teams={captainTeams} value={captainTeamId} onChange={setSelectedCaptainTeamId} /></div>}
         <SubTabBar>
           <SubTabBtn active={myTeamSubTab==="roster"} onClick={()=>setMyTeamSubTab("roster")}>Roster</SubTabBtn>
           <SubTabBtn active={myTeamSubTab==="lineup"} onClick={()=>setMyTeamSubTab("lineup")}>Lineup Planner</SubTabBtn>
@@ -1351,7 +1355,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
 }
 
 function MyStatsPage({ profile }) {
-  if (!profile?.team_id) {
+  const activeTeamIds = getActiveTeamIds(profile);
+  if (activeTeamIds.length === 0) {
     return (
       <>
         <PageHeader title="My Stats" />
@@ -1369,7 +1374,7 @@ function MyStatsPage({ profile }) {
           <div className="card">
             <div className="card__title">Link Your Player Number</div>
             <div style={{fontSize:12.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
-              Your stats are tracked by your IBA player number. Link yours from My Profile to see your record here.
+              Your stats are tracked by your IBA player number. Redeem a player-specific invite code from My Profile to link your roster entry and see your record here.
             </div>
             <Link to="/me" className="btn-primary" style={{textAlign:"center",textDecoration:"none",display:"block"}}>Go to My Profile</Link>
           </div>
@@ -1381,7 +1386,7 @@ function MyStatsPage({ profile }) {
     <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
-        <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} />
+        <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={activeTeamIds[0]} />
       </div>
     </>
   );
@@ -2497,8 +2502,8 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
     if (m.confirmed_at && isSameCalendarDay(new Date(m.confirmed_at))) return true;
     return false;
   };
-  const mySlotInMatch = (m) => myProfile?.team_id === m.team_home_id ? "home" : myProfile?.team_id === m.team_away_id ? "away" : null;
-  const isCaptainOfMatch = (m) => myProfile?.role === "captain" && !!mySlotInMatch(m);
+  const mySlotInMatch = (m) => getCaptainMatchSlot(myProfile, m);
+  const isCaptainOfMatch = (m) => !!mySlotInMatch(m);
   const canReopen = (m) => !m.is_makeup_pending && !m.reopened_at && (m.team_home_total!=null || m.team_away_total!=null)
     && (isManager || (isCaptainOfMatch(m) && isMatchNight(m)));
   const canRespondToPending = (m) => !!m.pending_correction
@@ -3644,9 +3649,19 @@ function AccountSettings({ profile, onProfileRefresh }) {
       </div>
       <div className="card">
         <div className="card__title">Player Number</div>
-        <div style={{fontSize:10.5,color:"#6A6A6A",marginBottom:6}}>Links your account to your league stats & history.</div>
-        <div className="field"><input className="input" value={playerNum} onChange={e=>setPlayerNum(e.target.value)} placeholder="If you already play in the league"/></div>
-        <button className="btn-secondary" onClick={savePlayerNum} disabled={savingPlayerNum||playerNum.trim()===(profile.player_num ?? "")}>{savingPlayerNum?"Saving…":"Save Player Number"}</button>
+        {profile.role === "manager" ? (
+          <>
+            <div style={{fontSize:10.5,color:"#6A6A6A",marginBottom:6}}>Manager-only correction for your own player-number link.</div>
+            <div className="field"><input className="input" value={playerNum} onChange={e=>setPlayerNum(e.target.value)} placeholder="Your league player number"/></div>
+            <button className="btn-secondary" onClick={savePlayerNum} disabled={savingPlayerNum||playerNum.trim()===(profile.player_num ?? "")}>{savingPlayerNum?"Saving…":"Save Player Number"}</button>
+          </>
+        ) : (
+          <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>
+            {profile.player_num
+              ? <>Your linked league player number is <strong style={{color:"#E0E0E0"}}>{profile.player_num}</strong>. To correct an existing link, ask your captain or league manager for a new player-specific invite code for the correct roster entry.</>
+              : "Your player number is linked through an invite code associated with your roster entry. Ask your captain or league manager for a player-specific code, then redeem it below."}
+          </div>
+        )}
       </div>
       <div className="card">
         <div className="card__title">My Teams</div>
@@ -3723,7 +3738,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
       <div className="card">
         <div className="card__title">Redeem Invite Code</div>
         <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>
-          Signed in with Google? Your account starts as a Player. Enter a code from your league manager to get the right access.
+          Redeem a code from your league manager or captain. A player-specific code can link your roster entry, player number, and team membership.
         </div>
         <div className="field"><input className="input input--code" value={claimCode} onChange={e=>setClaimCode(e.target.value)} placeholder="XXXXXX" autoCapitalize="characters"/></div>
         <button className="btn-secondary" onClick={redeemCode} disabled={!claimCode.trim()||claiming}>{claiming?"Checking…":"Redeem Code"}</button>
@@ -4514,7 +4529,9 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
     const ok = await db.setProfileRole(userId, editRole, editRole==="captain" ? editTeamId : editTeamId || null);
     setRoleSaving(false);
     if (!ok) { setRoleErr("Could not update role."); return; }
-    setEditRoleId(null); await refresh();
+    setEditRoleId(null);
+    await refresh();
+    if (userId === currentUserId) await onProfileRefresh();
   };
 
   if (loading) return <Loader/>;

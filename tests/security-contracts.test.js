@@ -55,3 +55,54 @@ describe("security migration contracts", () => {
     expect(db).toContain('supabase.rpc("remove_own_team_membership", { p_team_id: teamId })');
   });
 });
+
+
+describe("manager and captain role separation", () => {
+  it("preserves manager authority when captain assignments are added or claimed", () => {
+    const sql = read("supabase-schema-section-77-preserve-manager-role-during-captain-assignment.sql");
+    expect(sql).toContain("set role = case when role = 'manager' then 'manager' else 'captain' end");
+    expect(sql).toContain("set role = case when role = 'manager' then 'manager' else 'captain' end,");
+    expect(sql).toContain("public.assign_team_captain(p_team_id, p_profile_id)");
+    expect(sql).toContain("public.remove_team_captain(p_team_id, v_current_captain)");
+    expect(sql).toContain("revoke all on function public.set_team_captain(uuid, uuid) from public, anon");
+    expect(sql).toContain("public.teams");
+    expect(sql).toContain("where captain_profile_id = p_profile_id");
+    expect(sql).toContain("perform public.remove_team_captain(v_team_id, p_profile_id)");
+    expect(sql).toContain("revoke all on function public.assign_team_captain(uuid, uuid) from public, anon");
+    expect(sql).toContain("grant execute on function public.claim_invite_code(text) to authenticated");
+    expect(sql).toContain("perform set_config('app.bypass_privilege_check', 'true', true)");
+    expect(sql).toContain("for update");
+  });
+});
+
+
+describe("captain navigation follows team assignments", () => {
+  it("shows Manage My Team to a manager or player with an explicit captain assignment", () => {
+    const shell = read("src/Shell.jsx");
+    expect(shell).toContain('item.key === "myteam"');
+    expect(shell).toContain("(profile.captain_team_ids ?? []).length > 0");
+  });
+});
+
+
+describe("player identity linking requires trusted invites", () => {
+  it("does not accept user-editable player numbers at registration", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).not.toContain("player_num: playerNum.trim()");
+    expect(auth).toContain("invite_code: code.trim()");
+  });
+  it("limits direct player-number corrections to managers", () => {
+    const migration = read("supabase-schema-section-78-protect-player-number-linking.sql");
+    expect(migration).toContain("raw_user_meta_data->>'invite_code'");
+    expect(migration).not.toContain("raw_user_meta_data->>'player_num'");
+    expect(migration).toContain("pg_advisory_xact_lock(118004, 1)");
+    expect(migration).toContain("for update");
+    expect(migration).toContain("PLAYER_NUMBER_REQUIRES_MANAGER_OR_INVITE");
+    expect(migration).toContain("new.player_num := old.player_num");
+    expect(migration).toContain("set_config('app.bypass_privilege_check', 'true', true)");
+    expect(migration).toContain("create or replace function public.remove_player_from_team");
+    expect(migration).toContain("if v_invite.code is not null then");
+    const admin = read("src/AdminApp.jsx");
+    expect(admin).toContain('profile.role === "manager" ? (');
+  });
+});

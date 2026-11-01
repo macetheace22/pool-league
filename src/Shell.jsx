@@ -162,7 +162,9 @@ export function NavDrawer({ open, onClose, profile, onLogout }) {
   const location = useLocation();
   const movedNavKeys = ["schedules", "myteam", "matches", "teaminfo", "players", "teamlkp", "teamstandings", "mvpstandings", "leaderboard"];
   const officeItems = navItemsForRole(profile.role).filter(item => !movedNavKeys.includes(item.key));
-  const leagueItems = LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
+  const leagueItems = LEAGUE_NAV_ITEMS.filter(item => item.key === "myteam"
+    ? (profile.captain_team_ids ?? []).length > 0
+    : item.roles.includes(profile.role));
   const teamsPlayersItems = TEAMS_PLAYERS_NAV_ITEMS.filter(item => item.roles.includes(profile.role));
   const isActive = (path) => {
     const [pathname, query] = path.split("?");
