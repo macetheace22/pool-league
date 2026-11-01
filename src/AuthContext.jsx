@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
       setSession(sess);
-      if (!sess) setPreviewProfile(null);
+      if (!sess || (profile?.id && sess.user.id !== profile.id)) setPreviewProfile(null);
       if (sess) {
         const p = await db.getProfile(sess.user.id);
         setProfile(p);
