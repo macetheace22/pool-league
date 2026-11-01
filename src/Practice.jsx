@@ -653,7 +653,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
           <div className="card" style={{textAlign:"center",borderColor:"#1F6B4A",background:"#0F2D1F"}}>
             <Trophy size={22} color="#5FCF9E" style={{margin:"0 auto 8px"}}/>
             <div className="card__title" style={{color:"#5FCF9E"}}>{winner === "me" ? "You win!" : `${session.opponentName} wins!`}</div>
-            <button className="btn-primary" style={{marginTop:10}} onClick={finish}>Save Game</button>
+            <button className="btn-primary" style={{marginTop:10}} onClick={finish} disabled={recordStatus !== "ready"}>Save Game</button>
           </div>
         )}
 
