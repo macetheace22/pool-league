@@ -166,10 +166,15 @@ begin
     raise exception 'PLAYER_NUMBER_ALREADY_LINKED';
   end if;
 
+  -- The profile protection trigger normally blocks role/claim/player-number
+  -- changes from non-managers. This trusted, locked invite redemption is the
+  -- only non-manager path allowed to apply the server-stored invite values.
+  perform set_config('app.bypass_privilege_check', 'true', true);
   update public.profiles
   set is_claimed = true,
       player_num = coalesce(v_invite.player_num, player_num)
   where id = v_user_id;
+  perform set_config('app.bypass_privilege_check', 'false', true);
 
   if v_invite.team_id is not null then
     insert into public.profile_team_memberships (profile_id, team_id)
@@ -206,9 +211,11 @@ begin
 
       -- A captain invite adds a team assignment, not a replacement for the
       -- recipient's existing manager authority.
+      perform set_config('app.bypass_privilege_check', 'true', true);
       update public.profiles
       set role = case when role = 'manager' then 'manager' else 'captain' end
       where id = v_user_id;
+      perform set_config('app.bypass_privilege_check', 'false', true);
 
       insert into public.captaincy_history (team_id, profile_id, started_at)
       select v_invite.team_id, v_user_id, now()
