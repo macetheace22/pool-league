@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Minus, Search, Check, ChevronRight, Trophy } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
@@ -49,7 +49,7 @@ export default function Practice() {
     setPhase("opponent");
   };
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("start") === "1") startSession();
+    if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
   }, [location.search]);
   const cancelSession = () => { setSession(null); setPhase("landing"); };
 
@@ -95,7 +95,9 @@ export default function Practice() {
 
 // ─── Landing ────────────────────────────────────────────────────────────────
 function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
+  const sessionsRef = useRef(null);
   const [filterOpponent, setFilterOpponent] = useState(null);
+  const [showAllSessions, setShowAllSessions] = useState(false);
   const [linkingKey, setLinkingKey] = useState(null);
 
   const opponentKey = (g) => g.opponent_player_num ? `p:${g.opponent_player_num}` : `o:${g.opponent_id}`;
@@ -106,7 +108,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
     if (g.winner === "me") byOpponent[key].wins++; else if (g.winner === "opponent") byOpponent[key].losses++;
   });
   const opponents = Object.values(byOpponent).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses));
-  const visibleGames = filterOpponent ? (history ?? []).filter(g => opponentKey(g) === filterOpponent) : (history ?? []).slice(0, 10);
+  const visibleGames = filterOpponent ? (history ?? []).filter(g => opponentKey(g) === filterOpponent) : showAllSessions ? (history ?? []) : (history ?? []).slice(0, 10);
   const rawById = Object.fromEntries((rawOpponents ?? []).map(o => [o.id, o]));
 
   return (
@@ -114,14 +116,14 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
       <PageHeader title="Practice" />
       <div className="tab-content">
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
-          <Link to="/practice?start=1" className="office-list-item">
+          <button type="button" onClick={onStart} className="office-list-item">
             <Plus size={16} /><span>New Practice Session</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </Link>
-          <Link to="/practice#practice-sessions" className="office-list-item">
+          </button>
+          <button type="button" onClick={() => { setShowAllSessions(true); sessionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="office-list-item" aria-controls="practice-sessions">
             <Trophy size={16} /><span>My Practice Sessions</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </Link>
+          </button>
         </div>
 
         {opponents.length > 0 && (
@@ -159,7 +161,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
           </div>
         )}
 
-        <div className="card" id="practice-sessions">
+        <div className="card" id="practice-sessions" ref={sessionsRef} style={{ scrollMarginTop: 16 }}>
           <div className="card__title">{filterOpponent ? "Games vs This Opponent" : "My Practice Sessions"}</div>
           {history === undefined && <Loader />}
           {history && visibleGames.length === 0 && <div className="dash-empty">No practice games yet.</div>}
@@ -254,7 +256,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 
   return (
     <>
-      <PageHeader title="Practice" />
+      <PageHeader title="Practice" onBack={onCancel} />
       <div className="tab-content">
         <div className="field">
           <div className="form-label" style={{display:"flex",alignItems:"center",gap:5}}><Search size={11}/> Search league players</div>
@@ -306,7 +308,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 function GameTypeStep({ session, setSession, onNext, onBack }) {
   return (
     <>
-      <PageHeader title="Practice" subtitle={`vs ${session.opponentName}`} />
+      <PageHeader title="Practice" subtitle={`vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
           <div className="card__title">Game Type</div>
@@ -334,7 +336,7 @@ function FormatStep({ session, setSession, onNext, onBack }) {
     : "9-Ball and 10-Ball don't use a rating/handicap — this format doesn't apply to this game.";
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} />
+      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
           <div className="card__title">Format</div>
@@ -394,7 +396,7 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
 
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} />
+      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
           {!isMatch ? (
