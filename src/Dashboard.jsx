@@ -9,6 +9,7 @@ import { PageHeader, TabBar, navItemsForRole, LEAGUE_NAV_ITEMS, shellCss, Access
 import { css, Loader } from "./AdminApp";
 import * as db from "./db";
 import { getActiveTeamIds } from "./teamMembership";
+import TeamContextSelector from "./TeamContextSelector";
 
 // Free-text schedule dates are typically M/D/YYYY (same format used
 // throughout the rest of the app) -- an unparseable value is treated as
@@ -356,6 +357,7 @@ export function LeaguesDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Leagues" backFallback="/" />
       <div className="tab-content">
+        {isCaptain && selectedTeamIds.length > 1 && allTeamOverviews?.length > 1 && <TeamContextSelector teams={allTeamOverviews.map(item => ({id:item.team.id,name:item.team.name,context:item.team.context ?? ""}))} value={effectiveTeamId} onChange={setSelectedTeamId} />}
         {leaguesLoading ? <Loader /> : <>
         {leagueNews.length > 0 && (
           <DashCard icon={Newspaper} title="League News">
