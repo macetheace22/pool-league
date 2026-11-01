@@ -306,7 +306,7 @@ export default function LiveEntryApp() {
       return;
     }
     setActiveSession({
-      type: "live", route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+      type: "live", ownerId: profile?.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
       title: `${match.teamHome?.name ?? "Home"} vs ${match.teamAway?.name ?? "Away"}`,
       subtitle: match.seasonLabel ? `${match.seasonLabel}${match.divNum ? " · Div " + match.divNum : ""}` : "Live scoring",
       data: { pairingId },
