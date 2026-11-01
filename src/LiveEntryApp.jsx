@@ -7,6 +7,8 @@ import * as db from "./db";
 import { useAuth } from "./AuthContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import { mergeLiveMatchState } from "./liveMatchSync";
+import { useActiveSession } from "./ActiveSessionContext";
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 3000;
@@ -199,6 +201,7 @@ export default function LiveEntryApp() {
   const [searchParams] = useSearchParams();
   const pairingId = searchParams.get("pairing");
   const { profile } = useAuth();
+  const { setActiveSession, clearActiveSession } = useActiveSession();
 
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -207,6 +210,14 @@ export default function LiveEntryApp() {
   const [lastSync, setLastSync] = useState(null);
   const [syncErr, setSyncErr] = useState(false);
   const [activeSet, setActiveSet] = useState(0);
+
+  useEffect(() => {
+    if (!pairingId || !profile?.id) return;
+    setActiveSession({
+      type: "live", ownerId: profile.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+      title: "Live match", subtitle: "Loading match details", data: { pairingId },
+    });
+  }, [pairingId, profile?.id, setActiveSession]);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,13 +232,25 @@ export default function LiveEntryApp() {
       if (cancelled) return;
       if (!m) {
         setMatch(null);
+        clearActiveSession();
         setLoadError("This match could not be loaded. Return to Current League Matches and select it again.");
         return;
       }
       setMatch(m);
+      if (m.phase !== "archived") {
+        setActiveSession({
+          type: "live", ownerId: profile?.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+          title: `${m.teamHome?.name ?? "Home"} vs ${m.teamAway?.name ?? "Away"}`,
+          subtitle: m.seasonLabel ? `${m.seasonLabel}${m.divNum ? " · Div " + m.divNum : ""}` : "Live scoring",
+          data: { pairingId },
+        });
+      } else clearActiveSession();
       setLastSync(Date.now());
     }).catch(() => {
-      if (!cancelled) setLoadError("Unable to load this match. Check your connection and try again.");
+      if (!cancelled) {
+        clearActiveSession();
+        setLoadError("Unable to load this match. Check your connection and try again.");
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -288,6 +311,23 @@ export default function LiveEntryApp() {
     return false;
   }, [pairingId, match]);
 
+  useEffect(() => {
+    if (!match || !pairingId) return;
+    if (match.phase === "archived") {
+      clearActiveSession();
+      return;
+    }
+    setActiveSession({
+      type: "live", ownerId: profile?.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+      title: `${match.teamHome?.name ?? "Home"} vs ${match.teamAway?.name ?? "Away"}`,
+      subtitle: [
+        match.seasonLabel ? `${match.seasonLabel}${match.divNum ? " · Div " + match.divNum : ""}` : "Live scoring",
+        `${match.sets.filter(s => s.winnerSlot === "home").length}–${match.sets.filter(s => s.winnerSlot === "away").length} sets`,
+      ].join(" · "),
+      data: { pairingId },
+    });
+  }, [match?.phase, match?.teamHome?.name, match?.teamAway?.name, match?.seasonLabel, match?.divNum, match?.sets, pairingId, profile?.id, setActiveSession, clearActiveSession]);
+
   const refreshFromServer = useCallback(async () => {
     const fresh = await loadMatch(pairingId);
     if (fresh) { setMatch(fresh); setLastSync(Date.now()); }
@@ -343,12 +383,13 @@ export default function LiveEntryApp() {
         const finalState = { ...marked, phase: "archived" };
         await saveMatch(pairingId, finalState);
         setMatch(finalState);
+        clearActiveSession();
         setLastSync(Date.now());
         setSyncErr(false);
         archivingRef.current = false;
       })();
     }
-  }, [match?.confirmedHome, match?.confirmedAway, match?.disputedBy, match?.phase, match?.archiving, match?.makeup, match?.unavailableHome, match?.unavailableAway, match?.submissionReady, pairingId]);
+  }, [match?.confirmedHome, match?.confirmedAway, match?.disputedBy, match?.phase, match?.archiving, match?.makeup, match?.unavailableHome, match?.unavailableAway, match?.submissionReady, pairingId, clearActiveSession]);
 
   const resetMatch = async () => {
     const fresh = emptyMatch();
@@ -361,7 +402,7 @@ export default function LiveEntryApp() {
       <div className="app">
         <style>{css}</style>
         <style>{shellCss}</style>
-        <PageHeader title="Score Your Match" hideBack />
+        <PageHeader title="Score Your Match" backFallback="/matches" />
         <div className="screen"><div className="empty-state">No match selected. Go back to Current League Matches and pick a match to score.</div></div>
       </div>
     );
