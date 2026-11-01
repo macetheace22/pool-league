@@ -52,10 +52,12 @@ begin
        select 1 from public.teams
        where captain_profile_id = v_previous_captain
      ) then
+    perform set_config('app.bypass_privilege_check', 'true', true);
     update public.profiles
     set role = 'player'
     where id = v_previous_captain
       and role = 'captain';
+    perform set_config('app.bypass_privilege_check', 'false', true);
   end if;
 
   -- Keep manager as the account-level role while recording the team-specific
