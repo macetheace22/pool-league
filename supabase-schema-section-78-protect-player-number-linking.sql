@@ -114,6 +114,93 @@ begin
 end;
 $function$;
 
+
+-- Protect player_num from direct profile updates through the Data API. Only
+-- managers and the locked invite-redemption RPC may change this identity link.
+create or replace function public.protect_profile_privilege_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if current_role_name() is distinct from 'manager'
+     and coalesce(current_setting('app.bypass_privilege_check', true), 'false') <> 'true' then
+    new.role := old.role;
+    new.is_active := old.is_active;
+    new.is_claimed := old.is_claimed;
+    new.player_num := old.player_num;
+  end if;
+  return new;
+end;
+$function$;
+
+-- A captain may remove themselves from their own roster. If that also ends
+-- their final captain assignment, allow the trusted roster RPC to demote the
+-- profile while preserving the separate team-membership history.
+create or replace function public.remove_player_from_team(p_team_id uuid, p_player_num text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_profile_id uuid;
+  v_is_captain boolean;
+begin
+  perform public.assert_team_roster_change_allowed(p_team_id);
+
+  select p.id into v_profile_id
+  from public.profiles p
+  where p.player_num = p_player_num;
+
+  delete from public.rosters
+  where team_id = p_team_id
+    and player_num = p_player_num;
+
+  update public.profile_team_memberships
+  set ended_at = now()
+  where team_id = p_team_id
+    and profile_id = v_profile_id
+    and ended_at is null;
+
+  if v_profile_id is not null then
+    select exists (
+      select 1 from public.teams where captain_profile_id = v_profile_id
+    ) into v_is_captain;
+
+    if exists (
+      select 1 from public.teams
+      where id = p_team_id and captain_profile_id = v_profile_id
+    ) then
+      update public.teams
+      set captain_profile_id = null
+      where id = p_team_id and captain_profile_id = v_profile_id;
+
+      update public.captaincy_history
+      set ended_at = now()
+      where team_id = p_team_id
+        and profile_id = v_profile_id
+        and ended_at is null;
+
+      v_is_captain := exists (
+        select 1 from public.teams where captain_profile_id = v_profile_id
+      );
+    end if;
+
+    if not v_is_captain then
+      perform set_config('app.bypass_privilege_check', 'true', true);
+      update public.profiles
+      set role = 'player'
+      where id = v_profile_id and role = 'captain';
+      perform set_config('app.bypass_privilege_check', 'false', true);
+    end if;
+  end if;
+
+  return true;
+end;
+$function$;
+
 create or replace function public.set_own_player_number(p_player_num text)
 returns boolean
 language plpgsql
