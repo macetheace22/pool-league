@@ -299,6 +299,20 @@ export default function LiveEntryApp() {
     return false;
   }, [pairingId, match]);
 
+  useEffect(() => {
+    if (!match || !pairingId) return;
+    if (match.phase === "archived") {
+      clearActiveSession();
+      return;
+    }
+    setActiveSession({
+      type: "live", route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+      title: `${match.teamHome?.name ?? "Home"} vs ${match.teamAway?.name ?? "Away"}`,
+      subtitle: match.seasonLabel ? `${match.seasonLabel}${match.divNum ? " · Div " + match.divNum : ""}` : "Live scoring",
+      data: { pairingId },
+    });
+  }, [match?.phase, match?.teamHome?.name, match?.teamAway?.name, match?.seasonLabel, match?.divNum, pairingId, setActiveSession, clearActiveSession]);
+
   const refreshFromServer = useCallback(async () => {
     const fresh = await loadMatch(pairingId);
     if (fresh) { setMatch(fresh); setLastSync(Date.now()); }
