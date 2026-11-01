@@ -212,6 +212,14 @@ export default function LiveEntryApp() {
   const [activeSet, setActiveSet] = useState(0);
 
   useEffect(() => {
+    if (!pairingId || !profile?.id) return;
+    setActiveSession({
+      type: "live", ownerId: profile.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+      title: "Live match", subtitle: "Loading match details", data: { pairingId },
+    });
+  }, [pairingId, profile?.id, setActiveSession]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setLoadError("");
@@ -224,6 +232,7 @@ export default function LiveEntryApp() {
       if (cancelled) return;
       if (!m) {
         setMatch(null);
+        clearActiveSession();
         setLoadError("This match could not be loaded. Return to Current League Matches and select it again.");
         return;
       }
@@ -238,7 +247,10 @@ export default function LiveEntryApp() {
       } else clearActiveSession();
       setLastSync(Date.now());
     }).catch(() => {
-      if (!cancelled) setLoadError("Unable to load this match. Check your connection and try again.");
+      if (!cancelled) {
+        clearActiveSession();
+        setLoadError("Unable to load this match. Check your connection and try again.");
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
