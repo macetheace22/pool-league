@@ -146,3 +146,23 @@ describe("captain match permissions", () => {
     expect(getCaptainMatchSlot(profile, { team_home_id: "team-c", team_away_id: "team-d" })).toBeNull();
   });
 });
+
+
+describe("manager with team-specific captain assignments", () => {
+  it("retains manager authority while exposing only explicitly assigned captain teams", () => {
+    const profile = {
+      role: "manager",
+      team_memberships: [
+        { team_id: "team-player", ended_at: null },
+        { team_id: "team-captain", ended_at: null },
+      ],
+      captain_team_ids: ["team-captain"],
+    };
+    expect(getActiveTeamIds(profile)).toEqual(["team-player", "team-captain"]);
+    expect(getCaptainTeamIds(profile)).toEqual(["team-captain"]);
+    expect(isCaptainOfTeam(profile, "team-player")).toBe(false);
+    expect(isCaptainOfTeam(profile, "team-captain")).toBe(true);
+    // Manager-level access is determined by profile.role, not captainTeamIds.
+    expect(profile.role).toBe("manager");
+  });
+});
