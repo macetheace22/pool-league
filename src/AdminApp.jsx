@@ -266,7 +266,6 @@ export default function AdminApp({ page }) {
 // ─── Workspace App (page router driven by main.jsx routes) ────────────────────
 function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const isManager = profile.role === "manager";
-  const isCaptain = profile.role === "captain";
   const activeTeamIds = getActiveTeamIds(profile);
   const captainTeamIds = getCaptainTeamIds(profile);
   const primaryTeamId = activeTeamIds[0] ?? null;
@@ -278,7 +277,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   useEffect(() => {
     let cancelled = false;
-    if ((!isCaptain && !isManager) || captainTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
+    if (captainTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
     db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => captainTeamIds.includes(team.id))); })
       .catch(() => { if (!cancelled) setCaptainTeams([]); });
     return () => { cancelled = true; };
