@@ -83,10 +83,12 @@ begin
            select 1 from public.teams
            where captain_profile_id = v_previous_captain
          ) then
+        perform set_config('app.bypass_privilege_check', 'true', true);
         update public.profiles
         set role = 'player'
         where id = v_previous_captain
           and role = 'captain';
+        perform set_config('app.bypass_privilege_check', 'false', true);
       end if;
 
       insert into public.captaincy_history (team_id, profile_id, started_at)
