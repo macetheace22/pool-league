@@ -4556,6 +4556,13 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     </div>
                     <div className="list-row__actions">
                       <button
+                        className="btn-sm"
+                        onClick={() => startMimic(u)}
+                        disabled={isMe || !u.is_active}
+                        title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `Preview the app as ${u.username}`}
+                        aria-label={`View the app as ${u.username}`}
+                      ><Eye size={13}/> View as</button>
+                      <button
                         className="btn-icon"
                         onClick={()=>!isMe && startEditRole(u)}
                         disabled={isMe}
