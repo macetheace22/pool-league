@@ -320,10 +320,13 @@ export default function LiveEntryApp() {
     setActiveSession({
       type: "live", ownerId: profile?.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
       title: `${match.teamHome?.name ?? "Home"} vs ${match.teamAway?.name ?? "Away"}`,
-      subtitle: match.seasonLabel ? `${match.seasonLabel}${match.divNum ? " · Div " + match.divNum : ""}` : "Live scoring",
+      subtitle: [
+        match.seasonLabel ? `${match.seasonLabel}${match.divNum ? " · Div " + match.divNum : ""}` : "Live scoring",
+        `${match.sets.filter(s => s.winnerSlot === "home").length}–${match.sets.filter(s => s.winnerSlot === "away").length} sets`,
+      ].join(" · "),
       data: { pairingId },
     });
-  }, [match?.phase, match?.teamHome?.name, match?.teamAway?.name, match?.seasonLabel, match?.divNum, pairingId, profile?.id, setActiveSession, clearActiveSession]);
+  }, [match?.phase, match?.teamHome?.name, match?.teamAway?.name, match?.seasonLabel, match?.divNum, match?.sets, pairingId, profile?.id, setActiveSession, clearActiveSession]);
 
   const refreshFromServer = useCallback(async () => {
     const fresh = await loadMatch(pairingId);
