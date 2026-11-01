@@ -8,6 +8,7 @@ import { NavHistoryProvider } from './Shell.jsx';
 import { Home, LeaguesDashboard, LeagueOffice, SeasonManagementHub, TournamentsPlaceholder, TeamsPlayersDashboard } from './Dashboard.jsx';
 import Practice from './Practice.jsx';
 import Schedules from './Schedules.jsx';
+import { ActiveSessionProvider } from './ActiveSessionContext.jsx';
 
 // Reset the document scroll position whenever the active route changes.
 // This covers links, bottom-tab navigation, and browser Back/Forward without
@@ -101,6 +102,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <DirtySaveButtonBehavior />
       <NavHistoryProvider>
         <AuthProvider>
+          <ActiveSessionProvider>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/leagues" element={<LeaguesDashboard />} />
@@ -133,6 +135,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/live" element={<LiveEntryApp />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ActiveSessionProvider>
         </AuthProvider>
       </NavHistoryProvider>
     </BrowserRouter>
