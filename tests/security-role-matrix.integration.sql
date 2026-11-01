@@ -33,6 +33,7 @@ declare
   v_mixed_profile uuid;
   v_multi_captain uuid;
   v_test_player_num text;
+  v_existing_player_num text;
 begin
   select id into v_manager from public.profiles
     where role = 'manager' and is_active
@@ -311,6 +312,16 @@ begin
       raise;
     end if;
   end;
+
+  select player_num into v_existing_player_num
+  from public.profiles where id = v_manager;
+  update public.profiles
+  set player_num = v_test_player_num
+  where id = v_manager;
+  if (select player_num from public.profiles where id = v_manager)
+     is distinct from v_existing_player_num then
+    raise exception 'FAIL profile protection trigger must block direct player-number changes by non-managers';
+  end if;
 
   raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, manager role retention, and player-number identity protection';
 end;
