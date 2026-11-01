@@ -7,6 +7,8 @@ import * as db from "./db";
 import { useAuth } from "./AuthContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import { mergeLiveMatchState } from "./liveMatchSync";
+import { useActiveSession } from "./ActiveSessionContext";
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 3000;
@@ -199,6 +201,7 @@ export default function LiveEntryApp() {
   const [searchParams] = useSearchParams();
   const pairingId = searchParams.get("pairing");
   const { profile } = useAuth();
+  const { setActiveSession, clearActiveSession } = useActiveSession();
 
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -225,6 +228,14 @@ export default function LiveEntryApp() {
         return;
       }
       setMatch(m);
+      if (m.phase !== "archived") {
+        setActiveSession({
+          type: "live", route: `/live?pairing=${encodeURIComponent(pairingId)}`,
+          title: `${m.teamHome?.name ?? "Home"} vs ${m.teamAway?.name ?? "Away"}`,
+          subtitle: m.seasonLabel ? `${m.seasonLabel}${m.divNum ? " · Div " + m.divNum : ""}` : "Live scoring",
+          data: { pairingId },
+        });
+      } else clearActiveSession();
       setLastSync(Date.now());
     }).catch(() => {
       if (!cancelled) setLoadError("Unable to load this match. Check your connection and try again.");
@@ -343,12 +354,13 @@ export default function LiveEntryApp() {
         const finalState = { ...marked, phase: "archived" };
         await saveMatch(pairingId, finalState);
         setMatch(finalState);
+        clearActiveSession();
         setLastSync(Date.now());
         setSyncErr(false);
         archivingRef.current = false;
       })();
     }
-  }, [match?.confirmedHome, match?.confirmedAway, match?.disputedBy, match?.phase, match?.archiving, match?.makeup, match?.unavailableHome, match?.unavailableAway, match?.submissionReady, pairingId]);
+  }, [match?.confirmedHome, match?.confirmedAway, match?.disputedBy, match?.phase, match?.archiving, match?.makeup, match?.unavailableHome, match?.unavailableAway, match?.submissionReady, pairingId, clearActiveSession]);
 
   const resetMatch = async () => {
     const fresh = emptyMatch();
