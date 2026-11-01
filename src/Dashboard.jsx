@@ -195,7 +195,7 @@ export function TeamsPlayersDashboard() {
   return (
     <div className="app">
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
-      <PageHeader title="Teams and Players" subtitle="Look up league players and teams." />
+      <PageHeader title="Teams and Players" />
       <div className="tab-content">
         <Link to="/player-lookup" className="office-list-item">
           <Users size={16} /><span>Player Lookup</span>
