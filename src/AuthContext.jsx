@@ -20,6 +20,17 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(true);
   const [session, setSession]         = useState(null);
   const [profile, setProfile]         = useState(null);
+  const [previewProfile, setPreviewProfile] = useState(null);
+  const startMimic = (targetProfile) => {
+    if (profile?.role !== "manager" || !targetProfile?.id || targetProfile.id === profile.id || !targetProfile.is_active) return false;
+    setPreviewProfile({ ...targetProfile });
+    navigate("/");
+    return true;
+  };
+  const stopMimic = () => {
+    setPreviewProfile(null);
+    navigate("/access");
+  };
 
   useEffect(() => {
     let active = true;
@@ -34,6 +45,10 @@ export function AuthProvider({ children }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
       setSession(sess);
+      setProfile(currentProfile => {
+        if (!sess || (currentProfile?.id && sess.user.id !== currentProfile.id)) setPreviewProfile(null);
+        return currentProfile;
+      });
       if (sess) {
         const p = await db.getProfile(sess.user.id);
         setProfile(p);
@@ -45,6 +60,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = async () => {
+    setPreviewProfile(null);
     await supabase.auth.signOut();
     navigate("/");
   };
@@ -76,9 +92,30 @@ export function AuthProvider({ children }) {
     return <div className="iba-auth"><style>{css}</style><div className="auth-empty">Your account has been deactivated. Contact your league manager.</div></div>;
   }
 
+  const effectiveProfile = previewProfile ?? profile;
   return (
-    <AuthContext.Provider value={{ session, profile, logout, refreshProfile }}>
-      {children}
+    <AuthContext.Provider value={{
+      session, profile: effectiveProfile, realProfile: profile, previewProfile,
+      isMimicking: !!previewProfile, startMimic, stopMimic, logout, refreshProfile,
+    }}>
+      <div className={previewProfile ? "mimic-preview-mode" : undefined}>
+        {previewProfile && <style>{`
+          .mimic-preview-mode button { pointer-events: none !important; opacity: .5 !important; }
+          .mimic-preview-mode .page-header button,
+          .mimic-preview-mode .tab-bar-nav button,
+          .mimic-preview-mode .drawer button { pointer-events: auto !important; opacity: 1 !important; }
+          .mimic-preview-mode input,
+          .mimic-preview-mode select,
+          .mimic-preview-mode textarea { pointer-events: none !important; opacity: .65 !important; }
+        `}</style>}
+        {children}
+      </div>
+      {previewProfile && (
+        <div style={{position:"fixed",zIndex:2000,top:"calc(66px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:"#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
+          <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>Previewing {previewProfile.username} · Read-only · Your manager account remains signed in</span>
+          <button type="button" onClick={stopMimic} style={{border:0,borderRadius:8,padding:"8px 11px",background:"#F2C14E",color:"#241A05",fontSize:12,fontWeight:800,whiteSpace:"nowrap",cursor:"pointer"}}>Stop Mimicking</button>
+        </div>
+      )}
     </AuthContext.Provider>
   );
 }
