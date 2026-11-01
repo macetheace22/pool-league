@@ -138,6 +138,7 @@ declare
   v_invite public.invite_codes%rowtype;
   v_user_id uuid := auth.uid();
   v_previous_captain uuid;
+  v_existing_player_num text;
 begin
   if v_user_id is null then
     raise exception 'AUTH_REQUIRED';
@@ -147,10 +148,22 @@ begin
   from public.invite_codes
   where code = upper(p_code)
     and used_at is null
-    and expires_at > now();
+    and expires_at > now()
+  for update;
 
   if v_invite.code is null then
     raise exception 'Invalid or expired invite code';
+  end if;
+
+  select player_num into v_existing_player_num
+  from public.profiles
+  where id = v_user_id
+  for update;
+
+  if v_invite.player_num is not null
+     and v_existing_player_num is not null
+     and v_existing_player_num is distinct from v_invite.player_num then
+    raise exception 'PLAYER_NUMBER_ALREADY_LINKED';
   end if;
 
   update public.profiles
