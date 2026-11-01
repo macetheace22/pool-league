@@ -47,11 +47,20 @@ export async function getProfile(userId) {
   if (!data) return data;
   const { data: memberships } = await supabase
     .from("profile_team_memberships")
-    .select("id, team_id, joined_at, ended_at, teams(id, name, team_num, division_id, venue, is_bye, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active)))")
+    .select("id, team_id, joined_at, ended_at, teams(id, name, team_num, division_id, venue, is_bye, captain_profile_id, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active)))")
     .eq("profile_id", userId)
     .is("ended_at", null)
     .order("joined_at", { ascending: true });
-  return { ...data, team_memberships: memberships ?? [], team_ids: (memberships ?? []).map(m => m.team_id) };
+  const activeMemberships = memberships ?? [];
+  const captainTeamIds = activeMemberships
+    .filter(m => m.teams?.captain_profile_id === userId)
+    .map(m => m.team_id);
+  return {
+    ...data,
+    team_memberships: activeMemberships,
+    team_ids: activeMemberships.map(m => m.team_id),
+    captain_team_ids: [...new Set(captainTeamIds)],
+  };
 }
 export async function updateOwnUsername(userId, username) {
   const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);
