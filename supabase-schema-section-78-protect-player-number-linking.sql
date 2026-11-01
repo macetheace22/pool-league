@@ -250,7 +250,7 @@ revoke all on function public.set_own_player_number(text) from public, anon;
 grant execute on function public.set_own_player_number(text) to authenticated;
 
 -- Verification queries:
--- 1. handle_new_user must not read raw_user_meta_data->>'player_num'.
+-- 1. handle_new_user must not read a player number from user metadata.
 -- 2. set_own_player_number must reject non-manager callers.
 -- 3. a valid player invite code remains the only self-service route to link
 --    its server-stored player_num to the authenticated profile.
