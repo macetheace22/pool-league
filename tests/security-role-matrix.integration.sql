@@ -250,13 +250,25 @@ begin
   insert into public.profile_team_memberships(profile_id, team_id)
   values (v_manager, v_team_a)
   on conflict (profile_id, team_id) where ended_at is null do nothing;
-  update public.teams set captain_profile_id = v_manager where id = v_team_a;
   perform set_config('request.jwt.claim.sub', v_manager::text, true);
   perform set_config('request.jwt.claims', jsonb_build_object('sub', v_manager::text, 'role', 'authenticated')::text, true);
-  if public.current_role_name() is distinct from 'manager'
-     or public.is_on_team(v_team_a) is distinct from true
-     or public.is_team_captain(v_team_a) is distinct from true then
-    raise exception 'FAIL manager with player/captain membership must retain manager role and captain assignment';
+  select public.assign_team_captain(v_team_a, v_manager) into v_ok;
+  if v_ok is distinct from true
+     or public.current_role_name() is distinct from 'manager'
+     or not exists (select 1 from public.teams where id = v_team_a and captain_profile_id = v_manager)
+     or public.is_on_team(v_team_a) is distinct from true then
+    raise exception 'FAIL assigning a captain seat must preserve manager role and player membership';
+  end if;
+
+  select public.remove_team_captain(v_team_a, v_manager) into v_ok;
+  if v_ok is distinct from true
+     or public.current_role_name() is distinct from 'manager'
+     or exists (select 1 from public.teams where id = v_team_a and captain_profile_id = v_manager)
+     or not exists (
+       select 1 from public.profile_team_memberships
+       where profile_id = v_manager and team_id = v_team_a and ended_at is null
+     ) then
+    raise exception 'FAIL removing a manager captain seat must preserve manager role and player membership';
   end if;
 
   raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, multiple captain assignments, and manager role retention';
