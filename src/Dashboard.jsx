@@ -197,16 +197,14 @@ export function TeamsPlayersDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Teams and Players" subtitle="Look up league players and teams." />
       <div className="tab-content">
-        <div style={{display:"flex",flexDirection:"column",gap:8,maxWidth:620,margin:"0 auto"}}>
-          <Link to="/player-lookup" className="office-list-item">
-            <Users size={16} /><span>Player Lookup</span>
-            <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </Link>
-          <Link to="/team-lookup" className="office-list-item">
-            <Building2 size={16} /><span>Team Lookup</span>
-            <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </Link>
-        </div>
+        <Link to="/player-lookup" className="office-list-item">
+          <Users size={16} /><span>Player Lookup</span>
+          <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+        </Link>
+        <Link to="/team-lookup" className="office-list-item">
+          <Building2 size={16} /><span>Team Lookup</span>
+          <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+        </Link>
       </div>
       <TabBar />
     </div>
@@ -219,7 +217,7 @@ export function LeaguesDashboard() {
   const isManager = profile?.role === "manager";
   const isCaptain = profile?.role === "captain";
   const [selectedTeamId, setSelectedTeamId] = useState(null);
-  const selectedTeamIds = getActiveTeamIds(profile)[0] ?? nulls ?? [];
+  const selectedTeamIds = getActiveTeamIds(profile);
   const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
     ? selectedTeamId
     : selectedTeamIds[0] ?? null;
