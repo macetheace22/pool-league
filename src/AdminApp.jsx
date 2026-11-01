@@ -8,6 +8,7 @@ import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import SearchableOptionSelect from "./SearchableOptionSelect";
 import { getActiveTeamIds } from "./teamMembership";
+import TeamContextSelector from "./TeamContextSelector";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
 import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from "./Shell";
@@ -268,8 +269,19 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const isCaptain = profile.role === "captain";
   const activeTeamIds = getActiveTeamIds(profile);
   const primaryTeamId = activeTeamIds[0] ?? null;
+  const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState(primaryTeamId);
+  const [captainTeams, setCaptainTeams] = useState([]);
+  const captainTeamId = activeTeamIds.includes(selectedCaptainTeamId) ? selectedCaptainTeamId : primaryTeamId;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isCaptain || activeTeamIds.length === 0) { setCaptainTeams([]); return () => { cancelled = true; }; }
+    db.listAllTeamsWithContext().then(rows => { if (!cancelled) setCaptainTeams((rows ?? []).filter(team => activeTeamIds.includes(team.id))); })
+      .catch(() => { if (!cancelled) setCaptainTeams([]); });
+    return () => { cancelled = true; };
+  }, [profile.id, activeTeamIds.join("|")]);
 
   const [seasons, setSeasons] = useState([]);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
@@ -846,15 +858,16 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     return (
       <>
         <PageHeader title="Manage My Team" />
+        {activeTeamIds.length > 1 && captainTeams.length > 1 && <div className="tab-content" style={{paddingBottom:0}}><TeamContextSelector teams={captainTeams} value={captainTeamId} onChange={setSelectedCaptainTeamId} /></div>}
         <SubTabBar>
           <SubTabBtn active={myTeamSubTab==="roster"} onClick={()=>setMyTeamSubTab("roster")}>Roster</SubTabBtn>
           <SubTabBtn active={myTeamSubTab==="lineup"} onClick={()=>setMyTeamSubTab("lineup")}>Lineup Planner</SubTabBtn>
           <SubTabBtn active={myTeamSubTab==="stats"} onClick={()=>setMyTeamSubTab("stats")}>Team Stats</SubTabBtn>
         </SubTabBar>
         <div className="tab-content">
-          {myTeamSubTab === "roster" && <ManageMyTeamPage teamId={primaryTeamId} profileId={profile.id} />}
-          {myTeamSubTab === "lineup" && <LineupPlannerPanel key={primaryTeamId} teamId={primaryTeamId} profileId={profile.id} />}
-          {myTeamSubTab === "stats" && <TeamStatsPanel key={primaryTeamId} teamId={primaryTeamId} />}
+          {myTeamSubTab === "roster" && <ManageMyTeamPage key={captainTeamId} teamId={captainTeamId} profileId={profile.id} />}
+          {myTeamSubTab === "lineup" && <LineupPlannerPanel key={captainTeamId} teamId={captainTeamId} profileId={profile.id} />}
+          {myTeamSubTab === "stats" && <TeamStatsPanel key={captainTeamId} teamId={captainTeamId} />}
         </div>
       </>
     );
@@ -3723,6 +3736,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
 
 // ─── Manage My Team (captain) ──────────────────────────────────────────────────
 function ManageMyTeamPage({ teamId, profileId }) {
+  const searchRequestRef = useRef(0);
   const [team, setTeam] = useState(null);
   const [roster, setRoster] = useState([]);
   const [pastTeams, setPastTeams] = useState([]);
@@ -3764,7 +3778,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
       setLoading(false);
     }
   };
-  useEffect(() => { refresh(); }, [teamId]);
+  useEffect(() => { searchRequestRef.current += 1; setSearchQuery(""); setSearchResults([]); setSearching(false); refresh(); }, [teamId]);
 
   const flash = (msg) => { setSuccess(msg); setTimeout(()=>setSuccess(""),2500); };
   const onRosterNums = new Set(roster.map(p => p.num));
@@ -3797,11 +3811,17 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
   const runSearch = async (q) => {
     setSearchQuery(q);
-    if (q.trim().length < 2) { setSearchResults([]); return; }
-    setSearching(true);
-    const results = await db.searchPlayers(q);
-    setSearching(false);
-    setSearchResults(results);
+    const requestId = ++searchRequestRef.current;
+    if (q.trim().length < 2) { setSearchResults([]); setSearching(false); return; }
+    setSearching(true); setError("");
+    try {
+      const results = await db.searchPlayers(q);
+      if (requestId !== searchRequestRef.current) return;
+      setSearchResults(results ?? []);
+    } catch (e) {
+      if (requestId !== searchRequestRef.current) return;
+      setSearchResults([]); setError(e?.message || "Player search failed. Please try again.");
+    } finally { if (requestId === searchRequestRef.current) setSearching(false); }
   };
 
   const openPastRoster = async (pt) => {
@@ -3834,7 +3854,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
     const ok = await db.submitTeamRoster(teamId, profileId);
     setSubmitting(false);
     if (!ok) { setError("Could not submit roster."); return; }
-    flash("Roster submitted — your league manager has been notified."); await refresh();
+    flash("Roster marked as submitted for manager review."); await refresh();
   };
 
   if (!teamId) return <div className="empty-state">Your account isn't linked to a team yet — ask your league manager to assign one.</div>;
@@ -3854,7 +3874,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
       <div className="card">
         <div className="card__title">Roster ({roster.length})</div>
-        {!rosterChangesAllowed && <div className="readonly-bar">Roster changes are manager-only starting Week 6. Contact your league manager to add or remove players.</div>}
+        {!rosterChangesAllowed && <div className="readonly-bar">Starting Week 6, only league managers can add or remove players. You can still generate invite codes for players already on this roster.</div>}
         {roster.length===0 && <div className="empty-state" style={{border:"none"}}>No players on this roster yet.</div>}
         <div className="team-select-list">
           {roster.map(p => (
@@ -3985,9 +4005,10 @@ function ManageMyTeamPage({ teamId, profileId }) {
       <div className="card">
         <div className="card__title">Submit Roster</div>
         {team.rosterSubmittedAt
-          ? <div style={{fontSize:12,color:"#5FCF9E",fontWeight:600}}>Submitted {new Date(team.rosterSubmittedAt).toLocaleDateString()}. You can keep making changes — resubmit any time.</div>
-          : <div style={{fontSize:11.5,color:"#9A9A9A",marginBottom:8}}>Let your league manager know your roster is ready for the season. Doesn't lock anything — you can still edit it afterward.</div>}
-        <button className="btn-secondary" onClick={submitRoster} disabled={submitting || roster.length===0}>{submitting?"Submitting…":"Submit Roster"}</button>
+          ? <div style={{fontSize:12,color:"#5FCF9E",fontWeight:600,marginBottom:8}}>Marked submitted for manager review on {new Date(team.rosterSubmittedAt).toLocaleDateString()}.</div>
+          : <div style={{fontSize:11.5,color:"#9A9A9A",marginBottom:8}}>Mark this roster as ready for your league manager to review. This records the submission in the league app; it does not send a separate notification or lock the roster.</div>}
+        {(!team.rosterSubmittedAt || rosterChangesAllowed) && <button className="btn-secondary" onClick={submitRoster} disabled={submitting || roster.length===0}>{submitting?"Submitting…":team.rosterSubmittedAt?"Resubmit Roster":"Submit Roster"}</button>}
+        {team.rosterSubmittedAt && !rosterChangesAllowed && <div style={{fontSize:11,color:"#8A8A8A"}}>Roster changes are now manager-only, so contact your league manager if an update is needed.</div>}
       </div>
 
       {error && <ErrorMsg>{error}</ErrorMsg>}
@@ -4058,9 +4079,12 @@ function LineupPlannerPanel({ teamId, profileId }) {
   if (overview === undefined) return <Loader />;
   if (error && overview === null) return <div className="empty-state">{error}</div>;
 
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekOptions = (overview?.myWeeks ?? [])
     .map(w => ({ ...w, _date: (() => { const parts = (w.date||"").split("/").map(Number); return parts.length>=3 && !parts.some(isNaN) ? new Date(parts[2], parts[0]-1, parts[1]) : null; })() }))
-    .sort((a, b) => (a._date ?? 0) - (b._date ?? 0));
+    .filter(w => w._date && w._date >= today).sort((a, b) => a._date - b._date);
+  const upcomingWeekIds = new Set(weekOptions.map(w => w.id));
+  const upcomingPlans = plans.filter(p => upcomingWeekIds.has(p.scheduleWeekId));
 
   const planForWeek = (weekId) => plans.find(p => p.scheduleWeekId === weekId) ?? null;
   // Players who've marked themselves unable to shoot the CURRENTLY SELECTED
@@ -4098,9 +4122,10 @@ function LineupPlannerPanel({ teamId, profileId }) {
 
   const clearWeek = async (planId, weekId) => {
     if (!confirm("Clear this week's planned lineup? This doesn't affect the schedule or match itself, just the note to your team.")) return;
-    await db.deleteLineupPlan(planId);
+    const ok = await db.deleteLineupPlan(planId);
+    if (!ok) { setError("Could not clear this week's plan. Please try again."); return; }
     if (selectedWeekId === weekId) { setSelectedNums(new Set()); setNote(""); }
-    await refresh();
+    setSuccess("Plan cleared."); await refresh();
   };
 
   if (overview === undefined) return <Loader />;
@@ -4117,6 +4142,7 @@ function LineupPlannerPanel({ teamId, profileId }) {
 
       <div className="card">
         <div className="card__title">Plan a Week</div>
+        {weekOptions.length === 0 && <div className="empty-state" style={{border:"none"}}>There are no upcoming scheduled weeks available to plan.</div>}
         <div className="field"><Label>Week</Label>
           <SearchableOptionSelect options={weekOptions.map(w=>({value:w.id,label:`${w.week ? `Week ${w.week} · ` : ""}${w.date} — vs ${opponentNameFor(w.pairings[0],teamId,overview.teams)}${planForWeek(w.id) ? " (planned)" : ""}`,searchText:`${w.week ?? ""} ${w.date} ${opponentNameFor(w.pairings[0],teamId,overview.teams)}`}))} value={selectedWeekId} onChange={loadWeekIntoForm} placeholder="Select a week…" ariaLabel="Search scheduled weeks" />
         </div>
@@ -4159,11 +4185,11 @@ function LineupPlannerPanel({ teamId, profileId }) {
         )}
       </div>
 
-      {plans.length > 0 && (
+      {upcomingPlans.length > 0 && (
         <div className="card">
-          <div className="card__title">Planned Weeks ({plans.length})</div>
+          <div className="card__title">Upcoming Planned Weeks ({upcomingPlans.length})</div>
           <div className="list">
-            {plans.map(p => (
+            {upcomingPlans.map(p => (
               <div key={p.id} className="list-row">
                 <div className="list-row__body">
                   <div style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
