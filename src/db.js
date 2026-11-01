@@ -1069,11 +1069,18 @@ export async function renameTeam(teamId, newName) {
 }
 export async function addPlayerToTeam(teamId, { name, nickname }) {
   const num = `C-${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`;
-  const { error: playerErr } = await supabase.from("players").insert({ num, name, nickname: nickname || null });
-  if (playerErr) return null;
-  const { error: rosterErr } = await supabase.from("rosters").insert({ team_id: teamId, player_num: num });
-  if (rosterErr) return null;
+  const { data, error } = await supabase.rpc("add_new_player_to_team", {
+    p_team_id: teamId,
+    p_player_num: num,
+    p_name: name,
+    p_nickname: nickname || null,
+  });
+  if (error || data !== true) return null;
   return { num, name, nickname: nickname || "", rating: null };
+}
+export async function canChangeRoster(teamId) {
+  const { data, error } = await supabase.rpc("can_captain_change_roster", { p_team_id: teamId });
+  return !error && data === true;
 }
 // Adds an EXISTING player (already in the registry, from a search result or
 // a past roster) to a team -- no new players row, just the roster link.

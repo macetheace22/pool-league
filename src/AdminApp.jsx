@@ -3728,6 +3728,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
   const [pastTeams, setPastTeams] = useState([]);
   const [pastRoster, setPastRoster] = useState(null); // {teamName, players} for the most recent past team
   const [loading, setLoading] = useState(true);
+  const [rosterChangesAllowed, setRosterChangesAllowed] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [addMode, setAddMode] = useState(null); // null | "new" | "search" | "past"
@@ -3750,7 +3751,8 @@ function ManageMyTeamPage({ teamId, profileId }) {
     setLoading(true);
     setError("");
     try {
-      const [teams, players, past] = await Promise.all([db.listAllTeamsWithContext(), db.listRosterForTeam(teamId), db.listPastCaptainedTeams(profileId)]);
+      const [teams, players, past, canChangeRoster] = await Promise.all([db.listAllTeamsWithContext(), db.listRosterForTeam(teamId), db.listPastCaptainedTeams(profileId), db.canChangeRoster(teamId)]);
+      setRosterChangesAllowed(canChangeRoster === true);
       const t = (teams ?? []).find(x => x.id === teamId);
       setTeam(t ?? null);
       setNameInput(t?.name ?? "");
@@ -3852,6 +3854,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
       <div className="card">
         <div className="card__title">Roster ({roster.length})</div>
+        {!rosterChangesAllowed && <div className="readonly-bar">Roster changes are manager-only starting Week 6. Contact your league manager to add or remove players.</div>}
         {roster.length===0 && <div className="empty-state" style={{border:"none"}}>No players on this roster yet.</div>}
         <div className="team-select-list">
           {roster.map(p => (
@@ -3864,7 +3867,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
                 {!p.hasAccount && (
                   <button className="btn-icon-sm" onClick={()=>openCodeGen(p)} aria-label="Generate invite code"><Key size={13}/></button>
                 )}
-                <button className="btn-icon-sm" onClick={()=>removePlayer(p.num)} aria-label="Remove player"><Trash2 size={13}/></button>
+                {rosterChangesAllowed && <button className="btn-icon-sm" onClick={()=>removePlayer(p.num)} aria-label="Remove player"><Trash2 size={13}/></button>}
               </div>
               {codeGenFor?.num === p.num && (
                 <div style={{padding:"10px 12px",borderTop:"1px solid #2A2A2A"}}>
@@ -3894,7 +3897,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
           ))}
         </div>
 
-        {!addMode ? (
+        {!rosterChangesAllowed ? null : !addMode ? (
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:8}}>
             <button className="btn-secondary" onClick={()=>setAddMode("past")}>From My Last Team</button>
             <button className="btn-secondary" onClick={()=>setAddMode("search")}>Look Up a Player</button>
