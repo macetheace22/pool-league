@@ -68,3 +68,12 @@ Add dedicated staging fixtures for:
 - **Manager who is also a player/captain** — manager permissions remain intact; player team context remains available; any captain-specific team selector is limited to explicit captain assignments.
 
 Verify both the visible UI and the database RPC/RLS result. A hidden or disabled button is not authorization; direct RPC attempts for a team the user does not captain must be denied. Preserve every active membership and historical match/stat record when a captain assignment or membership ends.
+
+
+## Player-number identity protection
+
+- Registration must never accept `player_num` from `raw_user_meta_data`; that metadata is user-editable.
+- A player number is linked only from a server-stored, unused invite code that carries the matching `player_num`.
+- Invite-code claims lock the invite row and profile row, reject attempts to replace an already-linked player number, and consume the invite even when it has no `team_id`.
+- Direct `set_own_player_number` calls are manager-only. Non-manager users must redeem a player-specific invite.
+- Verify non-manager RPC attempts are denied and that a player-specific invite links only the player number stored on that invite.
