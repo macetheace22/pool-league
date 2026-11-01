@@ -1374,7 +1374,7 @@ function MyStatsPage({ profile }) {
           <div className="card">
             <div className="card__title">Link Your Player Number</div>
             <div style={{fontSize:12.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
-              Your stats are tracked by your IBA player number. Link yours from My Profile to see your record here.
+              Your stats are tracked by your IBA player number. Redeem a player-specific invite code from My Profile to link your roster entry and see your record here.
             </div>
             <Link to="/me" className="btn-primary" style={{textAlign:"center",textDecoration:"none",display:"block"}}>Go to My Profile</Link>
           </div>
