@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Play, X } from "lucide-react";
 
@@ -19,22 +19,22 @@ export function ActiveSessionProvider({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const setActiveSession = (next) => {
+  const setActiveSession = useCallback((next) => {
     setActiveSessionState((current) => {
       const value = typeof next === "function" ? next(current) : next;
       if (value) localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...value, updatedAt: Date.now() }));
       else localStorage.removeItem(STORAGE_KEY);
       return value ? { ...value, updatedAt: Date.now() } : null;
     });
-  };
-  const clearActiveSession = () => setActiveSession(null);
+  }, []);
+  const clearActiveSession = useCallback(() => setActiveSession(null), [setActiveSession]);
 
   useEffect(() => {
     if (activeSession?.type === "live" && activeSession.archived) clearActiveSession();
   }, [activeSession?.archived, activeSession?.type]);
 
-  const value = useMemo(() => ({ activeSession, setActiveSession, clearActiveSession }), [activeSession]);
-  const isViewingSession = activeSession?.route === location.pathname;
+  const value = useMemo(() => ({ activeSession, setActiveSession, clearActiveSession }), [activeSession, setActiveSession, clearActiveSession]);
+  const isViewingSession = activeSession?.route?.split("?")[0] === location.pathname;
   return (
     <ActiveSessionContext.Provider value={value}>
       {children}
