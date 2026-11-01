@@ -244,7 +244,22 @@ begin
     raise exception 'FAIL multiple captain teams: captain assignment must cover C/D, not B, while retaining player membership on A/B/C/D';
   end if;
 
-  raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, and multi-team captain assignments';
+
+  -- Managers retain their manager role and permissions even when they also
+  -- have a player membership and a team captain assignment.
+  insert into public.profile_team_memberships(profile_id, team_id)
+  values (v_manager, v_team_a)
+  on conflict (profile_id, team_id) where ended_at is null do nothing;
+  update public.teams set captain_profile_id = v_manager where id = v_team_a;
+  perform set_config('request.jwt.claim.sub', v_manager::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_manager::text, 'role', 'authenticated')::text, true);
+  if public.current_role_name() is distinct from 'manager'
+     or public.is_on_team(v_team_a) is distinct from true
+     or public.is_team_captain(v_team_a) is distinct from true then
+    raise exception 'FAIL manager with player/captain membership must retain manager role and captain assignment';
+  end if;
+
+  raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, multiple captain assignments, and manager role retention';
 end;
 $test$;
 
