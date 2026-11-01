@@ -20,6 +20,7 @@ declare
   v_invite public.invite_codes%rowtype;
   v_profile_role text := 'player';
   v_previous_captain uuid;
+  v_player_num_taken boolean;
 begin
   -- Serialize the one-time bootstrap-manager decision so two simultaneous
   -- first registrations cannot both become managers.
@@ -43,6 +44,14 @@ begin
 
   if v_invite.code is not null then
     v_profile_role := v_invite.role;
+    if v_invite.player_num is not null then
+      select exists (
+        select 1 from public.profiles where player_num = v_invite.player_num
+      ) into v_player_num_taken;
+      if v_player_num_taken then
+        raise exception 'PLAYER_ALREADY_CLAIMED';
+      end if;
+    end if;
   end if;
 
   insert into public.profiles (id, username, role, phone_number, is_claimed, player_num, email)
