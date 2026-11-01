@@ -78,6 +78,56 @@ begin
 end;
 $function$;
 
+-- Keep the legacy RPC name safe for any older clients: route it through
+-- the same history-aware assignment/removal functions used by the current UI.
+create or replace function public.set_team_captain(p_team_id uuid, p_profile_id uuid)
+returns table(ok boolean, reason text)
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_current_captain uuid;
+  v_ok boolean;
+begin
+  if current_role_name() is distinct from 'manager' then
+    return query select false, 'MANAGER_ONLY'::text;
+    return;
+  end if;
+  if p_team_id is null or not exists (
+    select 1 from public.teams where id = p_team_id
+  ) then
+    return query select false, 'TEAM_NOT_FOUND'::text;
+    return;
+  end if;
+
+  if p_profile_id is null then
+    select captain_profile_id into v_current_captain
+    from public.teams
+    where id = p_team_id
+    for update;
+
+    if v_current_captain is null then
+      return query select true, null::text;
+      return;
+    end if;
+    select public.remove_team_captain(p_team_id, v_current_captain) into v_ok;
+  else
+    if not exists (
+      select 1 from public.profiles
+      where id = p_profile_id and is_active
+    ) then
+      return query select false, 'PROFILE_NOT_FOUND'::text;
+      return;
+    end if;
+    select public.assign_team_captain(p_team_id, p_profile_id) into v_ok;
+  end if;
+
+  return query select coalesce(v_ok, false),
+    case when coalesce(v_ok, false) then null::text else 'CAPTAIN_ASSIGNMENT_FAILED'::text end;
+end;
+$function$;
+
 create or replace function public.claim_invite_code(p_code text)
 returns table(role text, team_id uuid)
 language plpgsql
@@ -231,6 +281,9 @@ $function$;
 -- performs its own manager/authentication checks.
 revoke all on function public.assign_team_captain(uuid, uuid) from public, anon;
 grant execute on function public.assign_team_captain(uuid, uuid) to authenticated;
+
+revoke all on function public.set_team_captain(uuid, uuid) from public, anon;
+grant execute on function public.set_team_captain(uuid, uuid) to authenticated;
 
 revoke all on function public.claim_invite_code(text) from public, anon;
 grant execute on function public.claim_invite_code(text) to authenticated;
