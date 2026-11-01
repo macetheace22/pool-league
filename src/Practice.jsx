@@ -7,6 +7,7 @@ import { css, Loader } from "./AdminApp";
 import { dashboardCss } from "./Dashboard";
 import * as db from "./db";
 import { useActiveSession } from "./ActiveSessionContext";
+import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 
 const GAME_TYPES = [
   { key: "8ball", label: "8-Ball" },
@@ -21,6 +22,26 @@ const FORMATS = [
 ];
 
 function gameTypeLabel(key) { return GAME_TYPES.find(g => g.key === key)?.label ?? key; }
+
+function practiceGameRow(profile, session) {
+  return {
+    created_by: profile.id,
+    opponent_player_num: session.opponentType === "player" ? session.opponentPlayerNum : null,
+    opponent_id: session.opponentType === "manual" ? session.opponentId : null,
+    opponent_name: session.opponentName,
+    game_type: session.gameType,
+    format: session.format,
+    target_config: session.format === "match"
+      ? { myTarget: session.myRating, oppTarget: session.opponentRating }
+      : { x: session.x },
+    my_rating: session.format === "match" ? session.myRating : null,
+    opponent_rating: session.format === "match" ? session.opponentRating : null,
+    my_score: session.myScore ?? 0,
+    opponent_score: session.opponentScore ?? 0,
+    winner: session.winner ?? null,
+    game_log: session.gameLog ?? [],
+  };
+}
 
 export default function Practice() {
   const { profile } = useAuth();
@@ -77,7 +98,7 @@ export default function Practice() {
 
   const wrap = (children) => (
     <div className="app">
-      <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style><style>{practiceCss}</style>
+      <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style><style>{practiceCss}</style><style>{shotTrackerCss}</style>
       {children}
       <TabBar />
     </div>
@@ -104,7 +125,7 @@ export default function Practice() {
       onNext={() => changePhase("play")} onBack={() => changePhase("format")} />);
   }
   if (phase === "play") {
-    return wrap(<PlayStep session={session} setSession={setSession}
+    return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
       onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: finalSession } }); }} onBack={() => changePhase("config")} />);
   }
   if (phase === "done") {
@@ -457,7 +478,45 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
 }
 
 // ─── Step 5: play (running tally) ───────────────────────────────────────────
-function PlayStep({ session, setSession, onDone, onBack }) {
+function PlayStep({ profile, session, setSession, onDone, onBack }) {
+  const [recordStatus, setRecordStatus] = useState("checking");
+  const [recordError, setRecordError] = useState("");
+  const [recordAttempt, setRecordAttempt] = useState(0);
+
+  // The parent row must exist before shot logging is enabled. Persist the UUID
+  // into the active session first so a resumed session reuses the same row.
+  useEffect(() => {
+    let cancelled = false;
+    const ensureRecord = async () => {
+      if (!profile?.id) {
+        setRecordError("Your account could not be identified. Sign in again before logging shots.");
+        setRecordStatus("error");
+        return;
+      }
+      if (!session.gameId) {
+        setSession(current => current?.gameId ? current : { ...current, gameId: crypto.randomUUID() });
+        return;
+      }
+      setRecordStatus("checking");
+      setRecordError("");
+      try {
+        let existing = await db.getPracticeGame(session.gameId, profile.id);
+        if (!existing) {
+          existing = await db.createPracticeGame({ id: session.gameId, ...practiceGameRow(profile, session) });
+        }
+        if (!existing) throw new Error("The practice game could not be created or recovered.");
+        if (!cancelled) setRecordStatus("ready");
+      } catch (error) {
+        if (!cancelled) {
+          setRecordError(error?.message || "Unable to prepare this practice game.");
+          setRecordStatus("error");
+        }
+      }
+    };
+    ensureRecord();
+    return () => { cancelled = true; };
+  }, [session.gameId, profile?.id, recordAttempt]);
+
   const myScore = session.myScore ?? 0;
   const oppScore = session.opponentScore ?? 0;
   const gameLog = session.gameLog ?? [];
@@ -466,6 +525,10 @@ function PlayStep({ session, setSession, onDone, onBack }) {
   const [err, setErr] = useState("");
 
   const isEightBall = session.gameType === "8ball";
+  const myPlayer = profile?.player_num ? { num: profile.player_num, name: profile.username || "You" } : null;
+  const opponentPlayer = session.opponentType === "player" && session.opponentPlayerNum
+    ? { num: session.opponentPlayerNum, name: session.opponentName }
+    : null;
 
   const oppTarget = session.format === "match" ? session.opponentRating
     : session.format === "bestof" ? Math.floor(session.x / 2) + 1 : session.x;
@@ -514,6 +577,32 @@ function PlayStep({ session, setSession, onDone, onBack }) {
       <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${FORMATS.find(f=>f.key===session.format)?.label}`} backFallback="/" />
       <div className="tab-content">
         <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Your session is saved as you go. You can leave this screen and resume from the active-session bar.</div>
+        {recordStatus === "checking" && <div className="card"><Loader /><div className="card__title">Preparing your practice game…</div></div>}
+        {recordStatus === "error" && (
+          <div className="card">
+            <div className="error-msg">{recordError}</div>
+            <button className="btn-secondary" style={{marginTop:10}} onClick={() => { setRecordStatus("checking"); setRecordAttempt(n => n + 1); }}>Retry</button>
+          </div>
+        )}
+        {recordStatus === "ready" && (
+          <div className="card">
+            <div className="card__title">Track a Rack</div>
+            {myPlayer ? (
+              <ShotTracker contextType="practice_game" contextId={session.gameId} player={myPlayer}
+                opponentNum={session.opponentType === "player" ? session.opponentPlayerNum : null}
+                gameType={session.gameType} />
+            ) : (
+              <div className="dash-empty">Your league player profile is not linked, so shot tracking is unavailable for your account.</div>
+            )}
+            {opponentPlayer && (
+              <ShotTracker contextType="practice_game" contextId={session.gameId} player={opponentPlayer}
+                opponentNum={myPlayer?.num ?? null} gameType={session.gameType} />
+            )}
+            {session.opponentType === "manual" && (
+              <div className="dash-empty" style={{marginTop:6}}>Your shots are tracked normally. Opponent shot tracking is available when you select a league player.</div>
+            )}
+          </div>
+        )}
         <div className="play-tally">
           <div className="play-tally__side">
             <div className="play-tally__name">You</div>
@@ -572,31 +661,30 @@ function PlayStep({ session, setSession, onDone, onBack }) {
 
 // ─── Step 6: done (save) ────────────────────────────────────────────────────
 function DoneStep({ profile, session, onSaved }) {
-  useEffect(() => {
-    const row = {
-      created_by: profile.id,
-      opponent_player_num: session.opponentType === "player" ? session.opponentPlayerNum : null,
-      opponent_id: session.opponentType === "manual" ? session.opponentId : null,
-      opponent_name: session.opponentName,
-      game_type: session.gameType,
-      format: session.format,
-      target_config: session.format === "match"
-        ? { myTarget: session.myRating, oppTarget: session.opponentRating }
-        : { x: session.x },
-      my_rating: session.format === "match" ? session.myRating : null,
-      opponent_rating: session.format === "match" ? session.opponentRating : null,
-      my_score: session.myScore,
-      opponent_score: session.opponentScore,
-      winner: session.winner,
-      game_log: session.gameLog ?? [],
-    };
-    db.savePracticeGame(row).then(() => onSaved());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [saving, setSaving] = useState(true);
+  const [error, setError] = useState("");
+  const saveResult = async () => {
+    setSaving(true);
+    setError("");
+    const saved = session.gameId
+      ? await db.updatePracticeGame(session.gameId, profile.id, practiceGameRow(profile, session))
+      : null;
+    setSaving(false);
+    if (saved) onSaved();
+    else setError("The practice result could not be saved. Your shot log is still attached to this practice game; retry the result save.");
+  };
+  useEffect(() => { saveResult(); }, []);
   return (
     <>
       <PageHeader title="Practice" hideBack />
-      <div className="tab-content"><Loader /></div>
+      <div className="tab-content">
+        {saving ? <Loader /> : (
+          <div className="card">
+            <div className="error-msg">{error}</div>
+            <button className="btn-primary" style={{marginTop:10}} onClick={saveResult}>Retry Save</button>
+          </div>
+        )}
+      </div>
     </>
   );
 }
