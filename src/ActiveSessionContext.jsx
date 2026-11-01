@@ -25,9 +25,14 @@ export function ActiveSessionProvider({ children }) {
   const setActiveSession = useCallback((next) => {
     setActiveSessionState((current) => {
       const value = typeof next === "function" ? next(current) : next;
-      if (value) localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...value, updatedAt: Date.now() }));
-      else localStorage.removeItem(STORAGE_KEY);
-      return value ? { ...value, updatedAt: Date.now() } : null;
+      const saved = value ? { ...value, updatedAt: Date.now() } : null;
+      try {
+        if (saved) localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+        else localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Keep the in-memory session usable if browser storage is unavailable.
+      }
+      return saved;
     });
   }, []);
   const clearActiveSession = useCallback(() => setActiveSession(null), [setActiveSession]);
