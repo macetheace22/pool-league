@@ -270,7 +270,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const activeTeamIds = getActiveTeamIds(profile);
   const captainTeamIds = getCaptainTeamIds(profile);
   const primaryTeamId = activeTeamIds[0] ?? null;
-  const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState(primaryTeamId);
+  const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState(captainTeamIds[0] ?? null);
   const [captainTeams, setCaptainTeams] = useState([]);
   const captainTeamId = captainTeamIds.includes(selectedCaptainTeamId) ? selectedCaptainTeamId : (captainTeamIds[0] ?? null);
   const navigate = useNavigate();
