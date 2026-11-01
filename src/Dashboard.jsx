@@ -273,7 +273,7 @@ export function LeaguesDashboard() {
   const upcomingWeekIds = new Set(upcomingAll.map(w => w.id));
   const safeLineupPlans = Array.isArray(lineupPlans) ? lineupPlans : [];
   const safeUnavailability = Array.isArray(unavailability) ? unavailability : [];
-  const upcomingPlans = safeLineupPlans.filter(p => upcomingWeekIds.has(p.scheduleWeekId) && (Array.isArray(p.players) ? p.players.length > 0 : false || p.note));
+  const upcomingPlans = safeLineupPlans.filter(p => upcomingWeekIds.has(p.scheduleWeekId) && ((Array.isArray(p.players) && p.players.length > 0) || p.note));
   const myUnavailableByWeek = new Map(
     safeUnavailability.filter(u => u.playerNum === profile?.player_num).map(u => [u.scheduleWeekId, u])
   );
