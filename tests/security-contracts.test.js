@@ -108,10 +108,20 @@ describe("player identity linking requires trusted invites", () => {
 });
 
 
+describe("division trigger search path hardening", () => {
+  it("pins the trigger function search_path without changing its validation", () => {
+    const sql = read("supabase-schema-section-79-harden-division-context-trigger.sql");
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain("if new.format is null or new.day is null then");
+    expect(sql).toContain("return new;");
+  });
+});
+
+
 describe("RLS auth.uid initplan optimization", () => {
   it("uses scalar subqueries for auth.uid() in the affected policies", () => {
     const sql = read("supabase-schema-section-80-optimize-rls-auth-initplans.sql");
-    expect((sql.match(/\(select auth\.uid\(\)\)/g) || []).length).toBeGreaterThanOrEqual(9);
+    expect((sql.match(/\\(select auth\\.uid\\(\\)\\)/g) || []).length).toBeGreaterThanOrEqual(9);
     expect(sql).toContain('drop policy if exists "read own profile"');
     expect(sql).toContain('drop policy if exists "log or manage own shot events"');
     expect(sql).toContain("public.can_write_practice_shot_event(context_id, player_num)");
