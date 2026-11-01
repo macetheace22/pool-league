@@ -213,49 +213,244 @@ export function TeamsPlayersDashboard() {
 
 export function LeaguesDashboard() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const isManager = profile?.role === "manager";
   const isCaptain = profile?.role === "captain";
-  const leagueItems = LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile?.role));
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const selectedTeamIds = getActiveTeamIds(profile);
+  const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
+    ? selectedTeamId
+    : selectedTeamIds[0] ?? null;
+  const [overview, setOverview] = useState(undefined); // undefined = loading, null = no team
+  const [lineupPlans, setLineupPlans] = useState(undefined); // undefined until initial team context has loaded
+  const [unavailability, setUnavailability] = useState(undefined); // undefined until initial team context has loaded
+  const [markingWeekId, setMarkingWeekId] = useState(null);
+  const [reasonInput, setReasonInput] = useState("");
+  const [view, setView] = useState("main"); // "main" | "upcoming" | "previous"
+
+  const refreshUnavailability = () => { if (effectiveTeamId) db.listTeamUnavailability(effectiveTeamId).then(setUnavailability); };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!effectiveTeamId) {
+      setOverview(null);
+      setLineupPlans([]);
+      setUnavailability([]);
+      return () => { cancelled = true; };
+    }
+
+    setOverview(undefined);
+    setLineupPlans(undefined);
+    setUnavailability(undefined);
+    Promise.all([
+      db.getTeamScheduleOverview(effectiveTeamId),
+      db.listTeamLineupPlans(effectiveTeamId),
+      db.listTeamUnavailability(effectiveTeamId),
+    ]).then(([nextOverview, plans, unavailable]) => {
+      if (cancelled) return;
+      setOverview(nextOverview ?? null);
+      setLineupPlans(plans ?? []);
+      setUnavailability(unavailable ?? []);
+    }).catch(() => {
+      if (cancelled) return;
+      setOverview(null);
+      setLineupPlans([]);
+      setUnavailability([]);
+    });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTeamId]);
+
+  const leaguesLoading = overview === undefined || lineupPlans === undefined || unavailability === undefined;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const upcomingAll = overview && Array.isArray(overview.myWeeks) ? overview.myWeeks
+    .map(w => ({ ...w, _date: parseWeekDate(w.date) }))
+    .filter(w => w._date && w._date >= today)
+    .sort((a, b) => a._date - b._date) : [];
+  const previousAll = Array.isArray(overview?.myCompleted) ? overview.myCompleted : [];
+  const myMakeups = previousAll.filter(m => m.is_makeup_pending);
+  const upcomingWeekIds = new Set(upcomingAll.map(w => w.id));
+  const safeLineupPlans = Array.isArray(lineupPlans) ? lineupPlans : [];
+  const safeUnavailability = Array.isArray(unavailability) ? unavailability : [];
+  const upcomingPlans = safeLineupPlans.filter(p => upcomingWeekIds.has(p.scheduleWeekId) && (Array.isArray(p.players) ? p.players.length > 0 : false || p.note));
+  const myUnavailableByWeek = new Map(
+    safeUnavailability.filter(u => u.playerNum === profile?.player_num).map(u => [u.scheduleWeekId, u])
+  );
+  const markUnavailable = async (weekId) => {
+    await db.setUnavailability(effectiveTeamId, weekId, profile.player_num, reasonInput, profile.id);
+    setReasonInput(""); setMarkingWeekId(null);
+    refreshUnavailability();
+  };
+  const markAvailableAgain = async (weekId) => {
+    await db.clearUnavailability(effectiveTeamId, weekId, profile.player_num);
+    refreshUnavailability();
+  };
+
+  if (view === "upcoming" || view === "previous") {
+    const isUpcoming = view === "upcoming";
+    return (
+      <div className="app">
+        <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
+        <PageHeader title={isUpcoming ? "Upcoming Matches" : "Previous Matches"} />
+        <div className="tab-content">
+          {(isUpcoming ? upcomingAll : previousAll).length === 0
+            ? <div className="empty-state">No {isUpcoming ? "upcoming" : "previous"} matches.</div>
+            : (isUpcoming ? upcomingAll : previousAll).map((item, i) => (
+                <MatchRow key={i} isUpcoming={isUpcoming} item={item} overview={overview} />
+              ))
+          }
+          <button className="btn-secondary" onClick={() => setView("main")} style={{marginTop:4}}>← Back to Leagues</button>
+        </div>
+        <TabBar />
+      </div>
+    );
+  }
 
   return (
     <div className="app">
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Leagues" />
       <div className="tab-content">
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {leagueItems.map(item => {
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+          {LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile?.role)).map(item => {
             const Icon = item.icon;
             return (
               <Link key={item.key} to={item.path} className="office-card">
                 <Icon size={20} color="#5FCF9E" />
-                <div style={{flex:1,minWidth:0}}>
-                  <div className="office-card__title">{item.label}</div>
-                </div>
+                <div style={{flex:1,minWidth:0}}><div className="office-card__title">{item.label}</div></div>
                 <ChevronRight size={16} color="#6A6A6A" />
               </Link>
             );
           })}
         </div>
+        {leaguesLoading ? <Loader /> : <>
+        {/* League News -- fee/membership tracking not built yet */}
+        <DashCard icon={Newspaper} title="League News">
+          <div className="empty-state" style={{padding:14}}>Coming soon — league fees and IBA membership status will show here.</div>
+        </DashCard>
+
+        {overview === undefined && <Loader />}
+
+        {overview && (
+          <>
+            <DashCard icon={Calendar} title="Next Match">
+              {upcomingAll.length === 0
+                ? <div className="dash-empty">No upcoming match scheduled.</div>
+                : <MatchRow item={upcomingAll[0]} overview={overview} isUpcoming clickable={false} />}
+            </DashCard>
+
+            {upcomingPlans.length > 0 && (
+              <DashCard icon={Users} title="Who's Shooting">
+                {upcomingPlans.map(p => (
+                  <div key={p.id} className="match-row">
+                    <div className="match-row__opponent">{p.weekNum ? `Week ${p.weekNum} · ` : ""}{p.weekDate}</div>
+                    <div className="match-row__meta">
+                      {p.players.length > 0 ? p.players.map(pl => pl.name).join(", ") : "No players noted yet"}
+                      {p.note && <div style={{marginTop:2,fontStyle:"italic",color:"#8A8A8A"}}>"{p.note}"</div>}
+                    </div>
+                  </div>
+                ))}
+              </DashCard>
+            )}
+
+            {effectiveTeamId && upcomingAll.length > 0 && (
+              <DashCard icon={AlertCircle} title="My Availability">
+                {!profile.player_num ? (
+                  <div className="dash-empty">Link your player number in My Profile to set your availability for upcoming weeks.</div>
+                ) : (
+                  <>
+                    <div style={{fontSize:10.5,color:"#6A6A6A",marginBottom:6}}>Let your captain know if you can't shoot an upcoming week — optional, just a heads-up.</div>
+                    {upcomingAll.map(w => {
+                      const marked = myUnavailableByWeek.get(w.id);
+                      return (
+                        <div key={w.id} style={{padding:"8px 0",borderTop:"1px solid #2A2A2A"}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                            <span style={{fontSize:12,fontWeight:700,color:"#E0E0E0"}}>{w.week ? `Week ${w.week} · ` : ""}{w.date}</span>
+                            {marked ? (
+                              <button className="btn-sm" onClick={() => markAvailableAgain(w.id)}>Available After All</button>
+                            ) : (
+                              <button className="btn-sm btn-sm--warn" onClick={() => { setMarkingWeekId(markingWeekId === w.id ? null : w.id); setReasonInput(""); }}>
+                                Can't Shoot
+                              </button>
+                            )}
+                          </div>
+                          {marked?.reason && <div style={{fontSize:10.5,color:"#8A8A8A",fontStyle:"italic",marginTop:2}}>"{marked.reason}"</div>}
+                          {markingWeekId === w.id && !marked && (
+                            <div style={{display:"flex",gap:6,marginTop:6}}>
+                              <input className="input" style={{flex:1}} value={reasonInput} onChange={e => setReasonInput(e.target.value)} placeholder="Reason (optional)" />
+                              <button className="btn-icon btn-icon--confirm" onClick={() => markUnavailable(w.id)}><Check size={13}/></button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </DashCard>
+            )}
+
+            <DashCard icon={Calendar} title="Upcoming Matches" onMore={upcomingAll.length > 3 ? () => setView("upcoming") : null}>
+              {upcomingAll.length === 0
+                ? <div className="dash-empty">Nothing scheduled yet.</div>
+                : upcomingAll.slice(0, 3).map((w, i) => <MatchRow key={i} item={w} overview={overview} isUpcoming clickable={false} />)}
+            </DashCard>
+
+            <DashCard icon={Trophy} title="Previous Matches" onMore={previousAll.length > 3 ? () => setView("previous") : null}>
+              {previousAll.length === 0
+                ? <div className="dash-empty">No matches played yet.</div>
+                : previousAll.slice(0, 3).map((m, i) => <MatchRow key={i} item={m} overview={overview} clickable={false} />)}
+            </DashCard>
+
+            {(isCaptain || isManager) && (
+              <DashCard icon={AlertCircle} title="Makeups">
+                {isManager ? (
+                  <div className="dash-empty">Manager view — see all leaguewide makeups in Match Lookup / History.
+                    <button className="link-btn" onClick={()=>navigate("/match-lookup")}>Open →</button>
+                  </div>
+                ) : myMakeups.length === 0 ? (
+                  <div className="dash-empty">No makeups pending for your team.</div>
+                ) : myMakeups.map((m, i) => <MatchRow key={i} item={m} overview={overview} clickable={false} />)}
+              </DashCard>
+            )}
+          </>
+        )}
+
+        {!overview && overview !== undefined && selectedTeamIds.length === 0 && (
+          <div className="empty-state">No team linked to your account yet — match cards will show once you're linked to a team.</div>
+        )}
+
+        <DashCard icon={Calendar} title="League Schedule">
+          <button className="btn-secondary" onClick={() => navigate("/schedules")}>View Full Schedule →</button>
+        </DashCard>
+
+        <DashCard icon={BarChart3} title="League Standings & History">
+          <button className="btn-secondary" onClick={()=>navigate("/team-standings")}>View Team Standings →</button>
+          <button className="btn-secondary" onClick={()=>navigate("/mvp-standings")}>View MVP Standings →</button>
+          <button className="btn-secondary" onClick={()=>navigate("/match-lookup")}>Look Up Previous Matches →</button>
+        </DashCard>
+
         {(isManager || isCaptain) && (
-          <Link to="/league-office" className="office-card" style={{marginTop:18}}>
-            <Wrench size={20} color="#5FCF9E" />
-            <div style={{flex:1,minWidth:0}}>
+          <Link to="/league-office" className="office-card">
+            <Wrench size={18} />
+            <div>
               <div className="office-card__title">League Office</div>
               <div className="office-card__desc">{isManager ? "Full league administration" : "Manage your team"}</div>
             </div>
-            <ChevronRight size={16} color="#6A6A6A" />
+            <ChevronRight size={16} />
           </Link>
         )}
         {!isManager && !isCaptain && (
-          <Link to="/league-office" className="office-card" style={{marginTop:18}}>
-            <Wrench size={20} color="#5FCF9E" />
-            <div style={{flex:1,minWidth:0}}>
+          <Link to="/league-office" className="office-card">
+            <Wrench size={18} />
+            <div>
               <div className="office-card__title">League Office</div>
               <div className="office-card__desc">Team & player lookup tools</div>
             </div>
-            <ChevronRight size={16} color="#6A6A6A" />
+            <ChevronRight size={16} />
           </Link>
         )}
+        </>}
       </div>
       <TabBar />
     </div>
@@ -280,8 +475,8 @@ function DashCard({ icon: Icon, title, onMore, children }) {
 // informational only for now.
 function MatchRow({ item, overview, isUpcoming, clickable }) {
   if (isUpcoming) {
-    const p = item.pairings[0];
-    const opp = opponentName(p, overview.team.id, overview.teams);
+    const p = Array.isArray(item.pairings) ? item.pairings[0] : null;
+    const opp = p ? opponentName(p, overview.team.id, overview.teams) : "TBD";
     return (
       <div className="match-row">
         <div className="match-row__opponent">vs {opp}</div>
