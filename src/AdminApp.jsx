@@ -1352,7 +1352,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
 }
 
 function MyStatsPage({ profile }) {
-  if (!profile?.team_id) {
+  const activeTeamIds = getActiveTeamIds(profile);
+  if (activeTeamIds.length === 0) {
     return (
       <>
         <PageHeader title="My Stats" />
@@ -1382,7 +1383,7 @@ function MyStatsPage({ profile }) {
     <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
-        <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} />
+        <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={activeTeamIds[0]} />
       </div>
     </>
   );
