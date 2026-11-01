@@ -117,7 +117,6 @@ describe("division trigger search path hardening", () => {
   });
 });
 
-
 describe("RLS auth.uid initplan optimization", () => {
   it("uses scalar subqueries for auth.uid() in the affected policies", () => {
     const sql = read("supabase-schema-section-80-optimize-rls-auth-initplans.sql");
