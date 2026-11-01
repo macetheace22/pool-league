@@ -26,6 +26,11 @@ declare
   v_state jsonb;
   v_ok boolean;
   v_reason text;
+  v_team_a uuid;
+  v_team_b uuid;
+  v_team_c uuid;
+  v_mixed_profile uuid;
+  v_multi_captain uuid;
 begin
   select id into v_manager from public.profiles
     where role = 'manager' and is_active
@@ -185,7 +190,60 @@ begin
     raise exception 'FAIL manager can reopen a completed match: %, %', v_ok, v_reason;
   end if;
 
-  raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, and match reopening role checks';
+
+  -- Mixed-role regression: memberships and captain assignments are distinct.
+  -- Use disposable assignments in this transaction; rollback restores every
+  -- prior captain and membership. Team A is player-only, B/C are captained.
+  select id into v_team_a from public.teams order by id offset 0 limit 1;
+  select id into v_team_b from public.teams where id <> v_team_a order by id limit 1;
+  select id into v_team_c from public.teams where id not in (v_team_a, v_team_b) order by id limit 1;
+  if v_team_a is null or v_team_b is null or v_team_c is null then
+    raise exception 'FIXTURES_REQUIRED: three teams are required for mixed-role captain coverage';
+  end if;
+
+  select id into v_mixed_profile from public.profiles
+    where is_active and role = 'player' order by created_at limit 1;
+  select id into v_multi_captain from public.profiles
+    where is_active and role = 'captain' order by created_at limit 1;
+  if v_mixed_profile is null or v_multi_captain is null then
+    raise exception 'FIXTURES_REQUIRED: active player and captain profiles are required for mixed-role coverage';
+  end if;
+
+  insert into public.profile_team_memberships(profile_id, team_id)
+  values
+    (v_mixed_profile, v_team_a),
+    (v_mixed_profile, v_team_b),
+    (v_multi_captain, v_team_a),
+    (v_multi_captain, v_team_b),
+    (v_multi_captain, v_team_c)
+  on conflict (profile_id, team_id) where ended_at is null do nothing;
+
+  update public.teams set captain_profile_id = null
+    where id in (v_team_a, v_team_b, v_team_c);
+  update public.teams set captain_profile_id = v_mixed_profile where id = v_team_b;
+  update public.teams set captain_profile_id = v_multi_captain where id in (v_team_b, v_team_c);
+
+  if public.is_on_team(v_mixed_profile, v_team_a) is distinct from true
+     or public.is_on_team(v_mixed_profile, v_team_b) is distinct from true
+     or public.is_team_captain(v_team_a) is distinct from false
+     or public.is_team_captain(v_team_b) is distinct from true then
+    raise exception 'FAIL mixed player/captain: player must belong to A/B but captain only B';
+  end if;
+
+  if public.is_on_team(v_multi_captain, v_team_a) is distinct from true
+     or public.is_team_captain(v_team_b) is distinct from true
+     or public.is_team_captain(v_team_c) is distinct from true then
+    raise exception 'FAIL multiple captain teams: captain assignment must cover B/C while retaining player membership on A';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', v_mixed_profile::text, true);
+  perform set_config('request.jwt.claims', jsonb_build_object('sub', v_mixed_profile::text, 'role', 'authenticated')::text, true);
+  if public.is_team_captain(v_team_a) is distinct from false
+     or public.is_team_captain(v_team_b) is distinct from true then
+    raise exception 'FAIL authenticated mixed-role captain authorization is not team-specific';
+  end if;
+
+  raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, and multi-team captain assignments';
 end;
 $test$;
 
