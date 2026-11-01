@@ -106,3 +106,13 @@ describe("player identity linking requires trusted invites", () => {
     expect(admin).toContain('profile.role === "manager" ? (');
   });
 });
+
+
+describe("division trigger search path hardening", () => {
+  it("pins the trigger function search_path without changing its validation", () => {
+    const sql = read("supabase-schema-section-79-harden-division-context-trigger.sql");
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain("if new.format is null or new.day is null then");
+    expect(sql).toContain("return new;");
+  });
+});
