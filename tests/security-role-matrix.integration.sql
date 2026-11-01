@@ -32,6 +32,7 @@ declare
   v_team_d uuid;
   v_mixed_profile uuid;
   v_multi_captain uuid;
+  v_test_player_num text;
 begin
   select id into v_manager from public.profiles
     where role = 'manager' and is_active
@@ -294,7 +295,24 @@ begin
     raise exception 'FAIL account-level Player demotion must clear captain seats but retain all player memberships';
   end if;
 
-  raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, multiple captain assignments, and manager role retention';
+
+  -- A non-manager cannot directly claim a player number. Player-number
+  -- linking is performed through a trusted invite whose player_num is stored
+  -- in the database, not through user-editable signup metadata.
+  select num into v_test_player_num from public.players order by num limit 1;
+  if v_test_player_num is null then
+    raise exception 'FIXTURES_REQUIRED: at least one player record is required for player-number authorization coverage';
+  end if;
+  begin
+    perform public.set_own_player_number(v_test_player_num);
+    raise exception 'FAIL non-manager must not self-assign a player number';
+  exception when others then
+    if sqlerrm <> 'PLAYER_NUMBER_REQUIRES_MANAGER_OR_INVITE' then
+      raise;
+    end if;
+  end;
+
+  raise notice 'PASS: membership removal, live scoring authorization, scheduled-team integrity, match reopening, mixed player/captain roles, manager role retention, and player-number identity protection';
 end;
 $test$;
 
