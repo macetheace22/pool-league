@@ -140,7 +140,7 @@ declare
   v_invite public.invite_codes%rowtype;
   v_user_id uuid := auth.uid();
   v_previous_captain uuid;
-  v_existing_player_num text;
+  v_number_claimed boolean;
 begin
   if v_user_id is null then
     raise exception 'AUTH_REQUIRED';
@@ -157,15 +157,16 @@ begin
     raise exception 'Invalid or expired invite code';
   end if;
 
-  select player_num into v_existing_player_num
-  from public.profiles
-  where id = v_user_id
-  for update;
+  perform 1 from public.profiles where id = v_user_id for update;
 
-  if v_invite.player_num is not null
-     and v_existing_player_num is not null
-     and v_existing_player_num is distinct from v_invite.player_num then
-    raise exception 'PLAYER_NUMBER_ALREADY_LINKED';
+  if v_invite.player_num is not null then
+    select exists (
+      select 1 from public.profiles
+      where player_num = v_invite.player_num and id <> v_user_id
+    ) into v_number_claimed;
+    if v_number_claimed then
+      raise exception 'PLAYER_ALREADY_CLAIMED';
+    end if;
   end if;
 
   -- The profile protection trigger normally blocks role/claim/player-number
