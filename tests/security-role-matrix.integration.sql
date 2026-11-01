@@ -211,6 +211,10 @@ begin
     raise exception 'FIXTURES_REQUIRED: active player and captain profiles are required for mixed-role coverage';
   end if;
 
+  -- A captain remains an ordinary roster player on other teams. The
+  -- profile-level role is captain because the account holds a captain seat.
+  update public.profiles set role = 'captain' where id = v_mixed_profile;
+
   insert into public.profile_team_memberships(profile_id, team_id)
   values
     (v_mixed_profile, v_team_a),
