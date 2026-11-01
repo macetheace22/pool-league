@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { Plus, Minus, Search, Check, ChevronRight, Trophy } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
@@ -23,7 +23,6 @@ function gameTypeLabel(key) { return GAME_TYPES.find(g => g.key === key)?.label 
 
 export default function Practice() {
   const { profile } = useAuth();
-  const location = useLocation();
   const [phase, setPhase] = useState("landing"); // landing | opponent | gametype | format | config | play | done
   const [session, setSession] = useState(null);
   const [history, setHistory] = useState(undefined);
@@ -48,9 +47,6 @@ export default function Practice() {
     });
     setPhase("opponent");
   };
-  useEffect(() => {
-    if (new URLSearchParams(location.search).get("start") === "1") startSession();
-  }, [location.search]);
   const cancelSession = () => { setSession(null); setPhase("landing"); };
 
   const wrap = (children) => (
@@ -95,6 +91,7 @@ export default function Practice() {
 
 // ─── Landing ────────────────────────────────────────────────────────────────
 function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
+  const sessionsRef = useRef(null);
   const [filterOpponent, setFilterOpponent] = useState(null);
   const [linkingKey, setLinkingKey] = useState(null);
 
@@ -114,14 +111,14 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
       <PageHeader title="Practice" />
       <div className="tab-content">
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
-          <Link to="/practice?start=1" className="office-list-item">
+          <button type="button" onClick={onStart} className="office-list-item">
             <Plus size={16} /><span>New Practice Session</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </Link>
-          <Link to="/practice#practice-sessions" className="office-list-item">
+          </button>
+          <button type="button" onClick={() => sessionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })} className="office-list-item">
             <Trophy size={16} /><span>My Practice Sessions</span>
             <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
-          </Link>
+          </button>
         </div>
 
         {opponents.length > 0 && (
@@ -159,7 +156,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
           </div>
         )}
 
-        <div className="card" id="practice-sessions">
+        <div className="card" id="practice-sessions" ref={sessionsRef} style={{ scrollMarginTop: 16 }}>
           <div className="card__title">{filterOpponent ? "Games vs This Opponent" : "My Practice Sessions"}</div>
           {history === undefined && <Loader />}
           {history && visibleGames.length === 0 && <div className="dash-empty">No practice games yet.</div>}
@@ -254,7 +251,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 
   return (
     <>
-      <PageHeader title="Practice" />
+      <PageHeader title="Practice" onBack={onCancel} />
       <div className="tab-content">
         <div className="field">
           <div className="form-label" style={{display:"flex",alignItems:"center",gap:5}}><Search size={11}/> Search league players</div>
@@ -306,7 +303,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 function GameTypeStep({ session, setSession, onNext, onBack }) {
   return (
     <>
-      <PageHeader title="Practice" subtitle={`vs ${session.opponentName}`} />
+      <PageHeader title="Practice" subtitle={`vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
           <div className="card__title">Game Type</div>
@@ -334,7 +331,7 @@ function FormatStep({ session, setSession, onNext, onBack }) {
     : "9-Ball and 10-Ball don't use a rating/handicap — this format doesn't apply to this game.";
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} />
+      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
           <div className="card__title">Format</div>
