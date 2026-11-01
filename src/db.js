@@ -2103,12 +2103,31 @@ export async function linkPracticeOpponent(opponentId, profileId) {
   return !error;
 }
 
+// Practice creates its parent row before shot logging begins. Its UUID is
+// shared with shot_events.context_id and survives active-session restoration.
+export async function createPracticeGame(row) {
+  const { data, error } = await supabase.from("practice_games").insert(row).select().single();
+  return error ? null : data;
+}
+export async function getPracticeGame(id, profileId) {
+  if (!id || !profileId) return null;
+  const { data, error } = await supabase.from("practice_games").select("*")
+    .eq("id", id).eq("created_by", profileId).maybeSingle();
+  return error ? null : data;
+}
+export async function updatePracticeGame(id, profileId, row) {
+  if (!id || !profileId) return null;
+  const { data, error } = await supabase.from("practice_games").update(row)
+    .eq("id", id).eq("created_by", profileId).select().single();
+  return error ? null : data;
+}
+// Retained for compatibility with any older callers.
 export async function savePracticeGame(row) {
   const { data, error } = await supabase.from("practice_games").insert(row).select().single();
   return error ? null : data;
 }
 export async function listMyPracticeGames(profileId) {
-  const { data } = await supabase.from("practice_games").select("*").eq("created_by", profileId).order("played_at", { ascending: false });
+  const { data } = await supabase.from("practice_games").select("*").eq("created_by", profileId).not("winner", "is", null).order("played_at", { ascending: false });
   return data ?? [];
 }
 
