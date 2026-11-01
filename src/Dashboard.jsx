@@ -5,7 +5,7 @@ import {
   Newspaper, Wrench, AlertCircle, Users, Check, TrendingUp, Settings2, Upload,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
-import { PageHeader, TabBar, navItemsForRole, shellCss, AccessDenied } from "./Shell";
+import { PageHeader, TabBar, navItemsForRole, LEAGUE_NAV_ITEMS, shellCss, AccessDenied } from "./Shell";
 import { css, Loader } from "./AdminApp";
 import * as db from "./db";
 import { getActiveTeamIds } from "./teamMembership";
@@ -96,6 +96,7 @@ export function Home() {
     { key: "stats", label: "My Stats", desc: "Your record & stats", icon: BarChart3, path: "/my-stats" },
     { key: "leagues", label: "Leagues", desc: "Matches, standings & more", icon: Trophy, path: "/leagues" },
     { key: "practice", label: "Practice", desc: "Play & track practice games", icon: Dumbbell, path: "/practice" },
+    { key: "teamsplayers", label: "Teams and Players", desc: "Find league players and teams", icon: Users, path: "/teams-and-players" },
     { key: "tournaments", label: "Tournaments", desc: "Brackets & tournament play", icon: Award, path: "/tournaments" },
     ...(profile?.role === "manager"
       ? [{ key: "office", label: "League Office", desc: "Full league administration", icon: Wrench, path: "/league-office" }]
@@ -196,25 +197,15 @@ export function TeamsPlayersDashboard() {
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
       <PageHeader title="Teams and Players" subtitle="Look up league players and teams." />
       <div className="tab-content">
-        <div style={{display:"flex",flexDirection:"column",gap:12,maxWidth:620,margin:"0 auto"}}>
-          <button className="btn-secondary" onClick={() => navigate("/player-lookup")}
-            style={{display:"flex",alignItems:"center",gap:12,textAlign:"left",padding:16,minHeight:76,width:"100%"}}>
-            <Users size={22} color="#5FCF9E" />
-            <span style={{display:"flex",flexDirection:"column",gap:4,flex:1}}>
-              <strong style={{fontSize:14}}>Player Lookup</strong>
-              <span style={{fontSize:12,color:"#9A9A9A",fontWeight:400}}>Find players, ratings, and player history.</span>
-            </span>
-            <ChevronRight size={18} />
-          </button>
-          <button className="btn-secondary" onClick={() => navigate("/team-lookup")}
-            style={{display:"flex",alignItems:"center",gap:12,textAlign:"left",padding:16,minHeight:76,width:"100%"}}>
-            <Building2 size={22} color="#5FCF9E" />
-            <span style={{display:"flex",flexDirection:"column",gap:4,flex:1}}>
-              <strong style={{fontSize:14}}>Team Lookup</strong>
-              <span style={{fontSize:12,color:"#9A9A9A",fontWeight:400}}>Find teams and explore team details.</span>
-            </span>
-            <ChevronRight size={18} />
-          </button>
+        <div style={{display:"flex",flexDirection:"column",gap:8,maxWidth:620,margin:"0 auto"}}>
+          <Link to="/player-lookup" className="office-list-item">
+            <Users size={16} /><span>Player Lookup</span>
+            <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+          </Link>
+          <Link to="/team-lookup" className="office-list-item">
+            <Building2 size={16} /><span>Team Lookup</span>
+            <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+          </Link>
         </div>
       </div>
       <TabBar />
@@ -319,8 +310,20 @@ export function LeaguesDashboard() {
   return (
     <div className="app">
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
-      <PageHeader title="Leagues" hideBack />
+      <PageHeader title="Leagues" />
       <div className="tab-content">
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
+          {LEAGUE_NAV_ITEMS.filter(item => item.roles.includes(profile?.role)).map(item => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.key} to={item.path} className="office-list-item">
+                <Icon size={16} />
+                <span>{item.label}</span>
+                <ChevronRight size={14} style={{marginLeft:"auto"}} color="#6A6A6A" />
+              </Link>
+            );
+          })}
+        </div>
         {leaguesLoading ? <Loader /> : <>
         {/* League News -- fee/membership tracking not built yet */}
         <DashCard icon={Newspaper} title="League News">
@@ -605,7 +608,7 @@ export function TournamentsPlaceholder() {
   return (
     <div className="app">
       <style>{css}</style><style>{shellCss}</style><style>{dashboardCss}</style>
-      <PageHeader title="Tournaments" hideBack />
+      <PageHeader title="Tournaments" />
       <div className="tab-content">
         <div className="empty-state">Tournament brackets — Scotch Doubles, Singles, and Team — are coming soon.</div>
       </div>
