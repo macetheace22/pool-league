@@ -7,7 +7,7 @@ import {
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import SearchableOptionSelect from "./SearchableOptionSelect";
-import { getActiveTeamIds, getCaptainTeamIds, getCaptainMatchSlot, isCaptainOfTeam } from "./teamMembership";
+import { getActiveTeamIds, getCaptainTeamIds, getCaptainMatchSlot } from "./teamMembership";
 import TeamContextSelector from "./TeamContextSelector";
 import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
