@@ -2430,3 +2430,51 @@ export function mostRecentCompletedMatch(teamOverviews) {
   return all.slice().sort((a, b) => new Date(b.confirmed_at || 0) - new Date(a.confirmed_at || 0))[0];
 }
 
+ // ─── League news ───────────────────────────────────────────────────────────
+export async function listPublishedLeagueNews() {
+  const { data, error } = await supabase.from("league_news")
+    .select("id, title, body, published_at")
+    .eq("is_published", true)
+    .order("published_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function listLeagueNewsForManager() {
+  const { data, error } = await supabase.from("league_news")
+    .select("id, title, body, is_published, published_at, created_at, updated_at")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function saveLeagueNews(post, userId) {
+  const title = String(post?.title ?? "").trim();
+  const body = String(post?.body ?? "").trim();
+  if (!title || !body) throw new Error("Enter both a headline and announcement.");
+  const isPublished = !!post.is_published;
+  const values = {
+    title,
+    body,
+    is_published: isPublished,
+    published_at: isPublished ? (post.published_at || new Date().toISOString()) : null,
+    updated_by: userId,
+    updated_at: new Date().toISOString(),
+  };
+  let query;
+  if (post.id) {
+    query = supabase.from("league_news").update(values).eq("id", post.id);
+  } else {
+    query = supabase.from("league_news").insert({ ...values, created_by: userId });
+  }
+  const { data, error } = await query.select("id, title, body, is_published, published_at, created_at, updated_at").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteLeagueNews(id) {
+  const { error } = await supabase.from("league_news").delete().eq("id", id);
+  if (error) throw error;
+  return true;
+}

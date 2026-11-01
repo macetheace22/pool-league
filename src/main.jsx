@@ -8,6 +8,7 @@ import { NavHistoryProvider } from './Shell.jsx';
 import { Home, LeaguesDashboard, LeagueOffice, SeasonManagementHub, TournamentsPlaceholder, TeamsPlayersDashboard } from './Dashboard.jsx';
 import Practice from './Practice.jsx';
 import Schedules from './Schedules.jsx';
+import LeagueNewsManager from './LeagueNews.jsx';
 import { ActiveSessionProvider } from './ActiveSessionContext.jsx';
 
 // Reset the document scroll position whenever the active route changes.
@@ -130,6 +131,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/match-lookup" element={<AdminApp page="matchlkp" />} />
             <Route path="/leaderboard" element={<AdminApp page="leaderboard" />} />
             <Route path="/my-stats" element={<AdminApp page="stats" />} />
+            <Route path="/league-news" element={<LeagueNewsManager />} />
             <Route path="/access" element={<AdminApp page="access" />} />
             <Route path="/me" element={<AdminApp page="me" />} />
             <Route path="/live" element={<LiveEntryApp />} />
