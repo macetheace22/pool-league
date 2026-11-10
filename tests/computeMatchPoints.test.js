@@ -398,6 +398,58 @@ describe("computeMatchPoints", () => {
   });
 
 
+
+  it("counts both put-up ratings on an individual forfeit but denies the forfeiting team its positive bonus", () => {
+    const state = {
+      format: "advanced",
+      sets: [{
+        complete: true,
+        winnerSlot: "away",
+        playerHome: { num: "1", rating: 50 },
+        playerAway: { num: "2", rating: 45 },
+        racks: [],
+        forfeited: true,
+        forfeitedBy: "home",
+        forfeitPoints: 150,
+      }],
+    };
+
+    // Both ratings count: home total 50, away total 45.
+    // Home forfeited and receives no +275 bonus; away receives +280.
+    // The receiving side also gets the 150-point forfeit value.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 0,
+      awayPoints: 430,
+    });
+  });
+
+  it("suspends both rating bonuses and penalties while a makeup is pending", () => {
+    const state = {
+      format: "advanced",
+      makeup: { confirmedHome: true, confirmedAway: true },
+      sets: [{
+        complete: true,
+        winnerSlot: "home",
+        playerHome: { num: "1", rating: 90 },
+        playerAway: { num: "2", rating: 50 },
+        racks: [{ home: 90, away: 30 }],
+      }, {
+        complete: false,
+        winnerSlot: null,
+        playerHome: { num: "3", rating: 90 },
+        playerAway: { num: "4", rating: 50 },
+        racks: [],
+      }],
+    };
+
+    // Only completed-set points count while the makeup is pending.
+    // No positive adjustment or over-limit penalty is applied yet.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 190,
+      awayPoints: 30,
+    });
+  });
+
   it("does not award either team's rating bonus when a set is left unplayed", () => {
     const state = {
       format: "advanced",
