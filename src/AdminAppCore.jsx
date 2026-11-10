@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
+import { buildRule55TieBreakAudit } from "./rule55TieBreak";
 import SearchableOptionSelect from "./SearchableOptionSelect";
 import { getActiveTeamIds } from "./teamMembership";
 import Scoresheet from "./Scoresheet";
@@ -2052,6 +2053,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const [matches, setMatches] = useState([]);
   const [standingsAdj, setStandingsAdj] = useState([]);
   const [mvpAdj, setMvpAdj] = useState([]);
+  const [rule55AuditData, setRule55AuditData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [resuming, setResuming] = useState(null);
@@ -2133,9 +2135,15 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
       db.listCompletedMatches(divisionId),
       db.listStandingsAdjustments(divisionId),
       db.listMvpAdjustments(divisionId),
-    ]).then(([m, sa, ma]) => { setMatches(m); setStandingsAdj(sa); setMvpAdj(ma); setLoading(false); });
+      isManager ? db.getRule55TieBreakAuditData(divisionId, teams).catch(error => {
+        console.error("Rule 5.5 audit data could not be loaded:", error);
+        return null;
+      }) : Promise.resolve(null),
+    ]).then(([m, sa, ma, auditData]) => {
+      setMatches(m); setStandingsAdj(sa); setMvpAdj(ma); setRule55AuditData(auditData); setLoading(false);
+    });
   };
-  useEffect(refresh, [divisionId]);
+  useEffect(refresh, [divisionId, isManager, teams]);
 
   if (manualEntryOpen) {
     return (
@@ -2267,6 +2275,12 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const mvp = db.computeOfficialMvp(mvpAdj);
   const appStandings = db.computeStandings(matches, []);
   const appMvp = db.computeMvp(matches, []);
+  const rule55Audit = rule55AuditData ? buildRule55TieBreakAudit({
+    officialStandings: standings,
+    schedule: rule55AuditData.schedule,
+    standingsHistory: rule55AuditData.standingsHistory,
+    counterSnapshots: rule55AuditData.counterSnapshots,
+  }) : [];
   const nothingYet = matches.length === 0 && standings.length === 0 && mvp.length === 0;
 
   if (nothingYet) {
@@ -2308,6 +2322,29 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
               </div></div>
             ))}
           </div>
+          {isManager && (
+            <div style={{marginTop:18}}>
+              <div className="list-row__sub" style={{padding:"8px 12px",fontWeight:700}}>Rule 5.5 tie-break audit · comparison only</div>
+              <div className="list-row__sub" style={{padding:"0 12px 8px"}}>Official IBA positions remain unchanged. Missing or incomplete imports are shown as unavailable, not zero.</div>
+              {!rule55AuditData ? <div className="empty-state" style={{border:"none"}}>Tie-break audit data could not be loaded.</div> :
+                rule55Audit.length === 0 ? <div className="empty-state" style={{border:"none"}}>No teams are currently tied on official IBA total points.</div> :
+                <div className="list">{rule55Audit.map(t => {
+                  const record = t.recordVsNext ? `${t.recordVsNext.wins}-${t.recordVsNext.losses}-${t.recordVsNext.draws}` : "Unavailable";
+                  const value = (v) => v == null ? "Unavailable" : v;
+                  return <div key={t.teamId} className="list-row"><div className="list-row__body" style={{alignItems:"flex-start"}}>
+                    <span className="list-row__id">{t.position ?? "—"}</span>
+                    <div style={{display:"flex",flexDirection:"column",gap:3,flex:1}}>
+                      <span className="list-row__name">{t.teamName}</span>
+                      <span className="list-row__sub">Tied with {t.tiedWith.join(", ")}</span>
+                      <span className="list-row__sub">1. Head-to-head points: {value(t.headToHeadPoints)}</span>
+                      <span className="list-row__sub">2. Regular-season sets won: {value(t.setsWon)}</span>
+                      <span className="list-row__sub">3. Points lost to opponents: {value(t.pointsLost)}</span>
+                      <span className="list-row__sub">4. Record vs. next team below: {record}</span>
+                    </div>
+                  </div></div>;
+                })}</div>}
+            </div>
+          )}
           <div style={{marginTop:18}}>
             <div className="list-row__sub" style={{padding:"8px 12px",fontWeight:700}}>App-entered match results · provisional comparison only</div>
             {appStandings.length === 0 ? <div className="empty-state" style={{border:"none"}}>No completed app-entered matches to compare.</div> :
