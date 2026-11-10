@@ -1900,6 +1900,31 @@ export function computeMvp(matches, adjustments = []) {
   return Object.values(byPlayer).sort((x, y) => y.mvpRanking - x.mvpRanking);
 }
 
+// Official IBA snapshots are the source of truth for published standings.
+// These helpers never combine imported cumulative totals with app-entered results.
+// App calculations remain separate through computeStandings(matches, []) and computeMvp(matches, []).
+export function computeOfficialStandings(adjustments = []) {
+  return (adjustments ?? []).map(adj => ({
+    teamId: adj.team_id ?? `manual:${adj.team_name}`, name: adj.team_name,
+    wins: adj.wins ?? null, losses: adj.losses ?? null,
+    setsFor: adj.sets_for ?? null, setsAgainst: adj.sets_against ?? null,
+    totalPoints: adj.total_points ?? 0, pointsLastWeek: adj.points_last_wk ?? null,
+    setsPlayed: adj.sets_played ?? null, position: adj.position ?? null,
+    rank: adj.position ?? null, weekKey: adj.week_key ?? null,
+    reportLabel: adj.label ?? null, source: "official_iba",
+  })).sort((a,b) => a.position == null ? (b.position == null ? 0 : 1) : b.position == null ? -1 : a.position-b.position);
+}
+export function computeOfficialMvp(adjustments = []) {
+  return (adjustments ?? []).map(adj => ({
+    num: adj.player_num ?? `manual:${adj.player_name}`, name: adj.player_name,
+    teamNum: adj.team_num ?? null, wins: adj.wins ?? 0, losses: adj.losses ?? 0,
+    sets: (adj.wins ?? 0)+(adj.losses ?? 0), pointsScored: adj.total_points ?? 0,
+    mvpRanking: adj.mvp_ranking_points ?? 0, position: adj.position ?? null,
+    rank: adj.position ?? null, weekKey: adj.week_key ?? null,
+    reportLabel: adj.label ?? null, source: "official_iba",
+  })).sort((a,b) => a.position == null ? (b.position == null ? 0 : 1) : b.position == null ? -1 : a.position-b.position);
+}
+
 // One player's own slice of computeMvp's scan -- same trusted formula the
 // real MVP standings use, just narrowed to a single player_num instead of
 // ranking everyone. Scoped to the player's CURRENT team's division (v1
@@ -2415,11 +2440,10 @@ export async function getStatsForDivisions(playerNum, divisionIds) {
 // real IBA report), scoped to the whole division so the rank is accurate,
 // then picks out just this one team's row. Powers Team Lookup's record card.
 export async function getTeamStandingsRow(teamId, divisionId) {
-  const [matches, adjustments] = await Promise.all([listCompletedMatches(divisionId), listStandingsAdjustments(divisionId)]);
-  const standings = computeStandings(matches, adjustments);
-  const idx = standings.findIndex(s => s.teamId === teamId);
-  if (idx === -1) return null;
-  return { ...standings[idx], rank: idx + 1, totalTeams: standings.length };
+  const adjustments = await listStandingsAdjustments(divisionId);
+  const standings = computeOfficialStandings(adjustments);
+  const row = standings.find(s => s.teamId === teamId);
+  return row ? { ...row, totalTeams: standings.length } : null;
 }
 
 // One player's MVP rank within a single division's real MVP standings --
@@ -2427,11 +2451,10 @@ export async function getTeamStandingsRow(teamId, divisionId) {
 // teams, and reusing computeMvp() (the exact formula the real MVP tab
 // ranks by) rather than a separate calculation.
 export async function getPlayerMvpRankRow(playerNum, divisionId) {
-  const [matches, adjustments] = await Promise.all([listCompletedMatches(divisionId), listMvpAdjustments(divisionId)]);
-  const ranked = computeMvp(matches, adjustments);
-  const idx = ranked.findIndex(p => p.num === playerNum);
-  if (idx === -1) return null;
-  return { ...ranked[idx], rank: idx + 1, totalPlayers: ranked.length };
+  const adjustments = await listMvpAdjustments(divisionId);
+  const ranked = computeOfficialMvp(adjustments);
+  const row = ranked.find(p => p.num === playerNum);
+  return row ? { ...row, totalPlayers: ranked.length } : null;
 }
 
 // ─── Playoff eligibility (section 41 — Division Playoffs Roster & Handicap
