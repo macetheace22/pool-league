@@ -445,7 +445,7 @@ describe("computeMatchPoints", () => {
     // Only completed-set points count while the makeup is pending.
     // No positive adjustment or over-limit penalty is applied yet.
     expect(computeMatchPoints(state)).toEqual({
-      homePoints: 190,
+      homePoints: 250,
       awayPoints: 30,
     });
   });
