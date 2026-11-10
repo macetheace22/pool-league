@@ -53,7 +53,7 @@ describe("IBA weekly team counter snapshots", () => {
     };
     const rows = buildIbaPlayerWeeklyCounterRows(
       parsed,
-      [{ id: "team-a", division_id: "division-1", team_num: "15101" }],
+      [{ id: "team-a", division_id: "division-1", team_num: "15101", divisions: { seasons: { id: "season-1" } } }],
       metadata,
     );
     expect(rows).toHaveLength(2);
