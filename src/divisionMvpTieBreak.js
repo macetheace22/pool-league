@@ -147,7 +147,7 @@ export function buildDivisionMvpTieBreakAudit({ officialMvp = [], matches = [], 
   if (headToHeadResolved) {
     outcome = "head-to-head-points";
     explanation = "The player with more individual points in their regular-season head-to-head set(s) wins.";
-  } else if ((!hasHeadToHead || headToHeadTied) && headToHeadComplete) {
+  } else if (!hasHeadToHead || (headToHeadTied && headToHeadComplete)) {
     const ratings = rows.map(row => row.averageOpponentRating);
     if (ratings.every(value => value != null)) {
       const difference = Math.abs(ratings[0] - ratings[1]);
