@@ -398,6 +398,170 @@ describe("computeMatchPoints", () => {
   });
 
 
+
+  it("counts both put-up ratings on an individual forfeit but denies the forfeiting team its positive bonus", () => {
+    const state = {
+      format: "advanced",
+      sets: [{
+        complete: true,
+        winnerSlot: "away",
+        playerHome: { num: "1", rating: 50 },
+        playerAway: { num: "2", rating: 45 },
+        racks: [],
+        forfeited: true,
+        forfeitedBy: "home",
+        forfeitPoints: 150,
+      }],
+    };
+
+    // Both ratings count: home total 50, away total 45.
+    // Home forfeited and receives no +275 bonus; away receives +280.
+    // The receiving side also gets the 150-point forfeit value.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 0,
+      awayPoints: 430,
+    });
+  });
+
+  it("suspends both rating bonuses and penalties while a makeup is pending", () => {
+    const state = {
+      format: "advanced",
+      makeup: { confirmedHome: true, confirmedAway: true },
+      sets: [{
+        complete: true,
+        winnerSlot: "home",
+        playerHome: { num: "1", rating: 90 },
+        playerAway: { num: "2", rating: 50 },
+        racks: [{ home: 90, away: 30 }],
+      }, {
+        complete: false,
+        winnerSlot: null,
+        playerHome: { num: "3", rating: 90 },
+        playerAway: { num: "4", rating: 50 },
+        racks: [],
+      }],
+    };
+
+    // Only completed-set points count while the makeup is pending.
+    // No positive adjustment or over-limit penalty is applied yet.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 250,
+      awayPoints: 30,
+    });
+  });
+
+  it("applies rating adjustments when a pending makeup is finalized by converting remaining tables to forfeits", () => {
+    const state = {
+      format: "advanced",
+      // Keep the original makeup metadata for audit/history. The match is
+      // finalized, so the caller explicitly overrides the pending state.
+      makeup: { confirmedHome: true, confirmedAway: true, shortTeam: "home" },
+      sets: [
+        {
+          complete: true,
+          winnerSlot: "away",
+          playerHome: { num: "1", rating: 50 },
+          playerAway: { num: "2", rating: 45 },
+          racks: [],
+          forfeited: true,
+          forfeitedBy: "home",
+          forfeitPoints: 150,
+        },
+        {
+          complete: true,
+          winnerSlot: "away",
+          playerHome: { num: "3", rating: 60 },
+          playerAway: { num: "4", rating: 55 },
+          racks: [],
+          forfeited: true,
+          forfeitedBy: "home",
+          forfeitPoints: 150,
+        },
+      ],
+    };
+
+    // Both put-up ratings count. Home forfeited and gets no bonus;
+    // away receives its rating bonus after the makeup is finalized.
+    expect(computeMatchPoints(state, { makeupPending: false })).toEqual({
+      homePoints: 0,
+      awayPoints: 525,
+    });
+  });
+
+  it("applies the 325-point rating adjustments after a makeup is completed", () => {
+    const state = {
+      format: "advanced",
+      // A resumed and completed makeup has no pending-makeup marker.
+      makeup: null,
+      sets: [0, 1].map(i => ({
+        complete: true,
+        winnerSlot: "home",
+        playerHome: { num: String(i + 1), rating: 90 },
+        playerAway: { num: String(i + 3), rating: 50 },
+        racks: [{ home: 90, away: 30 }],
+      })),
+    };
+
+    // Home rating total 180 => +145; away total 100 => +225.
+    // Each completed set scores 250 for home and 30 for away.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 645,
+      awayPoints: 285,
+    });
+  });
+
+  it("does not award either team's rating bonus when a set is left unplayed", () => {
+    const state = {
+      format: "advanced",
+      sets: [
+        {
+          complete: true,
+          winnerSlot: "home",
+          playerHome: { num: "1", rating: 50 },
+          playerAway: { num: "2", rating: 45 },
+          racks: [{ home: 50, away: 30 }],
+        },
+        {
+          complete: false,
+          winnerSlot: null,
+          playerHome: { num: "3", rating: 60 },
+          playerAway: { num: "4", rating: 55 },
+          racks: [],
+        },
+      ],
+    };
+
+    // Only completed-set points count. Section 6.10 removes both
+    // positive rating bonuses when any set is left unplayed.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 195,
+      awayPoints: 30,
+    });
+  });
+
+  it("retains an over-limit rating penalty when a set is left unplayed", () => {
+    const state = {
+      format: "advanced",
+      sets: [
+        ...Array.from({ length: 5 }, (_, i) => ({
+          complete: i < 4,
+          winnerSlot: i < 4 ? "home" : null,
+          playerHome: { num: String(i + 1), rating: 90 },
+          playerAway: { num: String(i + 6), rating: 50 },
+          racks: i < 4 ? [{ home: 90, away: 30 }] : [],
+        })),
+      ],
+    };
+
+    // Four completed home players total 360: 35 over the 325 limit,
+    // producing a 175-point penalty. The incomplete fifth set is ignored.
+    // The away side's positive rating bonus is suppressed by Section 6.10.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 825,
+      awayPoints: 120,
+    });
+  });
+
   it("ignores incomplete sets", () => {
     const state = {
       format: "masters",

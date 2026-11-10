@@ -1423,7 +1423,10 @@ export async function applyForfeitToRemainingTables(matchRow, assignments) {
   const newState = { ...matchRow.state, sets: newSets };
   const homeTotal = newSets.filter(s => s.winnerSlot === "home").length;
   const awayTotal = newSets.filter(s => s.winnerSlot === "away").length;
-  const { homePoints, awayPoints } = computeMatchPoints(newState);
+  // The archived row is no longer pending once every remaining table has
+  // been converted to an individual forfeit. Keep the makeup metadata for
+  // the audit trail, but calculate the finalized result under Section 6.4.
+  const { homePoints, awayPoints } = computeMatchPoints(newState, { makeupPending: false });
   const { error } = await supabase.from("completed_matches").update({
     state: newState, team_home_total: homeTotal, team_away_total: awayTotal,
     team_home_points: homePoints, team_away_points: awayPoints, is_makeup_pending: false,
@@ -1450,7 +1453,7 @@ function ratingForTeamTotal(rating, format) {
   if (isUnratedRatingDb(rating)) return format === "open" ? 45 : 50;
   return rating ?? 0;
 }
-function teamRatingBonusPenalty(state, side) {
+function teamRatingBonusPenalty(state, side, makeupPending) {
   const format = (state.format || "masters").toLowerCase();
   if (format === "masters") return 0;
   const total = (state.sets ?? []).filter(s => s.complete).reduce((sum, s) => {
@@ -1458,10 +1461,26 @@ function teamRatingBonusPenalty(state, side) {
     return player ? sum + ratingForTeamTotal(player.rating, format) : sum;
   }, 0);
   const diff = TEAM_RATING_LIMIT - total;
+  const sets = state.sets ?? [];
+
+  // Rule 6.9: while a makeup is pending, neither a rating bonus nor penalty
+  // is calculated. The completed makeup is recalculated after the match resumes.
+  if (makeupPending) return 0;
+
+  // Rule 6.10: a match finalized with a set left unplayed removes both teams'
+  // right to a positive rating bonus. The over-limit penalty remains.
+  if (diff >= 0 && sets.some(s => !s.complete)) return 0;
+
+  // Rule 6.4: both put-up players' ratings remain in the team totals, but a
+  // team that forfeited an individual set cannot receive a positive bonus.
+  // Its over-limit penalty, if any, is still calculated.
+  const forfeitedBySide = sets.some(s => s.complete && s.forfeited && s.forfeitedBy === side);
+  if (diff >= 0 && forfeitedBySide) return 0;
+
   return diff >= 0 ? diff : -(Math.abs(diff) * 5);
 }
 
-export function computeMatchPoints(state) {
+export function computeMatchPoints(state, { makeupPending = !!(state.makeup?.confirmedHome && state.makeup?.confirmedAway) } = {}) {
   const format = (state.format || "masters").toLowerCase();
   const isMasters = format === "masters";
   const fixedTarget = format === "open" ? 45 : 50;
