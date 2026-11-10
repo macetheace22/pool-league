@@ -12,8 +12,8 @@ describe("detectSetWinner — Rule 6.7", () => {
 
   it("uses the final game's winner, not the cumulative point differential", () => {
     expect(detectSetWinner([
-      { home: 60, away: 10 },
-      { home: 5, away: 53 },
+      { home: 30, away: 20 },
+      { home: 25, away: 53 },
     ], home, away, "advanced")).toBe("away");
   });
 
