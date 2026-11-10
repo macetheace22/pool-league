@@ -5,16 +5,20 @@ const home = { rating: 50 };
 const away = { rating: 45 };
 
 describe("detectSetWinner — Rule 6.7", () => {
-  it("uses the actual game winner when both players reach their targets in the same game", () => {
+  it("awards the set to the winner of the game in which both ratings are reached", () => {
     expect(detectSetWinner([
-      { home: 50, away: 45, gameWinner: "away" },
-    ], home, away, "advanced")).toBe("away");
+      { home: 50, away: 45 },
+    ], home, away, "advanced")).toBe("home");
+    expect(detectSetWinner([
+      { home: 50, away: 45 },
+    ], away, home, "advanced")).toBe("home");
   });
 
-  it("does not infer the game winner from the point differential", () => {
+  it("uses the last game's winner, not the cumulative point differential", () => {
     expect(detectSetWinner([
-      { home: 55, away: 48 },
-    ], home, away, "advanced")).toBeNull();
+      { home: 20, away: 10 },
+      { home: 30, away: 35 },
+    ], home, away, "advanced")).toBe("away");
   });
 
   it("awards the set to the only player who reaches their target", () => {
@@ -26,7 +30,7 @@ describe("detectSetWinner — Rule 6.7", () => {
   it("continues accumulating games until a target is reached", () => {
     expect(detectSetWinner([
       { home: 25, away: 20 },
-      { home: 25, away: 25, gameWinner: "away" },
+      { home: 25, away: 25 },
     ], home, away, "advanced")).toBe("away");
   });
 
@@ -34,7 +38,7 @@ describe("detectSetWinner — Rule 6.7", () => {
     expect(effectiveSetTarget({ rating: 1 }, { rating: 70 }, "open")).toBe(45);
     expect(effectiveSetTarget({ rating: 1 }, { rating: 70 }, "advanced")).toBe(50);
     expect(detectSetWinner([
-      { home: 45, away: 45, gameWinner: "home" },
+      { home: 45, away: 45 },
     ], { rating: 1 }, { rating: 70 }, "open")).toBe("home");
   });
 
