@@ -12,10 +12,8 @@ export function effectiveSetTarget(player, otherPlayer, format) {
   return player?.rating ?? null;
 }
 
-// Each entry in games is one completed game within the set. Points accumulate
-// only after a game is entered. If both players reach their targets in the
-// same game, Section 6.7 makes that game's actual winner—not the point
-// differential—the set winner.
+// Each rack is one completed game. When both players reach their targets
+// during the same game, the winner of that final game wins the set.
 export function detectSetWinner(games, playerHome, playerAway, format) {
   if (playerHome?.rating == null || playerAway?.rating == null) return null;
 
@@ -32,9 +30,7 @@ export function detectSetWinner(games, playerHome, playerAway, format) {
     const awayReached = runAway >= targetAway;
 
     if (homeReached && awayReached) {
-      return game.gameWinner === "home" || game.gameWinner === "away"
-        ? game.gameWinner
-        : null;
+      return game.home > game.away ? "home" : game.away > game.home ? "away" : game.tiebreak ?? "home";
     }
     if (homeReached) return "home";
     if (awayReached) return "away";
