@@ -74,6 +74,27 @@ describe("IBA weekly team counter snapshots", () => {
     )).toEqual([]);
   });
 
+  it("uses division-specific report weeks for a manual multi-division paste", () => {
+    const parsed = {
+      rosters: { "15101": ["12345"] },
+      registry: { "12345": { num: "12345", matchesPlayed: 4, matchesWon: 2 } },
+    };
+    const defaults = {
+      seasonId: "season-1",
+      reportWeeksByDivision: { "151": { weekNumber: 9 } },
+      reportPrintedOnDate: "2026-10-30",
+      contentSha256: "b".repeat(64),
+      source: "manual",
+    };
+    const rows = buildIbaPlayerWeeklyCounterRows(
+      parsed,
+      [{ id: "team-a", division_id: "division-1", team_num: "15101", divisions: { num: "151" } }],
+      {},
+      defaults,
+    );
+    expect(rows[0]).toMatchObject({ report_week: 9, source: "manual", report_printed_on_date: "2026-10-30" });
+  });
+
   it("rejects impossible counters rather than persisting them", () => {
     const parsed = {
       rosters: { "15101": ["12345"] },
