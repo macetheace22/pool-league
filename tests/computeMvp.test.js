@@ -57,7 +57,7 @@ describe("computeMvp", () => {
     expect(bob).toMatchObject({ losses: 1, mvpRanking: -200 });
   });
 
-  it("unrated (NR) player forces both to the fixed race target, same as computeMatchPoints", () => {
+  it("open unrated (NR) scoring uses the fixed target without margin-of-victory points", () => {
     const matches = [{
       state: {
         format: "open",
@@ -65,12 +65,12 @@ describe("computeMvp", () => {
           complete: true, winnerSlot: "home",
           playerHome: { num: "1", name: "Alice", rating: 1 }, // NR
           playerAway: { num: "2", name: "Bob", rating: 50 },
-          racks: [{ home: 45, away: 20 }], // fixed target 45 both sides -> away margin 25 -> addOn 75 -> Alice pointsScored 220
+          racks: [{ home: 45, away: 20 }], // fixed target 45; Open winner gets run + 100, with no margin points
         }],
       },
     }];
     const mvp = computeMvp(matches, []);
-    expect(mvp.find(p => p.num === "1").pointsScored).toBe(220);
+    expect(mvp.find(p => p.num === "1")).toMatchObject({ pointsScored: 145, mvpRanking: 345 });
   });
 
   it("imported weeks trust the report's own pre-computed mvp_ranking_points rather than recomputing", () => {
