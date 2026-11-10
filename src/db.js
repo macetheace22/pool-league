@@ -2025,28 +2025,33 @@ export async function listStandingsAdjustments(divisionId) {
 }
 
 /**
- * Loads the source data for the manager-only Rule 5.5 audit.
- * Keep weekly standings history (not only the current view) so weekly
- * points-last-week can be reconciled to each scheduled opponent.
+ * Loads all source rows for the manager-only Rule 5.5 audit. Explicit paging
+ * avoids Supabase's default row cap truncating a full season's player snapshots.
  */
-export async function getRule55TieBreakAuditData(divisionId, teams) {
-  const [schedule, standingsResult, countersResult] = await Promise.all([
-    listSchedule(divisionId, teams),
-    supabase.from("standings_adjustments")
-      .select("team_id, week_key, points_last_wk")
-      .eq("division_id", divisionId),
-    supabase.from("iba_player_weekly_counters")
-      .select("team_id, player_num, report_week, schedule_week_date, matches_played, matches_won, imported_at")
-      .eq("division_id", divisionId),
-  ]);
-  if (standingsResult.error) throw new Error(standingsResult.error.message);
-  if (countersResult.error) throw new Error(countersResult.error.message);
-  return {
-    schedule,
-    standingsHistory: standingsResult.data ?? [],
-    counterSnapshots: countersResult.data ?? [],
-  };
+async function loadAllDivisionRows(table, columns, divisionId) {
+  const pageSize = 1000;
+  const rows = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from(table).select(columns)
+      .eq("division_id", divisionId).range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message);
+    rows.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+  return rows;
 }
+
+export async function getRule55TieBreakAuditData(divisionId, teams) {
+  const [schedule, standingsHistory, counterSnapshots] = await Promise.all([
+    listSchedule(divisionId, teams),
+    loadAllDivisionRows("standings_adjustments", "team_id, week_key, points_last_wk", divisionId),
+    loadAllDivisionRows("iba_player_weekly_counters",
+      "team_id, player_num, report_week, schedule_week_date, matches_played, matches_won, imported_at",
+      divisionId),
+  ]);
+  return { schedule, standingsHistory, counterSnapshots };
+}
+
 // Importing a new week always adds a new row per team (division_id, team_name,
 // week_key) -- same accumulate-over-time behavior as player_ratings.
 // Re-importing the SAME week updates just that week's row, not a duplicate.
