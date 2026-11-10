@@ -1202,7 +1202,7 @@ export function buildIbaPlayerWeeklyCounterRows(parsed, teamRows, snapshotsByDiv
         ? { ...snapshotDefaults, reportWeek: divisionWeek ?? snapshotDefaults.reportWeek }
         : null
     );
-    if (!metadata?.seasonId || !Number.isInteger(Number(metadata.reportWeek)) || Number(metadata.reportWeek) < 1) continue;
+    if (!metadata?.seasonId || String(team.divisions?.seasons?.id ?? "") !== String(metadata.seasonId) || !Number.isInteger(Number(metadata.reportWeek)) || Number(metadata.reportWeek) < 1) continue;
     const validHash = String(metadata.contentSha256 ?? "").toLowerCase();
     if (!/^[a-f0-9]{64}$/.test(validHash)) continue;
 
@@ -1248,7 +1248,7 @@ export async function bulkImportPlayers(parsed, weekTag) {
   const teamNums = Object.keys(parsed.rosters ?? {});
   const { data: teamRows, error: teamLookupError } = await supabase
     .from("teams")
-    .select("id, division_id, team_num, divisions(num, format, day, seasons(is_active))")
+    .select("id, division_id, team_num, divisions(num, format, day, seasons(id, is_active))")
     .in("team_num", teamNums);
   if (teamLookupError) throw new Error(`Could not resolve roster teams: ${teamLookupError.message}`);
   const allowedDivisionIds = Array.isArray(weekTag?.allowedDivisionIds)
