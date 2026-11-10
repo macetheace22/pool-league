@@ -9,6 +9,15 @@ describe("IBA parsers", () => {
     expect(parseStandingsImport("76A01\tEliminators\t10\t123\t15\t8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators" });
   });
 
+  it("assigns official team positions by the order of rows in a standings report", () => {
+    const rows = parseStandingsImport([
+      "15103\\tFirst Place\\t959\\t2752\\t24",
+      "15101\\tSecond Place\\t302\\t2143\\t25",
+      "15102\\tThird Place\\t100\\t1800\\t20",
+    ].join("\\n"));
+    expect(rows.map(row => row.position)).toEqual([1, 2, 3]);
+  });
+
   it("keeps MVP compatible with tab-delimited paste and supports PDF space extraction", () => {
     expect(parseMvpImport("12345\tBilly Macy\t15101\t4\t1\t250\t1050")[0]).toMatchObject({ playerNum:"12345", teamNum:"15101", wins:4, losses:1, position:1 });
     expect(parseMvpImport("12345 Billy Macy 15101 4 1 250 1050")[0]).toMatchObject({ playerNum:"12345", playerName:"Billy Macy", teamNum:"15101", wins:4, losses:1 });
