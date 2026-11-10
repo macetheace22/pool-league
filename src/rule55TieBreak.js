@@ -12,7 +12,10 @@ function latestPerPlayer(rows) {
   for (const row of rows) {
     const key = String(row.player_num);
     const prior = latest.get(key);
-    if (!prior || String(row.imported_at ?? "") > String(prior.imported_at ?? "")) latest.set(key, row);
+    const rowDate = toIsoDate(row.schedule_week_date) ?? "";
+    const priorDate = toIsoDate(prior?.schedule_week_date) ?? "";
+    if (!prior || rowDate > priorDate ||
+      (rowDate === priorDate && String(row.imported_at ?? "") > String(prior.imported_at ?? ""))) latest.set(key, row);
   }
   return [...latest.values()];
 }
