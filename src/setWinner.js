@@ -12,8 +12,8 @@ export function effectiveSetTarget(player, otherPlayer, format) {
   return player?.rating ?? null;
 }
 
-// Each rack is one completed 8-ball game. The game's recorded points include
-// the winner's game bonus, so the higher per-game score identifies its winner.
+// Each rack is one completed 8-ball game. Its recorded per-game scores are
+// used to identify the last-game winner when both set targets are reached.
 export function detectSetWinner(games, playerHome, playerAway, format) {
   if (playerHome?.rating == null || playerAway?.rating == null) return null;
 
