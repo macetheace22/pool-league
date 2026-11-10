@@ -57,11 +57,17 @@ export function buildRule55TieBreakAudit({
   const tiedGroups = [...byPoints.values()].filter(group => group.length > 1);
   if (!tiedGroups.length) return [];
 
+  const latestStandingsDate = (standingsHistory ?? [])
+    .map(row => toIsoDate(row.week_key))
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null;
   const weeks = (schedule ?? []).map(week => ({
     ...week,
     dateKey: toIsoDate(week.date),
   })).filter(week =>
-    week.dateKey && !week.isPlayoff && !/playoff/i.test(week.special ?? "") && (week.pairings ?? []).length
+    week.dateKey && (!latestStandingsDate || week.dateKey <= latestStandingsDate) &&
+    !week.isPlayoff && !/playoff/i.test(week.special ?? "") && (week.pairings ?? []).length
   ).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 
   const pointsByTeamDate = new Map();
