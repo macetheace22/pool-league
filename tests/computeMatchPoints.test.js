@@ -450,6 +450,44 @@ describe("computeMatchPoints", () => {
     });
   });
 
+  it("applies rating adjustments when a pending makeup is finalized by converting remaining tables to forfeits", () => {
+    const state = {
+      format: "advanced",
+      // Keep the original makeup metadata for audit/history. The match is
+      // finalized, so the caller explicitly overrides the pending state.
+      makeup: { confirmedHome: true, confirmedAway: true, shortTeam: "home" },
+      sets: [
+        {
+          complete: true,
+          winnerSlot: "away",
+          playerHome: { num: "1", rating: 50 },
+          playerAway: { num: "2", rating: 45 },
+          racks: [],
+          forfeited: true,
+          forfeitedBy: "home",
+          forfeitPoints: 150,
+        },
+        {
+          complete: true,
+          winnerSlot: "away",
+          playerHome: { num: "3", rating: 60 },
+          playerAway: { num: "4", rating: 55 },
+          racks: [],
+          forfeited: true,
+          forfeitedBy: "home",
+          forfeitPoints: 150,
+        },
+      ],
+    };
+
+    // Both put-up ratings count. Home forfeited and gets no bonus;
+    // away receives its rating bonus after the makeup is finalized.
+    expect(computeMatchPoints(state, { makeupPending: false })).toEqual({
+      homePoints: 0,
+      awayPoints: 655,
+    });
+  });
+
   it("applies the 325-point rating adjustments after a makeup is completed", () => {
     const state = {
       format: "advanced",
