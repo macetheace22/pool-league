@@ -1585,8 +1585,8 @@ export function computeMatchPoints(state, { makeupPending = !!(state.makeup?.con
     }
   }
   if (!isMasters) {
-    homePoints += teamRatingBonusPenalty(state, "home");
-    awayPoints += teamRatingBonusPenalty(state, "away");
+    homePoints += teamRatingBonusPenalty(state, "home", makeupPending);
+    awayPoints += teamRatingBonusPenalty(state, "away", makeupPending);
   }
   return { homePoints, awayPoints };
 }
