@@ -2023,6 +2023,30 @@ export async function listStandingsAdjustments(divisionId) {
   const { data } = await supabase.from("standings_adjustments_current").select("*").eq("division_id", divisionId);
   return data ?? [];
 }
+
+/**
+ * Loads the source data for the manager-only Rule 5.5 audit.
+ * Keep weekly standings history (not only the current view) so weekly
+ * points-last-week can be reconciled to each scheduled opponent.
+ */
+export async function getRule55TieBreakAuditData(divisionId, teams) {
+  const [schedule, standingsResult, countersResult] = await Promise.all([
+    listSchedule(divisionId, teams),
+    supabase.from("standings_adjustments")
+      .select("team_id, week_key, points_last_wk")
+      .eq("division_id", divisionId),
+    supabase.from("iba_player_weekly_counters")
+      .select("team_id, player_num, report_week, schedule_week_date, matches_played, matches_won, imported_at")
+      .eq("division_id", divisionId),
+  ]);
+  if (standingsResult.error) throw new Error(standingsResult.error.message);
+  if (countersResult.error) throw new Error(countersResult.error.message);
+  return {
+    schedule,
+    standingsHistory: standingsResult.data ?? [],
+    counterSnapshots: countersResult.data ?? [],
+  };
+}
 // Importing a new week always adds a new row per team (division_id, team_name,
 // week_key) -- same accumulate-over-time behavior as player_ratings.
 // Re-importing the SAME week updates just that week's row, not a duplicate.
