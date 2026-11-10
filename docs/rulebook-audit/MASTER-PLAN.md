@@ -1,9 +1,19 @@
 # IBA Pool League App — Master Rulebook Audit & Implementation Plan
 
-Last reconciled: 2026-11-10  
-Baseline: main at b5faa9a (PR #129 merged)
+Last reconciled: 2026-11-09  
+Baseline: main at 13687803f19d61bf53c94730a6cbcdc5ffa5fcf9 (PR #130 merged)
 
-This is the canonical cross-chat tracker. Update it whenever a rule is audited, a user decision is made, implementation begins/merges, SQL is applied, or verification changes. It is not a substitute for rereading the exact rulebook clauses.
+This is the canonical cross-chat tracker and the source of continuity between audit chats. Update it whenever a rule is audited, a user decision is made, implementation begins/merges, SQL is applied, or verification changes. It is not a substitute for rereading the exact rulebook clauses.
+
+## Scope boundary
+The active project work is limited to aligning the existing app with the supplied IBA rulebook. Do not revive unrelated historical feature requests, redesigns, communication features, or general backlog items. A rulebook requirement may be implemented in the app, supported by an import, or intentionally left as a documented manual/paper process after discussing it with the user. Do not build software merely because a rule describes an operational process.
+
+## Continuity and closure rules
+- Treat **Settled user decisions** as durable; do not ask the user to repeat them. Reopen a decision only if the exact rulebook text, a newly discovered conflict, or a material code change makes it necessary.
+- Treat **Verified implementation baseline** and rule-table statuses as closed only to the extent their evidence says. Do not re-audit a verified item without a concrete reason.
+- Every audited rule must end with one explicit state: Verified in app; Import-only; Manual/paper process by user decision; Gap requiring implementation; or Decision needed. Keep partial audits marked partial.
+- When a gap is fixed, update the relevant rule row and evidence after merge/SQL/test verification. Do not keep listing the same closed gap as outstanding.
+- Continue at the earliest unresolved rulebook item in the phase order. Ask only for a genuinely unresolved rule interpretation or build-vs-manual decision.
 
 ## Working agreement
 1. Audit every rulebook section and subsection; do not silently omit clauses.
@@ -25,7 +35,7 @@ This is the canonical cross-chat tracker. Update it whenever a rule is audited, 
 - Current-year IBA membership application required. Dropping/re-adding resets times-with-team. At most one forfeited set may count if player was present, listed on scoresheet, and meets calculated-score requirement.
 - Each team keeps its paper scoresheet. App supports independent digital entry for one team; second team's digital entry/comparison is optional.
 - Section 6.7: if both players reach ratings in the same game, winner of that last game wins the set. Never prompt scorekeeper to select winner.
-- Section 2.7 timeouts are per player, per set: Open rating 30–50 = 2; Open 51–150 = 1; Advanced 40–150 = 1; Masters = 0. NR uses lowest timeout tier for format.
+- Section 2.7 timeouts are per player, per set: Open rating 30–50 = 2; Open 51–150 = 1; Advanced 40–150 = 1; Masters = 0. NR uses the lowest timeout tier for the format. This was supplied/settled in an earlier chat; do not ask the user to provide it again.
 - Regional ranking resets each season per user's explicit app-policy decision, despite Section 5.11 calendar-year wording.
 - Discuss sportsmanship, dropped/replacement teams, finance and other admin rules when reached; user decides build vs manual.
 
@@ -60,7 +70,7 @@ Status vocabulary: Not audited; Audited—no gap; Gap identified; Decision neede
 
 | Rule | Requirement / audit target | Finding / next work | Status |
 |---|---|---|---|
-| Sections 1–2 | General league play, coaching, timeout limits/duration | Timeout markers exist; enforce per player/set; audit remaining clauses | Gap |
+| Sections 1–2 | General league play, coaching, timeout limits/duration | User-provided Section 2.7 limits are settled (see decisions); current Live Entry records timeout markers for Open/Advanced but does not enforce per-player/per-set allowance. Continue remaining exact-clause audit and implement count enforcement against rating/format, including NR tier. | Gap |
 | Section 3 | Sportsmanship, warnings, escalating penalties, appeals | Discuss build vs manual when reached | Decision needed |
 | Section 4 | Formats/league operations | Re-read exact clauses against code | Not audited |
 | 5.5 team tie-break | Official tie resolution | PR #127 audit implemented; verify exact edge cases | Verify scope |
@@ -79,7 +89,7 @@ Status vocabulary: Not audited; Audited—no gap; Gap identified; Decision neede
 | 6.8 | Team rating total/325 cap | Implemented; finish exact clause audit | Audit remaining |
 | 6.9 | Makeup pending/resume | PR #129; verify all paths; deadlines under 8.5 | Verify |
 | 6.10 | Unplayed sets | PR #122 implemented/tested | Implemented |
-| 6.11 | Scoresheet fields, signatures, confirmations | Most stats exist; verify every required field and paper/digital process | Gap |
+| 6.11 | Scoresheet fields, signatures, confirmations | Partial code audit: ratings, rack/game points, innings, safeties, set totals, win bonus and player/team point totals are represented. Player numbers are stored on selected set players but are not displayed on the Scoresheet; team numbers are not displayed there. Table size and League Office message fields are not identified in the live scoring/scoresheet UI. Both-captain signatures remain on each team's paper scoresheet by user decision; digital team confirmations are not treated as signatures. Finish checking all data paths and classify each field as app, import, or paper/manual. | Gap — partial audit |
 | 7.1 | TruSpot ratings | Import only; don't recreate algorithm | Import-only |
 | 8.1 | Weeks 1–5 normal; Week 6 to four weeks before end survival-only/max six; final four weeks closed; no postseason changes; extreme manager exception | Cutoff foundation exists; full restrictions/exception remain | Gap |
 | 8.2–8.4 | Match/roster administration | Exact clause review | Not audited |
@@ -90,7 +100,7 @@ Status vocabulary: Not audited; Audited—no gap; Gap identified; Decision neede
 | Section 9 | Dues, deposits, fees, arrears, returned checks, prize holds | Discuss software vs manual when reached | Decision needed |
 
 ## Data-entry / import inventory
-- Weekly scoring: players, ratings, per-game points, innings, safeties, timeouts, set winner, match confirmation.
+- Weekly scoring: players, ratings, player numbers, team numbers, per-game points, innings, safeties, timeouts, set winner, match confirmation; table size and League Office messages need an explicit app-vs-paper decision when the exact clause is reached.
 - Eligibility: official IBA code, team membership history, times with team, score history, current roster, membership application.
 - Forfeit eligibility credit: presence, scoresheet listing, forfeited set, calculated-score requirement.
 - Certification: return status/date, postseason starting ratings, subsequent rating changes, investigation/appeal.
@@ -103,7 +113,7 @@ Status vocabulary: Not audited; Audited—no gap; Gap identified; Decision neede
 - Finance: dues, renewals, deposit, weekly fees, sanction fees, unpaid balances, returned payment, prize hold.
 
 ## Recommended phase order
-1. Scoring/scorekeeping compliance: timeout enforcement; complete 6.11; test all formats.
+1. Scoring/scorekeeping compliance: finish the Section 6.11 field-by-field audit; then implement Section 2.7 timeout-count enforcement and any confirmed Section 6.11 digital gaps; verify all affected formats.
 2. Eligibility/postseason readiness: 5.7 reconciliation/warnings; 5.8 multi-team rules; 5.9 certification.
 3. Roster/match administration: complete 8.1; makeup deadlines/notices; forfeits; weather/holiday; discuss dropped/replacement-team workflows.
 4. Regional/tournament: Regional Team ledger; Regional Singles; remaining postseason rules.
@@ -121,7 +131,7 @@ Phases are sequencing guidance; individual features remain subject to exact rule
 
 ## Cross-chat continuation
 At the start of every new Pool App audit chat:
-1. Read this file from current main.
+1. Read this file from current main and carry forward its settled decisions/statuses without asking the user to repeat them.
 2. Read exact rulebook source; this summary is not a substitute for the rule text.
 3. Check main SHA, open PRs, recent merges, latest CI, and relevant active Supabase schema/data.
 4. Reconcile drift in this file.
