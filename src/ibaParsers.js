@@ -277,7 +277,6 @@ function detectTeamHeader(line) {
 // Matches "<num> <play> <win> <name> [<rate>]" -- the trailing rate is
 // optional so this same regex covers both the rate-last and no-rate
 // single-column header styles.
-const PLAY_WIN = String.raw`[^\\dO]*([\\dO]+)\\.?\\s+([\\dO]+)\\.?\\s+`;
 const PLAY_WIN = String.raw`[^\dO]*([\dO]+)\.?\s+([\dO]+)\.?\s+`;
 const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\d{1,3}))?$`);
 // Extract the week explicitly printed in an IBA weekly PDF. IBA report types
