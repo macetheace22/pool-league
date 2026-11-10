@@ -7,6 +7,7 @@ import {
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import { buildRule55TieBreakAudit } from "./rule55TieBreak";
+import { buildDivisionMvpTieBreakAudit } from "./divisionMvpTieBreak";
 import SearchableOptionSelect from "./SearchableOptionSelect";
 import { getActiveTeamIds } from "./teamMembership";
 import Scoresheet from "./Scoresheet";
@@ -2054,6 +2055,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const [standingsAdj, setStandingsAdj] = useState([]);
   const [mvpAdj, setMvpAdj] = useState([]);
   const [rule55AuditData, setRule55AuditData] = useState(null);
+  const [mvpTieBreakData, setMvpTieBreakData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [resuming, setResuming] = useState(null);
@@ -2140,7 +2142,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
         return null;
       }) : Promise.resolve(null),
     ]).then(([m, sa, ma, auditData]) => {
-      setMatches(m); setStandingsAdj(sa); setMvpAdj(ma); setRule55AuditData(auditData); setLoading(false);
+      setMatches(m); setStandingsAdj(sa); setMvpAdj(ma); setRule55AuditData(auditData); setMvpTieBreakData(auditData); setLoading(false);
     });
   };
   useEffect(refresh, [divisionId, isManager]);
@@ -2281,6 +2283,12 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
     standingsHistory: rule55AuditData.standingsHistory,
     counterSnapshots: rule55AuditData.counterSnapshots,
   }) : [];
+  const divisionMvpTieBreakAudit = isManager && mvpTieBreakData
+    ? buildDivisionMvpTieBreakAudit({
+      officialMvp: mvp,
+      matches: mvpTieBreakData.matches ?? matches,
+      schedule: mvpTieBreakData.schedule ?? [],
+    }) : [];
   const nothingYet = matches.length === 0 && standings.length === 0 && mvp.length === 0;
 
   if (nothingYet) {
@@ -2343,6 +2351,35 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                     </div>
                   </div></div>;
                 })}</div>}
+            </div>
+          )}
+          {isManager && (
+            <div style={{marginTop:18}}>
+              <div className="list-row__sub" style={{padding:"8px 12px",fontWeight:700}}>Rule 5.5 Division MVP tie-break · comparison only</div>
+              <div className="list-row__sub" style={{padding:"0 12px 8px"}}>Official IBA MVP rankings and positions are unchanged. Head-to-head points use individual set scoring, excluding team bonuses and MVP ranking bonuses. Opponent averages use ratings recorded on historical scoresheets.</div>
+              {!mvpTieBreakData
+                ? <div className="empty-state" style={{border:"none"}}>Division MVP tie-break data could not be loaded.</div>
+                : divisionMvpTieBreakAudit.length === 0
+                  ? <div className="empty-state" style={{border:"none"}}>No tie at the highest official IBA MVP ranking.</div>
+                  : divisionMvpTieBreakAudit.map((audit, index) => (
+                    <div key={index} className="card" style={{margin:"8px 12px"}}>
+                      <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>{audit.explanation}</div>
+                      {audit.players.map(player => (
+                        <div key={player.num} style={{padding:"7px 0",borderTop:"1px solid var(--border,#333)"}}>
+                          <div style={{fontWeight:700,fontSize:13}}>{player.name} · #{player.num}</div>
+                          <div className="list-row__sub">Official position: {player.officialPosition ?? "—"} · MVP ranking: {player.officialMvpRanking}</div>
+                          <div className="list-row__sub">Head-to-head individual points: {player.headToHeadPoints == null ? player.headToHeadStatus : player.headToHeadPoints} ({player.headToHeadSets} set(s))</div>
+                          <div className="list-row__sub">Average opponent rating: {player.averageOpponentRating == null ? player.opponentRatingStatus : player.averageOpponentRating.toFixed(1)} ({player.opponentSets} set(s))</div>
+                        </div>
+                      ))}
+                      <div style={{fontSize:12,fontWeight:700,marginTop:8,color:audit.outcome==="single-set-playoff-required"?"#F59E0B":"#5FCF9E"}}>
+                        {audit.outcome==="head-to-head-points" ? "Tie-break: head-to-head points" :
+                         audit.outcome==="opponent-rating-average" ? "Tie-break: opponent rating average" :
+                         audit.outcome==="insufficient-data" ? "Outcome: insufficient data — review the match records" :
+                         "Outcome: single-set playoff required"}
+                      </div>
+                    </div>
+                  ))}
             </div>
           )}
           <div style={{marginTop:18}}>
