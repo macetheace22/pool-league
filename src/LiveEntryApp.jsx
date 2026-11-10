@@ -986,9 +986,6 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   const pctH = targetH ? Math.min(100, Math.round((runHome / targetH) * 100)) : 0;
   const pctA = targetA ? Math.min(100, Math.round((runAway / targetA) * 100)) : 0;
 
-  const nextHome = runHome + (Number(homeVal) || 0);
-  const nextAway = runAway + (Number(awayVal) || 0);
-  const bothReachOnNextGame = nextHome >= targetH && nextAway >= targetA;
   const canAdd = !set.complete && homeVal !== "" && awayVal !== "" && !isNaN(Number(homeVal)) && !isNaN(Number(awayVal));
 
   const addRack = () => {
