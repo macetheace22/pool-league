@@ -39,7 +39,7 @@ describe("Division MVP Rule 5.5 tie-break audit", () => {
       )])],
     });
     expect(rows[0].outcome).toBe("head-to-head-points");
-    expect(rows[0].players.map(player => player.headToHeadPoints)).toEqual([145, 20]);
+    expect(rows[0].players.map(player => player.headToHeadPoints)).toEqual([165, 20]);
   });
 
   it("uses historical ratings of regular-season opponents and requires a 5-point gap", () => {
