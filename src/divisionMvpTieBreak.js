@@ -68,11 +68,10 @@ export function buildDivisionMvpTieBreakAudit({ officialMvp = [], matches = [], 
 
   const regularMatches = scheduledRegularMatches(matches, schedule);
   const stats = new Map(tied.map(player => [String(player.num), {
-    player, headToHeadPoints: 0, headToHeadSets: 0, headToHeadComplete: true,
+    player, headToHeadPoints: 0, headToHeadSets: 0, headToHeadEncountered: false, headToHeadComplete: true,
     opponentRatingTotal: 0, opponentRatingCount: 0, opponentRatingsComplete: true,
     opponentSets: 0,
   }]));
-  const allPlayerRatings = new Map();
 
   for (const match of regularMatches) {
     const format = match.state.format ?? match.format ?? "masters";
@@ -83,8 +82,6 @@ export function buildDivisionMvpTieBreakAudit({ officialMvp = [], matches = [], 
       if (!homeNum || !awayNum) continue;
       const homeRating = Number(set.playerHome?.rating);
       const awayRating = Number(set.playerAway?.rating);
-      if (!allPlayerRatings.has(homeNum)) allPlayerRatings.set(homeNum, []);
-      if (!allPlayerRatings.has(awayNum)) allPlayerRatings.set(awayNum, []);
       const homeStats = stats.get(homeNum);
       const awayStats = stats.get(awayNum);
       if (homeStats) {
@@ -102,6 +99,8 @@ export function buildDivisionMvpTieBreakAudit({ officialMvp = [], matches = [], 
         } else awayStats.opponentRatingsComplete = false;
       }
       if (homeStats && awayStats) {
+        homeStats.headToHeadEncountered = true;
+        awayStats.headToHeadEncountered = true;
         const homePoints = individualSetPoints(set, "home", format);
         const awayPoints = individualSetPoints(set, "away", format);
         if (homePoints == null || awayPoints == null) {
@@ -118,8 +117,8 @@ export function buildDivisionMvpTieBreakAudit({ officialMvp = [], matches = [], 
   }
 
   const rows = [...stats.values()].map(stat => {
-    const hasHeadToHead = stat.headToHeadSets > 0;
-    const headToHeadPoints = hasHeadToHead && stat.headToHeadComplete ? stat.headToHeadPoints : null;
+    const hasHeadToHead = stat.headToHeadEncountered;
+    const headToHeadPoints = hasHeadToHead && stat.headToHeadComplete && stat.headToHeadSets > 0 ? stat.headToHeadPoints : null;
     const averageOpponentRating = stat.opponentSets > 0 &&
       stat.opponentRatingsComplete && stat.opponentRatingCount === stat.opponentSets
       ? stat.opponentRatingTotal / stat.opponentRatingCount : null;
@@ -136,20 +135,26 @@ export function buildDivisionMvpTieBreakAudit({ officialMvp = [], matches = [], 
   });
 
   const headToHeadValues = rows.map(row => row.headToHeadPoints);
-  let outcome = "single-set-playoff-required";
-  let explanation = "The rulebook tie-breaks do not resolve the tie; a single set is required.";
-  if (headToHeadValues.every(value => value != null) &&
-      rows.some(row => row.headToHeadSets > 0) &&
-      new Set(headToHeadValues).size > 1) {
+  const hasHeadToHead = rows.some(row => row.headToHeadStatus !== "No regular-season head-to-head set found");
+  let outcome = "insufficient-data";
+  let explanation = "Available match or rating data is incomplete; the tie-break cannot be determined from the records currently stored.";
+  const headToHeadComplete = headToHeadValues.every(value => value != null);
+  const headToHeadResolved = headToHeadComplete && hasHeadToHead && new Set(headToHeadValues).size > 1;
+  const headToHeadTied = headToHeadComplete && hasHeadToHead && new Set(headToHeadValues).size === 1;
+
+  if (headToHeadResolved) {
     outcome = "head-to-head-points";
     explanation = "The player with more individual points in their regular-season head-to-head set(s) wins.";
-  } else {
+  } else if ((!hasHeadToHead || headToHeadTied) && headToHeadComplete) {
     const ratings = rows.map(row => row.averageOpponentRating);
     if (ratings.every(value => value != null)) {
       const difference = Math.abs(ratings[0] - ratings[1]);
       if (difference >= 5) {
         outcome = "opponent-rating-average";
         explanation = "The player with the higher average opponent rating wins (difference of at least 5).";
+      } else {
+        outcome = "single-set-playoff-required";
+        explanation = "The head-to-head and opponent-rating tie-breaks do not resolve the tie; a single set is required.";
       }
     }
   }
