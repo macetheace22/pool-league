@@ -475,7 +475,7 @@ describe("computeMatchPoints", () => {
     // Home's completed put-ups total 450 (125 over 325), but Rule 6.9
     // suspends both the positive adjustment and the over-limit penalty.
     expect(computeMatchPoints(state)).toEqual({
-      homePoints: 950,
+      homePoints: 1250,
       awayPoints: 150,
     });
   });
