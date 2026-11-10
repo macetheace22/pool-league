@@ -27,8 +27,8 @@ describe("IBA weekly team counter snapshots", () => {
       },
     };
     const teams = [
-      { id: "team-a", division_id: "division-1", team_num: "15101" },
-      { id: "team-b", division_id: "division-1", team_num: "15102" },
+      { id: "team-a", division_id: "division-1", team_num: "15101", divisions: { seasons: { id: "season-1" } } },
+      { id: "team-b", division_id: "division-1", team_num: "15102", divisions: { seasons: { id: "season-1" } } },
     ];
 
     expect(buildIbaPlayerWeeklyCounterRows(parsed, teams, metadata)).toEqual([
@@ -88,7 +88,7 @@ describe("IBA weekly team counter snapshots", () => {
     };
     const rows = buildIbaPlayerWeeklyCounterRows(
       parsed,
-      [{ id: "team-a", division_id: "division-1", team_num: "15101", divisions: { num: "151" } }],
+      [{ id: "team-a", division_id: "division-1", team_num: "15101", divisions: { num: "151", seasons: { id: "season-1" } } }],
       {},
       defaults,
     );
