@@ -2244,8 +2244,10 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
 
   if (loading) return <Loader/>;
 
-  const standings = db.computeStandings(matches, standingsAdj);
-  const mvp = db.computeMvp(matches, mvpAdj);
+  const standings = db.computeOfficialStandings(standingsAdj);
+  const mvp = db.computeOfficialMvp(mvpAdj);
+  const appStandings = db.computeStandings(matches, []);
+  const appMvp = db.computeMvp(matches, []);
   const nothingYet = matches.length === 0 && standings.length === 0 && mvp.length === 0;
 
   if (nothingYet) {
@@ -2275,18 +2277,22 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
       {subTab==="standings" && (
         <>
           <div className="list">
-            {standings.map((t, i) => (
-              <div key={t.teamId} className="list-row">
-                <div className="list-row__body">
-                  <span className="list-row__id">{i+1}</span>
-                  <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
-                    <span className="list-row__name">{t.name}</span>
-                    <span className="list-row__sub">{t.wins}-{t.losses} · {t.setsFor}–{t.setsAgainst} sets</span>
-                  </div>
-                  <span className="player-rating-badge">{t.totalPoints} pts</span>
-                </div>
-              </div>
+            {standings.length === 0 && <div className="empty-state" style={{border:"none"}}>No official IBA standings report has been imported for this division yet.</div>}
+            {standings.length > 0 && <div className="list-row__sub" style={{padding:"8px 12px"}}>Official IBA standings{standings[0].reportLabel ? ` · ${standings[0].reportLabel}` : ""}</div>}
+            {standings.map(t => (
+              <div key={t.teamId} className="list-row"><div className="list-row__body">
+                <span className="list-row__id">{t.position ?? "—"}</span>
+                <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                  <span className="list-row__name">{t.name}</span>
+                  <span className="list-row__sub">{t.setsPlayed == null ? "Sets played unavailable" : `${t.setsPlayed} sets played`}{t.pointsLastWeek == null ? "" : ` · ${t.pointsLastWeek} pts last week`}</span>
+                </div><span className="player-rating-badge">{t.totalPoints} pts</span>
+              </div></div>
             ))}
+          </div>
+          <div style={{marginTop:18}}>
+            <div className="list-row__sub" style={{padding:"8px 12px",fontWeight:700}}>App-entered match results · provisional comparison only</div>
+            {appStandings.length === 0 ? <div className="empty-state" style={{border:"none"}}>No completed app-entered matches to compare.</div> :
+              <div className="list">{appStandings.map((t,i)=><div key={t.teamId} className="list-row"><div className="list-row__body"><span className="list-row__id">{i+1}</span><div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}><span className="list-row__name">{t.name}</span><span className="list-row__sub">{t.wins}-{t.losses} · {t.setsFor}–{t.setsAgainst} sets</span></div><span className="player-rating-badge">{t.totalPoints} pts</span></div></div>)}</div>}
           </div>
         </>
       )}
@@ -2294,18 +2300,18 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
       {subTab==="mvp" && (
         <>
           <div className="list">
-            {mvp.map((p, i) => (
-              <div key={p.num} className="list-row">
-                <div className="list-row__body">
-                  <span className="list-row__id">{i+1}</span>
-                  <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
-                    <span className="list-row__name">{p.name}</span>
-                    <span className="list-row__sub">{p.wins}W–{p.losses}L · {p.pointsScored} pts scored</span>
-                  </div>
-                  <span className="player-rating-badge">{p.mvpRanking}</span>
-                </div>
-              </div>
-            ))}
+            {mvp.length === 0 && <div className="empty-state" style={{border:"none"}}>No official IBA MVP report has been imported for this division yet.</div>}
+            {mvp.length > 0 && <div className="list-row__sub" style={{padding:"8px 12px"}}>Official IBA MVP standings{mvp[0].reportLabel ? ` · ${mvp[0].reportLabel}` : ""}</div>}
+            {mvp.map(p => (<div key={p.num} className="list-row"><div className="list-row__body">
+              <span className="list-row__id">{p.position ?? "—"}</span>
+              <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}><span className="list-row__name">{p.name}</span><span className="list-row__sub">{p.wins}W–{p.losses}L · {p.pointsScored} pts scored</span></div>
+              <span className="player-rating-badge">{p.mvpRanking}</span>
+            </div></div>))}
+          </div>
+          <div style={{marginTop:18}}>
+            <div className="list-row__sub" style={{padding:"8px 12px",fontWeight:700}}>App-entered match results · provisional comparison only</div>
+            {appMvp.length === 0 ? <div className="empty-state" style={{border:"none"}}>No completed app-entered matches to compare.</div> :
+              <div className="list">{appMvp.map((p,i)=><div key={p.num} className="list-row"><div className="list-row__body"><span className="list-row__id">{i+1}</span><div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}><span className="list-row__name">{p.name}</span><span className="list-row__sub">{p.wins}W–{p.losses}L · {p.pointsScored} pts scored</span></div><span className="player-rating-badge">{p.mvpRanking}</span></div></div>)}</div>}
           </div>
           {isManager && <SeedMvpImport divisionId={divisionId} onImported={refresh} existingCount={mvpAdj.length} />}
         </>
