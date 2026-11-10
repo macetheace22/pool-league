@@ -2210,8 +2210,8 @@ function TonightTab({ teams, schedule, resolveRoster, activeSeason, viewingDiv, 
     // forfeit-point tiers and is left alone here).
     isPlayoff: !!currentWeek.isPlayoff,
     playoffsStartDate: viewingDiv?.playoffs_start_date ?? null,
-    teamHome: { id: match.homeTeam.id, name: match.homeTeam.name, roster: match.homeRoster.map(p=>({num:p.num,name:p.name,nickname:p.nickname,rating:p.rating,eligCode:eligByNum[p.num]?.code ?? null})) },
-    teamAway: { id: match.awayTeam.id, name: match.awayTeam.name, roster: match.awayRoster.map(p=>({num:p.num,name:p.name,nickname:p.nickname,rating:p.rating,eligCode:eligByNum[p.num]?.code ?? null})) },
+    teamHome: { id: match.homeTeam.id, name: match.homeTeam.name, teamNum: match.homeTeam.teamNum ?? null, roster: match.homeRoster.map(p=>({num:p.num,name:p.name,nickname:p.nickname,rating:p.rating,eligCode:eligByNum[p.num]?.code ?? null})) },
+    teamAway: { id: match.awayTeam.id, name: match.awayTeam.name, teamNum: match.awayTeam.teamNum ?? null, roster: match.awayRoster.map(p=>({num:p.num,name:p.name,nickname:p.nickname,rating:p.rating,eligCode:eligByNum[p.num]?.code ?? null})) },
     sets: Array(5).fill(null).map((_, si) => ({
       setNum: si + 1, playerHome: null, playerAway: null, racks: [], winnerSlot: null, complete: false,
     })),
