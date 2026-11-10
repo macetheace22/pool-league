@@ -1,134 +1,346 @@
 # IBA Pool League App — Master Rulebook Audit & Implementation Plan
 
-Last reconciled: 2026-11-10  
-Baseline: main at b5faa9a (PR #129 merged)
+Last reconciled: 2026-11-09 (local project date; GitHub timestamps may display the following UTC date)  
+Code baseline: `main` at `13687803f19d61bf53c94730a6cbcdc5ffa5fcf9` (PR #130 merge)  
+Documentation update: PR #131, branch `docs/rulebook-audit-continuity-6-11` (open; this revision expands it into the full audit register)
 
-This is the canonical cross-chat tracker. Update it whenever a rule is audited, a user decision is made, implementation begins/merges, SQL is applied, or verification changes. It is not a substitute for rereading the exact rulebook clauses.
+This file is the single source of truth for rulebook scope, decisions, current implementation, outstanding audit, data entry/import needs, and delivery order. It is deliberately honest about what has and has not been checked: a complete inventory is not the same as a completed clause-by-clause audit.
 
-## Working agreement
-1. Audit every rulebook section and subsection; do not silently omit clauses.
-2. For each rule record: applicability (Open/Advanced/Masters/event), requirement, current UI/code/DB behavior, required player/captain/manager/import data, gap, user decision, implementation status, tests/acceptance criteria, related PR/SQL.
-3. Distinguish audited from implemented and verified.
-4. Sportsmanship, dropped/replacement teams, finance, and similar operational topics are decision points. Explain each rule and options, ask the user, then record build/defer/import-only/manual process. Do not assume they must become software.
-5. Official IBA imports remain authoritative where the user has chosen that source. App calculations may audit/reconcile but must not silently replace official results.
-6. Do not merge with a failing latest PR-head required CI check. Inspect failures; never dismiss all-failed emails without checking the run and commit SHA.
-7. SQL is manually applied by user. New public Supabase tables need RLS and deliberate Data API grants in the same migration.
-8. Never claim SQL, tests, or deployment verified without evidence.
-9. Every new audit chat starts by reading this file from current main and reconciling repo, PR/CI, and active Supabase state.
+## 1. Working agreement — how we prevent missed rules and repeated audits
 
-## Settled user decisions
-- Formats: Open, Advanced, Masters.
-- Official IBA imports are source of truth for published standings/MVP positions, TruSpot ratings, and official playoff eligibility codes. Do not recreate TruSpot's proprietary algorithm.
-- Section 5.7: rely on official IBA eligibility import. Missing data = Unverified/warning, not automatically ineligible. App-side calculations are reconciliation only.
-- Eligibility thresholds discussed: Division playoffs 4 times with team + 7 IBA scores; Seasonal tournaments 5 + 8; Regional Team Championship 6 + 9.
-- New-player exception: exactly 50% qualifies, based on current roster; lowers calculated-score minimums to 5/6/7 respectively, not times-played requirements.
-- Current-year IBA membership application required. Dropping/re-adding resets times-with-team. At most one forfeited set may count if player was present, listed on scoresheet, and meets calculated-score requirement.
-- Each team keeps its paper scoresheet. App supports independent digital entry for one team; second team's digital entry/comparison is optional.
-- Section 6.7: if both players reach ratings in the same game, winner of that last game wins the set. Never prompt scorekeeper to select winner.
-- Section 2.7 timeouts are per player, per set: Open rating 30–50 = 2; Open 51–150 = 1; Advanced 40–150 = 1; Masters = 0. NR uses lowest timeout tier for format.
-- Regional ranking resets each season per user's explicit app-policy decision, despite Section 5.11 calendar-year wording.
-- Discuss sportsmanship, dropped/replacement teams, finance and other admin rules when reached; user decides build vs manual.
+1. **No rulebook clause is skipped.** Every numbered clause and material sub-rule appears in the register below. A rule may be implemented in the app, supplied by an official IBA import, or intentionally handled on paper/by league management.
+2. **Audit once, track forever.** Once a clause is audited, record the evidence, decision, gaps, tests, PR/SQL, and verification state here. Do not ask the user to repeat a settled decision or re-audit a verified item without a specific new code change, contradictory evidence, failed test, or changed rule.
+3. **Separate the lifecycle statuses.** "Audited" does not mean implemented; "merged" does not mean verified; a table existing does not mean data has been imported; a test passing does not prove live Supabase data or manual league operations.
+4. **Every gap gets a closure definition.** A rule is not closed until its implementation route (app/import/manual) is explicit, acceptance criteria are met, tests pass, required SQL is applied by the user, and live behavior is verified where applicable.
+5. **No hidden assumptions.** When a rule requires a decision whether to build, import, or retain a paper/manual process, present the exact rule and practical choices when its phase is reached. Do not create unnecessary app workflows for duties the rulebook assigns to captains, referees, Tournament Directors, or the League Office.
+6. **Official IBA data remains authoritative** where the user has chosen it: TruSpot ratings, official standings/MVP positions, and official playoff eligibility codes. Do not silently replace official data with locally inferred results.
+7. **User's paper scoresheet decision remains in force.** Each team continues to keep its own paper scoresheet. The app supports one team's independent digital score entry; the opposing team's digital entry/comparison is optional. Paper captain signatures remain the acceptance record. Do not present app confirmations as signatures.
+8. **SQL is manually applied by the user.** Any future migration creating a public table must include RLS and deliberate Data API grants in the same migration. Never claim a migration was applied unless the user confirms or a live read-only check proves the expected schema.
+9. **PR discipline.** Focused PRs only; no cloning or local-computer changes. Do not merge without the user's approval. Inspect the latest PR-head CI, not a superseded run. After merge, verify the merge commit. Avoid unnecessary Vercel previews/deployments.
+10. **Continuity at every new chat.** Read this file from current `main`, reread the exact rulebook clauses for the next task, reconcile main/PR/CI and the active Supabase project, then resume the earliest open item in the phase order. Never ask the user to re-provide known limits or decisions.
 
-## Verified implementation baseline
-| Area | Evidence / status |
+### Status definitions
+
+| Status | Meaning |
 |---|---|
-| Sections 6.1–6.3 core scoring | Existing implementation/tests; PR #120 includes Open scoring correction. Full clause audit remains. |
-| Sections 6.4–6.6 forfeits | PRs #121/#122; scoring implemented. Timing/notice/emergency exception still require audit. |
-| Section 6.7 simultaneous finish | PR #129 merged; CI passed on PR head and merge commit. |
-| Section 6.9 pending makeup rating treatment | PR #129 merged; CI passed. |
-| Section 6.10 unplayed sets | PR #122 implemented/tested. |
-| Section 5.5 team tie-break audit | PR #127, audit-only; official rankings unchanged. |
-| Section 5.5 Division MVP tie-break audit | PR #128, audit-only; official rankings unchanged. |
-| Section 5.6 MVP formula/imported positions | PRs #123/#124; official imported positions preserved. |
-| Weekly IBA Play/Win parser | PR #125. |
-| Persist team-specific weekly Play/Win | PR #126; Section 82 SQL user-applied. Schema exists; populated data still to verify. |
-| Official standings positions | PR #123; Section 81 SQL user-applied; columns exist. |
-| Roster cutoff foundation | Section 76 validation previously all true; partial Section 8.1 coverage only. |
-| Sections 77–80 | User confirmed applied; PR #117 merged. |
-| League news | Section 61 SQL previously applied; table/RLS exist. |
+| Verified | Implementation or agreed process checked against acceptance criteria; evidence and test/live verification recorded |
+| Implemented — verification open | Code/SQL exists, but full behavior, live data, or edge cases are not yet verified |
+| Partial | Some requirements are represented, but material requirements remain missing |
+| Import-only | Official IBA report is the selected source; import, matching, freshness, missing-data behavior still need validation |
+| Manual process — agreed | User has explicitly chosen paper, referee, Tournament Director, or League Office handling |
+| Gap | A required behavior or data path is known to be missing or incomplete |
+| Decision needed | Rulebook leaves an operational choice or user must choose app vs manual handling |
+| Not audited | Exact clause has not yet been compared field-by-field with current code and workflow |
+| Deferred | Audited and intentionally sequenced later; not complete |
 
-## Latest baseline and Supabase observations
-- PR #129 merged to main at b5faa9a.
-- CI run #540 on merge commit passed; run #539 on final PR head passed.
-- Active Supabase project: iba-pool-league, ref mijhllycghzdryfvfgzv. Do not use inactive project named pool-league.
-- Read-only check 2026-11-10: iba_report_import_history, iba_player_weekly_counters, league_news, player_playoff_eligibility, standings_adjustments, mvp_adjustments exist with RLS enabled; Section 81 columns exist; Section 82 counter table exists; roster cutoff trigger enforce_roster_change_cutoff exists/enabled.
-- At that check player_playoff_eligibility and iba_player_weekly_counters had no rows. This is a time-specific data observation, not proof imports are broken.
-- Schema existence alone does not prove all policies, RPCs, UI or data completeness.
+## 2. Settled decisions — do not reopen without new evidence
 
-## Master rule-by-rule checklist
-Status vocabulary: Not audited; Audited—no gap; Gap identified; Decision needed; Planned; PR open; Merged—not verified; Verified; Manual process; Deferred; Import-only.
+- Formats are **Open, Advanced, Masters**.
+- Section 2.7 coaching time-outs are per player, per set:
+  - Open rating 30–50: 2 periods.
+  - Open rating 51–150: 1 period.
+  - Advanced rating 40–150: 1 period.
+  - Masters rating 50–150: 0 periods.
+  - NR uses the lowest time-out tier for that format.
+  - Coaching period duration is one minute. The exact rulebook wording around occasional vs repeated over-one-minute periods must be implemented consistently with the user's settled one-minute rule and the warning/penalty procedure already discussed; do not ask for the rating limits again.
+- Section 6.7: when both players reach their ratings in the same game, the winner of the last game wins the set. **Do not ask the scorekeeper who won.** Determine it from the recorded game result.
+- Section 5.7: official IBA playoff-eligibility import is authoritative. Missing data means **Unverified with a warning**, not automatically ineligible. Do not create an independent eligibility calculator that overrides the official code.
+- Eligibility thresholds previously captured for reference: Division playoffs 4 times with team + 7 IBA scores; Seasonal tournaments 5 + 8; Regional Team Championship 6 + 9. New-player exception: exactly 50% of current roster qualifies; reduces calculated-score minimums to 5/6/7 respectively, not times-played requirements. Current-year IBA membership application is required. Drop/re-add resets times with team. At most one forfeited set can count, and only if the player was present, listed on the scoresheet, and met the calculated-score requirement. The official eligibility import remains the deciding source.
+- Each team keeps its own paper scoresheet; the app supports one team's independent digital entry; second-team digital entry/comparison is optional. Both captains' paper signatures remain required by the agreed process; app confirmation is not a signature.
+- Section 5.11: regional ranking points reset each season under the user's explicit app-policy decision, despite the rulebook's calendar-year wording. Preserve this as an explicit policy override, not an unnoticed interpretation.
+- Section 5.5 tie-break audit work does not replace official IBA standings/MVP positions. Official imported positions remain authoritative.
+- Weekly Play/Win values are team-specific. In playoffs, the import supplies eligibility, not weekly Play/Win values; do not invent playoff counters.
+- A player may be on multiple teams, and may be a player on one team and captain of another. Do not conflate player memberships with captain authority.
+- Team numbers can contain letters (example: `76A01`); do not validate them as numeric-only.
 
-| Rule | Requirement / audit target | Finding / next work | Status |
-|---|---|---|---|
-| Sections 1–2 | General league play, coaching, timeout limits/duration | Timeout markers exist; enforce per player/set; audit remaining clauses | Gap |
-| Section 3 | Sportsmanship, warnings, escalating penalties, appeals | Discuss build vs manual when reached | Decision needed |
-| Section 4 | Formats/league operations | Re-read exact clauses against code | Not audited |
-| 5.5 team tie-break | Official tie resolution | PR #127 audit implemented; verify exact edge cases | Verify scope |
-| 5.5 MVP tie-break | Head-to-head and subsequent criteria | PR #128 audit implemented; verify incomplete-data behavior | Verify scope |
-| 5.6 MVP | Formula and official ranking | Formula implemented; official import authoritative | Implemented |
-| 5.7 eligibility | Official code, thresholds, 50% exception, membership, team history, forfeited-set credit | Import path; audit/reconciliation + Unverified warning remain | Gap |
-| 5.8 multi-team | Same-player conflicts, set order, delayed sets, Director ruling | Membership model exists; tournament enforcement incomplete | Gap |
-| 5.9 certification | Returned certification, rating thresholds, investigation/appeal | No complete workflow identified | Gap |
-| 5.10 | Tournament rules | Audit exact clauses | Not audited |
-| 5.11 regional team | Seasonal rosters, common players, ranking points, playoff points, points/set average | Regional ledger/workflow absent; season-reset policy override recorded | Gap |
-| 5.12 regional singles | Membership, Fall roster, score/match thresholds, season count, flight seeding | No complete workflow identified | Gap |
-| 5.13–5.14 | Tournament administration, decisions, appeals, practice/warnings | Re-read exact clauses; discuss build vs manual | Not audited |
-| 6.1–6.3 | Format scoring | Core code exists; finish clause audit | Audit remaining |
-| 6.4–6.6 | Forfeits, timing, emergency exception | Scoring exists; operational behavior needs audit | Gap |
-| 6.7 | Rack/game/set completion | PR #129; verify normal, correction and historical paths | Verify |
-| 6.8 | Team rating total/325 cap | Implemented; finish exact clause audit | Audit remaining |
-| 6.9 | Makeup pending/resume | PR #129; verify all paths; deadlines under 8.5 | Verify |
-| 6.10 | Unplayed sets | PR #122 implemented/tested | Implemented |
-| 6.11 | Scoresheet fields, signatures, confirmations | Most stats exist; verify every required field and paper/digital process | Gap |
-| 7.1 | TruSpot ratings | Import only; don't recreate algorithm | Import-only |
-| 8.1 | Weeks 1–5 normal; Week 6 to four weeks before end survival-only/max six; final four weeks closed; no postseason changes; extreme manager exception | Cutoff foundation exists; full restrictions/exception remain | Gap |
-| 8.2–8.4 | Match/roster administration | Exact clause review | Not audited |
-| 8.5 | Makeup deadline 7 days before season end; 5-day office notice | Enforcement/notice not identified | Gap |
-| 8.6 | Weather/holiday rescheduling | Audit exact rules and decide workflow | Not audited |
-| 8.7 | Dropped teams | Discuss software vs manual when reached | Decision needed |
-| 8.8 | Replacement teams inherit points / makeup rights | Discuss software vs manual when reached | Decision needed |
-| Section 9 | Dues, deposits, fees, arrears, returned checks, prize holds | Discuss software vs manual when reached | Decision needed |
+## 3. Verified implementation and delivery history
 
-## Data-entry / import inventory
-- Weekly scoring: players, ratings, per-game points, innings, safeties, timeouts, set winner, match confirmation.
-- Eligibility: official IBA code, team membership history, times with team, score history, current roster, membership application.
-- Forfeit eligibility credit: presence, scoresheet listing, forfeited set, calculated-score requirement.
-- Certification: return status/date, postseason starting ratings, subsequent rating changes, investigation/appeal.
-- Multi-team tournament: eligible teams, event/time slot, set order, delayed match, Director ruling.
-- Regional Team: seasonal rosters, common players, participation, points, playoff wins, points/set average.
-- Regional Singles: Fall roster, scores, matches, seasons, membership, flight rating.
-- Makeup: agreement, scheduled date, notice, completed/outstanding sets, weather/holiday exception.
-- Roster: effective date/week, reason, roster size, survival-only qualification, manager exception.
-- Conduct/coaching: player, incident, warning, repeat offense, penalty, decision-maker, appeal.
-- Finance: dues, renewals, deposit, weekly fees, sanction fees, unpaid balances, returned payment, prize hold.
+This is the known baseline from merged PRs and prior user-confirmed SQL actions. The individual rule register below identifies what remains to verify.
 
-## Recommended phase order
-1. Scoring/scorekeeping compliance: timeout enforcement; complete 6.11; test all formats.
-2. Eligibility/postseason readiness: 5.7 reconciliation/warnings; 5.8 multi-team rules; 5.9 certification.
-3. Roster/match administration: complete 8.1; makeup deadlines/notices; forfeits; weather/holiday; discuss dropped/replacement-team workflows.
-4. Regional/tournament: Regional Team ledger; Regional Singles; remaining postseason rules.
-5. Coaching/conduct/finance: discuss each rule with user and build only where agreed.
-Phases are sequencing guidance; individual features remain subject to exact rule audit and user decision.
+| Work | Current evidence/status |
+|---|---|
+| PR #120 — Open scoring correction (6.1) | Merged. Core Open scoring correction is in main; complete Section 6 clause audit and full-format acceptance remain. |
+| PR #121 — Section 6.6 forfeit scoring coverage | Merged. Adds/extends focused forfeit-point tests; not proof that all 6.5 timed team-forfeit operations are implemented. |
+| PR #122 — Sections 6.4, 6.9, 6.10 | Merged. Individual-forfeit rating treatment, pending-makeup rating adjustment behavior, and unplayed-set behavior were implemented/tested. |
+| PR #123 — official IBA team/MVP positions | Merged. Section 81 adds official position storage. |
+| PR #124 — official IBA snapshots as standings source | Merged. Official imported standings snapshots remain the standings source of truth. |
+| PR #125 — cumulative played/won from IBA roster reports | Merged. Parser captures the counters. |
+| PR #126 — persist team-specific weekly Play/Win counters | Merged. Section 82 SQL was user-applied; schema existence was verified. Population/currentness must be rechecked when eligibility workflows are validated. |
+| PR #127 — Rule 5.5 team tie-break audit | Merged. Audit/reconciliation support; official published ranking is not overwritten. |
+| PR #128 — Division MVP Rule 5.5 tie-break audit | Merged. Audit/reconciliation support; official published ranking is not overwritten. |
+| PR #129 — Section 6.7 and pending-makeup correction | Merged. CI passed on final PR head and merge commit. Includes simultaneous-finish logic and pending-makeup rating treatment. One code-path verification item remains in the Section 6.7 register below. |
+| PR #130 — initial master audit plan | Merged. Established this document. |
+| PR #131 — continuity and full audit register | Open; documentation-only. This expanded version is being added to that PR. Do not treat it as merged until the user merges it. |
 
-## CI / merge policy
-- Never ignore an "All jobs have failed" email without inspection.
-- Recent PRs had genuine failures on intermediate commits while edits were in progress. Example: PR #129 earlier run 537 failed tests/setWinner.test.js; later PR-head run 539 passed and merge run 540 passed.
-- Merge readiness is based on latest PR-head SHA and required checks, not every superseded run and not merely the fact the PR was merged.
-- If latest PR-head run fails, stop and fix. If an earlier commit failed but latest head passed, older run is superseded for merge readiness but remains a historical failure.
-- After merge, verify CI on merge commit. Successful main CI confirms merged snapshot passed configured workflow; it does not excuse bypassing a failed required PR check.
-- Before merge verify PR head SHA, latest CI for that SHA, tests, production build, SQL access check when applicable; verify merge commit CI afterward.
-- Preserve failure visibility; do not disable checks/notifications to hide genuine regressions.
+### Database / SQL baseline
 
-## Cross-chat continuation
-At the start of every new Pool App audit chat:
-1. Read this file from current main.
-2. Read exact rulebook source; this summary is not a substitute for the rule text.
-3. Check main SHA, open PRs, recent merges, latest CI, and relevant active Supabase schema/data.
-4. Reconcile drift in this file.
-5. Resume earliest unresolved item in phase order.
-6. Ask only for decisions genuinely needed to interpret/scope the next rule.
-7. Update this file through a focused PR when a decision/status/phase changes.
+- Active Supabase project: `iba-pool-league`, ref `mijhllycghzdryfvfgzv`. Never use the inactive project named `pool-league`.
+- Sections 76–82 were previously confirmed applied by the user. Section 76 validation previously returned true for the cutoff function, captain permission, new-player function, trigger function, enabled roster cutoff trigger, and add/remove RPC enforcement.
+- Section 81 official standings position columns and Section 82 team-specific weekly counters were previously confirmed present.
+- Prior read-only audit found `league_news`, `iba_report_import_history`, `iba_player_weekly_counters`, `player_playoff_eligibility`, `standings_adjustments`, and `mvp_adjustments` with RLS enabled. At that time, `player_playoff_eligibility` and `iba_player_weekly_counters` had no rows. Recheck live rows before asserting imports are populated.
+- Section 61 league news, Sections 77–80, and Sections 81–82 are historical infrastructure. They are not themselves proof of rulebook compliance.
+- A schema/table existing is not proof that its import, UI, policy, RPC, data population, or user-facing warning works.
 
-Suggested new-chat prompt:
+## 4. Master rule-by-rule register
 
-> Continue the IBA Pool League App rulebook audit. First read docs/rulebook-audit/MASTER-PLAN.md from current main, then reconcile it with the exact rulebook source, current GitHub PR/CI state, and active Supabase project. Do not repeat completed work or assume unverified items are complete. Resume at the earliest unresolved item in the phase plan, and ask me rule-specific build-vs-manual questions as we reach those sections.
+The register covers every numbered clause in the supplied rulebook. "Not audited" is an intentional visible status, not a claim that the rule is unimportant. The next phase converts these entries into exact requirement/code/data/acceptance audits and then closes them.
+
+### Section 1 — General Rules
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 1.1 | Playing table / start time / home advantage | Not audited. Determine which parts are enforced by schedule/venue workflow and which remain team responsibilities. |
+| 1.2 | Who puts up first / coin flip / alternating order | Partial evidence: Live Entry has coin-flip and put-up sequencing. Audit exact alternating sequence, edge cases, and whether the UI clearly supports it. |
+| 1.3 | Lag / first break / winner breaks next | Not audited. Likely referee/player process; decide whether any scorekeeping field is required. |
+| 1.4 | Fouls and ball-in-hand penalties | Not audited. Broadly referee/opponent adjudication; identify only the digital recording/penalty behaviors the rulebook requires. |
+| 1.5 | Cue ball in hand | Not audited; manual play rule unless a required scoring record is identified. |
+| 1.6 | Pocket patch (Open format) | Not audited. Open-only rule; likely player process, no app workflow assumed. |
+| 1.7 | Safety notification | Partial: safety counts are entered in Live Entry. Whether the app needs any separate notification/acknowledgement is not audited. |
+| 1.8 | Frozen cue ball | Not audited; likely manual/referee rule. |
+| 1.9 | Accidentally moved balls | Not audited; likely manual/referee rule. |
+| 1.10 | Accidentally pocketed ball | Not audited; likely manual/referee rule. |
+| 1.11 | Hanging ball | Not audited; likely manual/referee rule. |
+| 1.12 | Jumped ball | Not audited; likely manual/referee rule. |
+| 1.13 | Jump shots | Not audited; likely manual/referee rule. |
+| 1.14 | Masse shots | Not audited; likely manual/referee rule. |
+| 1.15 | Stalemated game | Not audited; determine if a re-rack/result entry is needed. |
+| 1.16 | Accidentally shooting wrong group | Not audited; likely manual/referee rule. |
+| 1.17 | Cue ball out of kitchen | Not audited; likely manual/referee rule. |
+| 1.18 | Legal cue ball | Not audited; likely manual/referee rule. |
+| 1.19 | Jawed balls | Not audited; likely manual/referee rule. |
+| 1.20 | Interference with stroke | Not audited; likely manual/referee rule. |
+| 1.21 | Final position of balls | Not audited; likely manual/referee rule. |
+| 1.22 | Required warnings | Not audited. Cross-reference Section 2 coaching and Section 3 conduct; determine whether any warnings/penalties must be logged for League Office review. |
+
+### Section 2 — Coaching
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 2.1 | Definition of coaching | Not audited. Define the app's role; likely incident/referee process rather than live shot adjudication. |
+| 2.2 | Player chooses own coach at start of set | Gap. Live Entry has no coach selection field or persisted coach identity. |
+| 2.3 | Changing coach only for two-table conflict exception | Gap. No coach assignment/change workflow identified. |
+| 2.4 | Coach roster membership, conduct, position, no touching balls | Not audited; mostly manual enforcement. Determine whether incident record is needed. |
+| 2.5 | When coaching is in effect | Not audited; manual enforcement. |
+| 2.6 | Coaching period start/end and one-minute guidance | Gap. No period timer, duration, or warning/penalty workflow identified. Apply the settled one-minute user decision consistently with the rulebook's occasional-vs-habitual wording. |
+| 2.7 | Timeout reasons, allowance, opponent acknowledgement, over-limit warning/foul | **Deferred, not implemented.** Live Entry currently records Open/Advanced timeout markers only; Masters has no timeout controls, consistent with zero allowance. No per-player/per-set count, NR tier, remaining count/status-check, timeout reason, acknowledgement, selected coach, warning, violation, or ball-in-hand enforcement. Implement after Section 6.11 in Phase 1. Limits are settled above; do not ask again. |
+| 2.8 | Coaching violations | Gap. No structured violation/penalty record identified. |
+| 2.9 | Sportsmanship in coaching | Not audited; connect to Section 3 incident handling. |
+
+### Section 3 — Sportsmanship
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 3.1 | Good sportsmanship / honest answers / roster disclosure | Not audited; likely manual. Check if captain roster changes need a record/notice. |
+| 3.2 | Poor sportsmanship examples, sharking, slow play, verbal/physical abuse | Not audited; likely League Office incident process. |
+| 3.3 | Penalties (warning through expulsion, rating/points/captain role/postseason) | Decision needed. Ask which parts need app support versus manager-maintained records. |
+| 3.4 | Right of appeal / neutral committee | Decision needed; likely manual governance. |
+| 3.5 | Bad behavior of opponent / protest documentation | Decision needed. Scoresheet's League Office message area is paper today; determine whether a digital incident/protest record is wanted. |
+| 3.6 | Tournament sportsmanship violations | Manual/TD rules are the likely path; verify tournament rules sheet and record-keeping expectations. |
+
+### Section 4 — League Structure
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 4.1 | Divisions (4–16 teams, day/time, geography, special divisions) | Partial: seasons/divisions/schedules are represented. Audit minimum/maximum team count, special-division exceptions, and schedule constraints. |
+| 4.2 | Teams (1–8 roster members; 2–6 play per match) | Partial: team rosters and five-set lineup workflow exist. Audit 1–8 roster boundaries and match participation exceptions. |
+| 4.3 | Captain duties | Partial: captain identity, team management, roster, and schedule tools exist. Audit contact/communication, roster responsibility, and manager escalation duties. |
+| 4.4 | Coach role | Gap with Section 2: no selected coach data path identified. |
+| 4.5 | Player membership, amateur/age, identity, multiple teams/divisions, one set per match | Partial: player identity linking and multiple team memberships exist; PR #113 addressed identity-linking and multi-team role cases. Audit division-season exclusivity, tournament limits, proof-of-identity handling, and one-set restriction. |
+
+### Section 5 — Regular and Post-Season Play
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 5.1 | Regular-season standings determine seeding; championship/consolation brackets | Partial/import-led: official IBA standings are authoritative (PRs #123/#124). Audit bracket qualification, consolation cross-division brackets/byes, and trophy eligibility. |
+| 5.2 | Division playoff pairings and home advantage | Not audited end-to-end. Verify playoff schedule generation, seed pairing, and home-field assignment. |
+| 5.3 | Seasonal Championship/Consolation qualification | Not audited end-to-end. Verify first-place automatic qualification and division champion/consolation champion routes. |
+| 5.4 | Seasonal tournament seeding/byes | Not audited. Audit seeding categories and bye assignment. |
+| 5.5 — Team | Head-to-head points, sets won, points lost, record vs immediately lower team | PR #127 merged; audit helper exists. Official standings position remains authoritative. Verify exact tie-data completeness and display only; do not replace official position. |
+| 5.5 — Division MVP | Head-to-head points, opponent average rating difference of 5, single-set playoff | PR #128 merged; audit helper exists. Official IBA MVP position remains authoritative. Verify exact tie-data completeness and display only; no independent ranking override. |
+| 5.5 — Gladiator match | Postseason sudden-death exception allowing already-played player | Not audited; requires tournament match/TD process. |
+| 5.5 — Dead heat | Regular-season tie stands; postseason tie resolved by three of five set wins | Not audited. Confirm team match result handling in playoff mode. |
+| 5.6 | Division MVP formula, forfeit win 125 without 200 set-win bonus, top-15 invitations | Partial/import-led: official MVP positions are captured and preserved (PRs #123/#124); imported MVP report parser exists. Audit formula and eligibility/invitation edge cases without overriding official ranking. |
+| 5.7 | Postseason eligibility, times with team, scores history, membership, 50% new-player exception, forfeit credit | Import-only with a gap. Parser and storage path for official playoff eligibility codes exist; roster launch attaches imported `eligCode`. Missing code currently does not block the player, consistent with not auto-blocking, but an explicit **Unverified warning** in the lineup/manager workflow remains to verify/implement. Do not independently calculate or override official eligibility. Verify import matching, report freshness, code mapping, membership application status if the official report covers it, and one-forfeit credit semantics. Section 82 weekly counters are supporting imported data, not a substitute for the official eligibility code. |
+| 5.8 | Multi-team tournament eligibility, self-match restriction, first/second/third set, delayed set, TD decision, anti-stalling | Gap. Multi-team membership exists; tournament time-slot conflict, set-order restrictions, delay queue, TD decision, and stall warning are not implemented/verified. |
+| 5.9 | Team Rating Certification, potential/automatic disqualification, appeal | Gap. No certification return, baseline rating snapshot, postseason change tracking, or appeal workflow identified. |
+| 5.10 | Sudden-death match end, postseason forfeit points, tournament referee exceptions, game formats, stopwatch, TD rules sheet, coaching/sportsmanship | Partial/manual. Forfeit point code exists. Tournament-only referee/stopwatch/TD authority and 8/9/10-ball tournament scoring are not a live app workflow; decide what needs recording and what remains manual. App's current match scoring is 8-ball. |
+| 5.11 | Regional Team Championship eligibility, Fall roster, common players, seasons, ranking points, points/set average tiebreak | Gap. No complete regional team ledger/workflow identified. Preserve user's explicit season-reset override; do not revert to calendar-year rule. |
+| 5.12 | Regional Singles eligibility, membership, Fall roster, scores, matches/seasons, flight seeding | Gap. No complete eligibility ledger/seeding workflow identified. |
+| 5.13 | Tournament Directors / referee / appeals | Manual process candidate. Confirm whether TD assignment/contact and decisions need app records. |
+| 5.14 | Tournament practice prohibition and escalating penalties | Gap/manual decision. No tournament practice-warning/penalty tracking identified. |
+
+### Section 6 — Scoring Rules
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 6.1 | Winning shooter points by format | Implemented in core scoring; PR #120 corrected Open scoring. Finish exact clause tests across Open/Advanced/Masters, including normal and NR sets. |
+| 6.2 | Losing shooter points by format | Implemented in core scoring; verify Open/Advanced retain scored points and Masters receives zero across all paths. |
+| 6.3 | Margin of victory; race-to-points/games; NR exception | Partial. Current scoring implements points-based margin and fixed NR target behavior. Audit whether race-to-games is applicable to any IBA event in this app and confirm exact NR/established-player loser calculation. |
+| 6.4 | Individual forfeit player selection, rating totals, no bonus to forfeiting team, last-set ordering | Core scoring implemented in PR #122 and Live Entry. Verify all selection constraints (unused player on forfeiting side; present unused player on receiving side), rating totals, and that forfeits occur only after all played sets. |
+| 6.5 | Team match timed forfeits at 15/30/45 minutes; emergency 15-minute allowance; no-show/lone shooter options | Gap / audit required. Live Entry supports individual set forfeits and makeup-pending reporting, but no verified scheduled-start timer, staged 1/2/5-set forfeiture workflow, emergency allowance conditions, or full lone-shooter/no-show workflow. Build only after exact operational audit. |
+| 6.6 | Forfeit point values, regular vs postseason | Core values and tests exist (PR #121 and PR #122 history). Current code/test values: regular Open 125, Advanced 150, Masters 100; postseason Open 100 + receiving player's rating, Advanced 250, Masters 200. The supplied text extraction shows the Section 6.6 heading but not its value table; verify the original rulebook page/table against these values before final closure. |
+| 6.7 | Game completion, same-game simultaneous rating finish, last-game winner | PR #129 merged; user decision is explicit: last game's winner wins, no prompt. Verify the stored per-game score representation always identifies the winner. Current `detectSetWinner` returns a side when game points differ, but has a `tiebreak` fallback when the last game's recorded points are equal; confirm whether equal totals are possible in valid 8-ball scoring and add a regression test so no scorekeeper winner prompt is ever needed. |
+| 6.8 | Team match totals and 325 rating limit; NR rating values | Core team scoring and 325 bonus/5x penalty exist in `db.js` and Scoresheet. Verify all five played/forfeited set combinations, NR=45 Open / 50 Advanced-Masters, Round Robin NR=75 exception, and that Masters is excluded from team rating adjustment. |
+| 6.9 | Make-up agreement/date; suspend bonus/penalty; ratings at time played | PR #129 passes pending-makeup state into rating adjustment; PR #122 related behavior. App records makeup reason/confirmation and pending status. Gap: score sheet's required makeup date and League Office notice are not digitally captured (paper decision may satisfy); audit deadline/notice rules under 8.5 separately. |
+| 6.10 | Unplayed sets when neither team has enough players; each gets points to date; no rating bonus | Implemented/tested in PR #122. Verify historical display and completed-vs-pending standings treatment. |
+| 6.11 | Independent team scorekeeping; required player/set fields; table size, League Office messages, signatures | Partial audit. Live Entry captures player/rating, per-game points, innings, safeties, timeout markers, and set result; Scoresheet derives per-game totals, total innings, safeties, winner bonus, and player totals. Player number is carried on selected player objects but is not displayed on the Scoresheet. Team number is not displayed on the Scoresheet; persistence/source path needs end-to-end verification. Table size and League Office messages are paper-back-of-sheet fields. Both captains' signatures remain paper/manual by user decision; digital confirmations are not signatures. Finish the field-by-field persistence/display audit, then add only the required digital identifiers/fields that are not already satisfied by the paper process. |
+
+### Section 7 — Rating System
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 7.1 | TruSpot player ratings / rating percentage | Import-only for official ratings; do not recreate TruSpot. Verify current rating import, historical rating snapshots on each played set, and rating percentage/match scoring behavior. |
+| 7.2 | Team rating limit | Implemented in scoring: 325 limit, positive difference bonus and 5x over-limit penalty for Open/Advanced. Cross-check against Section 6.8; no duplicate implementation. |
+
+### Section 8 — Miscellaneous Rules
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 8.1 | Roster windows: Weeks 1–5; survival-only through four weeks before end; max six; final four weeks closed; no postseason changes; extreme manager exception | Partial. Section 76 enforces captain Week 6 cutoff foundation and manager authority. Remaining survival-only qualification, max-six rule, final-four-week cutoff, postseason freeze, and extreme-circumstance manager override need full audit/implementation. |
+| 8.2 | Home team's table choice; one/two-table demand at one hour; no delay/harassment | Not audited. Determine whether scheduling/live match needs table count/choice/time records or whether this remains captain/referee process. |
+| 8.3 | Illegal substitution / false identity / match points and postseason disqualification | Partial. PR #113 hardened player-number identity linking; it does not by itself implement investigation, match-point reversal, postseason disqualification, suspension, or captain consequences. |
+| 8.4 | Schedule publication, odd-team BYE, first five weeks provisional, rotating byes, incomplete-cycle average points | Partial: schedule import/management exists. Audit BYE rotation, incomplete-cycle average-point treatment, and conversion of provisional TBA matches into makeups/byes. |
+| 8.5 | Make-up scheduling responsibility, 7-day cutoff, 5-day League Office notice, failure-to-agree consequences, suspend during regular play | Gap. No complete deadline/notice/exception enforcement verified. |
+| 8.6 | Official weather emergency and holiday reschedule rights/notice | Not audited. Likely manager/manual workflow; decide if app needs reason, notice timestamp, and approval record. |
+| 8.7 | Dropped team standings remedies | Decision needed. Rule grants management discretion among wiping results, averages, byes, or other methods. Ask user whether to build manager adjustment tools or keep manual League Office action. |
+| 8.8 | Replacement team inherits points and up to three makeups | Decision needed. Determine whether current season/team replacement data model can represent inheritance and makeup entitlement or if manager records it manually. |
+| 8.9 | No smoke breaks during a set | Manual process candidate; no app enforcement assumed. |
+| 8.10 | Rack templates allowed if both players have option | Manual process candidate; no app enforcement assumed. |
+| 8.11 | Personal balls allowed if regulation and both agree | Manual process candidate; no app enforcement assumed. |
+
+### Section 9 — Financial Rules
+
+| Clause | Rule area | Current status / next action |
+|---|---|---|
+| 9.1 | $20 annual membership; $10 qualifying Fall-to-Winter renewal | Decision needed: determine whether app should track dues/payment eligibility or whether League Office/payment records remain external. |
+| 9.2 | Other sanction fees | Decision needed; likely external/manual unless user requests fee ledger. |
+| 9.3 | Team responsibility; hold prize money for arrears/returned checks | Decision needed; determine whether app needs account balances/prize holds or manager-only notes. |
+| 9.4 | Unpaid roster players through Week 5; team assumes fees thereafter | Gap/decision needed. Related to 8.1 roster window; decide if membership-paid status is tracked in app. |
+| 9.5 | $30 refundable team deposit / forfeiture conditions | Decision needed; likely manager finance ledger. |
+| 9.6 | $40 weekly fees; both teams pay despite forfeits; bye and tournament exceptions | Decision needed; determine whether fees are tracked in app or remain external. |
+| 9.7 | Split game cost / special pocketed-ball retrieval situations | Manual process candidate. |
+| 9.8 | Check payee, returned-check amount + $20 within 30 days, team liability | Decision needed; likely external accounting process. |
+| 9.9 | Dropout team full-season fees if roster not withdrawn 7 days before season; captain/member liability | Decision needed; align with Section 8.7; likely League Office finance process. |
+
+## 5. Priority audit/implementation queue — the order we will follow
+
+This order closes scoring, forfeits, eligibility, and scorekeeping before moving to less central rulebook areas. Within each phase, finish the audit, list every gap, implement focused PRs, apply any SQL, verify, then mark closed here. Do not jump ahead merely because a later feature is easier.
+
+### Phase 0 — Establish the baseline and keep this tracker authoritative
+1. Merge PR #131 after reviewing the expanded plan.
+2. At the start of each work block, refresh main SHA, open PRs, latest CI, and relevant live Supabase facts.
+3. Update this plan in the same PR as each material audit decision/status change, or a focused docs PR if implementation is separate.
+
+### Phase 1 — Complete scoring, forfeits, coaching time-outs, and scorekeeping (Sections 6.1–6.11, then 2.7)
+1. Finish the 6.11 field-by-field map: player number, team number, ratings, safeties, points per game, innings per game, total innings, total points, winner bonus, player total, table size, League Office messages, and signatures. Confirm what is app data vs paper/manual by the already-settled scoresheet decision.
+2. Complete the 6.4–6.6 forfeit audit, especially Section 6.5's 15/30/45-minute team-forfeit schedule, emergency 15-minute allowance, lone-shooter path, no-show, and ordering/selection constraints. Validate Section 6.6's original rulebook value table against current code/tests.
+3. Close remaining 6.1–6.3 and 6.8 scoring edge cases across Open, Advanced, and Masters, including NR, rating percentage, margin, all forfeit combinations, and team-rating cap.
+4. Verify Section 6.7 simultaneous finish end-to-end. The last-game winner must be derived automatically; add coverage for any valid score representation edge case. No winner-selection prompt.
+5. Verify 6.9/6.10 makeup and unplayed-set lifecycle, including pending standings, resumed match, finalization, and historical Scoresheet.
+6. Implement Section 2.7 and the connected 2.1–2.6/2.8 fields needed for enforcement: coach selection, per-player/per-set allowance, NR tier, remaining count/status check, timeout reason, opponent acknowledgement, one-minute period, warning, repeat violation, and ball-in-hand penalty. Masters remains zero. Do not ask the user for settled limits.
+7. Run focused tests plus full Vitest/build/SQL-access CI. Perform an end-to-end acceptance pass for all three formats and normal/forfeit/makeup match paths. Only then mark the scoring/forfeit/scorekeeping phase Verified.
+
+**Phase 1 acceptance gate:** A match can be scored correctly in all three formats; regular and postseason forfeits produce exact rulebook points; team-match timing/forfeit exceptions are accounted for; all required scoresheet fields are available through the app or the explicitly retained paper process; no simultaneous-finish winner prompt exists; makeup/unplayed-set points and rating adjustments are correct; timeout allowances and penalties are enforced.
+
+### Phase 2 — Postseason eligibility and multi-team/certification (Sections 5.7–5.9, related 4.5)
+1. Verify the official playoff eligibility report parser, week/date matching, player-number linking, import history, duplicate handling, and roster attachment.
+2. Make missing/unmatched/stale eligibility visibly **Unverified** with a warning; do not silently treat it as confirmed eligible and do not automatically block it. Known official ineligible codes continue to gate selection.
+3. Validate the official code mapping and the user's settled thresholds/new-player/forfeit-credit decisions against the source report. Do not calculate a competing eligibility result.
+4. Audit Section 5.8 tournament time-slot conflicts, player-versus-self restriction, first/second/third-set rule, delayed-set queue, no-withdrawal-after-matchup, TD decision, and stalling warning.
+5. Audit/build Section 5.9 certification return, baseline rating snapshot, post-season rating movement thresholds (+15/+40 potential; +20/+60 automatic), potential-DQ investigation/neutral appeal, and automatic-DQ behavior.
+6. Verify Section 4.5 one-team-per-division/season restriction and tournament two-team/two-event limit against multi-team memberships.
+7. Verify live data population and freshness for `player_playoff_eligibility` and Section 82 counters; no rows means no eligibility data can be claimed as loaded.
+
+**Phase 2 acceptance gate:** Official import is the only eligibility authority; unknown data is visibly Unverified; known ineligible players cannot be selected; multi-team tournament conflicts and certification rules are either implemented or explicitly assigned to a documented manual/TD process.
+
+### Phase 3 — Roster, schedule, makeup, and match administration (Sections 4.1–4.3, 8.1–8.8)
+1. Complete Section 8.1 beyond the Week 6 cutoff: survival-only changes, six-player cap, final four-week freeze, postseason freeze, and manager extreme-circumstance exception.
+2. Audit Section 8.3 illegal substitution consequences and the evidence/manager workflow beyond identity-link security.
+3. Audit Sections 8.2/8.4 table choice, one/two-table timing, schedule publication, TBA conversion, BYE rotation, and incomplete-cycle average points.
+4. Implement or explicitly manualize Section 8.5 deadlines, five-day office notice, no-agreement consequences, and makeup suspension/resumption.
+5. Audit Section 8.6 weather emergency and holiday notice requirements.
+6. Ask the user for build-vs-manual decisions on dropped teams (8.7) and replacement teams (8.8), then record and implement only the agreed path.
+7. Reconcile team/division limits and captain responsibilities in Sections 4.1–4.3 with current season/schedule/roster workflows.
+
+**Phase 3 acceptance gate:** Captains/managers cannot make prohibited roster changes; permitted exceptions are manager-controlled; schedule/byes and table-choice requirements are correctly represented; makeups and team changes follow deadlines and approval rules.
+
+### Phase 4 — Standings, playoffs, MVP, and regional/tournament administration (Sections 5.1–5.6, 5.10–5.14, 5.11–5.12)
+1. Verify regular standings, playoff seeding, division brackets, consolation cross-division brackets, seasonal tournament qualification, seeding, and byes.
+2. Verify official standings/MVP imports and positions; retain the completed 5.5 tie-break audit support without overriding IBA's published positions.
+3. Finish Section 5.6 formula/forfeit-win handling and top-15 invitation eligibility audit.
+4. Audit sudden-death match completion, postseason forfeit scoring, TD-specific scoring/shot calls/stopwatch, tournament rules sheet, and practice penalties.
+5. Decide whether to build regional team ranking/prize eligibility and regional singles eligibility/flight seeding. Preserve the user's season-reset override for regional ranking.
+6. Decide which TD decisions, appeals, and tournament incidents are stored in the app versus kept in official paper/League Office records.
+
+**Phase 4 acceptance gate:** Official standings and MVP positions remain authoritative; all qualification/seeding calculations are reproducible and testable; tournament-only exceptions are either supported or documented as manual with an accountable role.
+
+### Phase 5 — Coaching, general play, and sportsmanship (remaining Sections 1–3, 4.4)
+1. Audit Sections 1.1–1.22 clause by clause. Classify each as app support, referee/player process, or manual; only build digital behavior when it improves required scoring, warning, or evidence capture.
+2. Complete coaching rules 2.1–2.9 not already closed in Phase 1, including selected coach restrictions and coaching-violation handling.
+3. Review sportsmanship 3.1–3.6 and ask the user for decisions on incident logs, evidence, penalties, and appeals. Preserve League Office/neutral committee authority.
+4. Close the Section 4.4 coach role and its relationship to roster membership.
+
+**Phase 5 acceptance gate:** Every general-play/coaching/sportsmanship clause has an explicit app/import/manual disposition; any required warning or incident data is captured without trying to automate subjective referee/management judgment.
+
+### Phase 6 — Financial rules (Section 9)
+1. Review each fee/dues/deposit/returned-check/prize-hold requirement with the user.
+2. Decide which financial facts, if any, should be tracked in the app versus external accounting/League Office records.
+3. Implement only the agreed scope with role protection and auditable history.
+
+**Phase 6 acceptance gate:** Each financial clause has an explicit owner and record location; no fee or payment workflow is assumed or built without user approval.
+
+### Final completion gate — whole rulebook
+- Every clause in Sections 1–9 has a final status of Verified, Import-only, or Manual process — agreed (or a clearly documented exception/decision).
+- No clause remains Not audited, Gap, Partial, Deferred, or Decision needed.
+- Every implementation has tests and a merged PR; every required SQL migration is confirmed applied; live data/import checks are recorded; manual responsibilities are documented.
+- The user receives a final rulebook-to-app coverage report with remaining operational limitations, not just a list of merged PRs.
+
+## 6. Data-entry and import inventory
+
+| Rule area | Required information / source | Current position and remaining work |
+|---|---|---|
+| Match setup / 1.1–1.3 | Scheduled time, home/away, table selection, coin flip, lag/break order, put-up sequence | Schedule and coin-flip/put-up code exist; audit the remaining rule fields and whether table/lag are manual. |
+| Scoring / 6.1–6.8 | Format, player identity/number, rating, per-game points, innings, safeties, set winner, ratings used, forfeit status/points | Core live state and scoring exist; finish full validation and Section 6.11 identifier display/persistence audit. |
+| Coaching / 2.1–2.9 | Coach identity, roster membership, time-out reason, count, duration, acknowledgement, warnings, violations, BIH penalty | Timeout marker only today; fields/workflow are a Phase 1 gap. |
+| Forfeits / 6.4–6.6 | Forfeiting side, both listed players, player present/unused status, match start time, elapsed 15/30/45 minutes, emergency allowance, forfeit points | Individual set forfeit exists; team-match timing/exception workflow remains to audit/build. |
+| Makeup / 6.9–6.10 and 8.5 | Agreement, reason, date, office notice date, sets completed/unplayed, ratings at play time | Pending/resume/confirm flow exists; deadline and office-notice capture remain open or paper/manual by decision. |
+| Eligibility / 5.7 | Official code, player number, report week/date, membership application status, team history, calculated-score evidence, special forfeit credit | Official import parser/storage/attachment exists; missing/unmatched warning and live population/freshness verification remain. |
+| Multi-team / 4.5, 5.8 | Active team/event memberships, division/season, event/time slot, set order, delayed set, TD ruling | Membership model exists; tournament conflict enforcement remains. |
+| Certification / 5.9 | Certification returned/signed/date, baseline ratings, later ratings, team total, investigation, appeal | No complete workflow identified. |
+| Standings/MVP / 5.1–5.6 | Official positions, team points, sets, opponent totals, MVP points/wins/losses, tie-break evidence | Official positions and audit helpers exist; finish data completeness/edge-case audit. |
+| Regional / 5.11–5.12 | Seasonal rosters, common players, match counts, ranking points, points/set average, singles score/match/season thresholds, flight rating | No complete ledger/workflow identified; user decision required. |
+| Roster / 8.1 | Effective week/date, add/drop, reason, roster size, survival eligibility, manager exception, postseason freeze | Week 6 cutoff foundation exists; remaining restrictions/exception open. |
+| Scheduling / 8.2, 8.4–8.6 | Table choice, one/two-table request time, schedule version, BYE cycle, makeup date, notice, weather declaration, holiday notice | Schedule infrastructure exists; clause audit and workflow gaps remain. |
+| Dropped/replacement teams / 8.7–8.8 | Manager adjustment decision, affected match history/points, replacement team, inherited points, makeup entitlement | User decision needed; do not assume a calculation. |
+| Conduct / 1.22, 2, 3, 5.10, 5.13–5.14 | Warning, player/team, incident, time, referee/TD, penalty, evidence, appeal | No complete workflow identified; decide app vs League Office/manual. |
+| Finance / 9.1–9.9 | Membership dues, renewal exception, sanction fees, team deposit, weekly fees, unpaid roster members, returned checks, prize holds | No app scope assumed; user decision needed. |
+| Paper scorekeeping / 6.11 | Table size, League Office message, both captain signatures, independent team scoresheet | Retained on paper by user decision; digital confirmation is not a signature. |
+
+## 7. Specific verification cautions
+
+- **Section 6.6 source table:** the available extracted text of the supplied rulebook has a blank after the Section 6.6 heading, likely because the values are in a table/image. The current code/tests contain values listed above. Do not mark 6.6 fully verified until the original page/table is checked.
+- **Section 6.7 winner inference:** PR #129's stated intent is automatic last-game winner. Current helper code compares recorded per-game point totals and has a `tiebreak` fallback for equal totals. Verify valid game scoring always differentiates the winner; if not, use the correct existing game-result data to determine it without asking the scorekeeper.
+- **Section 5.7 live data:** the eligibility parser and table exist, but a previous read-only check found no rows. Recheck imports before testing eligibility UI.
+- **Section 6.11 identifiers:** player number is carried in live selected-player data but omitted from Scoresheet's display model; team number is not displayed. Verify whether team number is present in the completed-match record and whether both identifiers survive the archive path before changing schema.
+- **Section 2.7:** Open/Advanced timeout chips are data markers only; Masters has no chips. This is partial support, not enforcement.
+- **Section 8.1:** Section 76's Week 6 cutoff is a foundation, not proof of full Section 8.1 compliance.
+- **Section 5.5:** tie-break audit tools are not the authoritative standings/MVP result; imported IBA positions are.
+- **CI:** a passing CI run verifies the tested commit, not interactive production behavior, SQL application, imported row population, or paper responsibilities.
+
+## 8. CI, SQL, and closure checklist
+
+For every implementation PR:
+- [ ] PR is focused on the current phase and references the exact rule clauses.
+- [ ] Acceptance criteria cover each rulebook requirement and relevant formats/roles/edge cases.
+- [ ] Automated tests cover normal, boundary, missing-data, and regression scenarios.
+- [ ] Latest PR-head required CI checks pass: tests, production build, Supabase SQL-access guard.
+- [ ] Any SQL file is included in the PR; new public tables include RLS and least-privilege grants.
+- [ ] User applies SQL manually and confirms; verify expected live schema/data read-only when appropriate.
+- [ ] User reviews and merges; do not merge on the user's behalf.
+- [ ] Merge commit CI is checked.
+- [ ] Live workflow/role verification is performed where possible; limitations are stated.
+- [ ] This master plan is updated with PR, SQL, test, data, and verification evidence.
+
+## 9. Cross-chat continuation prompt
+
+> Continue the IBA Pool League App rulebook audit using `docs/rulebook-audit/MASTER-PLAN.md` from current `main` as the single source of truth. First reconcile main SHA, PRs, latest CI, exact rulebook text, and the active Supabase project. Do not repeat verified audits or ask for settled decisions. Resume the earliest incomplete task in the priority queue. Keep the plan updated in the same focused PR as work proceeds. Do not move to a later phase until the current phase's acceptance gate is met.
