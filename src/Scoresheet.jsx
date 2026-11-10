@@ -8,7 +8,7 @@ const TEAM_RATING_LIMIT = 325; // only used in open/advanced
 // playerA = home, playerB = away (arbitrary but consistent -- the original
 // prototype's "top row / bottom row" convention mattered for matching a
 // physical scanned scoresheet; for a computed view it doesn't).
-function toDisplaySets(match) {
+export function toDisplaySets(match) {
   const venue = match.venue || "—";
   return (match.state?.sets ?? [])
     .filter(s => s.complete && s.playerHome && s.playerAway)
@@ -16,8 +16,8 @@ function toDisplaySets(match) {
       if (s.forfeited) {
         return {
           setNum: s.setNum, venue,
-          playerA: { name: s.playerHome.name, rating: s.playerHome.rating ?? 0, team: "home" },
-          playerB: { name: s.playerAway.name, rating: s.playerAway.rating ?? 0, team: "away" },
+          playerA: { name: s.playerHome.name, num: s.playerHome.num ?? null, rating: s.playerHome.rating ?? 0, team: "home" },
+          playerB: { name: s.playerAway.name, num: s.playerAway.num ?? null, rating: s.playerAway.rating ?? 0, team: "away" },
           racks: [], finalA: 0, finalB: 0,
           winnerSide: s.winnerSlot === "home" ? "a" : s.winnerSlot === "away" ? "b" : null,
           source: match.source,
@@ -36,8 +36,8 @@ function toDisplaySets(match) {
       return {
         setNum: s.setNum,
         venue,
-        playerA: { name: s.playerHome.name, rating: s.playerHome.rating ?? 0, team: "home" },
-        playerB: { name: s.playerAway.name, rating: s.playerAway.rating ?? 0, team: "away" },
+        playerA: { name: s.playerHome.name, num: s.playerHome.num ?? null, rating: s.playerHome.rating ?? 0, team: "home" },
+        playerB: { name: s.playerAway.name, num: s.playerAway.num ?? null, rating: s.playerAway.rating ?? 0, team: "away" },
         racks,
         finalA: runA,
         finalB: runB,
@@ -156,6 +156,7 @@ function FrontSheetSet({ set }) {
         <div className={headerClass}>
           <div className="rack-grid__player-header-inner">
             <span className="rack-grid__player-name">{player.name}</span>
+            <span className="rack-grid__player-number">#{player.num ?? "—"}</span>
             <span className="rack-grid__player-rating">Rated {player.rating}</span>
           </div>
         </div>
@@ -396,7 +397,8 @@ export default function Scoresheet({ match, onClose }) {
       <button className="scoresheet-close" onClick={onClose}><X size={14}/> Back to History</button>
       {makeupBanner}
       <div className="app__header">
-        <div className="app__header-meta">{match.venue || "—"} · {match.week_num ? `Week ${match.week_num}` : match.week_date || ""} · {isMasters ? "IBA Masters Format" : "IBA Advanced Format"}</div>
+        <div className="app__header-meta">{match.venue || "—"} · {match.week_num ? `Week ${match.week_num}` : match.week_date || ""} · {isMasters ? "IBA Masters Format" : match.format === "open" ? "IBA Open Format" : "IBA Advanced Format"}</div>
+        <div className="app__header-teams">{match.state?.teamHome?.teamNum ? `Team ${match.state.teamHome.teamNum}` : "Team number unavailable"} <span className="vs-sm">vs</span> {match.state?.teamAway?.teamNum ? `Team ${match.state.teamAway.teamNum}` : "Team number unavailable"}</div>
         <div className="app__header-title">{match.team_home_name} <span className="vs-sm">vs</span> {match.team_away_name}</div>
       </div>
       <div className="view-toggle">
