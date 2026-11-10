@@ -1,6 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { computeStandings, computeOfficialStandings } from "../src/db.js";
 
+describe("official standings source precedence", () => {
+  it("uses imported cumulative totals and official report positions without adding app matches", () => {
+    const appMatches = [{ team_home_id:"t1", team_home_name:"A", team_away_id:"t2", team_away_name:"B", team_home_total:3, team_away_total:2, team_home_points:500, team_away_points:400, is_makeup_pending:false }];
+    const official = computeOfficialStandings([{team_id:"t1",team_name:"A",total_points:1200,position:2},{team_id:"t2",team_name:"B",total_points:1400,position:1}]);
+    expect(computeStandings(appMatches, []).find(x=>x.teamId==="t1").totalPoints).toBe(500);
+    expect(official.map(x=>x.teamId)).toEqual(["t2","t1"]);
+    expect(official.find(x=>x.teamId==="t1")).toMatchObject({totalPoints:1200,rank:2});
+  });
+});
+
 describe("computeStandings", () => {
   it("computes wins/losses/sets/points for both teams from a single match", () => {
     const matches = [{
