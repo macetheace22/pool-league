@@ -122,7 +122,7 @@ describe("IBA parsers", () => {
       "Team 15102 Team Two",
       "Twin City Billiards",
       "106 12345 7 3 Player One",
-    ].join("\\n"));
+    ].join("\n"));
 
     expect(result.registry["12345"].teamCounters).toEqual({
       "15101": { matchesPlayed: 4, matchesWon: 2 },
