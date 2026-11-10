@@ -107,7 +107,7 @@ function parseStandingsImport(raw) {
     }
     if (teamNum && teamName) rows.push({ teamNum, teamName, pointsLastWk, totalPoints, setsPlayed });
   }
-  if (rows.length) return rows;
+  if (rows.length) return rows.map((row, index) => ({ ...row, position: index + 1 }));
 
   // Current IBA DIV PDFs may extract each cell on its own line. The final
   // token joins points-last-week (in tenths) and sets played, e.g. 95924 = 95.9, 24.
@@ -125,7 +125,7 @@ function parseStandingsImport(raw) {
     compactRows.push({ teamNum, teamName, pointsLastWk, totalPoints, setsPlayed });
     i += 4;
   }
-  return compactRows;
+  return compactRows.map((row, index) => ({ ...row, position: index + 1 }));
 }
 // MVP Standings report: Plyr# <tab> Player Name <tab> Team# <tab> Sets Won
 // <tab> Sets Lost <tab> Points Scored <tab> Total MVP Ranking Points. The
@@ -179,7 +179,7 @@ function parseMvpImport(raw) {
     }
     if (parsed) rows.push(parsed);
   }
-  return rows;
+  return rows.map((row, index) => ({ ...row, position: index + 1 }));
 }
 // ─── Bulk league roster parser (IBA PDF format) ───────────────────────────────
 // Handles multiple known "pasted from PDF viewer" layouts. Each layout is

@@ -3,14 +3,23 @@ import { parseLeagueRoster, parseStandingsImport, parseMvpImport } from "../src/
 
 describe("IBA parsers", () => {
   it("keeps standings compatible with tab-delimited paste and supports PDF space extraction", () => {
-    expect(parseStandingsImport("15101\tRoom 40\t10\t123\t15\t8.20")[0]).toMatchObject({ teamNum:"15101", teamName:"Room 40", totalPoints:123, setsPlayed:15 });
+    expect(parseStandingsImport("15101\tRoom 40\t10\t123\t15\t8.20")[0]).toMatchObject({ teamNum:"15101", teamName:"Room 40", totalPoints:123, setsPlayed:15, position:1 });
     expect(parseStandingsImport("15101 Room 40 10 123 15 8.20")[0]).toMatchObject({ teamNum:"15101", teamName:"Room 40", totalPoints:123, setsPlayed:15 });
     expect(parseStandingsImport("76A01 Eliminators 10 123 15 8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators", totalPoints:123, setsPlayed:15 });
     expect(parseStandingsImport("76A01\tEliminators\t10\t123\t15\t8.20")[0]).toMatchObject({ teamNum:"76A01", teamName:"Eliminators" });
   });
 
+  it("assigns official team positions by the order of rows in a standings report", () => {
+    const rows = parseStandingsImport([
+      "15103\tFirst Place\t959\t2752\t24",
+      "15101\tSecond Place\t302\t2143\t25",
+      "15102\tThird Place\t100\t1800\t20",
+    ].join("\n"));
+    expect(rows.map(row => row.position)).toEqual([1, 2, 3]);
+  });
+
   it("keeps MVP compatible with tab-delimited paste and supports PDF space extraction", () => {
-    expect(parseMvpImport("12345\tBilly Macy\t15101\t4\t1\t250\t1050")[0]).toMatchObject({ playerNum:"12345", teamNum:"15101", wins:4, losses:1 });
+    expect(parseMvpImport("12345\tBilly Macy\t15101\t4\t1\t250\t1050")[0]).toMatchObject({ playerNum:"12345", teamNum:"15101", wins:4, losses:1, position:1 });
     expect(parseMvpImport("12345 Billy Macy 15101 4 1 250 1050")[0]).toMatchObject({ playerNum:"12345", playerName:"Billy Macy", teamNum:"15101", wins:4, losses:1 });
     expect(parseMvpImport("12345 Billy Macy 76A01 4 1 250 1050")[0]).toMatchObject({ playerNum:"12345", playerName:"Billy Macy", teamNum:"76A01", wins:4, losses:1 });
   });
@@ -52,16 +61,16 @@ describe("IBA parsers", () => {
   it("parses current compact DIV PDF cells with tenths and sets played joined", () => {
     const raw = ["Fall Season 2026", "Week", "6", "Wed (BCA/VNEA)TCB Masters", "Team", "Points / Set", "Team Name", "Total PointsPoints Last WkSets Plyd", "15103", "115", "T.C.'s", "2752", "95924", "15101", "86", "Scotty Doesn't Know", "2143", "30225", "Division Standings", "Printed: 10/9/2026"].join("\n");
     expect(parseStandingsImport(raw)).toEqual([
-      { teamNum:"15103", teamName:"T.C.'s", pointsLastWk:959, totalPoints:2752, setsPlayed:24 },
-      { teamNum:"15101", teamName:"Scotty Doesn't Know", pointsLastWk:302, totalPoints:2143, setsPlayed:25 }
+      { teamNum:"15103", teamName:"T.C.'s", pointsLastWk:959, totalPoints:2752, setsPlayed:24, position:1 },
+      { teamNum:"15101", teamName:"Scotty Doesn't Know", pointsLastWk:302, totalPoints:2143, setsPlayed:25, position:2 }
     ]);
   });
 
   it("parses compact current MVP PDF rows and preserves player-number zeroes", () => {
     const raw = ["Plyr # Player Name Team Sets Won Total MVP Ranking Points Sets Lost Points Scored", "00609 Scott Peterson15103415200720", "27585 Mike Quackenbush15103414371837", "MVP Standings"].join("\n");
     expect(parseMvpImport(raw)).toEqual([
-      { playerNum:"00609", playerName:"Scott Peterson", teamNum:"15103", wins:4, losses:0, pointsScored:720, mvpRankingPoints:1520 },
-      { playerNum:"27585", playerName:"Mike Quackenbush", teamNum:"15103", wins:4, losses:1, pointsScored:837, mvpRankingPoints:1437 }
+      { playerNum:"00609", playerName:"Scott Peterson", teamNum:"15103", wins:4, losses:0, pointsScored:720, mvpRankingPoints:1520, position:1 },
+      { playerNum:"27585", playerName:"Mike Quackenbush", teamNum:"15103", wins:4, losses:1, pointsScored:837, mvpRankingPoints:1437, position:2 }
     ]);
   });
 
