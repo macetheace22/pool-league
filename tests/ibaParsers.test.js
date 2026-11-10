@@ -51,6 +51,9 @@ describe("IBA parsers", () => {
     expect(result.teams["15201"].name).toBe("No Bull");
     expect(result.rosters["15101"]).toEqual(["34240", "14768", "25953"]);
     expect(result.registry["34240"]).toMatchObject({ name: "Marier, Dave", rating: 105 });
+    expect(result.registry["34240"]).toMatchObject({ matchesPlayed: 4, matchesWon: 2 });
+    expect(result.registry["14768"]).toMatchObject({ matchesPlayed: 2, matchesWon: 1 });
+    expect(result.registry["25953"]).toMatchObject({ matchesPlayed: 0, matchesWon: 0 });
     expect(result.registry["14768"]).toMatchObject({ name: "Barrett, Scott", rating: 116 });
     expect(result.registry["25953"]).toMatchObject({ name: "Stewart, Ryan", rating: 73 });
     expect(result.registry["13102"]).toMatchObject({ name: "Johnson, Loren", nickname: "Smooth", rating: 88 });
@@ -85,6 +88,7 @@ describe("IBA parsers", () => {
     expect(result.teams["15101"]).toMatchObject({ name:"Scotty Doesn't Know", location:"Twin City Billiards" });
     expect(result.teams["15102"]).toMatchObject({ name:"Damn It", location:"Twin City Billiards" });
     expect(result.registry["34240"]).toMatchObject({ name:"Marier, Dave", num:"34240", rating:105 });
+    expect(result.registry["34240"]).toMatchObject({ matchesPlayed:4, matchesWon:2 });
     expect(result.registry["14768"]).toMatchObject({ name:"Barrett, Scott", num:"14768", rating:116 });
     expect(result.registry["22774"]).toMatchObject({ name:"Norberg, Scott", nickname:"304", rating:79 });
     expect(result.registry["25953"]).toMatchObject({ name:"Stewart, Ryan", rating:73 });
