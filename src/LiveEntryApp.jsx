@@ -8,6 +8,7 @@ import { useAuth } from "./AuthContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import { mergeLiveMatchState } from "./liveMatchSync";
 import { useActiveSession } from "./ActiveSessionContext";
+import { detectSetWinner } from "./setWinner";
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -47,24 +48,6 @@ function effectiveTarget(player, otherPlayer, format) {
   return player.rating;
 }
 
-function detectWinner(racks, playerHome, playerAway, format) {
-  if (playerHome?.rating == null || playerAway?.rating == null) return null;
-  const targetHome = effectiveTarget(playerHome, playerAway, format);
-  const targetAway = effectiveTarget(playerAway, playerHome, format);
-  let runH = 0, runA = 0;
-  for (const r of racks) {
-    runH += r.home ?? 0;
-    runA += r.away ?? 0;
-    const hDone = runH >= targetHome;
-    const aDone = runA >= targetAway;
-    // If a single rack pushes both players past their targets at once, the
-    // winner is whoever won that specific rack -- not just the higher total.
-    if (hDone && aDone) return (r.home > r.away ? "home" : r.away > r.home ? "away" : r.tiebreak ?? "home");
-    if (hDone) return "home";
-    if (aDone) return "away";
-  }
-  return null;
-}
 
 async function loadMatch(pairingId) {
   try { return await db.getLiveMatch(pairingId); }
@@ -980,6 +963,7 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   const TIMEOUTS_ENABLED = match.format === "open" || match.format === "advanced";
   const [homeVal, setHomeVal] = useState("");
   const [awayVal, setAwayVal] = useState("");
+  const [gameWinner, setGameWinner] = useState("");
   const [inningsVal, setInningsVal] = useState("");
   const [timeoutHome, setTimeoutHome] = useState(false);
   const [timeoutAway, setTimeoutAway] = useState(false);
@@ -994,7 +978,7 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   const runAway = runningTotal(set.racks, "away");
   const safHome = safetyTotal(set.racks, "home");
   const safAway = safetyTotal(set.racks, "away");
-  const winner = detectWinner(set.racks, set.playerHome, set.playerAway, match.format);
+  const winner = detectSetWinner(set.racks, set.playerHome, set.playerAway, match.format);
   const ratingH = set.playerHome.rating;
   const ratingA = set.playerAway.rating;
   const targetH = effectiveTarget(set.playerHome, set.playerAway, match.format);
@@ -1003,20 +987,23 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   const pctH = targetH ? Math.min(100, Math.round((runHome / targetH) * 100)) : 0;
   const pctA = targetA ? Math.min(100, Math.round((runAway / targetA) * 100)) : 0;
 
-  const canAdd = !set.complete && homeVal !== "" && awayVal !== "" && !isNaN(Number(homeVal)) && !isNaN(Number(awayVal));
+  const nextHome = runHome + (Number(homeVal) || 0);
+  const nextAway = runAway + (Number(awayVal) || 0);
+  const bothReachOnNextGame = nextHome >= targetH && nextAway >= targetA;
+  const canAdd = !set.complete && homeVal !== "" && awayVal !== "" && !isNaN(Number(homeVal)) && !isNaN(Number(awayVal)) && (!bothReachOnNextGame || gameWinner === "home" || gameWinner === "away");
 
   const addRack = () => {
-    const rack = { home: Number(homeVal), away: Number(awayVal), innings: Number(inningsVal) || 0, safetyHome: safHomeVal, safetyAway: safAwayVal, ...(TIMEOUTS_ENABLED && { timeoutHome, timeoutAway }) };
+    const rack = { home: Number(homeVal), away: Number(awayVal), ...(bothReachOnNextGame && { gameWinner }), innings: Number(inningsVal) || 0, safetyHome: safHomeVal, safetyAway: safAwayVal, ...(TIMEOUTS_ENABLED && { timeoutHome, timeoutAway }) };
     const newRacks = [...set.racks, rack];
-    const newWinner = detectWinner(newRacks, set.playerHome, set.playerAway, match.format);
+    const newWinner = detectSetWinner(newRacks, set.playerHome, set.playerAway, match.format);
     onUpdateSet({ ...set, racks: newRacks, winnerSlot: newWinner, complete: newWinner !== null });
-    setHomeVal(""); setAwayVal(""); setInningsVal(""); setTimeoutHome(false); setTimeoutAway(false); setSafHomeVal(0); setSafAwayVal(0);
+    setHomeVal(""); setAwayVal(""); setGameWinner(""); setInningsVal(""); setTimeoutHome(false); setTimeoutAway(false); setSafHomeVal(0); setSafAwayVal(0);
   };
 
   const removeLastRack = () => {
     if (set.racks.length === 0) return;
     const newRacks = set.racks.slice(0, -1);
-    const newWinner = detectWinner(newRacks, set.playerHome, set.playerAway, match.format);
+    const newWinner = detectSetWinner(newRacks, set.playerHome, set.playerAway, match.format);
     onUpdateSet({ ...set, racks: newRacks, winnerSlot: newWinner, complete: newWinner !== null });
   };
 
@@ -1067,6 +1054,15 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
               <input className="rack-entry-form__input" type="number" min={0} value={inningsVal} onChange={(e) => setInningsVal(e.target.value)} placeholder="0" />
             </div>
           </div>
+          {bothReachOnNextGame && (
+            <div className="field" role="group" aria-label="Winner of this game">
+              <label className="rack-entry-form__label">Both players reach their ratings in this game. Who won the game?</label>
+              <div className="seg-control">
+                <button type="button" className={`seg-btn ${gameWinner === "home" ? "seg-btn--active" : ""}`} onClick={() => setGameWinner("home")}>{set.playerHome.name}</button>
+                <button type="button" className={`seg-btn ${gameWinner === "away" ? "seg-btn--active" : ""}`} onClick={() => setGameWinner("away")}>{set.playerAway.name}</button>
+              </div>
+            </div>
+          )}
           <div className="safety-row">
             <SafetyStepper label={`${set.playerHome.name.split(" ")[0]} Saf.`} value={safHomeVal} onChange={setSafHomeVal} color="home" />
             <SafetyStepper label={`${set.playerAway.name.split(" ")[0]} Saf.`} value={safAwayVal} onChange={setSafAwayVal} color="away" />
