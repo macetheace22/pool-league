@@ -2042,14 +2042,15 @@ async function loadAllDivisionRows(table, columns, divisionId) {
 }
 
 export async function getRule55TieBreakAuditData(divisionId, teams) {
-  const [schedule, standingsHistory, counterSnapshots] = await Promise.all([
+  const [schedule, standingsHistory, counterSnapshots, matches] = await Promise.all([
     listSchedule(divisionId, teams),
     loadAllDivisionRows("standings_adjustments", "team_id, week_key, points_last_wk", divisionId),
     loadAllDivisionRows("iba_player_weekly_counters",
       "team_id, player_num, report_week, schedule_week_date, matches_played, matches_won, imported_at",
       divisionId),
+    listCompletedMatches(divisionId),
   ]);
-  return { schedule, standingsHistory, counterSnapshots };
+  return { schedule, standingsHistory, counterSnapshots, matches };
 }
 
 // Importing a new week always adds a new row per team (division_id, team_name,
