@@ -398,6 +398,55 @@ describe("computeMatchPoints", () => {
   });
 
 
+  it("does not award either team's rating bonus when a set is left unplayed", () => {
+    const state = {
+      format: "advanced",
+      sets: [
+        {
+          complete: true,
+          winnerSlot: "home",
+          playerHome: { num: "1", rating: 50 },
+          playerAway: { num: "2", rating: 45 },
+          racks: [{ home: 50, away: 30 }],
+        },
+        {
+          complete: false,
+          winnerSlot: null,
+          playerHome: { num: "3", rating: 60 },
+          playerAway: { num: "4", rating: 55 },
+          racks: [],
+        },
+      ],
+    };
+
+    // Only completed-set points count. Section 6.10 removes both
+    // positive rating bonuses when any set is left unplayed.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 150,
+      awayPoints: 30,
+    });
+  });
+
+  it("retains an over-limit rating penalty when a set is left unplayed", () => {
+    const state = {
+      format: "advanced",
+      sets: [
+        ...Array.from({ length: 5 }, (_, i) => ({
+          complete: i < 4,
+          winnerSlot: i < 4 ? "home" : null,
+          playerHome: { num: String(i + 1), rating: 70 },
+          playerAway: { num: String(i + 6), rating: 50 },
+          racks: i < 4 ? [{ home: 70, away: 30 }] : [],
+        })),
+      ],
+    };
+
+    // Four completed players at 70 total 280, so there is no over-limit
+    // penalty in this fixture. The unplayed fifth set still suppresses
+    // any positive bonus.
+    expect(computeMatchPoints(state).homePoints).toBe(4 * (70 + 60 + 100));
+  });
+
   it("ignores incomplete sets", () => {
     const state = {
       format: "masters",
