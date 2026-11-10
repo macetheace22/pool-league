@@ -12,8 +12,8 @@ export function effectiveSetTarget(player, otherPlayer, format) {
   return player?.rating ?? null;
 }
 
-// Each rack is one completed game. When both players reach their targets
-// during the same game, the winner of that final game wins the set.
+// Each rack is one completed 8-ball game. The game's recorded points include
+// the winner's game bonus, so the higher per-game score identifies its winner.
 export function detectSetWinner(games, playerHome, playerAway, format) {
   if (playerHome?.rating == null || playerAway?.rating == null) return null;
 
@@ -23,14 +23,18 @@ export function detectSetWinner(games, playerHome, playerAway, format) {
   let runAway = 0;
 
   for (const game of games ?? []) {
-    runHome += Number(game.home ?? 0);
-    runAway += Number(game.away ?? 0);
+    const pointsHome = Number(game.home ?? 0);
+    const pointsAway = Number(game.away ?? 0);
+    runHome += pointsHome;
+    runAway += pointsAway;
 
     const homeReached = runHome >= targetHome;
     const awayReached = runAway >= targetAway;
 
     if (homeReached && awayReached) {
-      return game.home > game.away ? "home" : game.away > game.home ? "away" : game.tiebreak ?? "home";
+      if (pointsHome > pointsAway) return "home";
+      if (pointsAway > pointsHome) return "away";
+      return game.tiebreak === "home" || game.tiebreak === "away" ? game.tiebreak : null;
     }
     if (homeReached) return "home";
     if (awayReached) return "away";
