@@ -1,6 +1,45 @@
 import { describe, it, expect } from "vitest";
 
-import { computeMatchPoints } from "../src/db.js";
+import { computeMatchPoints, computeForfeitPoints } from "../src/db.js";
+
+
+describe("computeForfeitPoints — Rule 6.6", () => {
+  it.each([
+    ["open", 125],
+    ["advanced", 150],
+    ["masters", 100],
+  ])("%s regular-season forfeit uses the rulebook value", (format, expected) => {
+    expect(computeForfeitPoints({ format, weekDate: "2026-03-01" }, 50)).toBe(expected);
+  });
+
+  it.each([
+    ["open", 50, 150],
+    ["open", 40, 140],
+    ["advanced", 50, 250],
+    ["masters", 50, 200],
+  ])("%s postseason forfeit uses the rulebook value", (format, rating, expected) => {
+    expect(computeForfeitPoints({
+      format,
+      weekDate: "2026-04-01",
+      playoffsStartDate: "2026-03-15",
+    }, rating)).toBe(expected);
+  });
+
+  it("classifies the playoff start date itself as postseason", () => {
+    expect(computeForfeitPoints({
+      format: "advanced",
+      weekDate: "2026-03-15",
+      playoffsStartDate: "2026-03-15",
+    }, 50)).toBe(250);
+  });
+
+  it("uses regular-season points when playoff start date is unavailable", () => {
+    expect(computeForfeitPoints({
+      format: "masters",
+      weekDate: "2026-04-01",
+    }, 50)).toBe(100);
+  });
+});
 
 describe("computeMatchPoints", () => {
 
