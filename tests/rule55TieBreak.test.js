@@ -7,8 +7,8 @@ const baseTeams = [
   { teamId: "c", name: "C", position: 3, totalPoints: 90 },
 ];
 const schedule = [
-  { week: 1, date: "9/1/2026", pairings: [{ homeTeamId: "a", awayTeamId: "b" }, { homeTeamId: "c", awayTeamId: "a" }] },
-  { week: 2, date: "9/8/2026", pairings: [{ homeTeamId: "a", awayTeamId: "c" }, { homeTeamId: "b", awayTeamId: "a" }] },
+  { week: 1, date: "9/1/2026", pairings: [{ homeTeamId: "a", awayTeamId: "b" }, { homeTeamId: "c", awayTeamId: "d" }] },
+  { week: 2, date: "9/8/2026", pairings: [{ homeTeamId: "a", awayTeamId: "c" }, { homeTeamId: "b", awayTeamId: "d" }] },
 ];
 
 describe("Rule 5.5 tie-break audit", () => {
@@ -31,7 +31,7 @@ describe("Rule 5.5 tie-break audit", () => {
     });
     expect(rows.find(row => row.teamId === "a")).toMatchObject({
       headToHeadPoints: 90,
-      pointsLost: 145,
+      pointsLost: 140,
       completeness: { headToHeadPoints: true, pointsLost: true },
     });
   });
