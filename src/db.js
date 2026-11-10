@@ -1458,6 +1458,9 @@ function teamRatingBonusPenalty(state, side) {
     return player ? sum + ratingForTeamTotal(player.rating, format) : sum;
   }, 0);
   const diff = TEAM_RATING_LIMIT - total;
+  // Rule 6.10: when a set is left unplayed, neither team receives a
+  // positive rating bonus. The over-limit rating penalty still applies.
+  if (diff >= 0 && (state.sets ?? []).some(s => !s.complete)) return 0;
   return diff >= 0 ? diff : -(Math.abs(diff) * 5);
 }
 
