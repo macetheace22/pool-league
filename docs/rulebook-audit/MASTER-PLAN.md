@@ -1,8 +1,8 @@
 # IBA Pool League App — Master Rulebook Audit & Implementation Plan
 
-Last reconciled: 2026-11-09 (local project date; GitHub timestamps may display the following UTC date)  
-Code baseline: `main` at `13687803f19d61bf53c94730a6cbcdc5ffa5fcf9` (PR #130 merge)  
-Documentation update: PR #131, branch `docs/rulebook-audit-continuity-6-11` (open; this revision expands it into the full audit register)
+Last reconciled: 2026-11-10 (local project date; GitHub timestamps may display the following UTC date)  
+Code baseline: `main` at `26d20dc81a2e18806a1a7d781593244f2257fd07` (PR #130 merge)  
+Documentation update: PR #131, branch `docs/rulebook-audit-continuity-6-11` (merged).
 
 This file is the single source of truth for rulebook scope, decisions, current implementation, outstanding audit, data entry/import needs, and delivery order. It is deliberately honest about what has and has not been checked: a complete inventory is not the same as a completed clause-by-clause audit.
 
@@ -70,7 +70,7 @@ This is the known baseline from merged PRs and prior user-confirmed SQL actions.
 | PR #128 — Division MVP Rule 5.5 tie-break audit | Merged. Audit/reconciliation support; official published ranking is not overwritten. |
 | PR #129 — Section 6.7 and pending-makeup correction | Merged. CI passed on final PR head and merge commit. Includes simultaneous-finish logic and pending-makeup rating treatment. One code-path verification item remains in the Section 6.7 register below. |
 | PR #130 — initial master audit plan | Merged. Established this document. |
-| PR #131 — continuity and full audit register | Open; documentation-only. This expanded version is being added to that PR. Do not treat it as merged until the user merges it. |
+| PR #131 — continuity and full audit register | Merged. Documentation-only master-plan expansion is now on `main`. |
 
 ### Database / SQL baseline
 
@@ -183,7 +183,7 @@ The register covers every numbered clause in the supplied rulebook. "Not audited
 | 6.8 | Team match totals and 325 rating limit; NR rating values | Core team scoring and 325 bonus/5x penalty exist in `db.js` and Scoresheet. Verify all five played/forfeited set combinations, NR=45 Open / 50 Advanced-Masters, Round Robin NR=75 exception, and that Masters is excluded from team rating adjustment. |
 | 6.9 | Make-up agreement/date; suspend bonus/penalty; ratings at time played | PR #129 passes pending-makeup state into rating adjustment; PR #122 related behavior. App records makeup reason/confirmation and pending status. Gap: score sheet's required makeup date and League Office notice are not digitally captured (paper decision may satisfy); audit deadline/notice rules under 8.5 separately. |
 | 6.10 | Unplayed sets when neither team has enough players; each gets points to date; no rating bonus | Implemented/tested in PR #122. Verify historical display and completed-vs-pending standings treatment. |
-| 6.11 | Independent team scorekeeping; required player/set fields; table size, League Office messages, signatures | Partial audit. Live Entry captures player/rating, per-game points, innings, safeties, timeout markers, and set result; Scoresheet derives per-game totals, total innings, safeties, winner bonus, and player totals. Player number is carried on selected player objects but is not displayed on the Scoresheet. Team number is not displayed on the Scoresheet; persistence/source path needs end-to-end verification. Table size and League Office messages are paper-back-of-sheet fields. Both captains' signatures remain paper/manual by user decision; digital confirmations are not signatures. Finish the field-by-field persistence/display audit, then add only the required digital identifiers/fields that are not already satisfied by the paper process. |
+| 6.11 | Independent team scorekeeping; required player/set fields; table size, League Office messages, signatures | Partial audit. Live Entry captures player/rating, per-game points, innings, safeties, timeout markers, and set result; Scoresheet derives per-game totals, total innings, safeties, winner bonus, and player totals. Player number is now displayed on the Scoresheet. Team number is now copied into new live-match state and displayed on the Scoresheet; older archived matches without the field show unavailable rather than guessing. Table size and League Office messages are paper-back-of-sheet fields. Both captains' signatures remain paper/manual by user decision; digital confirmations are not signatures. Finish the field-by-field persistence/display audit, then add only the required digital identifiers/fields that are not already satisfied by the paper process. |
 
 ### Section 7 — Rating System
 
@@ -232,7 +232,7 @@ This order closes scoring, forfeits, eligibility, and scorekeeping before moving
 3. Update this plan in the same PR as each material audit decision/status change, or a focused docs PR if implementation is separate.
 
 ### Phase 1 — Complete scoring, forfeits, coaching time-outs, and scorekeeping (Sections 6.1–6.11, then 2.7)
-1. Finish the 6.11 field-by-field map: player number, team number, ratings, safeties, points per game, innings per game, total innings, total points, winner bonus, player total, table size, League Office messages, and signatures. Confirm what is app data vs paper/manual by the already-settled scoresheet decision.
+1. Verify the completed 6.11 identifier implementation in acceptance: player number and team number persistence/display, plus existing ratings, safeties, points/game, innings/game, totals, winner bonus, and player totals. Table size, League Office messages, and captain signatures remain paper/manual by settled decision.
 2. Complete the 6.4–6.6 forfeit audit, especially Section 6.5's 15/30/45-minute team-forfeit schedule, emergency 15-minute allowance, lone-shooter path, no-show, and ordering/selection constraints. Validate Section 6.6's original rulebook value table against current code/tests.
 3. Close remaining 6.1–6.3 and 6.8 scoring edge cases across Open, Advanced, and Masters, including NR, rating percentage, margin, all forfeit combinations, and team-rating cap.
 4. Verify Section 6.7 simultaneous finish end-to-end. The last-game winner must be derived automatically; add coverage for any valid score representation edge case. No winner-selection prompt.
