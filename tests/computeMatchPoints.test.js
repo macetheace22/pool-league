@@ -450,6 +450,36 @@ describe("computeMatchPoints", () => {
     });
   });
 
+  it("suspends an over-limit penalty while a makeup is pending", () => {
+    const state = {
+      format: "advanced",
+      makeup: { confirmedHome: true, confirmedAway: true },
+      sets: [
+        ...Array.from({ length: 5 }, (_, i) => ({
+          complete: true,
+          winnerSlot: "home",
+          playerHome: { num: String(i + 1), rating: 90 },
+          playerAway: { num: String(i + 6), rating: 50 },
+          racks: [{ home: 90, away: 30 }],
+        })),
+        {
+          complete: false,
+          winnerSlot: null,
+          playerHome: { num: "11", rating: 50 },
+          playerAway: { num: "12", rating: 50 },
+          racks: [],
+        },
+      ],
+    };
+
+    // Home's completed put-ups total 450 (125 over 325), but Rule 6.9
+    // suspends both the positive adjustment and the over-limit penalty.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 950,
+      awayPoints: 150,
+    });
+  });
+
   it("applies rating adjustments when a pending makeup is finalized by converting remaining tables to forfeits", () => {
     const state = {
       format: "advanced",
