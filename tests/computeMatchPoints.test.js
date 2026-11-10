@@ -422,7 +422,7 @@ describe("computeMatchPoints", () => {
     // Only completed-set points count. Section 6.10 removes both
     // positive rating bonuses when any set is left unplayed.
     expect(computeMatchPoints(state)).toEqual({
-      homePoints: 150,
+      homePoints: 195,
       awayPoints: 30,
     });
   });
@@ -434,17 +434,20 @@ describe("computeMatchPoints", () => {
         ...Array.from({ length: 5 }, (_, i) => ({
           complete: i < 4,
           winnerSlot: i < 4 ? "home" : null,
-          playerHome: { num: String(i + 1), rating: 70 },
+          playerHome: { num: String(i + 1), rating: 90 },
           playerAway: { num: String(i + 6), rating: 50 },
-          racks: i < 4 ? [{ home: 70, away: 30 }] : [],
+          racks: i < 4 ? [{ home: 90, away: 30 }] : [],
         })),
       ],
     };
 
-    // Four completed players at 70 total 280, so there is no over-limit
-    // penalty in this fixture. The unplayed fifth set still suppresses
-    // any positive bonus.
-    expect(computeMatchPoints(state).homePoints).toBe(4 * (70 + 60 + 100));
+    // Four completed home players total 360: 35 over the 325 limit,
+    // producing a 175-point penalty. The incomplete fifth set is ignored.
+    // The away side's positive rating bonus is suppressed by Section 6.10.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 825,
+      awayPoints: 120,
+    });
   });
 
   it("ignores incomplete sets", () => {
