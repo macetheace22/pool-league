@@ -11,10 +11,10 @@ describe("IBA parsers", () => {
 
   it("assigns official team positions by the order of rows in a standings report", () => {
     const rows = parseStandingsImport([
-      "15103\\tFirst Place\\t959\\t2752\\t24",
-      "15101\\tSecond Place\\t302\\t2143\\t25",
-      "15102\\tThird Place\\t100\\t1800\\t20",
-    ].join("\\n"));
+      "15103\tFirst Place\t959\t2752\t24",
+      "15101\tSecond Place\t302\t2143\t25",
+      "15102\tThird Place\t100\t1800\t20",
+    ].join("\n"));
     expect(rows.map(row => row.position)).toEqual([1, 2, 3]);
   });
 
