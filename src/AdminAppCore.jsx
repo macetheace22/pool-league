@@ -2143,7 +2143,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
       setMatches(m); setStandingsAdj(sa); setMvpAdj(ma); setRule55AuditData(auditData); setLoading(false);
     });
   };
-  useEffect(refresh, [divisionId, isManager, teams]);
+  useEffect(refresh, [divisionId, isManager]);
 
   if (manualEntryOpen) {
     return (
