@@ -1946,6 +1946,7 @@ export async function importStandingsForWeek(divisionId, rows, teams, weekTag) {
     team_name: r.teamName,
     season_id: seasonId,
     points_last_wk: r.pointsLastWk, total_points: r.totalPoints, sets_played: r.setsPlayed,
+    position: r.position,
     week_key: weekTag.weekKey, label: weekTag.label,
   }));
   if (inserted.length === 0) return true;
@@ -1974,6 +1975,7 @@ export async function importMvpForWeek(divisionId, rows, weekTag) {
     player_name: r.playerName,
     team_num: r.teamNum,
     wins: r.wins, losses: r.losses, total_points: r.pointsScored, mvp_ranking_points: r.mvpRankingPoints,
+    position: r.position,
     season_id: seasonId, week_key: weekTag.weekKey, label: weekTag.label,
   }));
   if (inserted.length === 0) return true;
