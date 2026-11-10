@@ -254,7 +254,16 @@ function addPlayer(registry, rosters, teamId, num, fullName, rate, needsRating, 
   if (!hasRate) needsRating.push({ teamId, num, name: parsed.name, nickname: parsed.nickname, firstName, lastName });
   // Add the player either way -- even with no rating yet, they belong on this roster and
   // should show up in the admin panel (as "—") so the rating can be filled in by hand.
-  registry[num] = { num, name: parsed.name, nickname: parsed.nickname, rating: hasRate ? rate : null, firstName, lastName, matchesPlayed, matchesWon };
+  const prior = registry[num] ?? {};
+  registry[num] = {
+    ...prior,
+    num, name: parsed.name, nickname: parsed.nickname,
+    rating: hasRate ? rate : null, firstName, lastName, matchesPlayed, matchesWon,
+    teamCounters: {
+      ...(prior.teamCounters ?? {}),
+      [teamId]: { matchesPlayed, matchesWon },
+    },
+  };
   if (!rosters[teamId].includes(num)) rosters[teamId].push(num);
 }
 

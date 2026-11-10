@@ -399,9 +399,23 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       ambiguousRoster: (parsed.ambiguousRoster || []).filter(item => eligiblePlayerNums.has(item.playerNum || item.num)),
     };
     if (!eligibleTeamNums.size) continue;
+    const weeklyCounterSnapshotsByDivision = Object.fromEntries(
+      checks.filter(check => check.status === "ready").map(check => {
+        const tag = preflight.weekTagsByReportDivision[`rost:${check.divisionId}`];
+        return [String(check.divisionId), {
+          seasonId: season.id,
+          reportWeek: check.weekNumber,
+          scheduleWeekDate: tag?.weekKey ?? null,
+          reportPrintedOnDate: check.reportPrintedOnDate,
+          contentSha256: report.sha256,
+          source: report.source === "manual" ? "manual" : "automatic",
+        }];
+      }),
+    );
     const imported = await db.bulkImportPlayers(filteredParsed, {
       byReportDivision: preflight.weekTagsByReportDivision,
       allowedDivisionIds: [...readyDivisionIds],
+      weeklyCounterSnapshotsByDivision,
       fallback: fallbackWeekTag,
     });
     result.roster.updatedDivisions.push(...(imported?.updatedDivisions || []));

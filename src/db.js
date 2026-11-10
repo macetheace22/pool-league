@@ -1188,11 +1188,67 @@ export async function recordIbaReportImportHistory(entry) {
   return { ok: true, data };
 }
 
+export function buildIbaPlayerWeeklyCounterRows(parsed, teamRows, snapshotsByDivision = {}, snapshotDefaults = {}) {
+  const teamByNum = Object.fromEntries((teamRows ?? []).map(team => [String(team.team_num), team]));
+  const candidates = [];
+  const divisionsWithCounters = new Set();
+
+  for (const [teamNum, playerNums] of Object.entries(parsed?.rosters ?? {})) {
+    const team = teamByNum[String(teamNum)];
+    if (!team) continue;
+    const divisionWeek = snapshotDefaults.reportWeeksByDivision?.[String(team.divisions?.num)]?.weekNumber;
+    const metadata = snapshotsByDivision[String(team.division_id)] ?? (
+      snapshotDefaults?.seasonId
+        ? { ...snapshotDefaults, reportWeek: divisionWeek ?? snapshotDefaults.reportWeek }
+        : null
+    );
+    if (!metadata?.seasonId || String(team.divisions?.seasons?.id ?? "") !== String(metadata.seasonId) || !Number.isInteger(Number(metadata.reportWeek)) || Number(metadata.reportWeek) < 1) continue;
+    const validHash = String(metadata.contentSha256 ?? "").toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(validHash)) continue;
+
+    for (const playerNum of playerNums) {
+      const player = parsed?.registry?.[playerNum];
+      if (!player) continue;
+      const counters = player.teamCounters?.[teamNum] ?? {
+        matchesPlayed: player.matchesPlayed ?? null,
+        matchesWon: player.matchesWon ?? null,
+      };
+      const matchesPlayed = counters.matchesPlayed == null ? null : Number(counters.matchesPlayed);
+      const matchesWon = counters.matchesWon == null ? null : Number(counters.matchesWon);
+      if ((matchesPlayed != null && (!Number.isInteger(matchesPlayed) || matchesPlayed < 0)) ||
+          (matchesWon != null && (!Number.isInteger(matchesWon) || matchesWon < 0)) ||
+          (matchesPlayed != null && matchesWon != null && matchesWon > matchesPlayed)) {
+        throw new Error(`Invalid IBA match counters for player ${playerNum} on team ${teamNum}.`);
+      }
+      if (matchesPlayed != null || matchesWon != null) divisionsWithCounters.add(String(team.division_id));
+      candidates.push({
+        season_id: metadata.seasonId,
+        division_id: team.division_id,
+        team_id: team.id,
+        team_num: String(team.team_num),
+        player_num: String(playerNum),
+        report_week: Number(metadata.reportWeek),
+        schedule_week_date: metadata.scheduleWeekDate || null,
+        report_printed_on_date: metadata.reportPrintedOnDate || null,
+        matches_played: matchesPlayed,
+        matches_won: matchesWon,
+        content_sha256: validHash,
+        source: metadata.source === "manual" ? "manual" : "automatic",
+      });
+    }
+  }
+
+  // No Play/Win columns means this is not a match-counter snapshot (e.g. a
+  // playoff eligibility-only report). When any counters exist for a division,
+  // retain other roster rows with nulls so missing OCR values are not zeroed.
+  return candidates.filter(row => divisionsWithCounters.has(String(row.division_id)));
+}
+
 export async function bulkImportPlayers(parsed, weekTag) {
   const teamNums = Object.keys(parsed.rosters ?? {});
   const { data: teamRows, error: teamLookupError } = await supabase
     .from("teams")
-    .select("id, division_id, team_num, divisions(format, day, seasons(is_active))")
+    .select("id, division_id, team_num, divisions(num, format, day, seasons(id, is_active))")
     .in("team_num", teamNums);
   if (teamLookupError) throw new Error(`Could not resolve roster teams: ${teamLookupError.message}`);
   const allowedDivisionIds = Array.isArray(weekTag?.allowedDivisionIds)
@@ -1264,6 +1320,23 @@ export async function bulkImportPlayers(parsed, weekTag) {
   if (rosterRows.length) {
     const { error } = await supabase.from("rosters").upsert(rosterRows, { onConflict: "team_id,player_num" });
     if (error) throw new Error(`Could not save roster assignments: ${error.message}`);
+  }
+
+  const weeklyCounterRows = buildIbaPlayerWeeklyCounterRows(
+    parsed,
+    Object.values(byNum),
+    weekTag?.weeklyCounterSnapshotsByDivision ?? {},
+    weekTag?.weeklyCounterSnapshotDefaults ?? {},
+  );
+  if (weeklyCounterRows.length) {
+    const { error } = await supabase.from("iba_player_weekly_counters").upsert(
+      weeklyCounterRows,
+      {
+        onConflict: "season_id,division_id,team_id,player_num,report_week,content_sha256",
+        ignoreDuplicates: true,
+      },
+    );
+    if (error) throw new Error(`Could not save imported IBA weekly match counters: ${error.message}`);
   }
 
   const updatedDivisions = Object.entries(byDivision).map(([divisionId, teamCount]) => ({ divisionId, teamCount }));
