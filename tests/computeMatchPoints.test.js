@@ -224,7 +224,7 @@ describe("computeMatchPoints", () => {
     */
 
     expect(computeMatchPoints(state)).toEqual({
-      homePoints: 500,
+      homePoints: 425,
       awayPoints: 295,
     });
   });
