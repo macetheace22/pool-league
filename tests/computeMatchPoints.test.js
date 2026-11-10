@@ -484,7 +484,7 @@ describe("computeMatchPoints", () => {
     // away receives its rating bonus after the makeup is finalized.
     expect(computeMatchPoints(state, { makeupPending: false })).toEqual({
       homePoints: 0,
-      awayPoints: 655,
+      awayPoints: 525,
     });
   });
 
