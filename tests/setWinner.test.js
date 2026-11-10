@@ -29,8 +29,8 @@ describe("detectSetWinner — Rule 6.7", () => {
 
   it("continues accumulating games until a target is reached", () => {
     expect(detectSetWinner([
-      { home: 25, away: 20 },
-      { home: 25, away: 25 },
+      { home: 30, away: 20 },
+      { home: 20, away: 25 },
     ], home, away, "advanced")).toBe("away");
   });
 
