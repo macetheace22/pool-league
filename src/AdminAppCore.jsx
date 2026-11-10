@@ -12,7 +12,7 @@ import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
 import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from "./Shell";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { parseStandingsImport, parseMvpImport, parseLeagueRoster } from "./ibaParsers";
+import { parseStandingsImport, parseMvpImport, parseLeagueRoster, extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision } from "./ibaParsers";
 import IbaAutoSyncPanel from "./IbaAutoSyncPanel";
 import IbaScheduleImportPanel from "./IbaScheduleImportPanel";
 // SetEntry is the exact same rack-by-rack (innings, safeties, timeouts)
@@ -465,8 +465,27 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   };
 
   // ── Players / rosters / ratings ──
-  const handleBulkImport = async (parsed) => {
+  const handleBulkImport = async (parsed, rawReportText = "") => {
     const weekTag = currentWeekTag(viewSchedule);
+    if (rawReportText && viewingSeason?.id) {
+      const reportWeek = extractIbaReportWeek(rawReportText);
+      const reportWeeksByDivision = extractIbaReportWeeksByDivision(rawReportText).byDivision;
+      let contentSha256 = null;
+      if (globalThis.crypto?.subtle && globalThis.TextEncoder) {
+        const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawReportText));
+        contentSha256 = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+      }
+      if (contentSha256) {
+        weekTag.weeklyCounterSnapshotDefaults = {
+          seasonId: viewingSeason.id,
+          reportWeek: reportWeek.weekNumber,
+          reportWeeksByDivision,
+          reportPrintedOnDate: extractIbaReportPrintedOnDate(rawReportText),
+          contentSha256,
+          source: "manual",
+        };
+      }
+    }
     const result = await db.bulkImportPlayers(parsed, weekTag);
     await refreshCurrentDivision();
     return result;
@@ -4882,7 +4901,7 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
     }
     const finalParsed = { ...parsed, rosters: finalRosters };
 
-    const result = await onBulkImport(finalParsed);
+    const result = await onBulkImport(finalParsed, raw);
     setImportResult(result);
     setSaved(true); setTimeout(()=>setSaved(false),1800);
     setPasteMode(false); setRaw(""); setParsed(null); setAmbiguousOverrides({});
