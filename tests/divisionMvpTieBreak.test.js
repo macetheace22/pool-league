@@ -86,6 +86,20 @@ describe("Division MVP Rule 5.5 tie-break audit", () => {
     expect(result[0].outcome).toBe("single-set-playoff-required");
   });
 
+  it("does not apply the opponent-rating rule when head-to-head scoring is incomplete", () => {
+    const result = buildDivisionMvpTieBreakAudit({
+      officialMvp,
+      schedule,
+      matches: [match([{
+        complete: true, forfeited: false, winnerSlot: "home",
+        playerHome: { num: "11111", rating: 40 },
+        playerAway: { num: "22222", rating: 40 },
+        racks: [],
+      }])],
+    });
+    expect(result[0].outcome).toBe("insufficient-data");
+  });
+
   it("requires the single-set playoff when neither numeric tie-break resolves the tie", () => {
     const result = buildDivisionMvpTieBreakAudit({
       officialMvp,
