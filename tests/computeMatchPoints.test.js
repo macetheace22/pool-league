@@ -181,7 +181,7 @@ describe("computeMatchPoints", () => {
   });
 
 
-  it("open format: unrated player forces both players to the fixed target", () => {
+  it("open format: unrated player uses the fixed target but does not receive margin-of-victory points", () => {
     const state = {
       format: "open",
 
@@ -205,10 +205,9 @@ describe("computeMatchPoints", () => {
       target of 45.
 
       Away run = 20
-      Margin = 45 - 20 = 25
-      Add-on = 25 * 3 = 75
+      Open scoring does not award margin-of-victory points.
 
-      Home = 45 + 75 + 100 = 220
+      Home = 45 + 100 = 145
       Away = 20
 
       Team ratings:
@@ -225,7 +224,7 @@ describe("computeMatchPoints", () => {
     */
 
     expect(computeMatchPoints(state)).toEqual({
-      homePoints: 500,
+      homePoints: 425,
       awayPoints: 295,
     });
   });
