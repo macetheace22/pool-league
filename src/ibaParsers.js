@@ -240,7 +240,12 @@ function splitName(fullName) {
   return { firstName: trimmed.slice(0, idx), lastName: trimmed.slice(idx + 1).trim() };
 }
 
-function addPlayer(registry, rosters, teamId, num, fullName, rate, needsRating) {
+function parseIbaCount(value) {
+  const normalized = String(value ?? "").replace(/O/gi, "0").replace(/[^\d]/g, "");
+  return normalized ? Number(normalized) : null;
+}
+
+function addPlayer(registry, rosters, teamId, num, fullName, rate, needsRating, matchesPlayed = null, matchesWon = null) {
   rosters[teamId] = rosters[teamId] ?? [];
   const parsed = cleanName(fullName);
   if (!parsed) return;
@@ -249,7 +254,7 @@ function addPlayer(registry, rosters, teamId, num, fullName, rate, needsRating) 
   if (!hasRate) needsRating.push({ teamId, num, name: parsed.name, nickname: parsed.nickname, firstName, lastName });
   // Add the player either way -- even with no rating yet, they belong on this roster and
   // should show up in the admin panel (as "—") so the rating can be filled in by hand.
-  registry[num] = { num, name: parsed.name, nickname: parsed.nickname, rating: hasRate ? rate : null, firstName, lastName };
+  registry[num] = { num, name: parsed.name, nickname: parsed.nickname, rating: hasRate ? rate : null, firstName, lastName, matchesPlayed, matchesWon };
   if (!rosters[teamId].includes(num)) rosters[teamId].push(num);
 }
 
@@ -272,8 +277,8 @@ function detectTeamHeader(line) {
 // Matches "<num> <play> <win> <name> [<rate>]" -- the trailing rate is
 // optional so this same regex covers both the rate-last and no-rate
 // single-column header styles.
-const PLAY_WIN = String.raw`[^\dO]*[\dO]+\.?\s+[\dO]+\.?\s+`;
-const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\d{1,3}))?$`);
+const PLAY_WIN = String.raw\`[^\\dO]*([\\dO]+)\\.?\\s+([\\dO]+)\\.?\\s+\`;
+const RE_RATE_LAST_OPT = new RegExp(\`^(\\\\d{5})\\\\.?\\\\s+\${PLAY_WIN}(.+?)(?:\\\\s+(\\\\d{1,3}))?$\`);
 
 // ==================================================================
 // Section-level dispatch
@@ -407,11 +412,11 @@ function parseMultiColumnRateFirst(lines, registry, rosters, teams, needsRating,
     // Play/Win counts occasionally get OCR'd/extracted as a mix of "0" and
     // the letter "O" (e.g. "0O" instead of "00"), so tolerate [\dO] there
     // the same way the single-column regexes do.
-    const anchorRe = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+[\dO]+\.?\s+[\dO.]+\s+/g;
+    const anchorRe = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+([\dO]+)\.?\s+([\dO]+)\.?\s+/g;
     const anchors = [];
     let am;
     while ((am = anchorRe.exec(line)) !== null) {
-      anchors.push({ pos: am.index, rate: parseInt(am[1], 10), num: am[2], nameStart: am.index + am[0].length });
+      anchors.push({ pos: am.index, rate: parseInt(am[1], 10), num: am[2], matchesPlayed: parseIbaCount(am[3]), matchesWon: parseIbaCount(am[4]), nameStart: am.index + am[0].length });
     }
     if (anchors.length === 0) continue;
 
@@ -422,7 +427,7 @@ function parseMultiColumnRateFirst(lines, registry, rosters, teams, needsRating,
       calibratedPositions = anchors.map(a => a.pos);
       anchors.forEach((a, ai) => {
         const nameEnd = ai + 1 < anchors.length ? anchors[ai + 1].pos : line.length;
-        addPlayer(registry, rosters, activeTeams[ai], a.num, line.slice(a.nameStart, nameEnd), a.rate, needsRating);
+        addPlayer(registry, rosters, activeTeams[ai], a.num, line.slice(a.nameStart, nameEnd), a.rate, needsRating, a.matchesPlayed, a.matchesWon);
       });
     } else {
       // A team ran out of players before its neighbors, leaving fewer
@@ -450,7 +455,7 @@ function parseMultiColumnRateFirst(lines, registry, rosters, teams, needsRating,
         const name = line.slice(a.nameStart, nameEnd);
 
         if (prefixIsSafe) {
-          addPlayer(registry, rosters, activeTeams[ai], a.num, name, a.rate, needsRating);
+          addPlayer(registry, rosters, activeTeams[ai], a.num, name, a.rate, needsRating, a.matchesPlayed, a.matchesWon);
           return;
         }
 
@@ -461,7 +466,7 @@ function parseMultiColumnRateFirst(lines, registry, rosters, teams, needsRating,
             if (d < bestDist) { bestDist = d; bestCol = ci; }
           });
         }
-        addPlayer(registry, rosters, activeTeams[bestCol], a.num, name, a.rate, needsRating);
+        addPlayer(registry, rosters, activeTeams[bestCol], a.num, name, a.rate, needsRating, a.matchesPlayed, a.matchesWon);
         ambiguousRoster.push({ num: a.num, guessedTeamId: activeTeams[bestCol], candidateTeamIds: activeTeams });
       });
     }
@@ -524,16 +529,16 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
     // Current IBA roster PDFs commonly extract rows as:
     // "Rate Num Play Win Name" (rate FIRST), unlike older rate-last layouts.
     // Keep the player number as a string to preserve leading zeroes.
-    const rateFirst = line.match(/^(\d{1,3})\s+(\d{5})\.?\s+[\dO]+\.?\s+[\dO]+\.?\s+(.+)$/);
+    const rateFirst = line.match(/^(\d{1,3})\s+(\d{5})\.?\s+([\dO]+)\.?\s+([\dO]+)\.?\s+(.+)$/);
     if (rateFirst) {
-      current.players.push({ num: rateFirst[2], name: rateFirst[3], rate: parseInt(rateFirst[1], 10) });
+      current.players.push({ num: rateFirst[2], name: rateFirst[5], rate: parseInt(rateFirst[1], 10), matchesPlayed: parseIbaCount(rateFirst[3]), matchesWon: parseIbaCount(rateFirst[4]) });
       continue;
     }
 
     const m = RE_RATE_LAST_OPT.exec(line);
     if (m) {
-      current.players.push({ num: m[1], name: m[2] });
-      if (m[3] !== undefined) current.trailingRates.push(parseInt(m[3], 10));
+      current.players.push({ num: m[1], name: m[4], matchesPlayed: parseIbaCount(m[2]), matchesWon: parseIbaCount(m[3]) });
+      if (m[5] !== undefined) current.trailingRates.push(parseInt(m[5], 10));
       continue;
     }
   }
@@ -547,7 +552,7 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
     for (const team of teamsList) {
       team.players.forEach((player, i) => {
         const rate = player.rate !== undefined ? player.rate : team.trailingRates[i];
-        addPlayer(registry, rosters, team.id, player.num, player.name, rate, needsRating);
+        addPlayer(registry, rosters, team.id, player.num, player.name, rate, needsRating, player.matchesPlayed, player.matchesWon);
       });
     }
     return;
@@ -562,7 +567,7 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
   if (!anyTeamMissingRate) {
     for (const team of teamsList) {
       team.players.forEach((p, i) => {
-        addPlayer(registry, rosters, team.id, p.num, p.name, team.trailingRates[i], needsRating);
+        addPlayer(registry, rosters, team.id, p.num, p.name, team.trailingRates[i], needsRating, p.matchesPlayed, p.matchesWon);
       });
     }
     return;
@@ -597,7 +602,7 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 
       team.players.forEach((p, i) => {
         const rate = trueRates ? trueRates[i] : undefined;
-        addPlayer(registry, rosters, team.id, p.num, p.name, rate, needsRating);
+        addPlayer(registry, rosters, team.id, p.num, p.name, rate, needsRating, p.matchesPlayed, p.matchesWon);
       });
     }
   }
