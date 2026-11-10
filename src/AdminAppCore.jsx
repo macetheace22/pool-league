@@ -2375,6 +2375,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                       <div style={{fontSize:12,fontWeight:700,marginTop:8,color:audit.outcome==="single-set-playoff-required"?"#F59E0B":"#5FCF9E"}}>
                         {audit.outcome==="head-to-head-points" ? "Tie-break: head-to-head points" :
                          audit.outcome==="opponent-rating-average" ? "Tie-break: opponent rating average" :
+                         audit.outcome==="insufficient-data" ? "Outcome: insufficient data — review the match records" :
                          "Outcome: single-set playoff required"}
                       </div>
                     </div>
