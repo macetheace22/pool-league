@@ -450,6 +450,28 @@ describe("computeMatchPoints", () => {
     });
   });
 
+  it("applies the 325-point rating adjustments after a makeup is completed", () => {
+    const state = {
+      format: "advanced",
+      // A resumed and completed makeup has no pending-makeup marker.
+      makeup: null,
+      sets: [0, 1].map(i => ({
+        complete: true,
+        winnerSlot: "home",
+        playerHome: { num: String(i + 1), rating: 90 },
+        playerAway: { num: String(i + 3), rating: 50 },
+        racks: [{ home: 90, away: 30 }],
+      })),
+    };
+
+    // Home rating total 180 => +145; away total 100 => +225.
+    // Each completed set scores 250 for home and 30 for away.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 645,
+      awayPoints: 285,
+    });
+  });
+
   it("does not award either team's rating bonus when a set is left unplayed", () => {
     const state = {
       format: "advanced",
