@@ -20,7 +20,7 @@ create table if not exists public.iba_player_weekly_counters (
   matches_won integer check (matches_won is null or matches_won >= 0),
   content_sha256 text not null check (content_sha256 ~ '^[a-f0-9]{64}$'),
   source text not null check (source in ('automatic', 'manual')),
-  imported_by uuid not null default auth.uid() references public.profiles(id) on delete restrict,
+  imported_by uuid default auth.uid() references public.profiles(id) on delete set null,
   imported_at timestamptz not null default now(),
   constraint iba_player_weekly_counters_wins_not_over_played
     check (matches_played is null or matches_won is null or matches_won <= matches_played),
