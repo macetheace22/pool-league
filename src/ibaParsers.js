@@ -278,7 +278,8 @@ function detectTeamHeader(line) {
 // optional so this same regex covers both the rate-last and no-rate
 // single-column header styles.
 const PLAY_WIN = String.raw`[^\\dO]*([\\dO]+)\\.?\\s+([\\dO]+)\\.?\\s+`;
-const RE_RATE_LAST_OPT = new RegExp(`^(\\\\d{5})\\\\.?\\\\s+${PLAY_WIN}(.+?)(?:\\\\s+(\\\\d{1,3}))?// Shared IBA report parsers. Manual paste and automatic PDF imports both use these functions.
+const PLAY_WIN = String.raw`[^\dO]*([\dO]+)\.?\s+([\dO]+)\.?\s+`;
+const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\d{1,3}))?$`);
 // Extract the week explicitly printed in an IBA weekly PDF. IBA report types
 // use two common labels: roster/ratings and MVP use "For week: 17", while
 // team standings uses "Week 17". Do not infer a week from today's date or the
