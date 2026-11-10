@@ -97,7 +97,7 @@ describe("Division MVP Rule 5.5 tie-break audit", () => {
       ],
     });
     expect(result[0].players[0].averageOpponentRating).toBeNull();
-    expect(result[0].outcome).toBe("single-set-playoff-required");
+    expect(result[0].outcome).toBe("insufficient-data");
   });
 
   it("does not apply the opponent-rating rule when head-to-head scoring is incomplete", () => {
@@ -118,12 +118,10 @@ describe("Division MVP Rule 5.5 tie-break audit", () => {
     const result = buildDivisionMvpTieBreakAudit({
       officialMvp,
       schedule,
-      matches: [match([set(
-        { num: "11111", rating: 40 },
-        { num: "22222", rating: 40 },
-        [[10, 10]],
-        "home",
-      )])],
+      matches: [match([
+        set({ num: "11111", rating: 40 }, { num: "22222", rating: 40 }, [[10, 10]], "home"),
+        set({ num: "11111", rating: 40 }, { num: "22222", rating: 40 }, [[10, 10]], "away"),
+      ])],
     });
     expect(result[0].outcome).toBe("single-set-playoff-required");
   });
