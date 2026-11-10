@@ -1482,12 +1482,12 @@ export function computeMatchPoints(state) {
     const runAway = (s.racks ?? []).reduce((t, r) => t + (r.away ?? 0), 0);
     if (s.winnerSlot === "home") {
       const margin = Math.max(0, (targetAway ?? 0) - runAway);
-      const addOn = margin * 3;
+      const addOn = format === "open" ? 0 : margin * 3;
       homePoints += isMasters ? (addOn + 100) : (runHome + addOn + 100);
       awayPoints += isMasters ? 0 : runAway;
     } else if (s.winnerSlot === "away") {
       const margin = Math.max(0, (targetHome ?? 0) - runHome);
-      const addOn = margin * 3;
+      const addOn = format === "open" ? 0 : margin * 3;
       awayPoints += isMasters ? (addOn + 100) : (runAway + addOn + 100);
       homePoints += isMasters ? 0 : runHome;
     }
@@ -1849,7 +1849,8 @@ export function computeMvp(matches, adjustments = []) {
 
       if (s.winnerSlot === "home") {
         const margin = Math.max(0, (targetAway ?? 0) - runAway);
-        const homePoints = isMasters ? (margin * 3 + 100) : (runHome + margin * 3 + 100);
+        const marginPoints = format === "open" ? 0 : margin * 3;
+        const homePoints = isMasters ? (marginPoints + 100) : (runHome + marginPoints + 100);
         byPlayer[home.num].pointsScored += homePoints;
         byPlayer[away.num].pointsScored += isMasters ? 0 : runAway;
         byPlayer[home.num].wins++; byPlayer[away.num].losses++;
@@ -1857,7 +1858,8 @@ export function computeMvp(matches, adjustments = []) {
         byPlayer[away.num].mvpRanking += (isMasters ? 0 : runAway) - 200;
       } else if (s.winnerSlot === "away") {
         const margin = Math.max(0, (targetHome ?? 0) - runHome);
-        const awayPoints = isMasters ? (margin * 3 + 100) : (runAway + margin * 3 + 100);
+        const marginPoints = format === "open" ? 0 : margin * 3;
+        const awayPoints = isMasters ? (marginPoints + 100) : (runAway + marginPoints + 100);
         byPlayer[away.num].pointsScored += awayPoints;
         byPlayer[home.num].pointsScored += isMasters ? 0 : runHome;
         byPlayer[away.num].wins++; byPlayer[home.num].losses++;
