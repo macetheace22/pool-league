@@ -7,6 +7,8 @@ function individualSetPoints(set, side, format) {
   const home = set.playerHome;
   const away = set.playerAway;
   if (!home || !away || !["home", "away"].includes(set.winnerSlot)) return null;
+  if (!Array.isArray(set.racks) || set.racks.length === 0 || set.racks.some(rack =>
+    rack?.home == null || rack?.away == null || !Number.isFinite(Number(rack.home)) || !Number.isFinite(Number(rack.away)))) return null;
   const isMasters = String(format ?? "masters").toLowerCase() === "masters";
   const isOpen = String(format ?? "masters").toLowerCase() === "open";
   const fixedTarget = isOpen ? 45 : 50;
