@@ -114,6 +114,22 @@ describe("IBA parsers", () => {
     expect(result.rosters["76A02"]).toEqual(["14768"]);
   });
 
+  it("keeps IBA Play/Win counters separate when one player appears on multiple teams", () => {
+    const result = parseLeagueRoster([
+      "Team 15101 Team One",
+      "Twin City Billiards",
+      "105 12345 4 2 Player One",
+      "Team 15102 Team Two",
+      "Twin City Billiards",
+      "106 12345 7 3 Player One",
+    ].join("\\n"));
+
+    expect(result.registry["12345"].teamCounters).toEqual({
+      "15101": { matchesPlayed: 4, matchesWon: 2 },
+      "15102": { matchesPlayed: 7, matchesWon: 3 },
+    });
+  });
+
   it("parses a simple single-column roster without changing the existing output contract", () => {
     const result = parseLeagueRoster([
       "Division Roster and Handicap Report",
