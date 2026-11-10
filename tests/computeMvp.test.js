@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { computeMvp } from "../src/db.js";
+import { computeMvp, computeOfficialMvp } from "../src/db.js";
+
+describe("official MVP source precedence", () => {
+  it("uses imported ranking totals and positions without adding app match results", () => {
+    const official = computeOfficialMvp([{player_num:"9",player_name:"Carol",total_points:500,mvp_ranking_points:700,position:3},{player_num:"8",player_name:"Dana",total_points:600,mvp_ranking_points:900,position:1}]);
+    expect(official.map(x=>x.num)).toEqual(["8","9"]);
+    expect(official.find(x=>x.num==="9")).toMatchObject({mvpRanking:700,rank:3,pointsScored:500});
+  });
+});
 
 describe("computeMvp", () => {
   it("masters format: winner's mvpRanking = points + 200, loser's = 0 - 200", () => {
