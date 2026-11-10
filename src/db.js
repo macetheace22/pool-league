@@ -1458,9 +1458,23 @@ function teamRatingBonusPenalty(state, side) {
     return player ? sum + ratingForTeamTotal(player.rating, format) : sum;
   }, 0);
   const diff = TEAM_RATING_LIMIT - total;
-  // Rule 6.10: when a set is left unplayed, neither team receives a
-  // positive rating bonus. The over-limit rating penalty still applies.
-  if (diff >= 0 && (state.sets ?? []).some(s => !s.complete)) return 0;
+  const sets = state.sets ?? [];
+  const makeupPending = !!(state.makeup?.confirmedHome && state.makeup?.confirmedAway);
+
+  // Rule 6.9: while a makeup is pending, neither a rating bonus nor penalty
+  // is calculated. The completed makeup is recalculated after the match resumes.
+  if (makeupPending) return 0;
+
+  // Rule 6.10: a match finalized with a set left unplayed removes both teams'
+  // right to a positive rating bonus. The over-limit penalty remains.
+  if (diff >= 0 && sets.some(s => !s.complete)) return 0;
+
+  // Rule 6.4: both put-up players' ratings remain in the team totals, but a
+  // team that forfeited an individual set cannot receive a positive bonus.
+  // Its over-limit penalty, if any, is still calculated.
+  const forfeitedBySide = sets.some(s => s.complete && s.forfeited && s.forfeitedBy === side);
+  if (diff >= 0 && forfeitedBySide) return 0;
+
   return diff >= 0 ? diff : -(Math.abs(diff) * 5);
 }
 
