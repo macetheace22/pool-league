@@ -99,7 +99,7 @@ function computeSetRollup(set, format) {
   return { marginHome, marginAway, addOnHome, addOnAway, winBonusHome, winBonusAway, totalHome, totalAway, homeSlot, awaySlot };
 }
 
-function FrontSheetSet({ set }) {
+function FrontSheetSet({ set, showInnings }) {
   const gameCount = set.racks.length;
   const totalInnings = set.totalInnings ?? set.racks.reduce((s, r) => s + (r.innings || 0), 0);
   const containerRef = useRef(null);
@@ -187,6 +187,15 @@ function FrontSheetSet({ set }) {
                 <td className="rack-grid__total-col"></td>
                 {fillerWidthPx > 0 && <td className="rack-grid__filler-col"></td>}
               </tr>
+              {showInnings && (
+                <tr className="rack-grid__row-innings">
+                  <td className="rack-grid__rowlabel">Innings</td>
+                  <td className="rack-grid__safeties-col"></td>
+                  {set.racks.map((r) => <td key={r.n}>{r.innings ?? 0}</td>)}
+                  <td className="rack-grid__total-col"></td>
+                  {fillerWidthPx > 0 && <td className="rack-grid__filler-col"></td>}
+                </tr>
+              )}
               <tr className={totalRowClass}>
                 <td className="rack-grid__rowlabel">Total</td>
                 <td className="rack-grid__safeties-col"></td>
@@ -370,6 +379,7 @@ function TeamColumn({ teamName, rollups, team, isMasters, format, ratingTotal, b
 export default function Scoresheet({ match, onClose }) {
   const [view, setView] = useState("front");
   const [setIndex, setSetIndex] = useState(0);
+  const [showInnings, setShowInnings] = useState(false);
   const sets = toDisplaySets(match);
   const isMasters = match.format === "masters";
   const shortTeamName = match.state?.makeup?.shortTeam === "home" ? match.team_home_name
@@ -420,7 +430,17 @@ export default function Scoresheet({ match, onClose }) {
               <ChevronRight size={16} />
             </button>
           </div>
-          <FrontSheetSet set={sets[setIndex]} />
+          <div className="scoresheet-detail-options">
+            <button
+              type="button"
+              className="scoresheet-detail-options__toggle"
+              aria-pressed={showInnings}
+              onClick={() => setShowInnings((shown) => !shown)}
+            >
+              {showInnings ? "Hide innings" : "Show innings"}
+            </button>
+          </div>
+          <FrontSheetSet set={sets[setIndex]} showInnings={showInnings} />
         </>
       ) : (
         <BackSheet match={match} sets={sets} />
@@ -450,6 +470,9 @@ const css = `
 .set-nav__btn { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #3A3A3A; background: #1C1C1C; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #E0E0E0; }
 .set-nav__btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .set-nav__label { font-size: 12.5px; font-weight: 700; color: #E0E0E0; min-width: 80px; text-align: center; }
+.scoresheet-detail-options { display: flex; justify-content: flex-end; margin-top: -5px; }
+.scoresheet-detail-options__toggle { border: 1px solid #3A3A3A; border-radius: 7px; background: #1C1C1C; color: #9FC4B4; padding: 5px 9px; font: inherit; font-size: 10.5px; font-weight: 700; cursor: pointer; }
+.rack-grid__row-innings td { background: #F7F7F7; color: #4A4A4A; font-size: 10.5px; }
 
 .set-sheet { background: #FFFFFF; border: 1.5px solid #333333; border-radius: 14px; padding: 14px; }
 .data-source-tag { font-size: 10px; font-weight: 600; padding: 6px 10px; border-radius: 7px; margin-bottom: 12px; text-align: center; }
