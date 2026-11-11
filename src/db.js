@@ -1472,6 +1472,26 @@ export function computeForfeitPoints(matchLike, receivingPlayerRating) {
 // Already-completed tables (played for real, or already forfeited earlier)
 // are left untouched. Once every table has a result, is_makeup_pending clears
 // and the match is a normal final record from here on.
+export function buildFullMatchForfeitSets(match, forfeitingSide, forfeitingPlayers, receivingPlayers) {
+  const receivingSide = forfeitingSide === "home" ? "away" : "home";
+  return Array.from({ length: 5 }, (_, i) => {
+    const forfeitingPlayer = forfeitingPlayers[i];
+    const receivingPlayer = receivingPlayers[i];
+    const points = computeForfeitPoints(match, receivingPlayer.rating);
+    return {
+      setNum: i + 1,
+      playerHome: forfeitingSide === "home" ? forfeitingPlayer : receivingPlayer,
+      playerAway: forfeitingSide === "away" ? forfeitingPlayer : receivingPlayer,
+      racks: [],
+      complete: true,
+      winnerSlot: receivingSide,
+      forfeited: true,
+      forfeitedBy: forfeitingSide,
+      forfeitPoints: points,
+    };
+  });
+}
+
 export async function applyForfeitToRemainingTables(matchRow, assignments) {
   const shortTeam = matchRow.state?.makeup?.shortTeam;
   if (!shortTeam) return false;

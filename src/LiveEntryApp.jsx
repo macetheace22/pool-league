@@ -9,6 +9,7 @@ import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import { mergeLiveMatchState } from "./liveMatchSync";
 import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
+import { hasLaterCompletedSet } from "./forfeitRules";
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -136,6 +137,10 @@ function setDraftState(match, setIdx) {
     if (!firstAssigned) return `putup_${firstRole}`;
     return `counter_${firstRole === "block" ? "choice" : "block"}`;
   }
+
+  // A forfeited set must be the last set of the match. Once a forfeit has
+  // been recorded, no later set may be opened or played.
+  if (match.sets.slice(0, setIdx).some(s => s.complete && s.forfeited)) return "locked";
 
   // Sets 3-5 unlock when enough prior sets are complete/in-progress-resolved
   // Set 3 unlocks once 1 of {1,2} is complete. Set 4 unlocks once 2 total sets complete. Set 5 once 3 complete.
@@ -337,7 +342,11 @@ export default function LiveEntryApp() {
     const homeOk = match.unavailableHome || match.confirmedHome;
     const awayOk = match.unavailableAway || match.confirmedAway;
     const normalReady = match.phase === "confirm" && homeOk && awayOk && !match.disputedBy && !(match.unavailableHome && match.unavailableAway) && match.submissionReady;
-    const makeupReady = match.makeup && match.makeup.confirmedHome && match.makeup.confirmedAway && !match.makeup.disputedBy;
+    const makeupReady = match.makeup &&
+      (match.unavailableHome || match.makeup.confirmedHome) &&
+      (match.unavailableAway || match.makeup.confirmedAway) &&
+      !match.makeup.disputedBy &&
+      ((!match.unavailableHome && !match.unavailableAway) || match.makeup.submissionReady);
     if ((normalReady || makeupReady) && !match.archiving && !archivingRef.current) {
       archivingRef.current = true;
       (async () => {
@@ -646,13 +655,118 @@ function MidMatchMakeupTrigger({ match, onSave }) {
   }
   return (
     <button className="makeup-trigger-link" onClick={()=>setReporting(true)}>
-      <AlertTriangle size={12}/> {completedCount > 0 ? "Out of shooters for the rest of the night — report a makeup" : "A team has no shooters tonight — report a makeup"}
+      <AlertTriangle size={12}/> {completedCount > 0 ? "End Tonight & Make Up Remaining Sets" : "End Tonight as Makeup"}
     </button>
   );
 }
 
 // ─── Draft Screen (alternating player selection) ──────────────────────────────
+function FullMatchForfeitForm({ match, onCancel, onConfirm }) {
+  const [forfeitingSide, setForfeitingSide] = useState("home");
+  const [forfeitingPlayers, setForfeitingPlayers] = useState(Array(5).fill(null));
+  const [receivingPlayers, setReceivingPlayers] = useState(Array(5).fill(null));
+  const [confirmedPresent, setConfirmedPresent] = useState(false);
+
+  const forfeitingTeam = match[`team${forfeitingSide === "home" ? "Home" : "Away"}`];
+  const receivingSide = forfeitingSide === "home" ? "away" : "home";
+  const receivingTeam = match[`team${receivingSide === "home" ? "Home" : "Away"}`];
+  const forfeitingRoster = forfeitingTeam?.roster ?? [];
+  const receivingRoster = receivingTeam?.roster ?? [];
+
+  const pick = (list, index, player) => setList => setList(prev => prev.map((p, i) => i === index ? player : p));
+  const setForfeiting = (index, player) => setForfeitingPlayers(prev => prev.map((p, i) => i === index ? player : p));
+  const setReceiving = (index, player) => setReceivingPlayers(prev => prev.map((p, i) => i === index ? player : p));
+
+  const available = (roster, selected, index) => roster.filter(p =>
+    !selected.some((other, i) => i !== index && other?.num === p.num)
+  );
+  const complete = forfeitingPlayers.every(Boolean) && receivingPlayers.every(Boolean) && confirmedPresent;
+
+  const submit = () => {
+    if (!complete) return;
+    const sets = Array.from({ length: 5 }, (_, i) => {
+      const forfeitingPlayer = forfeitingPlayers[i];
+      const receivingPlayer = receivingPlayers[i];
+      const points = computeForfeitPoints(match, receivingPlayer.rating);
+      return {
+        setNum: i + 1,
+        playerHome: forfeitingSide === "home" ? forfeitingPlayer : receivingPlayer,
+        playerAway: forfeitingSide === "away" ? forfeitingPlayer : receivingPlayer,
+        racks: [],
+        complete: true,
+        winnerSlot: receivingSide,
+        forfeited: true,
+        forfeitedBy: forfeitingSide,
+        forfeitPoints: points,
+      };
+    });
+    onConfirm({ ...match, sets, phase: "confirm" });
+  };
+
+  return (
+    <div className="screen">
+      <div className="screen__eyebrow"><AlertTriangle size={12}/> Match Forfeit</div>
+      <div className="screen__title">Forfeit Entire Match</div>
+      <div className="card" style={{borderColor:"#7F1D1D",background:"#2A1010"}}>
+        <div style={{fontSize:12.5,color:"#E0E0E0",lineHeight:1.5}}>
+          This records all five sets as forfeits. The receiving team gets the Section 6.6 forfeit points for each set; the forfeiting team receives 0.
+        </div>
+      </div>
+      <div className="card">
+        <div className="card__title">Which team is forfeiting?</div>
+        <div className="coinflip-choices">
+          <button className={`coinflip-btn coinflip-btn--home ${forfeitingSide === "home" ? "" : "coinflip-btn--dim"}`}
+            onClick={() => { setForfeitingSide("home"); setForfeitingPlayers(Array(5).fill(null)); setReceivingPlayers(Array(5).fill(null)); }}>
+            {match.teamHome.name}
+          </button>
+          <button className={`coinflip-btn coinflip-btn--away ${forfeitingSide === "away" ? "" : "coinflip-btn--dim"}`}
+            onClick={() => { setForfeitingSide("away"); setForfeitingPlayers(Array(5).fill(null)); setReceivingPlayers(Array(5).fill(null)); }}>
+            {match.teamAway.name}
+          </button>
+        </div>
+      </div>
+      {[0,1,2,3,4].map(i => (
+        <div className="card" key={i}>
+          <div className="card__title">Set {i + 1}</div>
+          <div className="field">
+            <Label>{forfeitingTeam.name} — forfeiting player</Label>
+            <select className="input input--select" value={forfeitingPlayers[i]?.num ?? ""}
+              onChange={e => setForfeiting(i, forfeitingRoster.find(p => p.num === e.target.value) ?? null)}>
+              <option value="">Select player…</option>
+              {available(forfeitingRoster, forfeitingPlayers, i).map(p =>
+                <option key={p.num} value={p.num}>{p.name}{p.nickname ? ` "${p.nickname}"` : ""} ({p.rating})</option>
+              )}
+            </select>
+          </div>
+          <div className="field">
+            <Label>{receivingTeam.name} — receiving player (present)</Label>
+            <select className="input input--select" value={receivingPlayers[i]?.num ?? ""}
+              onChange={e => setReceiving(i, receivingRoster.find(p => p.num === e.target.value) ?? null)}>
+              <option value="">Select player…</option>
+              {available(receivingRoster, receivingPlayers, i).map(p =>
+                <option key={p.num} value={p.num}>{p.name}{p.nickname ? ` "${p.nickname}"` : ""} ({p.rating})</option>
+              )}
+            </select>
+          </div>
+          {receivingPlayers[i] && <div style={{fontSize:12,color:"#5FCF9E",fontWeight:700}}>
+            {receivingPlayers[i].name} receives {computeForfeitPoints(match, receivingPlayers[i].rating)} points
+          </div>}
+        </div>
+      ))}
+      <label style={{display:"flex",gap:8,alignItems:"flex-start",fontSize:12,color:"#C8C8C8",margin:"8px 0 12px"}}>
+        <input type="checkbox" checked={confirmedPresent} onChange={e => setConfirmedPresent(e.target.checked)} />
+        <span>I confirm the five receiving players selected above are present and have not previously played in this match.</span>
+      </label>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn-primary" disabled={!complete} onClick={submit} style={{flex:1}}>Record Full Match Forfeit</button>
+        <button className="btn-secondary" onClick={onCancel}>Back</button>
+      </div>
+    </div>
+  );
+}
+
 function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
+  const [fullMatchForfeitOpen, setFullMatchForfeitOpen] = useState(false);
   const used = usedPlayerNums(match);
 
   // Find which sets are unlocked/active for navigation
@@ -677,6 +791,10 @@ function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
   };
 
   const forfeitSet = (setIdx, forfeitingSide, forfeitingPlayer, receivingPlayer) => {
+    if (hasLaterCompletedSet(match.sets, setIdx)) {
+      window.alert("A forfeited set must be the last set of the match. Later sets have already been played.");
+      return;
+    }
     const receivingSide = forfeitingSide === "home" ? "away" : "home";
     const points = computeForfeitPoints(match, receivingPlayer.rating);
     const newSets = match.sets.map((s, i) => i !== setIdx ? s : {
@@ -693,10 +811,20 @@ function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
     onSave({ ...match, sets: newSets, phase: nextPhase(newSets) });
   };
 
+  if (fullMatchForfeitOpen) {
+    return <FullMatchForfeitForm match={match} onCancel={() => setFullMatchForfeitOpen(false)} onConfirm={onSave} />;
+  }
+
   return (
     <div className="screen">
       <div className="screen__eyebrow"><Lock size={12}/> Setting Lineups</div>
       <div className="screen__title">Pick Players</div>
+      {match.sets.every(s => !s.complete) && (
+        <button className="btn-secondary" style={{marginBottom:10,color:"#F87171",borderColor:"#7F1D1D"}}
+          onClick={() => setFullMatchForfeitOpen(true)}>
+          <AlertTriangle size={12}/> Forfeit Entire Match
+        </button>
+      )}
       <DraftSetTabBar statuses={statuses} activeSet={activeSet} onSelect={setActiveSet} />
       <DraftSetEntry
         key={activeSet}
@@ -1117,71 +1245,59 @@ function ToggleChip({ label, active, color, onToggle }) {
 function MakeupConfirmScreen({ match, onSave }) {
   const [flagging, setFlagging] = useState(null);
   const [note, setNote] = useState("");
+  const [ack, setAck] = useState(false);
   const m = match.makeup;
   const shortTeamName = m.shortTeam === "home" ? match.teamHome.name : match.teamAway.name;
   const completedCount = match.sets.filter(s => s.complete).length;
+  const solo = !!(match.unavailableHome || match.unavailableAway);
+  const unavailableTeamName = match.unavailableHome ? match.teamHome.name : match.unavailableAway ? match.teamAway.name : null;
 
   const confirmSide = (side) => {
     onSave({ ...match, makeup: { ...m, [side === "home" ? "confirmedHome" : "confirmedAway"]: true } });
   };
   const submitFlag = () => {
-    onSave({ ...match, makeup: { ...m, confirmedHome: false, confirmedAway: false, disputedBy: flagging, disputeNote: note.trim() || "No details given." } });
+    onSave({ ...match, makeup: { ...m, confirmedHome: false, confirmedAway: false, disputedBy: flagging, disputeNote: note.trim() || "No details given.", submissionReady: false } });
     setFlagging(null); setNote("");
   };
-  const clearDispute = () => {
-    onSave({ ...match, makeup: { ...m, disputedBy: null, disputeNote: null } });
-  };
-  const cancelMakeup = () => {
-    onSave({ ...match, makeup: null });
-  };
+  const clearDispute = () => onSave({ ...match, makeup: { ...m, disputedBy: null, disputeNote: null } });
+  const cancelMakeup = () => onSave({ ...match, makeup: null });
+  const homeOk = match.unavailableHome || m.confirmedHome;
+  const awayOk = match.unavailableAway || m.confirmedAway;
+  const readyForFinalReview = homeOk && awayOk && !m.disputedBy;
+
+  if (readyForFinalReview && (!solo || m.submissionReady)) {
+    return <div className="screen"><div className="screen__eyebrow"><Check size={12}/> Makeup Ready</div><div className="screen__title">Makeup Recorded</div><div className="card" style={{textAlign:"center"}}><div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>{solo ? "This makeup was reviewed and submitted by the available scorer. The other team was not confirming in the app tonight." : "Both teams have confirmed this makeup."}</div></div></div>;
+  }
+
+  if (readyForFinalReview && solo) {
+    return (
+      <div className="screen">
+        <div className="screen__eyebrow"><Check size={12}/> Final Review</div>
+        <div className="screen__title">Submit Makeup</div>
+        <div className="card" style={{borderColor:"#92400E",background:"#2A1F00"}}>
+          <div style={{fontSize:12.5,fontWeight:700,color:"#F59E0B",marginBottom:6}}>Scored for both teams</div>
+          <div style={{fontSize:11.5,color:"#E0E0E0",lineHeight:1.5,marginBottom:12}}>{unavailableTeamName} wasn't confirming in the app tonight. Double-check the completed sets and the remaining sets that will be made up before submitting.</div>
+          <label style={{display:"flex",alignItems:"flex-start",gap:9,fontSize:12.5,color:"#E0E0E0",cursor:"pointer"}}><input type="checkbox" checked={ack} onChange={(e)=>setAck(e.target.checked)} style={{marginTop:2,flexShrink:0}} />I've reviewed this makeup and confirm it is accurate for both teams.</label>
+        </div>
+        <button className="btn-primary" disabled={!ack} onClick={()=>onSave({ ...match, makeup: { ...m, submissionReady: true } })}>Submit Makeup</button>
+      </div>
+    );
+  }
 
   return (
     <div className="screen">
       <div className="screen__eyebrow"><AlertTriangle size={12}/> Makeup Reported</div>
       <div className="screen__title">Confirm This Is a Makeup</div>
-      <div className="card" style={{borderColor:"#92400E",background:"#2A1F00"}}>
-        <div style={{fontSize:12.5,fontWeight:700,color:"#F59E0B",marginBottom:4}}>{shortTeamName} is short players tonight</div>
-        <div style={{fontSize:12,color:"#E0E0E0",lineHeight:1.4}}>{m.reason}</div>
-      </div>
-      <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>
-        {completedCount > 0
-          ? `${completedCount} of 5 tables already played tonight keep their real score. The rest will show as "Makeup Pending" in team history until they're rescheduled & played.`
-          : `Once both teams confirm, tonight's match is recorded with no score — it'll show as "Makeup Pending" in team history until it's rescheduled & played.`}
-      </div>
+      <div className="card" style={{borderColor:"#92400E",background:"#2A1F00"}}><div style={{fontSize:12.5,fontWeight:700,color:"#F59E0B",marginBottom:4}}>{shortTeamName} is short players tonight</div><div style={{fontSize:12,color:"#E0E0E0",lineHeight:1.4}}>{m.reason}</div></div>
+      <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>{completedCount > 0 ? (completedCount + ' of 5 tables already played tonight keep their real score. The rest will show as "Makeup Pending" in team history until they\'re rescheduled & played.') : "Once the applicable side(s) confirm, tonight\'s match is recorded with no score — it\'ll show as \"Makeup Pending\" in team history until it\'s rescheduled & played."}</div>
 
-      {m.disputedBy && (
-        <div className="dispute-banner">
-          <div className="dispute-banner__title">{m.disputedBy === "home" ? match.teamHome.name : match.teamAway.name} flagged a problem</div>
-          <div className="dispute-banner__note">{m.disputeNote}</div>
-          <button className="btn-secondary" onClick={clearDispute}>Reviewed together — clear flag</button>
-        </div>
-      )}
-
-      {!m.disputedBy && (
-        <div className="confirm-row">
-          <ConfirmCard teamName={match.teamHome.name} side="home" confirmed={m.confirmedHome}
-            onConfirm={() => confirmSide("home")} onFlag={() => setFlagging("home")} confirmLabel="Confirm Makeup" />
-          <ConfirmCard teamName={match.teamAway.name} side="away" confirmed={m.confirmedAway}
-            onConfirm={() => confirmSide("away")} onFlag={() => setFlagging("away")} confirmLabel="Confirm Makeup" />
-        </div>
-      )}
-
-      {flagging && (
-        <div className="card">
-          <div className="card__title">What looks wrong?</div>
-          <textarea className="flag-textarea" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. We actually have 5 shooters"/>
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn-secondary" onClick={()=>setFlagging(null)}>Cancel</button>
-            <button className="btn-primary" onClick={submitFlag}>Submit Flag</button>
-          </div>
-        </div>
-      )}
-
+      {m.disputedBy && <div className="dispute-banner"><div className="dispute-banner__title">{m.disputedBy === "home" ? match.teamHome.name : match.teamAway.name} flagged a problem</div><div className="dispute-banner__note">{m.disputeNote}</div><button className="btn-secondary" onClick={clearDispute}>Reviewed together — clear flag</button></div>}
+      {!m.disputedBy && <div className="confirm-row">{match.unavailableHome ? <UnavailableCard teamName={match.teamHome.name} side="home" /> : <ConfirmCard teamName={match.teamHome.name} side="home" confirmed={m.confirmedHome} onConfirm={()=>confirmSide("home")} onFlag={()=>setFlagging("home")} confirmLabel="Confirm Makeup" />}{match.unavailableAway ? <UnavailableCard teamName={match.teamAway.name} side="away" /> : <ConfirmCard teamName={match.teamAway.name} side="away" confirmed={m.confirmedAway} onConfirm={()=>confirmSide("away")} onFlag={()=>setFlagging("away")} confirmLabel="Confirm Makeup" />}</div>}
+      {flagging && <div className="card"><div className="card__title">What looks wrong?</div><textarea className="flag-textarea" rows={3} value={note} onChange={(e)=>setNote(e.target.value)} placeholder="e.g. We actually have 5 shooters" /><div style={{display:"flex",gap:8}}><button className="btn-secondary" onClick={()=>setFlagging(null)}>Cancel</button><button className="btn-primary" onClick={submitFlag}>Submit Flag</button></div></div>}
       <SecondaryBtn onClick={cancelMakeup}>{completedCount > 0 ? "Cancel — we can finish tonight after all" : "Cancel — we can play tonight after all"}</SecondaryBtn>
     </div>
   );
 }
-
 // ─── Confirm Screen (both sides sign off before archiving) ───────────────────
 // Two sub-steps now, not one: first each PRESENT side confirms (a side
 // marked unavailable -- e.g. the other team doesn't have the app tonight --
