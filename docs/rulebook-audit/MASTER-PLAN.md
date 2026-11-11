@@ -10,14 +10,15 @@ This file is the single source of truth for rulebook scope, decisions, current i
 
 1. **No rulebook clause is skipped.** Every numbered clause and material sub-rule appears in the register below. A rule may be implemented in the app, supplied by an official IBA import, or intentionally handled on paper/by league management.
 2. **Audit once, track forever.** Once a clause is audited, record the evidence, decision, gaps, tests, PR/SQL, and verification state here. Do not ask the user to repeat a settled decision or re-audit a verified item without a specific new code change, contradictory evidence, failed test, or changed rule.
-3. **Separate the lifecycle statuses.** "Audited" does not mean implemented; "merged" does not mean verified; a table existing does not mean data has been imported; a test passing does not prove live Supabase data or manual league operations.
-4. **Every gap gets a closure definition.** A rule is not closed until its implementation route (app/import/manual) is explicit, acceptance criteria are met, tests pass, required SQL is applied by the user, and live behavior is verified where applicable.
-5. **No hidden assumptions.** When a rule requires a decision whether to build, import, or retain a paper/manual process, present the exact rule and practical choices when its phase is reached. Do not create unnecessary app workflows for duties the rulebook assigns to captains, referees, Tournament Directors, or the League Office.
-6. **Official IBA data remains authoritative** where the user has chosen it: TruSpot ratings, official standings/MVP positions, and official playoff eligibility codes. Do not silently replace official data with locally inferred results.
-7. **User's paper scoresheet decision remains in force.** Each team continues to keep its own paper scoresheet. The app supports one team's independent digital score entry; the opposing team's digital entry/comparison is optional. Paper captain signatures remain the acceptance record. Do not present app confirmations as signatures.
-8. **SQL is manually applied by the user.** Any future migration creating a public table must include RLS and deliberate Data API grants in the same migration. Never claim a migration was applied unless the user confirms or a live read-only check proves the expected schema.
-9. **PR discipline.** Focused PRs only; no cloning or local-computer changes. Do not merge without the user's approval. Inspect the latest PR-head CI, not a superseded run. After merge, verify the merge commit. Avoid unnecessary Vercel previews/deployments.
-10. **Continuity at every new chat.** Read this file from current `main`, reread the exact rulebook clauses for the next task, reconcile main/PR/CI and the active Supabase project, then resume the earliest open item in the phase order. Never ask the user to re-provide known limits or decisions.
+3. **Review before build.** Discovery and alignment happen before implementation. When a gap is found, explain what the rule requires, what the current app does, what is missing, and the proposed implementation path. Discuss and resolve the proposed behavior with the user before writing production code or opening an implementation PR.
+4. **Separate the lifecycle statuses.** "Audited" does not mean implemented; "merged" does not mean verified; a table existing does not mean data has been imported; a test passing does not prove live Supabase data or manual league operations.
+5. **Every gap gets a closure definition.** A rule is not closed until its implementation route (app/import/manual) is explicit, acceptance criteria are met, tests pass, required SQL is applied by the user, and live behavior is verified where applicable.
+6. **No hidden assumptions.** When a rule requires a decision whether to build, import, or retain a paper/manual process, present the exact rule and practical choices when its phase is reached. Do not create unnecessary app workflows for duties the rulebook assigns to captains, referees, Tournament Directors, or the League Office.
+7. **Official IBA data remains authoritative** where the user has chosen it: TruSpot ratings, official standings/MVP positions, and official playoff eligibility codes. Do not silently replace official data with locally inferred results.
+8. **User's paper scoresheet decision remains in force.** Each team continues to keep its own paper scoresheet. The app supports one team's independent digital score entry; the opposing team's digital entry/comparison is optional. Paper captain signatures remain the acceptance record. Do not present app confirmations as signatures.
+9. **SQL is manually applied by the user.** Any future migration creating a public table must include RLS and deliberate Data API grants in the same migration. Never claim a migration was applied unless the user confirms or a live read-only check proves the expected schema.
+10. **PR discipline.** Focused PRs only; no cloning or local-computer changes. Do not merge without the user's approval. Inspect the latest PR-head CI, not a superseded run. After merge, verify the merge commit. Avoid unnecessary Vercel previews/deployments.
+11. **Continuity at every new chat.** Read this file from current `main`, reread the exact rulebook clauses for the next task, reconcile main/PR/CI and the active Supabase project, then resume the earliest open item in the phase order. Never ask the user to re-provide known limits or decisions.
 
 ### Status definitions
 
@@ -343,4 +344,28 @@ For every implementation PR:
 
 ## 9. Cross-chat continuation prompt
 
-> Continue the IBA Pool League App rulebook audit using `docs/rulebook-audit/MASTER-PLAN.md` from current `main` as the single source of truth. First reconcile main SHA, PRs, latest CI, exact rulebook text, and the active Supabase project. Do not repeat verified audits or ask for settled decisions. Resume the earliest incomplete task in the priority queue. Keep the plan updated in the same focused PR as work proceeds. Do not move to a later phase until the current phase's acceptance gate is met.
+> Continue the IBA Pool League App rulebook audit and implementation using `docs/rulebook-audit/MASTER-PLAN.md` from current `main` as the single source of truth. This is an ongoing, complete rulebook-to-app effort; do not assume a particular phase or restart the audit from the beginning.
+>
+> **First reconcile the actual current state:** read the master plan from current `main`; inspect the latest main SHA, merged/open PRs and branches, relevant CI/build status, current app code/tests, the exact rulebook text for the next task, and the active Supabase project/data/schema/policies/functions when relevant. Do not rely on stale conversation summaries when current repository evidence is available.
+>
+> **Core operating process:** audit → discuss/alignment → build → test → review/merge → verify → update master plan → continue.
+>
+> 1. Identify the earliest unfinished item in the master plan's priority queue.
+> 2. Audit that rulebook requirement against the current code, data model, imports, UI/workflow, tests, and manual responsibilities. Identify the exact gap(s), including edge cases and affected formats/roles.
+> 3. **Before implementing anything that changes product behavior, stop at the review/alignment gate.** Explain:
+>    - what the rulebook requires;
+>    - what the app currently does;
+>    - what is actually missing;
+>    - what should remain manual/import-only/audit-only;
+>    - the proposed implementation, including data, UI, workflow, validation, edge cases, and acceptance criteria.
+>    Discuss this with me and incorporate my decisions. Do not create production code or an implementation PR until we are aligned on the proposed behavior.
+> 4. Once aligned, implement the agreed solution in a focused PR. Do not create unnecessary branches, clone the repo, or bundle unrelated work.
+> 5. Include tests as part of the implementation. Do not claim tests, builds, SQL application, live data, or production behavior passed unless actually verified.
+> 6. If SQL is required, include the migration in the focused PR. New public Supabase tables must include explicit RLS and least-privilege Data API grants in the same migration. I will apply SQL manually; never claim it is applied until I confirm or a live read-only verification proves it.
+> 7. Do not merge PRs on my behalf. After I merge, verify the merged main state and relevant CI, then update the master plan with the actual evidence.
+> 8. Continue automatically to the next unfinished task after verification. Do not stop at phase boundaries or ask me whether to proceed when the next task is already defined by the master plan.
+> 9. Preserve all settled decisions in the master plan. Do not reopen them unless new rulebook evidence, code evidence, or a genuine contradiction requires discussion.
+> 10. If the correct disposition is **Manual process — agreed**, **Import-only**, or **Audit/reconciliation only**, do not build unnecessary app functionality merely to make the clause look implemented. Document the responsible person/process and acceptance evidence.
+> 11. If a genuine unresolved business decision is required, present the rulebook requirement and concrete options, explain the consequences, and wait for my decision before implementation.
+>
+> **Completion goal:** Continue this process until the entire rulebook Sections 1–9 has been audited and every clause has a final disposition of Verified, Import-only, or Manual process — agreed (or a clearly documented exception/decision), with required implementation/data persistence/import behavior/manual responsibilities, SQL, tests, and verification completed. Do not declare the audit complete merely because the PR queue is empty.
