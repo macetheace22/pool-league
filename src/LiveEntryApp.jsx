@@ -342,7 +342,11 @@ export default function LiveEntryApp() {
     const homeOk = match.unavailableHome || match.confirmedHome;
     const awayOk = match.unavailableAway || match.confirmedAway;
     const normalReady = match.phase === "confirm" && homeOk && awayOk && !match.disputedBy && !(match.unavailableHome && match.unavailableAway) && match.submissionReady;
-    const makeupReady = match.makeup && match.makeup.confirmedHome && match.makeup.confirmedAway && !match.makeup.disputedBy;
+    const makeupReady = match.makeup &&
+      (match.unavailableHome || match.makeup.confirmedHome) &&
+      (match.unavailableAway || match.makeup.confirmedAway) &&
+      !match.makeup.disputedBy &&
+      ((!match.unavailableHome && !match.unavailableAway) || match.makeup.submissionReady);
     if ((normalReady || makeupReady) && !match.archiving && !archivingRef.current) {
       archivingRef.current = true;
       (async () => {
@@ -1241,71 +1245,59 @@ function ToggleChip({ label, active, color, onToggle }) {
 function MakeupConfirmScreen({ match, onSave }) {
   const [flagging, setFlagging] = useState(null);
   const [note, setNote] = useState("");
+  const [ack, setAck] = useState(false);
   const m = match.makeup;
   const shortTeamName = m.shortTeam === "home" ? match.teamHome.name : match.teamAway.name;
   const completedCount = match.sets.filter(s => s.complete).length;
+  const solo = !!(match.unavailableHome || match.unavailableAway);
+  const unavailableTeamName = match.unavailableHome ? match.teamHome.name : match.unavailableAway ? match.teamAway.name : null;
 
   const confirmSide = (side) => {
     onSave({ ...match, makeup: { ...m, [side === "home" ? "confirmedHome" : "confirmedAway"]: true } });
   };
   const submitFlag = () => {
-    onSave({ ...match, makeup: { ...m, confirmedHome: false, confirmedAway: false, disputedBy: flagging, disputeNote: note.trim() || "No details given." } });
+    onSave({ ...match, makeup: { ...m, confirmedHome: false, confirmedAway: false, disputedBy: flagging, disputeNote: note.trim() || "No details given.", submissionReady: false } });
     setFlagging(null); setNote("");
   };
-  const clearDispute = () => {
-    onSave({ ...match, makeup: { ...m, disputedBy: null, disputeNote: null } });
-  };
-  const cancelMakeup = () => {
-    onSave({ ...match, makeup: null });
-  };
+  const clearDispute = () => onSave({ ...match, makeup: { ...m, disputedBy: null, disputeNote: null } });
+  const cancelMakeup = () => onSave({ ...match, makeup: null });
+  const homeOk = match.unavailableHome || m.confirmedHome;
+  const awayOk = match.unavailableAway || m.confirmedAway;
+  const readyForFinalReview = homeOk && awayOk && !m.disputedBy;
+
+  if (readyForFinalReview && (!solo || m.submissionReady)) {
+    return <div className="screen"><div className="screen__eyebrow"><Check size={12}/> Makeup Ready</div><div className="screen__title">Makeup Recorded</div><div className="card" style={{textAlign:"center"}}><div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5}}>{solo ? "This makeup was reviewed and submitted by the available scorer. The other team was not confirming in the app tonight." : "Both teams have confirmed this makeup."}</div></div></div>;
+  }
+
+  if (readyForFinalReview && solo) {
+    return (
+      <div className="screen">
+        <div className="screen__eyebrow"><Check size={12}/> Final Review</div>
+        <div className="screen__title">Submit Makeup</div>
+        <div className="card" style={{borderColor:"#92400E",background:"#2A1F00"}}>
+          <div style={{fontSize:12.5,fontWeight:700,color:"#F59E0B",marginBottom:6}}>Scored for both teams</div>
+          <div style={{fontSize:11.5,color:"#E0E0E0",lineHeight:1.5,marginBottom:12}}>{unavailableTeamName} wasn't confirming in the app tonight. Double-check the completed sets and the remaining sets that will be made up before submitting.</div>
+          <label style={{display:"flex",alignItems:"flex-start",gap:9,fontSize:12.5,color:"#E0E0E0",cursor:"pointer"}}><input type="checkbox" checked={ack} onChange={(e)=>setAck(e.target.checked)} style={{marginTop:2,flexShrink:0}} />I've reviewed this makeup and confirm it is accurate for both teams.</label>
+        </div>
+        <button className="btn-primary" disabled={!ack} onClick={()=>onSave({ ...match, makeup: { ...m, submissionReady: true } })}>Submit Makeup</button>
+      </div>
+    );
+  }
 
   return (
     <div className="screen">
       <div className="screen__eyebrow"><AlertTriangle size={12}/> Makeup Reported</div>
       <div className="screen__title">Confirm This Is a Makeup</div>
-      <div className="card" style={{borderColor:"#92400E",background:"#2A1F00"}}>
-        <div style={{fontSize:12.5,fontWeight:700,color:"#F59E0B",marginBottom:4}}>{shortTeamName} is short players tonight</div>
-        <div style={{fontSize:12,color:"#E0E0E0",lineHeight:1.4}}>{m.reason}</div>
-      </div>
-      <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>
-        {completedCount > 0
-          ? `${completedCount} of 5 tables already played tonight keep their real score. The rest will show as "Makeup Pending" in team history until they're rescheduled & played.`
-          : `Once both teams confirm, tonight's match is recorded with no score — it'll show as "Makeup Pending" in team history until it's rescheduled & played.`}
-      </div>
+      <div className="card" style={{borderColor:"#92400E",background:"#2A1F00"}}><div style={{fontSize:12.5,fontWeight:700,color:"#F59E0B",marginBottom:4}}>{shortTeamName} is short players tonight</div><div style={{fontSize:12,color:"#E0E0E0",lineHeight:1.4}}>{m.reason}</div></div>
+      <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>{completedCount > 0 ? (completedCount + ' of 5 tables already played tonight keep their real score. The rest will show as "Makeup Pending" in team history until they\'re rescheduled & played.') : "Once the applicable side(s) confirm, tonight\'s match is recorded with no score — it\'ll show as \"Makeup Pending\" in team history until it\'s rescheduled & played."}</div>
 
-      {m.disputedBy && (
-        <div className="dispute-banner">
-          <div className="dispute-banner__title">{m.disputedBy === "home" ? match.teamHome.name : match.teamAway.name} flagged a problem</div>
-          <div className="dispute-banner__note">{m.disputeNote}</div>
-          <button className="btn-secondary" onClick={clearDispute}>Reviewed together — clear flag</button>
-        </div>
-      )}
-
-      {!m.disputedBy && (
-        <div className="confirm-row">
-          <ConfirmCard teamName={match.teamHome.name} side="home" confirmed={m.confirmedHome}
-            onConfirm={() => confirmSide("home")} onFlag={() => setFlagging("home")} confirmLabel="Confirm Makeup" />
-          <ConfirmCard teamName={match.teamAway.name} side="away" confirmed={m.confirmedAway}
-            onConfirm={() => confirmSide("away")} onFlag={() => setFlagging("away")} confirmLabel="Confirm Makeup" />
-        </div>
-      )}
-
-      {flagging && (
-        <div className="card">
-          <div className="card__title">What looks wrong?</div>
-          <textarea className="flag-textarea" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. We actually have 5 shooters"/>
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn-secondary" onClick={()=>setFlagging(null)}>Cancel</button>
-            <button className="btn-primary" onClick={submitFlag}>Submit Flag</button>
-          </div>
-        </div>
-      )}
-
+      {m.disputedBy && <div className="dispute-banner"><div className="dispute-banner__title">{m.disputedBy === "home" ? match.teamHome.name : match.teamAway.name} flagged a problem</div><div className="dispute-banner__note">{m.disputeNote}</div><button className="btn-secondary" onClick={clearDispute}>Reviewed together — clear flag</button></div>}
+      {!m.disputedBy && <div className="confirm-row">{match.unavailableHome ? <UnavailableCard teamName={match.teamHome.name} side="home" /> : <ConfirmCard teamName={match.teamHome.name} side="home" confirmed={m.confirmedHome} onConfirm={()=>confirmSide("home")} onFlag={()=>setFlagging("home")} confirmLabel="Confirm Makeup" />}{match.unavailableAway ? <UnavailableCard teamName={match.teamAway.name} side="away" /> : <ConfirmCard teamName={match.teamAway.name} side="away" confirmed={m.confirmedAway} onConfirm={()=>confirmSide("away")} onFlag={()=>setFlagging("away")} confirmLabel="Confirm Makeup" />}</div>}
+      {flagging && <div className="card"><div className="card__title">What looks wrong?</div><textarea className="flag-textarea" rows={3} value={note} onChange={(e)=>setNote(e.target.value)} placeholder="e.g. We actually have 5 shooters" /><div style={{display:"flex",gap:8}}><button className="btn-secondary" onClick={()=>setFlagging(null)}>Cancel</button><button className="btn-primary" onClick={submitFlag}>Submit Flag</button></div></div>}
       <SecondaryBtn onClick={cancelMakeup}>{completedCount > 0 ? "Cancel — we can finish tonight after all" : "Cancel — we can play tonight after all"}</SecondaryBtn>
     </div>
   );
 }
-
 // ─── Confirm Screen (both sides sign off before archiving) ───────────────────
 // Two sub-steps now, not one: first each PRESENT side confirms (a side
 // marked unavailable -- e.g. the other team doesn't have the app tonight --
