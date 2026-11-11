@@ -651,7 +651,7 @@ function MidMatchMakeupTrigger({ match, onSave }) {
   }
   return (
     <button className="makeup-trigger-link" onClick={()=>setReporting(true)}>
-      <AlertTriangle size={12}/> {completedCount > 0 ? "Out of shooters for the rest of the night — report a makeup" : "A team has no shooters tonight — report a makeup"}
+      <AlertTriangle size={12}/> {completedCount > 0 ? "End Tonight & Make Up Remaining Sets" : "End Tonight as Makeup"}
     </button>
   );
 }
