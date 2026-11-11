@@ -1549,6 +1549,12 @@ function ratingForTeamTotal(rating, format) {
 function teamRatingBonusPenalty(state, side, makeupPending) {
   const format = (state.format || "masters").toLowerCase();
   if (format === "masters") return 0;
+
+  // Rule 6.5: when the entire team match is forfeited, the forfeiting team
+  // receives exactly zero points. Do not apply its 325-limit penalty.
+  // Individual set forfeits (Rule 6.4), including a lone shooter's remaining
+  // sets, do not carry this match-level override.
+  if (state.fullMatchForfeit?.forfeitingSide === side) return 0;
   const total = (state.sets ?? []).filter(s => s.complete).reduce((sum, s) => {
     const player = side === "home" ? s.playerHome : s.playerAway;
     return player ? sum + ratingForTeamTotal(player.rating, format) : sum;

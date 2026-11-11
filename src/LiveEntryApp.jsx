@@ -700,7 +700,12 @@ function FullMatchForfeitForm({ match, onCancel, onConfirm }) {
         forfeitPoints: points,
       };
     });
-    onConfirm({ ...match, sets, phase: "confirm" });
+    onConfirm({
+      ...match,
+      sets,
+      fullMatchForfeit: { forfeitingSide },
+      phase: "confirm",
+    });
   };
 
   return (
