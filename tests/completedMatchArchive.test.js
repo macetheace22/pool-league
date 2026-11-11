@@ -9,8 +9,8 @@ const baseState = {
   weekDate: "07/15/2026",
   venue: "Pullman Club",
   format: "masters",
-  teamHome: { id: "team-home", name: "Home Team" },
-  teamAway: { id: "team-away", name: "Away Team" },
+  teamHome: { id: "team-home", name: "Home Team", teamNum: "76A01" },
+  teamAway: { id: "team-away", name: "Away Team", teamNum: "76B02" },
   sets: [{
     setNum: 1,
     complete: true,
@@ -45,6 +45,8 @@ describe("completed match archive transformation", () => {
     });
     expect(row.state).toBe(baseState);
     expect(row.state.schedulePairingId).toBe("pair-123");
+    expect(row.state.teamHome.teamNum).toBe("76A01");
+    expect(row.state.teamAway.teamNum).toBe("76B02");
   });
 
   it("marks an untouched confirmed makeup as pending without inventing a 0-0 result", () => {
