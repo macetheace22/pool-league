@@ -14,6 +14,7 @@ import { useAuth } from "./AuthContext";
 import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from "./Shell";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { parseStandingsImport, parseMvpImport, parseLeagueRoster } from "./ibaParsers";
+import { makeupDeadlineFromPlayoffsStart } from "./forfeitRules";
 import IbaAutoSyncPanel from "./IbaAutoSyncPanel";
 import IbaScheduleImportPanel, { clearIbaSchedulePanelState } from "./IbaScheduleImportPanel";
 // SetEntry is the exact same rack-by-rack (innings, safeties, timeouts)
@@ -2475,9 +2476,11 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   // { mode: "pick" | "edit" | "respond", match, set? }
   const [correctionFlow, setCorrectionFlow] = useState(null);
 
-  const makeupDeadline = playoffsStartDate
-    ? new Date(new Date(playoffsStartDate + "T00:00:00").getTime() - 14 * 86400000)
-    : null;
+  // Rule 8.5: no make-ups are allowed less than seven days before the
+  // last scheduled regular-season date. The schedule's playoff start is the
+  // next scheduled week, so subtracting 14 days from playoff start yields the
+  // same seven-day cutoff from the final regular-season date.
+  const makeupDeadline = makeupDeadlineFromPlayoffsStart(playoffsStartDate);
   const isPastDeadline = makeupDeadline ? Date.now() > makeupDeadline.getTime() : false;
 
   // Same-night check mirrors the server-side rule in reopen_match_for_editing()
