@@ -703,6 +703,94 @@ describe("computeMatchPoints", () => {
   });
 
 
+
+  it("counts Advanced NR players as 50 and established opponents at their actual ratings for the team limit", () => {
+    const state = {
+      format: "advanced",
+      sets: [
+        [1, 55], // NR counts as 50; opponent remains 55.
+        [50, 55],
+        [60, 55],
+        [70, 55],
+        [80, 55],
+      ].map(([homeRating, awayRating], index) => ({
+        complete: true,
+        winnerSlot: null,
+        playerHome: { num: String(index + 1), rating: homeRating },
+        playerAway: { num: String(index + 6), rating: awayRating },
+        racks: [],
+      })),
+    };
+
+    // Home: 50 + 50 + 60 + 70 + 80 = 310 => +15.
+    // Away: 55 * 5 = 275 => +50.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 15,
+      awayPoints: 50,
+    });
+  });
+
+  it("applies the five-times over-limit penalty in Open as well as Advanced", () => {
+    const state = {
+      format: "open",
+      sets: Array.from({ length: 5 }, (_, index) => ({
+        complete: true,
+        winnerSlot: null,
+        playerHome: { num: String(index + 1), rating: 70 },
+        playerAway: { num: String(index + 6), rating: 50 },
+        racks: [],
+      })),
+    };
+
+    // Home: 350 => 25 over, penalized 125.
+    // Away: 250 => 75 below, receives a 75-point bonus.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: -125,
+      awayPoints: 75,
+    });
+  });
+
+  it("retains the over-limit penalty for a team that forfeited an individual set", () => {
+    const state = {
+      format: "advanced",
+      sets: Array.from({ length: 5 }, (_, index) => ({
+        complete: true,
+        winnerSlot: null,
+        playerHome: { num: String(index + 1), rating: 70 },
+        playerAway: { num: String(index + 6), rating: 60 },
+        racks: [],
+        ...(index === 4
+          ? { forfeited: true, forfeitedBy: "home", forfeitPoints: 0 }
+          : {}),
+      })),
+    };
+
+    // Home: 350 => -125 penalty; forfeiting does not erase it.
+    // Away: 300 => +25 bonus as the receiving team.
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: -125,
+      awayPoints: 25,
+    });
+  });
+
+  it("applies no team rating adjustment when the total is exactly 325", () => {
+    const state = {
+      format: "advanced",
+      sets: Array.from({ length: 5 }, (_, index) => ({
+        complete: true,
+        winnerSlot: null,
+        playerHome: { num: String(index + 1), rating: 65 },
+        playerAway: { num: String(index + 6), rating: 65 },
+        racks: [],
+      })),
+    };
+
+    expect(computeMatchPoints(state)).toEqual({
+      homePoints: 0,
+      awayPoints: 0,
+    });
+  });
+
   it("defaults to masters when format is missing", () => {
     const state = {
       sets: [{
