@@ -139,6 +139,8 @@ describe("Section 4.5 player division transfers", () => {
     expect(sql).toContain("has_played boolean not null default false");
     expect(sql).toContain("track_live_match_player_participation");
     expect(sql).toContain("track_completed_match_player_participation");
+    expect(sql).toContain("if v_has_played then");
+    expect(sql).toContain("Before the player has participated in a set");
     expect(sql).toContain("jsonb_array_length(coalesce(v_set->'racks', '[]'::jsonb)) > 0");
   });
 
