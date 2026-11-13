@@ -916,6 +916,12 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
           : <>{opponentPlayer?.name} ({opponentPlayer?.rating}) is on the table — {team.name} picks a counter</>
         }
       </div>
+      {match.isPlayoff && availableRoster.some(player => !player.eligCode) && (
+        <div className="import-warning-block" style={{marginBottom:8}}>
+          <div className="import-warning-block__title"><AlertTriangle size={12}/> Eligibility unverified</div>
+          <div style={{fontSize:11,color:"#D0D0D0"}}>One or more players have no linked official IBA eligibility code. They remain selectable, but confirm their status with the official report.</div>
+        </div>
+      )}
       <div className="draft-roster-list">
         {availableRoster.length === 0 && <div className="empty-state">No available players left on this roster.</div>}
         {availableRoster
