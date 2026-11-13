@@ -9,28 +9,36 @@ import * as db from "./db";
 import { useActiveSession } from "./ActiveSessionContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 
+const PRACTICE_TYPES = [
+  { key: "skills_drills", label: "Practice Skills & Drills", desc: "Work on your own game with Track a Rack and focused practice drills — no opponent or match result." },
+  { key: "opponent", label: "Practice vs. Opponent", desc: "Play a practice set against another player and track the result using an IBA-style scoring method." },
+];
 const GAME_TYPES = [
-  { key: "8ball", label: "8-Ball" },
-  { key: "9ball", label: "9-Ball" },
-  { key: "10ball", label: "10-Ball" },
-  { key: "ultimate", label: "Ultimate Pool" },
+  { key: "8ball", label: "8-Ball", desc: "Practice the game used in IBA league play." },
+  { key: "9ball", label: "9-Ball", desc: "Practice 9-ball with its own rack and scoring style." },
+  { key: "10ball", label: "10-Ball", desc: "Practice 10-ball with its own rack and scoring style." },
+  { key: "ultimate", label: "Ultimate Pool", desc: "Practice Ultimate Pool without affecting league scoring." },
 ];
-const FORMATS = [
-  { key: "race", label: "Race to X", desc: "First to win X games" },
-  { key: "bestof", label: "Best of X", desc: "First to win more than half (pick an odd X)" },
-  { key: "match", label: "Match", desc: "Race to your own rating — no margin scoring, just first there wins" },
+const SCORING_METHODS = [
+  { key: "race_to_points", label: "Race to Points", desc: "Track points earned in each game toward the player's target." },
+  { key: "race_to_games", label: "Race to Games", desc: "Track games won toward the selected number of games needed to win." },
 ];
+
+function scoringMethodLabel(key) { return SCORING_METHODS.find(f => f.key === key)?.label ?? key; }
 
 function gameTypeLabel(key) { return GAME_TYPES.find(g => g.key === key)?.label ?? key; }
 
 function practiceGameRow(profile, session) {
   return {
     created_by: profile.id,
+    practice_type: session.practiceType ?? "opponent",
+    scoring_method: session.practiceType === "opponent" ? (session.scoringMethod ?? null) : null,
+    completed_at: session.completedAt ?? null,
     opponent_player_num: session.opponentType === "player" ? session.opponentPlayerNum : null,
     opponent_id: session.opponentType === "manual" ? session.opponentId : null,
-    opponent_name: session.opponentName,
-    game_type: session.gameType,
-    format: session.format,
+    opponent_name: session.practiceType === "skills_drills" ? null : session.opponentName,
+    game_type: session.gameType ?? null,
+    format: session.practiceType === "opponent" ? session.format : null,
     target_config: session.format === "match"
       ? { myTarget: session.myRating, oppTarget: session.opponentRating }
       : { x: session.x },
@@ -51,7 +59,7 @@ export default function Practice() {
   useEffect(() => {
     if (activeSession?.type === "practice" && activeSession.data?.phase === "done") clearActiveSession();
   }, [activeSession?.type, activeSession?.data?.phase, clearActiveSession]);
-  const [phase, setPhase] = useState(restoredPractice?.phase ?? "landing"); // landing | opponent | gametype | format | config | play | done
+  const [phase, setPhase] = useState(restoredPractice?.phase ?? "landing"); // landing | type | opponent | gametype | scoring | config | play | skillsplay | done
   const [session, setSessionState] = useState(restoredPractice?.session ?? null);
   const setSession = (next) => setSessionState((current) =>
     typeof next === "function" ? next(current) : next
@@ -84,12 +92,13 @@ export default function Practice() {
 
   const startSession = () => {
     const initial = {
+      practiceType: null, scoringMethod: null,
       opponentType: null, opponentPlayerNum: null, opponentId: null, opponentName: "", opponentRating: null,
       gameType: null, format: null, x: 5, myRating: null, myScore: 0, opponentScore: 0, gameLog: [], myPts: "", oppPts: "",
     };
     setSessionState(initial);
-    setPhase("opponent");
-    setActiveSession({ type: "practice", ownerId: profile?.id, route: "/practice", title: "Choose an opponent", subtitle: "Practice setup", data: { phase: "opponent", session: initial } });
+    setPhase("type");
+    setActiveSession({ type: "practice", ownerId: profile?.id, route: "/practice", title: "Choose a practice type", subtitle: "Practice setup", data: { phase: "type", session: initial } });
   };
   useEffect(() => {
     if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
@@ -108,21 +117,26 @@ export default function Practice() {
     return wrap(<><PageHeader title="Practice" /><div className="tab-content"><Loader /></div></>);
   }
 
+  if (phase === "type") {
+    return wrap(<PracticeTypeStep session={session} setSession={setSession}
+      onNext={(type) => changePhase(type === "skills_drills" ? "gametype" : "opponent")} onCancel={cancelSession} />);
+  }
   if (phase === "opponent") {
     return wrap(<OpponentStep profile={profile} session={session} setSession={setSession}
       onNext={() => changePhase("gametype")} onCancel={cancelSession} />);
   }
   if (phase === "gametype") {
     return wrap(<GameTypeStep session={session} setSession={setSession}
-      onNext={() => changePhase("format")} onBack={() => changePhase("opponent")} />);
+      onNext={() => changePhase(session.practiceType === "skills_drills" ? "skillsplay" : "scoring")}
+      onBack={() => changePhase(session.practiceType === "skills_drills" ? "type" : "opponent")} />);
   }
-  if (phase === "format") {
-    return wrap(<FormatStep session={session} setSession={setSession}
+  if (phase === "scoring") {
+    return wrap(<ScoringMethodStep session={session} setSession={setSession}
       onNext={() => changePhase("config")} onBack={() => changePhase("gametype")} />);
   }
   if (phase === "config") {
     return wrap(<ConfigStep profile={profile} session={session} setSession={setSession}
-      onNext={() => changePhase("play")} onBack={() => changePhase("format")} />);
+      onNext={() => changePhase("play")} onBack={() => changePhase("scoring")} />);
   }
   if (phase === "play") {
     return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
@@ -220,6 +234,33 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
           ))}
           {filterOpponent && <button className="btn-secondary" style={{marginTop:8}} onClick={() => setFilterOpponent(null)}>Show All</button>}
         </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Step 1: practice type ─────────────────────────────────────────────────
+function PracticeTypeStep({ session, setSession, onNext, onCancel }) {
+  return (
+    <>
+      <PageHeader title="Practice" onBack={onCancel} />
+      <div className="tab-content">
+        <div className="card">
+          <div className="card__title">Practice Type</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:6}}>
+            {PRACTICE_TYPES.map(type => (
+              <button key={type.key} className="seg-btn" style={{padding:14,textAlign:"left"}}
+                onClick={() => {
+                  setSession(s => ({ ...s, practiceType: type.key, scoringMethod: type.key === "skills_drills" ? null : s.scoringMethod }));
+                  onNext(type.key);
+                }}>
+                <div style={{fontWeight:700}}>{type.label}</div>
+                <div style={{fontSize:10.5,color:"#9A9A9A",fontWeight:500,marginTop:3,lineHeight:1.35}}>{type.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <button className="btn-secondary" onClick={onCancel}>Cancel</button>
       </div>
     </>
   );
@@ -349,17 +390,19 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 
 // ─── Step 2: game type ──────────────────────────────────────────────────────
 function GameTypeStep({ session, setSession, onNext, onBack }) {
+  const isSkills = session.practiceType === "skills_drills";
   return (
     <>
-      <PageHeader title="Practice" subtitle={`vs ${session.opponentName}`} onBack={onBack} />
+      <PageHeader title="Practice" subtitle={isSkills ? "Skills & Drills" : `vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
           <div className="card__title">Game Type</div>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:6}}>
             {GAME_TYPES.map(g => (
-              <button key={g.key} className={`seg-btn ${session.gameType===g.key?"seg-btn--active":""}`} style={{padding:14}}
+              <button key={g.key} className={`seg-btn ${session.gameType===g.key?"seg-btn--active":""}`} style={{padding:14,textAlign:"left"}}
                 onClick={() => { setSession(s => ({ ...s, gameType: g.key })); onNext(); }}>
-                {g.label}
+                <div style={{fontWeight:700}}>{g.label}</div>
+                <div style={{fontSize:10.5,color:"#9A9A9A",fontWeight:500,marginTop:3,lineHeight:1.35}}>{g.desc}</div>
               </button>
             ))}
           </div>
@@ -370,33 +413,26 @@ function GameTypeStep({ session, setSession, onNext, onBack }) {
   );
 }
 
-// ─── Step 3: format ─────────────────────────────────────────────────────────
-function FormatStep({ session, setSession, onNext, onBack }) {
-  const matchAvailable = session.gameType === "8ball";
-  const matchPending = session.gameType === "ultimate"; // rules TBD, not simply "no rating concept"
-  const matchUnavailableReason = matchPending
-    ? "Ultimate Pool's timed rating format is being defined — coming soon."
-    : "9-Ball and 10-Ball don't use a rating/handicap — this format doesn't apply to this game.";
+// ─── Step 3: scoring method ────────────────────────────────────────────────
+function ScoringMethodStep({ session, setSession, onNext, onBack }) {
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} onBack={onBack} />
+      <PageHeader title="Practice" subtitle={`vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
-          <div className="card__title">Format</div>
+          <div className="card__title">Scoring Method</div>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:6}}>
-            {FORMATS.map(f => {
-              const disabled = f.key === "match" && !matchAvailable;
-              return (
-                <button key={f.key} className="seg-btn" style={{padding:14,textAlign:"left",opacity:disabled?0.4:1,cursor:disabled?"not-allowed":"pointer"}}
-                  disabled={disabled}
-                  onClick={() => { setSession(s => ({ ...s, format: f.key })); onNext(); }}>
-                  <div style={{fontWeight:700}}>{f.label}</div>
-                  <div style={{fontSize:10.5,color:"#9A9A9A",fontWeight:500,marginTop:2}}>
-                    {disabled ? matchUnavailableReason : f.desc}
-                  </div>
-                </button>
-              );
-            })}
+            {SCORING_METHODS.map(method => (
+              <button key={method.key} className={`seg-btn ${session.scoringMethod===method.key?"seg-btn--active":""}`} style={{padding:14,textAlign:"left"}}
+                onClick={() => {
+                  const format = method.key === "race_to_points" ? "match" : "race";
+                  setSession(s => ({ ...s, scoringMethod: method.key, format }));
+                  onNext();
+                }}>
+                <div style={{fontWeight:700}}>{method.label}</div>
+                <div style={{fontSize:10.5,color:"#9A9A9A",fontWeight:500,marginTop:3,lineHeight:1.35}}>{method.desc}</div>
+              </button>
+            ))}
           </div>
         </div>
         <button className="btn-secondary" onClick={onBack}>← Back</button>
@@ -419,20 +455,22 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
     db.getPlayerRating(profile.player_num).then(r => { setMyRating(r ?? ""); setLoadingMyRating(false); });
   }, [session.format, profile?.player_num]);
 
-  const isMatch = session.format === "match";
-  const isBestOf = session.format === "bestof";
+  const isRaceToPoints = session.scoringMethod === "race_to_points";
+  const isRaceToGames = session.scoringMethod === "race_to_games";
 
   const next = () => {
     setErr("");
-    if (!isMatch) {
+    if (isRaceToGames) {
       const n = Number(x);
-      if (!n || n < 1) { setErr("Enter a valid number."); return; }
-      if (isBestOf && n % 2 === 0) { setErr("Best of needs an odd number (e.g. 3, 5, 7)."); return; }
+      if (!n || n < 1) { setErr("Enter a valid number of games."); return; }
       setSession(s => ({ ...s, x: n }));
-    } else {
+    } else if (isRaceToPoints) {
       const my = Number(myRating), opp = Number(oppRating);
       if (!my || !opp) { setErr("Enter a rating for both players."); return; }
       setSession(s => ({ ...s, myRating: my, opponentRating: opp }));
+    } else {
+      setErr("Choose a scoring method.");
+      return;
     }
     onNext();
   };
@@ -442,11 +480,11 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
       <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
-          {!isMatch ? (
+          {isRaceToGames ? (
             <>
-              <div className="card__title">{isBestOf ? "Best of How Many?" : "Race to How Many?"}</div>
+              <div className="card__title">Race to How Many Games?</div>
               <div style={{fontSize:11.5,color:"#9A9A9A",marginBottom:8}}>
-                {isBestOf ? "Pick an odd number — first to win more than half takes it." : "First to win this many games takes it."}
+                Set the number of games needed to win the practice set.
               </div>
               <input className="input" type="number" value={x} onChange={e=>setX(e.target.value)} />
             </>
@@ -472,6 +510,52 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
           <button className="btn-primary" style={{marginTop:10}} onClick={next}>Start Playing</button>
         </div>
         <button className="btn-secondary" onClick={onBack}>← Back</button>
+      </div>
+    </>
+  );
+}
+
+// ─── Skills & Drills play ─────────────────────────────────────────────────
+function SkillsDrillsStep({ profile, session, setSession, onDone, onBack }) {
+  const [recordStatus, setRecordStatus] = useState("checking");
+  const [recordError, setRecordError] = useState("");
+  const [recordAttempt, setRecordAttempt] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const ensureRecord = async () => {
+      if (!profile?.id) { setRecordError("Your account could not be identified. Sign in again before logging practice."); setRecordStatus("error"); return; }
+      if (!session.gameId) { setSession(current => current?.gameId ? current : { ...current, gameId: crypto.randomUUID() }); return; }
+      try {
+        let existing = await db.getPracticeGame(session.gameId, profile.id);
+        if (!existing) {
+          existing = await db.createPracticeGame({ id: session.gameId, ...practiceGameRow(profile, session) });
+          if (!existing) existing = await db.getPracticeGame(session.gameId, profile.id);
+        }
+        if (!existing) throw new Error("The practice session could not be created or recovered.");
+        if (!cancelled) setRecordStatus("ready");
+      } catch (error) {
+        if (!cancelled) { setRecordError(error?.message || "Unable to prepare this practice session."); setRecordStatus("error"); }
+      }
+    };
+    ensureRecord();
+    return () => { cancelled = true; };
+  }, [session.gameId, profile?.id, recordAttempt]);
+
+  const finish = () => onDone({ ...session, completedAt: new Date().toISOString(), winner: null, myScore: 0, opponentScore: 0 });
+  return (
+    <>
+      <PageHeader title="Practice" subtitle="Skills & Drills" backFallback="/practice" />
+      <div className="tab-content">
+        <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Practice on your own — use Track a Rack for shot-by-shot detail, or work through drills without an opponent.</div>
+        {recordStatus === "checking" && <div className="card"><Loader /><div className="card__title">Preparing your practice session…</div></div>}
+        {recordStatus === "error" && <div className="card"><div className="error-msg">{recordError}</div><button className="btn-secondary" style={{marginTop:10}} onClick={() => { setRecordStatus("checking"); setRecordAttempt(n => n + 1); }}>Retry</button></div>}
+        {recordStatus === "ready" && <div className="card">
+          <div className="card__title">Track a Rack</div>
+          {profile?.player_num ? <ShotTracker contextType="practice_game" contextId={session.gameId} player={{ num: profile.player_num, name: profile.username || "You" }} opponentNum={null} gameType={session.gameType} /> :
+            <div className="dash-empty">Your league player profile is not linked, so shot tracking is unavailable for your account.</div>}
+          <button className="btn-primary" style={{marginTop:12}} onClick={finish}>Finish Practice</button>
+        </div>}
+        <button className="btn-secondary" onClick={onBack}>← Back to Game Type</button>
       </div>
     </>
   );
@@ -534,10 +618,8 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
     ? { num: session.opponentPlayerNum, name: session.opponentName }
     : null;
 
-  const oppTarget = session.format === "match" ? session.opponentRating
-    : session.format === "bestof" ? Math.floor(session.x / 2) + 1 : session.x;
-  const myTargetDisplay = session.format === "match" ? session.myRating
-    : session.format === "bestof" ? Math.floor(session.x / 2) + 1 : session.x;
+  const oppTarget = session.scoringMethod === "race_to_points" ? session.opponentRating : session.x;
+  const myTargetDisplay = session.scoringMethod === "race_to_points" ? session.myRating : session.x;
 
   const winner = myScore >= myTargetDisplay ? "me" : oppScore >= oppTarget ? "opponent" : null;
 
@@ -573,12 +655,12 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
   };
 
   const finish = () => {
-    onDone({ ...session, myScore, opponentScore: oppScore, winner, gameLog });
+    onDone({ ...session, myScore, opponentScore: oppScore, winner, gameLog, completedAt: new Date().toISOString() });
   };
 
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${FORMATS.find(f=>f.key===session.format)?.label}`} backFallback="/" />
+      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${scoringMethodLabel(session.scoringMethod)}`} backFallback="/" />
       <div className="tab-content">
         <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Your session is saved as you go. You can leave this screen and resume from the active-session bar.</div>
         {recordStatus === "checking" && <div className="card"><Loader /><div className="card__title">Preparing your practice game…</div></div>}
