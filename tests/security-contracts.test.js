@@ -126,3 +126,42 @@ describe("RLS auth.uid initplan optimization", () => {
     expect(sql).toContain("public.can_write_practice_shot_event(context_id, player_num)");
   });
 });
+
+
+describe("Section 4.5 player division transfers", () => {
+  it("records durable division assignments and blocks unapproved same-division roster changes", () => {
+    const sql = read("supabase-schema-section-84-player-transfer-approval.sql");
+    expect(sql).toContain("player_division_team_assignments");
+    expect(sql).toContain("primary key (player_num, division_id)");
+    expect(sql).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
+    expect(sql).toContain("before insert or update of team_id, player_num on public.rosters");
+    expect(sql).toContain("public.rosters r");
+    expect(sql).toContain("has_played boolean not null default false");
+    expect(sql).toContain("track_live_match_player_participation");
+    expect(sql).toContain("track_completed_match_player_participation");
+    expect(sql).toContain("if v_has_played then");
+    expect(sql).toContain("Before the player has participated in a set");
+    expect(sql).toContain("jsonb_array_length(coalesce(v_set->'racks', '[]'::jsonb)) > 0");
+  });
+
+  it("allows only receiving-team captains to request and managers to decide transfers", () => {
+    const sql = read("supabase-schema-section-84-player-transfer-approval.sql");
+    expect(sql).toContain("public.is_team_captain(p_to_team_id)");
+    expect(sql).toContain("public.current_role_name() <> 'manager'");
+    expect(sql).toContain("status in ('pending', 'approved', 'declined')");
+    expect(sql).toContain("revoke all on function public.decide_player_transfer_request(uuid, boolean) from public, anon");
+    expect(sql).toContain("grant execute on function public.decide_player_transfer_request(uuid, boolean) to authenticated");
+    expect(sql).toContain("update public.player_division_team_assignments");
+    expect(sql).toContain("delete from public.rosters");
+  });
+
+  it("routes captain roster additions through transfer requests and exposes manager decisions", () => {
+    const db = read("src/db.js");
+    const admin = read("src/AdminApp.jsx");
+    expect(db).toContain('supabase.rpc("create_player_transfer_request"');
+    expect(db).toContain('supabase.rpc("decide_player_transfer_request"');
+    expect(admin).toContain("PlayerTransferRequestsTab");
+    expect(admin).toContain("receiving team");
+    expect(admin).toContain("League Manager for approval");
+  });
+});

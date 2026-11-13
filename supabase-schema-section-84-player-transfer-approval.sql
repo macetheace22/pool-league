@@ -1,0 +1,405 @@
+-- Section 84: enforce one team per division/season and require approval for transfers
+--
+-- A player's provisional roster assignment can change until they actually play.
+-- Once they participate in a rack, a same-division team change requires a
+-- receiving-team captain's request and an explicit League Manager decision.
+
+create table if not exists public.player_division_team_assignments (
+  player_num text not null references public.players(num) on delete cascade,
+  division_id uuid not null references public.divisions(id) on delete cascade,
+  team_id uuid not null references public.teams(id) on delete restrict,
+  has_played boolean not null default false,
+  assigned_at timestamptz not null default now(),
+  primary key (player_num, division_id)
+);
+
+alter table public.player_division_team_assignments enable row level security;
+revoke all on public.player_division_team_assignments from public, anon, authenticated;
+-- Explicit Data API grant is paired with RLS and no policies, so authenticated
+-- clients cannot read or mutate this internal assignment ledger directly.
+grant select on public.player_division_team_assignments to authenticated;
+
+-- Seed historical participation first, so a player who has already played
+-- remains assigned even if they were later removed from the current roster.
+-- Latest match archive wins if older data contains an already-approved move.
+insert into public.player_division_team_assignments
+  (player_num, division_id, team_id, has_played)
+select distinct on (played.player_num, played.division_id)
+  played.player_num, played.division_id, played.team_id, true
+from (
+  select
+    set_row.value->'playerHome'->>'num' as player_num,
+    cm.division_id,
+    cm.team_home_id as team_id,
+    cm.created_at
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerHome'->>'num', '') is not null
+  union all
+  select
+    set_row.value->'playerAway'->>'num' as player_num,
+    cm.division_id,
+    cm.team_away_id as team_id,
+    cm.created_at
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerAway'->>'num', '') is not null
+) played
+where played.division_id is not null and played.team_id is not null
+order by played.player_num, played.division_id, played.created_at desc
+on conflict (player_num, division_id) do nothing;
+
+-- Current roster entries are provisional until the player actually participates
+-- in a set. Existing roster conflicts are left untouched for manager review.
+insert into public.player_division_team_assignments (player_num, division_id, team_id)
+select r.player_num, t.division_id, min(r.team_id::text)::uuid
+from public.rosters r
+join public.teams t on t.id = r.team_id
+where t.division_id is not null
+group by r.player_num, t.division_id
+having count(distinct r.team_id) = 1
+on conflict (player_num, division_id) do nothing;
+
+create table if not exists public.player_transfer_requests (
+  id uuid primary key default gen_random_uuid(),
+  player_num text not null references public.players(num) on delete cascade,
+  division_id uuid not null references public.divisions(id) on delete cascade,
+  from_team_id uuid not null references public.teams(id) on delete restrict,
+  to_team_id uuid not null references public.teams(id) on delete restrict,
+  requested_by uuid not null references public.profiles(id) on delete restrict,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'declined')),
+  reviewed_by uuid references public.profiles(id) on delete set null,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  check (from_team_id <> to_team_id)
+);
+
+create unique index if not exists player_transfer_one_pending_per_player_division
+  on public.player_transfer_requests(player_num, division_id)
+  where status = 'pending';
+create index if not exists player_transfer_requests_status_created
+  on public.player_transfer_requests(status, created_at desc);
+
+alter table public.player_transfer_requests enable row level security;
+revoke all on public.player_transfer_requests from public, anon;
+grant select on public.player_transfer_requests to authenticated;
+
+drop policy if exists "Managers can review player transfer requests" on public.player_transfer_requests;
+create policy "Managers can review player transfer requests"
+  on public.player_transfer_requests
+  for select to authenticated
+  using (public.current_role_name() = 'manager');
+
+-- Record a player's first team in each division and reject direct reassignment,
+-- including delete-then-insert attempts and weekly-import upserts.
+create or replace function public.enforce_player_division_team_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_division_id uuid;
+  v_assigned_team_id uuid;
+  v_has_played boolean;
+begin
+  select division_id into v_division_id
+  from public.teams
+  where id = new.team_id;
+
+  if v_division_id is null then
+    return new;
+  end if;
+
+  -- Do not allow an active duplicate roster row, even for a player whose
+  -- assignment is still provisional (has not yet played a set).
+  if exists (
+    select 1
+    from public.rosters r
+    join public.teams t on t.id = r.team_id
+    where r.player_num = new.player_num
+      and t.division_id = v_division_id
+      and r.team_id <> new.team_id
+  ) then
+    raise exception 'PLAYER_TRANSFER_APPROVAL_REQUIRED'
+      using errcode = '23514',
+        detail = 'Remove the player from the existing team roster first. A player who has already played requires League Manager transfer approval.';
+  end if;
+
+  insert into public.player_division_team_assignments (player_num, division_id, team_id)
+  values (new.player_num, v_division_id, new.team_id)
+  on conflict (player_num, division_id) do nothing;
+
+  select team_id, has_played into v_assigned_team_id, v_has_played
+  from public.player_division_team_assignments
+  where player_num = new.player_num
+    and division_id = v_division_id
+  for update;
+
+  if v_assigned_team_id <> new.team_id then
+    if v_has_played then
+      raise exception 'PLAYER_TRANSFER_APPROVAL_REQUIRED'
+        using errcode = '23514',
+          detail = 'This player has already played for another team in this division this season. The receiving team captain must submit a transfer request for League Manager approval.';
+    end if;
+
+    -- Before the player has participated in a set, a roster correction or
+    -- team change is permitted without the special transfer approval.
+    update public.player_division_team_assignments
+    set team_id = new.team_id, assigned_at = now()
+    where player_num = new.player_num and division_id = v_division_id;
+  end if;
+
+  return new;
+end;
+$$;
+
+-- Mark a player's division assignment as locked once they actually participate
+-- in a rack. Live scoring writes live_match.state; manual match entry writes
+-- completed_matches.state, so both paths feed the same durable flag.
+create or replace function public.mark_division_players_as_played(
+  p_division_id uuid,
+  p_team_id uuid,
+  p_player_num text
+)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.player_division_team_assignments
+  set has_played = true
+  where division_id = p_division_id
+    and team_id = p_team_id
+    and player_num = p_player_num;
+$$;
+
+revoke all on function public.mark_division_players_as_played(uuid, uuid, text) from public, anon, authenticated;
+
+create or replace function public.track_live_match_player_participation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_set jsonb;
+  v_division_id uuid;
+  v_home_team_id uuid;
+  v_away_team_id uuid;
+  v_player_num text;
+begin
+  v_division_id := nullif(new.state->>'divisionId', '')::uuid;
+  v_home_team_id := nullif(new.state #>> '{teamHome,id}', '')::uuid;
+  v_away_team_id := nullif(new.state #>> '{teamAway,id}', '')::uuid;
+  if v_division_id is null then return new; end if;
+
+  for v_set in select value from jsonb_array_elements(coalesce(new.state->'sets', '[]'::jsonb))
+  loop
+    if jsonb_array_length(coalesce(v_set->'racks', '[]'::jsonb)) > 0 then
+      v_player_num := nullif(v_set #>> '{playerHome,num}', '');
+      if v_player_num is not null and v_home_team_id is not null then
+        perform public.mark_division_players_as_played(v_division_id, v_home_team_id, v_player_num);
+      end if;
+      v_player_num := nullif(v_set #>> '{playerAway,num}', '');
+      if v_player_num is not null and v_away_team_id is not null then
+        perform public.mark_division_players_as_played(v_division_id, v_away_team_id, v_player_num);
+      end if;
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+revoke all on function public.track_live_match_player_participation() from public, anon, authenticated;
+drop trigger if exists track_live_match_player_participation on public.live_match;
+create trigger track_live_match_player_participation
+after insert or update of state on public.live_match
+for each row execute function public.track_live_match_player_participation();
+
+create or replace function public.track_completed_match_player_participation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_set jsonb;
+  v_player_num text;
+begin
+  for v_set in select value from jsonb_array_elements(coalesce(new.state->'sets', '[]'::jsonb))
+  loop
+    if jsonb_array_length(coalesce(v_set->'racks', '[]'::jsonb)) > 0 then
+      v_player_num := nullif(v_set #>> '{playerHome,num}', '');
+      if v_player_num is not null and new.team_home_id is not null then
+        perform public.mark_division_players_as_played(new.division_id, new.team_home_id, v_player_num);
+      end if;
+      v_player_num := nullif(v_set #>> '{playerAway,num}', '');
+      if v_player_num is not null and new.team_away_id is not null then
+        perform public.mark_division_players_as_played(new.division_id, new.team_away_id, v_player_num);
+      end if;
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+revoke all on function public.track_completed_match_player_participation() from public, anon, authenticated;
+drop trigger if exists track_completed_match_player_participation on public.completed_matches;
+create trigger track_completed_match_player_participation
+after insert or update of state on public.completed_matches
+for each row execute function public.track_completed_match_player_participation();
+
+revoke all on function public.enforce_player_division_team_assignment() from public, anon, authenticated;
+drop trigger if exists enforce_player_division_team_assignment on public.rosters;
+create trigger enforce_player_division_team_assignment
+before insert or update of team_id, player_num on public.rosters
+for each row execute function public.enforce_player_division_team_assignment();
+
+create or replace function public.create_player_transfer_request(
+  p_player_num text,
+  p_to_team_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role text;
+  v_division_id uuid;
+  v_from_team_id uuid;
+  v_has_played boolean;
+  v_request_id uuid;
+  v_pending_to_team_id uuid;
+begin
+  v_role := public.current_role_name();
+  if v_role not in ('captain', 'manager') or not public.is_team_captain(p_to_team_id) then
+    raise exception 'RECEIVING_TEAM_CAPTAIN_REQUIRED' using errcode = '42501';
+  end if;
+
+  select division_id into v_division_id
+  from public.teams
+  where id = p_to_team_id and coalesce(is_bye, false) = false;
+
+  if v_division_id is null then
+    raise exception 'INVALID_RECEIVING_TEAM';
+  end if;
+
+  if not exists (select 1 from public.players where num = p_player_num) then
+    raise exception 'PLAYER_NOT_FOUND';
+  end if;
+
+  select team_id, has_played into v_from_team_id, v_has_played
+  from public.player_division_team_assignments
+  where player_num = p_player_num and division_id = v_division_id;
+
+  -- No previous assignment in this division (or already assigned to this
+  -- team): the caller should use the ordinary roster-add RPC instead.
+  if v_from_team_id is null or v_from_team_id = p_to_team_id or not coalesce(v_has_played, false) then
+    return jsonb_build_object('status', 'add');
+  end if;
+
+  select id, to_team_id into v_request_id, v_pending_to_team_id
+  from public.player_transfer_requests
+  where player_num = p_player_num and division_id = v_division_id and status = 'pending';
+
+  if v_request_id is not null then
+    if v_pending_to_team_id <> p_to_team_id then
+      raise exception 'TRANSFER_REQUEST_ALREADY_PENDING';
+    end if;
+    return jsonb_build_object('status', 'pending', 'request_id', v_request_id);
+  end if;
+
+  insert into public.player_transfer_requests
+    (player_num, division_id, from_team_id, to_team_id, requested_by)
+  values
+    (p_player_num, v_division_id, v_from_team_id, p_to_team_id, auth.uid())
+  returning id into v_request_id;
+
+  return jsonb_build_object('status', 'pending', 'request_id', v_request_id);
+end;
+$$;
+
+revoke all on function public.create_player_transfer_request(text, uuid) from public, anon;
+grant execute on function public.create_player_transfer_request(text, uuid) to authenticated;
+
+create or replace function public.decide_player_transfer_request(
+  p_request_id uuid,
+  p_approve boolean
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_request public.player_transfer_requests%rowtype;
+  v_profile_id uuid;
+begin
+  if public.current_role_name() <> 'manager' then
+    raise exception 'MANAGER_ONLY' using errcode = '42501';
+  end if;
+
+  select * into v_request
+  from public.player_transfer_requests
+  where id = p_request_id
+  for update;
+
+  if not found or v_request.status <> 'pending' then
+    raise exception 'TRANSFER_REQUEST_NOT_PENDING';
+  end if;
+
+  if p_approve then
+    -- Update the durable assignment first so the roster trigger recognizes
+    -- this exact manager-authorized destination.
+    update public.player_division_team_assignments
+    set team_id = v_request.to_team_id, assigned_at = now()
+    where player_num = v_request.player_num
+      and division_id = v_request.division_id
+      and team_id = v_request.from_team_id;
+
+    if not found then
+      raise exception 'TRANSFER_ASSIGNMENT_CHANGED';
+    end if;
+
+    delete from public.rosters
+    where team_id = v_request.from_team_id
+      and player_num = v_request.player_num;
+
+    insert into public.rosters(team_id, player_num)
+    values (v_request.to_team_id, v_request.player_num)
+    on conflict (team_id, player_num) do nothing;
+
+    select id into v_profile_id
+    from public.profiles
+    where player_num = v_request.player_num
+    limit 1;
+
+    if v_profile_id is not null then
+      update public.profile_team_memberships
+      set ended_at = now()
+      where profile_id = v_profile_id
+        and team_id = v_request.from_team_id
+        and ended_at is null;
+
+      insert into public.profile_team_memberships(profile_id, team_id)
+      values (v_profile_id, v_request.to_team_id)
+      on conflict (profile_id, team_id) where ended_at is null do nothing;
+    end if;
+  end if;
+
+  update public.player_transfer_requests
+  set status = case when p_approve then 'approved' else 'declined' end,
+      reviewed_by = auth.uid(),
+      reviewed_at = now()
+  where id = p_request_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.decide_player_transfer_request(uuid, boolean) from public, anon;
+grant execute on function public.decide_player_transfer_request(uuid, boolean) to authenticated;

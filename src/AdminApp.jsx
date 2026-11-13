@@ -835,9 +835,12 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         <SubTabBar>
           <SubTabBtn active={accessSubTab==="users"} onClick={()=>setAccessSubTab("users")}>Users ({accessCounts.users})</SubTabBtn>
           <SubTabBtn active={accessSubTab==="codes"} onClick={()=>setAccessSubTab("codes")}>Codes ({accessCounts.codes})</SubTabBtn>
+          <SubTabBtn active={accessSubTab==="transfers"} onClick={()=>setAccessSubTab("transfers")}>Transfers</SubTabBtn>
         </SubTabBar>
         <div className="tab-content">
-          <AccountsTab currentUserId={profile.id} subTab={accessSubTab} onCounts={setAccessCounts} />
+          {accessSubTab === "transfers"
+            ? <PlayerTransferRequestsTab />
+            : <AccountsTab currentUserId={profile.id} subTab={accessSubTab} onCounts={setAccessCounts} />}
         </div>
       </>
     );
@@ -3795,9 +3798,21 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
   const addExisting = async (playerNum, label) => {
     setError("");
-    const ok = await db.addExistingPlayerToRoster(teamId, playerNum);
-    if (!ok) { setError("Could not add player — they may already be on this roster."); return; }
-    flash(`${label} added.`); await refresh();
+    const result = await db.addExistingPlayerToRoster(teamId, playerNum);
+    if (!result?.ok) {
+      const message = result?.error?.includes("PLAYER_TRANSFER_APPROVAL_REQUIRED")
+        ? "This player has already played for another team in this division. A League Manager-approved transfer is required."
+        : result?.error?.includes("TRANSFER_REQUEST_ALREADY_PENDING")
+          ? "A transfer request for this player is already pending for another team in this division."
+          : result?.error || "Could not add player.";
+      setError(message); return;
+    }
+    if (result.status === "pending") {
+      flash(`${label}: transfer request sent to the League Manager for approval.`);
+    } else {
+      flash(`${label} added.`);
+    }
+    await refresh();
   };
 
   const runSearch = async (q) => {
@@ -4439,6 +4454,71 @@ function formatLastSeen(iso) {
 }
 
 // ─── Accounts Tab ─────────────────────────────────────────────────────────────
+function PlayerTransferRequestsTab() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    setError("");
+    try { setRows(await db.listPlayerTransferRequests()); }
+    catch (e) { setError(e?.message || "Could not load transfer requests."); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const decide = async (row, approve) => {
+    const action = approve ? "approve" : "decline";
+    if (!window.confirm(`${approve ? "Approve" : "Decline"} transfer of ${row.player?.name || row.player_num} from ${row.fromTeam?.name || "the current team"} to ${row.toTeam?.name || "the receiving team"}?`)) return;
+    setBusyId(row.id);
+    const ok = await db.decidePlayerTransferRequest(row.id, approve);
+    setBusyId(null);
+    if (!ok) { setError(`Could not ${action} this transfer. It may have already been reviewed or the roster may have changed.`); return; }
+    await refresh();
+  };
+
+  const pending = rows.filter(r => r.status === "pending");
+  const history = rows.filter(r => r.status !== "pending");
+  if (loading) return <Loader />;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      {error && <ErrorMsg>{error}</ErrorMsg>}
+      <div className="card">
+        <div className="card__title">Pending Player Transfers ({pending.length})</div>
+        {pending.length === 0 && <div className="empty-state" style={{border:"none"}}>No transfer requests are waiting for approval.</div>}
+        {pending.map(row => (
+          <div key={row.id} className="list-row" style={{alignItems:"flex-start",padding:"12px 0"}}>
+            <div className="list-row__body" style={{display:"flex",flexDirection:"column",alignItems:"stretch",gap:5}}>
+              <strong>{row.player?.name || row.player_num}</strong>
+              <span className="list-row__sub">{row.player_num} · Division {row.division?.num ?? "—"} · {row.division?.format ?? ""} {row.division?.day ?? ""}</span>
+              <span style={{fontSize:12,color:"#AAA"}}>{row.fromTeam?.name || "Current team"} → {row.toTeam?.name || "Receiving team"}</span>
+              <span style={{fontSize:10.5,color:"#777"}}>Requested {new Date(row.created_at).toLocaleString()}</span>
+              <div style={{display:"flex",gap:8,marginTop:4}}>
+                <button className="btn-primary" onClick={()=>decide(row,true)} disabled={busyId===row.id}>{busyId===row.id?"Saving…":"Accept"}</button>
+                <button className="btn-secondary" onClick={()=>decide(row,false)} disabled={busyId===row.id}>Decline</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {history.length > 0 && <div className="card">
+        <div className="card__title">Decision History ({history.length})</div>
+        {history.map(row => (
+          <div key={row.id} className="list-row" style={{padding:"9px 0"}}>
+            <div className="list-row__body" style={{display:"flex",flexDirection:"column",alignItems:"stretch",gap:3}}>
+              <strong>{row.player?.name || row.player_num}</strong>
+              <span className="list-row__sub">{row.fromTeam?.name || "Current team"} → {row.toTeam?.name || "Receiving team"}</span>
+              <span style={{fontSize:11,color:row.status==="approved"?"#5FCF9E":"#F87171",fontWeight:700}}>{row.status.toUpperCase()} · {row.reviewed_at ? new Date(row.reviewed_at).toLocaleString() : ""}</span>
+            </div>
+          </div>
+        ))}
+      </div>}
+    </div>
+  );
+}
+
 function AccountsTab({ currentUserId, subTab, onCounts }) {
   const { startMimic } = useAuth();
   const [users, setUsers]       = useState([]);
