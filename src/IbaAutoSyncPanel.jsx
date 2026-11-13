@@ -85,7 +85,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         sourceContext: `${section.formatLabel} · ${section.dayLabel}`,
         sourceKey: section.key,
         teamNum: Object.entries(section.parsed?.rosters || {}).find(([, nums]) => nums.includes(playerNum))?.[0] || "",
-        playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—",
+        playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—", eligibilityCode: parsed.eligibilityRows?.find(row => String(row.num) === String(playerNum))?.eligCode ?? "—", eligibilityCode: section.parsed?.eligibilityRows?.find(row => String(row.num) === String(playerNum))?.eligCode ?? "—",
         eligibilityCode: section.parsed?.eligibilityRows?.find(row => String(row.num) === String(playerNum))?.eligCode || "—",
       })));
     }
