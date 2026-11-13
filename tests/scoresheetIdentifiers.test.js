@@ -25,6 +25,28 @@ describe("Section 6.11 scoresheet identifiers", () => {
     expect(set.totalInnings).toBe(8);
   });
 
+  it("retains every set and distinguishes final forfeits from unplayed sets", () => {
+    const match = { state: { sets: [
+      { setNum: 1, complete: true, playerHome: { name: "Home", num: "1", rating: 50 }, playerAway: { name: "Away", num: "2", rating: 55 }, racks: [{ home: 50, away: 20 }], winnerSlot: "home" },
+      { setNum: 2, complete: true, forfeited: true, forfeitedBy: "away", forfeitPoints: 125, playerHome: { name: "Home 2", num: "3", rating: 50 }, playerAway: { name: "Away 2", num: "4", rating: 55 }, winnerSlot: "home" },
+      { setNum: 3, complete: false, playerHome: null, playerAway: null, racks: [] },
+    ] } };
+    const sets = toDisplaySets(match);
+    expect(sets).toHaveLength(3);
+    expect(sets.map(set => set.status)).toEqual(["played", "forfeited", "unplayed"]);
+    expect(sets[1].forfeitedBy).toBe("away");
+    expect(sets[2].winnerSide).toBeNull();
+  });
+
+  it("labels unfinished sets as awaiting makeup while the match is pending", () => {
+    const match = { is_makeup_pending: true, state: { sets: [
+      { setNum: 1, complete: true, playerHome: { name: "Home", rating: 50 }, playerAway: { name: "Away", rating: 55 }, racks: [{ home: 50, away: 20 }], winnerSlot: "home" },
+      { setNum: 2, complete: false, playerHome: null, playerAway: null, racks: [] },
+    ] } };
+    const sets = toDisplaySets(match);
+    expect(sets.map(set => set.status)).toEqual(["played", "makeup-pending"]);
+  });
+
   it("preserves player numbers on forfeited completed sets", () => {
     const match = { state: { sets: [{
       setNum: 1, complete: true, forfeited: true,
