@@ -1002,18 +1002,12 @@ function ForfeitTableForm({ match, setIdx, used, defaultForfeitingSide, lockForf
         <div className="draft-roster-list">
           {forfeitingRoster.slice().sort((a,b)=>b.rating-a.rating).map(p => {
             const ineligibleReason = playoffIneligibleReason(match, p);
-            if (ineligibleReason) {
-              return (
-                <div key={p.num} className="draft-roster-row draft-roster-row--ineligible">
-                  <span className="draft-roster-row__name">{p.name}{p.nickname?<span className="player-nickname"> "{p.nickname}"</span>:""}</span>
-                  <span className="draft-roster-row__ineligible-tag">{p.eligCode} — {ineligibleReason}</span>
-                </div>
-              );
-            }
             return (
               <button key={p.num} className={`draft-roster-row ${forfeitingPlayer?.num===p.num?"draft-roster-row--selected":""}`} onClick={()=>setForfeitingPlayer(p)}>
                 <span className="draft-roster-row__name">{p.name}{p.nickname?<span className="player-nickname"> "{p.nickname}"</span>:""}</span>
-                <span className="draft-roster-row__rating">{p.rating}</span>
+                {ineligibleReason
+                  ? <span className="draft-roster-row__ineligible-tag">{p.eligCode} — listed as forfeiting player</span>
+                  : <span className="draft-roster-row__rating">{p.rating}</span>}
               </button>
             );
           })}
