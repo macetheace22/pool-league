@@ -414,7 +414,13 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       const matches = reportRouting[teamNum] || [];
       return matches.length > 1 && matches.some(team => readyDivisionIds.has(team.divisionId));
     });
+    const unmatchedTeamNums = Object.keys(parsed.rosters || {}).filter(teamNum =>
+      (reportRouting[teamNum] || []).length === 0
+    );
     if (ambiguousTeamNums.length) result.warnings.push(`${report.key}: ${ambiguousTeamNums.length} roster team numbers matched multiple active divisions and were skipped.`);
+    if (unmatchedTeamNums.length) {
+      result.roster.warnings.push(`${report.key}: ${unmatchedTeamNums.length} roster team number(s) did not match an active team. Resolve the team mapping and re-import; current rosters for this report were left unchanged.`);
+    }
     const eligiblePlayerNums = new Set([...eligibleTeamNums].flatMap(teamNum => parsed.rosters[teamNum] || []));
     const filteredParsed = {
       ...parsed,
@@ -443,12 +449,18 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       byReportDivision: preflight.weekTagsByReportDivision,
       allowedDivisionIds: [...readyDivisionIds],
       weeklyCounterSnapshotsByDivision,
+      unmatchedTeamNums,
+      ambiguousTeamNums,
       fallback: fallbackWeekTag,
     });
     result.roster.updatedDivisions.push(...(imported?.updatedDivisions || []));
     result.roster.unmatchedTeams.push(...(imported?.unmatchedTeams || []));
     result.roster.ambiguousTeamIds.push(...(imported?.ambiguousTeamIds || []));
     result.roster.warnings.push(...(imported?.warnings || []));
+    result.roster.warnings.push(...(imported?.rosterSyncWarnings || []));
+    result.roster.warnings.push(...(imported?.skippedRosterDivisions || []).map(item =>
+      `Division ${item.divisionId}: ${item.reason} Current roster memberships were left unchanged.`
+    ));
     result.roster.eligibilityImported += imported?.eligibilityImport?.imported ?? 0;
     if (imported?.eligibilityImport?.skipped) result.warnings.push(`${report.key}: playoff eligibility rows were detected, but the report's as-of date could not be validated. Ratings and rosters were imported; eligibility was not updated.`);
     if (imported?.eligibilityImport?.unmatchedCount) result.warnings.push(`${report.key}: ${imported.eligibilityImport.unmatchedCount} eligibility player numbers did not match known players and will not gate player eligibility.`);
