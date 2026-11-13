@@ -2633,7 +2633,7 @@ export function computeTeamHeadToHead(matches, teamId) {
 // ─── Home dashboard: membership-driven team aggregation ─────────────────────
 // Current team context comes from active profile_team_memberships rows.
 export async function getMyTeamsOverview(profile) {
-  const teamIds = getActiveTeamIds(profile);
+  const teamIds = [...new Set([...getActiveTeamIds(profile), ...getCaptainTeamIds(profile)])];
   if (teamIds.length === 0) return [];
   const overviews = await Promise.all(teamIds.map(id => getTeamScheduleOverview(id)));
   return overviews.filter(Boolean);
