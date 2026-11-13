@@ -41,8 +41,8 @@ export function toDisplaySets(match) {
       if (!s.playerHome || !s.playerAway) {
         return {
           setNum: s.setNum, venue, status: "unplayed",
-          playerA: s.playerHome ? { name: s.playerHome.name, num: s.playerHome.num ?? null, rating: s.playerHome.rating ?? null, team: "home" } : null,
-          playerB: s.playerAway ? { name: s.playerAway.name, num: s.playerAway.num ?? null, rating: s.playerAway.rating ?? null, team: "away" } : null,
+          playerA: { name: s.playerHome?.name ?? "Home player not assigned", num: s.playerHome?.num ?? null, rating: s.playerHome?.rating ?? null, team: "home" },
+          playerB: { name: s.playerAway?.name ?? "Away player not assigned", num: s.playerAway?.num ?? null, rating: s.playerAway?.rating ?? null, team: "away" },
           racks: [], finalA: 0, finalB: 0, winnerSide: null, source: match.source,
           totalInnings: 0, safetiesA: 0, safetiesB: 0, forfeited: false,
         };
