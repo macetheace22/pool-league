@@ -311,7 +311,7 @@ function parsePlayoffEligibilityRoster(raw) {
     : null;
   const registry = {}, rosters = {}, teams = {}, eligibilityRows = [], needsRating = [];
   let currentTeams = [];
-  for (const line of text.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
+  for (const line of text.split(/\\r?\\n/).filter(value => value.trim())) {
     const teamHeaders = [...line.matchAll(/\bTeam\s+([A-Z0-9]{3,8})\s+(.*?)(?=\s+Team\s+[A-Z0-9]{3,8}\b|$)/gi)];
     if (teamHeaders.length) {
       currentTeams = teamHeaders.map(match => {
@@ -324,7 +324,7 @@ function parsePlayoffEligibilityRoster(raw) {
       }
     }
     const hasPlayerRows = /(?:^|\s)(?:\d{1,3}|NR)\s+\d{5}\s+[ETAS]\s+/i.test(line);
-    if (/^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line) && !teamHeaders.length && !hasPlayerRows) continue;
+    if (/^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line.trim()) && !teamHeaders.length && !hasPlayerRows) continue;
     if (!currentTeams.length) continue;
     const anchor = /(?:^|\s)(\d{1,3}|NR)\s+(\d{5})\s+([ETAS])\s+/gi;
     const matches = [...line.matchAll(anchor)];
