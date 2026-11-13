@@ -461,6 +461,12 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                     </div>
                   );
                 })()}
+                {r.reportType === "rost" && Number(parsedReport?.eligibilityRows ?? 0) > 0 && (
+                  <div style={{padding:"7px 10px",fontSize:11,color:parsedReport.eligibilityAsOfDate ? "#5FCF9E" : "#F0C36D",borderTop:"1px solid #292929"}}>
+                    Official playoff eligibility detected: {parsedReport.eligibilityRows} players · as of {parsedReport.eligibilityAsOfDate || "date unavailable"}.
+                    {parsedReport.eligibilityParseError ? ` ${parsedReport.eligibilityParseError} Ratings and rosters remain importable; eligibility will not be changed.` : " Ratings and eligibility will be imported together."}
+                  </div>
+                )}
                 {expandedPreview[r.key] && (
                   <div style={{padding:10}}>
                     {empty ? (
@@ -531,7 +537,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
             <div className="import-warning-block" style={{background:"#0F2D1F",borderColor:"#1F6B4A",marginTop:10}}>
               <div className="import-warning-block__title" style={{color:"#5FCF9E"}}><Check size={12}/> IBA reports imported</div>
               <div style={{fontSize:11,color:"#E0E0E0"}}>
-                {result.roster ? `${result.roster.updatedDivisions?.length ?? 0} divisions received roster/rating updates.` : "No roster report imported."}
+                {result.roster ? `${result.roster.updatedDivisions?.length ?? 0} divisions received roster/rating updates.` : "No roster report imported."}{result.roster?.eligibilityImported ? ` ${result.roster.eligibilityImported} official playoff eligibility rows imported.` : ""}
                 {result.standings ? ` ${result.standings.imported} standings rows imported.` : ""}
                 {result.mvp ? ` ${result.mvp.imported} MVP rows imported.` : ""}
               </div>
