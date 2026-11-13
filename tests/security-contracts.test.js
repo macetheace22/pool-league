@@ -337,3 +337,27 @@ describe("Section 8.1 roster window and import safeguards", () => {
     expect(transfer).toContain("if v_has_played then");
   });
 });
+
+
+describe("Section 8.1 automatic roster routing and history refresh", () => {
+  it("fails closed when automatic reports contain unmatched or ambiguous team numbers", () => {
+    const db = read("src/db.js");
+    const auto = read("src/ibaAutoSync.js");
+    expect(db).toContain("weekTag?.unmatchedTeamNums");
+    expect(db).toContain("weekTag?.ambiguousTeamNums");
+    expect(auto).toContain("const unmatchedTeamNums = Object.keys(parsed.rosters || {}).filter");
+    expect(auto).toContain("unmatchedTeamNums,");
+    expect(auto).toContain("ambiguousTeamNums,");
+  });
+
+  it("backfills former affiliations from completed-match participation and refreshes current imports", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    expect(sql).toContain("Completed matches recover prior team associations");
+    expect(sql).toContain("cm.team_home_id");
+    expect(sql).toContain("cm.team_away_id");
+    expect(sql).toContain("playerHome");
+    expect(sql).toContain("playerAway");
+    expect(sql).toContain("Refresh the last-seen timestamp for every player");
+    expect(sql).toContain("last_seen_at = greatest");
+  });
+});
