@@ -2197,10 +2197,25 @@ export async function importPlayoffEligibilityForWeek(divisionId, rows, weekTag)
     elig_code: r.eligCode,
     week_key: weekTag.weekKey, label: weekTag.label,
   }));
-  const unmatchedCount = rows.filter(r => r.num && !knownNums.has(r.num)).length;
-  if (inserted.length === 0) return { ok: true, unmatchedCount: 0 };
-  const { error } = await supabase.from("player_playoff_eligibility").upsert(inserted, { onConflict: "season_id,division_id,player_num,week_key" });
-  return { ok: !error, unmatchedCount };
+  const linkedRows = inserted.filter(row => row.player_num);
+  const unmatchedRows = inserted.filter(row => !row.player_num);
+  const unmatchedCount = unmatchedRows.length;
+  if (linkedRows.length) {
+    const { error } = await supabase.from("player_playoff_eligibility").upsert(linkedRows, { onConflict: "season_id,division_id,player_num,week_key" });
+    if (error) return { ok: false, unmatchedCount };
+  }
+  // PostgreSQL unique constraints treat NULL player_num values as distinct,
+  // so an upsert cannot de-duplicate unlinked report rows. Replace the
+  // unmatched portion of this exact dated snapshot on every re-import.
+  const { error: deleteError } = await supabase.from("player_playoff_eligibility")
+    .delete().eq("season_id", seasonId).eq("division_id", divisionId)
+    .eq("week_key", weekTag.weekKey).is("player_num", null);
+  if (deleteError) return { ok: false, unmatchedCount };
+  if (unmatchedRows.length) {
+    const { error: insertError } = await supabase.from("player_playoff_eligibility").insert(unmatchedRows);
+    if (insertError) return { ok: false, unmatchedCount };
+  }
+  return { ok: true, unmatchedCount };
 }
 
 export async function listPlayoffEligibility(divisionId) {
