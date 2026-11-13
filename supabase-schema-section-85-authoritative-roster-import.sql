@@ -464,6 +464,7 @@ declare
   v_team_count integer;
   v_player_count integer;
   v_removed record;
+  v_over_six_teams jsonb := '[]'::jsonb;
 begin
   if auth.uid() is null or public.current_role_name() is distinct from 'manager' then
     raise exception 'MANAGER_REQUIRED' using errcode = '42501';
@@ -600,7 +601,29 @@ begin
   join public.profiles profile on profile.player_num = player_row.player_num
   on conflict (profile_id, team_id) where ended_at is null do nothing;
 
-  return jsonb_build_object('teamCount', v_team_count, 'playerCount', v_player_count);
+  -- Official imports remain authoritative, but flag any imported roster
+  -- above six during the restricted period so management can review it.
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'teamId', roster_counts.team_id,
+    'teamNum', roster_counts.team_num,
+    'playerCount', roster_counts.player_count
+  )), '[]'::jsonb)
+  into v_over_six_teams
+  from (
+    select t.id as team_id, t.team_num, count(distinct player_row.player_num)::integer as player_count
+    from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
+    join public.teams t on t.id = item.team_id
+    cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
+    group by t.id, t.team_num
+  ) roster_counts
+  cross join lateral public.roster_change_window(roster_counts.team_id) window_dates
+  where roster_counts.player_count > 6
+    and window_dates.week_six_date is not null
+    and current_date >= window_dates.week_six_date
+    and (window_dates.final_four_start_date is null or current_date < window_dates.final_four_start_date)
+    and (window_dates.postseason_start_date is null or current_date < window_dates.postseason_start_date);
+
+  return jsonb_build_object('teamCount', v_team_count, 'playerCount', v_player_count, 'overSixTeams', v_over_six_teams);
 end;
 $$;
 
