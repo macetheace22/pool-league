@@ -35,6 +35,51 @@ select r.player_num, r.team_id
 from public.rosters r
 on conflict (player_num, team_id) where ended_at is null do nothing;
 
+-- Recover historical profile-team memberships where the account retained a
+-- player number, including memberships that ended before this migration.
+insert into public.player_team_roster_history(player_num, team_id, joined_at, ended_at)
+select profile.player_num, membership.team_id, membership.joined_at, membership.ended_at
+from public.profile_team_memberships membership
+join public.profiles profile on profile.id = membership.profile_id
+where profile.player_num is not null
+  and membership.ended_at is not null
+  and not exists (
+    select 1 from public.player_team_roster_history history
+    where history.player_num = profile.player_num
+      and history.team_id = membership.team_id
+  );
+
+-- Completed matches provide historical team associations for players who
+-- played but no longer have a current roster or linked account membership.
+insert into public.player_team_roster_history(player_num, team_id, joined_at, ended_at)
+select played.player_num, played.team_id, min(played.created_at), max(played.created_at)
+from (
+  select
+    set_row.value->'playerHome'->>'num' as player_num,
+    cm.team_home_id as team_id,
+    cm.created_at
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerHome'->>'num', '') is not null
+  union all
+  select
+    set_row.value->'playerAway'->>'num' as player_num,
+    cm.team_away_id as team_id,
+    cm.created_at
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerAway'->>'num', '') is not null
+) played
+where played.team_id is not null
+  and not exists (
+    select 1 from public.player_team_roster_history history
+    where history.player_num = played.player_num
+      and history.team_id = played.team_id
+  )
+group by played.player_num, played.team_id;
+
 create or replace function public.track_player_team_roster_history()
 returns trigger
 language plpgsql
