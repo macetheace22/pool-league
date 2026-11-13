@@ -10,6 +10,7 @@ import { mergeLiveMatchState } from "./liveMatchSync";
 import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
 import { hasLaterStartedSet } from "./forfeitRules";
+import { liveSetDisposition } from "./liveSetDisposition";
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1463,7 +1464,7 @@ function FinalSubmitScreen({ match, onSave, homeSets, awaySets, matchWinner }) {
         {match.sets.map((s) => (
           <div key={s.setNum} className="sets-summary__row">
             <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-            <span className="sets-summary__score">{s.forfeited ? `FORFEIT · ${s.forfeitPoints}pt` : s.complete ? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}` : s.racks?.length ? "IN PROGRESS" : "UNPLAYED"}</span>
+            <span className="sets-summary__score">{liveSetDisposition(s, !!match.makeup) ?? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}`}</span>
             <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
           </div>
         ))}
@@ -1518,7 +1519,7 @@ function DoneScreen({ match, onReset }) {
               return (
                 <div key={s.setNum} className="sets-summary__row">
                   <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-                  <span className="sets-summary__score">{s.forfeited ? `FORFEIT · ${s.forfeitPoints}pt` : s.complete ? `${runH}–${runA}` : s.racks?.length ? "IN PROGRESS" : "UNPLAYED"}</span>
+                  <span className="sets-summary__score">{liveSetDisposition(s, !!match.makeup) ?? `${runH}–${runA}`}</span>
                   <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
                 </div>
               );
@@ -1551,7 +1552,7 @@ function DoneScreen({ match, onReset }) {
           return (
             <div key={s.setNum} className="sets-summary__row">
               <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-              <span className="sets-summary__score">{s.forfeited ? `FORFEIT · ${s.forfeitPoints}pt` : s.complete ? `${runH}–${runA}` : "UNPLAYED"}</span>
+              <span className="sets-summary__score">{liveSetDisposition(s, false) ?? `${runH}–${runA}`}</span>
               <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
             </div>
           );
