@@ -136,6 +136,10 @@ describe("Section 4.5 player division transfers", () => {
     expect(sql).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
     expect(sql).toContain("before insert or update of team_id, player_num on public.rosters");
     expect(sql).toContain("public.rosters r");
+    expect(sql).toContain("has_played boolean not null default false");
+    expect(sql).toContain("track_live_match_player_participation");
+    expect(sql).toContain("track_completed_match_player_participation");
+    expect(sql).toContain("jsonb_array_length(coalesce(v_set->'racks', '[]'::jsonb)) > 0");
   });
 
   it("allows only receiving-team captains to request and managers to decide transfers", () => {
