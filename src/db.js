@@ -1322,6 +1322,30 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (error) throw new Error(`Could not save roster assignments: ${error.message}`);
   }
 
+  const eligibilityImport = { imported: 0, unmatchedCount: 0, skipped: false };
+  if ((parsed.eligibilityRows ?? []).length) {
+    const asOfDate = parsed.eligibilityAsOfDate;
+    if (!asOfDate) {
+      eligibilityImport.skipped = true;
+    } else {
+      const rowsByDivision = {};
+      for (const row of parsed.eligibilityRows) {
+        const team = byNum[row.teamNum];
+        if (!team) continue;
+        (rowsByDivision[team.division_id] ??= []).push(row);
+      }
+      for (const [divisionId, rows] of Object.entries(rowsByDivision)) {
+        const imported = await importPlayoffEligibilityForWeek(divisionId, rows, {
+          weekKey: asOfDate,
+          label: `Playoffs Week ${parsed.eligibilityWeek ?? "—"} · As of ${asOfDate}`,
+        });
+        if (!imported?.ok) throw new Error(`Could not save playoff eligibility for division ${divisionId}.`);
+        eligibilityImport.imported += rows.length;
+        eligibilityImport.unmatchedCount += imported.unmatchedCount ?? 0;
+      }
+    }
+  }
+
   const weeklyCounterRows = buildIbaPlayerWeeklyCounterRows(
     parsed,
     Object.values(byNum),
@@ -1345,7 +1369,7 @@ export async function bulkImportPlayers(parsed, weekTag) {
     teamName: parsed.teams?.[num]?.name ?? null,
     playerNums: parsed.rosters[num] ?? [],
   }));
-  return { updatedDivisions, unmatchedTeamIds, unmatchedTeams, ambiguousTeamIds, weekTag };
+  return { updatedDivisions, unmatchedTeamIds, unmatchedTeams, ambiguousTeamIds, weekTag, eligibilityImport };
 }
 
 // Reconciliation, path 1: the unmatched team number was actually a typo (or
