@@ -147,6 +147,22 @@ Team 85382 North Stars
     expect(parsed.rosters["76002"]).toEqual(["23456", "45678"]);
   });
 
+  it("does not shift players into the wrong team when a column has no row", () => {
+    const header = "Team 76001 Alpha         Team 76002 Beta         Team 76003 Gamma";
+    const playerLine = " ".repeat(25) + "40 12345 E Sam Two" + " ".repeat(8) + "42 34567 T Pat Three";
+    const parsed = parseLeagueRoster([
+      "Division Playoffs - Roster and Handicap Report",
+      "For Week: 19",
+      "Ratings current as of: 05/13/26",
+      "Rate Num Elig Name",
+      header,
+      playerLine,
+    ].join("\\n"));
+    expect(parsed.rosters["76001"]).toEqual([]);
+    expect(parsed.rosters["76002"]).toEqual(["12345"]);
+    expect(parsed.rosters["76003"]).toEqual(["34567"]);
+  });
+
   it("parses IBA multi-column team IDs containing letters", () => {
     const multiColumn = [
       "Division Playoffs - Roster and Handicap Report",
