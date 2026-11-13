@@ -1,5 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
+import { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
+export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
 export function normalizeUSDate(str) {
@@ -2207,28 +2209,7 @@ export async function listPlayoffEligibility(divisionId) {
   return data ?? [];
 }
 
-// The official playoff roster is a division-wide snapshot. A player omitted
-// from a newer report must not inherit an older E/T/A/S code. Keep only rows
-// from the newest dated snapshot; undated legacy rows remain visible for review
-// but are never trusted to gate a player's selection.
-export function latestPlayoffEligibilityRows(rows) {
-  const dated = (rows ?? []).filter(row => /^\\d{4}-\\d{2}-\\d{2}$/.test(String(row.week_key ?? "")));
-  if (!dated.length) return [];
-  const latestWeekKey = dated.reduce((latest, row) => String(row.week_key) > latest ? String(row.week_key) : latest, "");
-  return dated.filter(row => String(row.week_key) === latestWeekKey);
-}
 
-// { [player_num]: { code: 'E'|'T'|'A'|'S', weekKey, label } } -- only rows
-// in the latest division-wide snapshot and linked to a known player can gate
-// a roster player's selection. Missing, stale, undated, and unmatched rows are
-// unverified rather than implicitly eligible or ineligible.
-export function eligibilityByPlayerNum(rows) {
-  const map = {};
-  for (const r of latestPlayoffEligibilityRows(rows)) {
-    if (r.player_num) map[r.player_num] = { code: r.elig_code, weekKey: r.week_key, label: r.label };
-  }
-  return map;
-}
 
 
 // ─── Live match ─────────────────────────────────────────────────────────────
