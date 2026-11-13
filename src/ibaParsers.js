@@ -310,11 +310,9 @@ function parsePlayoffEligibilityRoster(raw) {
   for (const line of text.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
     const teamHeaders = [...line.matchAll(/\bTeam\s+([A-Z0-9]{3,8})\s+(.*?)(?=\s+Team\s+[A-Z0-9]{3,8}\b|$)/gi)];
     if (teamHeaders.length) {
-      currentTeams = teamHeaders.map((match, index) => {
-        const nextHeader = teamHeaders[index + 1]?.index ?? line.length;
-        const segment = line.slice(match.index + match[0].length, nextHeader);
-        const rowStart = segment.search(/(?:^|\s)\d{1,3}\s+\d{5}\s+[ETAS]\s+/);
-        return { num: match[1], name: rowStart >= 0 ? segment.slice(0, rowStart).trim() : match[2].trim() };
+      currentTeams = teamHeaders.map(match => {
+        const rowStart = match[2].search(/(?:^|\\s)\\d{1,3}\\s+\\d{5}\\s+[ETAS]\\s+/);
+        return { num: match[1], name: rowStart >= 0 ? match[2].slice(0, rowStart).trim() : match[2].trim() };
       });
       for (const team of currentTeams) {
         teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\bBYE\b/i.test(team.name) };
