@@ -2618,9 +2618,15 @@ export async function getPlayerMvpRankRow(playerNum, divisionId) {
 // code) -- null if that report has never been imported for this division or
 // this player never resolved to a real player_num in it.
 export async function getPlayerPlayoffEligibility(playerNum, divisionId) {
-  const { data } = await supabase.from("player_playoff_eligibility_current")
-    .select("*").eq("division_id", divisionId).eq("player_num", playerNum).maybeSingle();
-  return data;
+  const rows = await listPlayoffEligibility(divisionId);
+  const current = eligibilityByPlayerNum(rows)[playerNum];
+  if (!current) return null;
+  return {
+    player_num: playerNum,
+    elig_code: current.code,
+    week_key: current.weekKey,
+    label: current.label,
+  };
 }
 // ─── Team-vs-team head-to-head ─────────────────────────────────────────────
 // Pure aggregation over a list of completed_matches rows (typically a
