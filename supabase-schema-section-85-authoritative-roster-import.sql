@@ -520,6 +520,17 @@ begin
   join public.profiles profile on profile.player_num = player_row.player_num
   on conflict (profile_id, team_id) where ended_at is null do nothing;
 
+  -- Refresh the last-seen timestamp for every player in the published
+  -- roster, including unchanged memberships not touched by roster triggers.
+  insert into public.player_team_roster_history
+    (player_num, team_id, division_id, first_added_at, last_seen_at)
+  select player_row.player_num, item.team_id, team.division_id, now(), now()
+  from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
+  cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
+  join public.teams team on team.id = item.team_id
+  on conflict (player_num, team_id) do update
+  set last_seen_at = greatest(public.player_team_roster_history.last_seen_at, excluded.last_seen_at);
+
   -- Official imports remain authoritative, but flag any imported roster
   -- above six during the restricted period so management can review it.
   select coalesce(jsonb_agg(jsonb_build_object(
