@@ -198,6 +198,9 @@ describe("Section 8.1 authoritative roster import", () => {
     expect(sql).toContain("v_last_regular_week - 3");
     expect(sql).toContain("sw.is_playoff = true");
     expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
+    expect(sql).toContain("create or replace function public.can_captain_change_roster");
+    expect(sql).toContain("return false;");
+
   });
 });
 
