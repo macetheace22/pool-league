@@ -329,6 +329,7 @@ describe("Section 8.1 roster window and import safeguards", () => {
     expect(sql).toContain("public.current_role_name() is distinct from 'manager'");
     expect(sql).toContain("set_config('app.official_iba_roster_import', 'true', true)");
     expect(sql).toContain("ROSTER_IMPORT_INCOMPLETE_DIVISION");
+    expect(sql).toContain("coalesce(expected.is_bye, false) = false");
     expect(sql).toContain("ROSTER_IMPORT_PLAYER_ON_MULTIPLE_TEAMS");
     expect(sql).toContain("ROSTER_LIMIT_EIGHT");
     expect(transfer).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
