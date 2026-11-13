@@ -296,7 +296,7 @@ function parsePlayoffEligibilityRoster(raw) {
   const text = String(raw || "");
   if (!/Division Playoffs[\s\S]*?Rate\s+Num\s+Elig\s+Name/i.test(text) && !/Rate\s+Num\s+Elig\s+Name/i.test(text)) return null;
   const week = extractIbaReportWeek(text);
-  const asOfMatches = [...text.matchAll(/Ratings\\s+current\\s+as\\s+of\\s*:?\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/gi)];
+  const asOfMatches = [...text.matchAll(/Ratings\s+current\s+as\s+of\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/gi)];
   const parsedAsOfDates = asOfMatches.map(match => {
     const [month, day, rawYear] = match[1].split("/").map(Number);
     const year = rawYear < 100 ? rawYear + (rawYear >= 70 ? 1900 : 2000) : rawYear;
