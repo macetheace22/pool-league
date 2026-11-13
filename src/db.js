@@ -2325,7 +2325,10 @@ export async function savePracticeGame(row) {
   return error ? null : data;
 }
 export async function listMyPracticeGames(profileId) {
-  const { data } = await supabase.from("practice_games").select("*").eq("created_by", profileId).not("winner", "is", null).order("played_at", { ascending: false });
+  const { data } = await supabase.from("practice_games").select("*")
+    .eq("created_by", profileId)
+    .or("winner.not.is.null,completed_at.not.is.null")
+    .order("played_at", { ascending: false });
   return data ?? [];
 }
 
