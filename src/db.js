@@ -1368,16 +1368,32 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (error) throw new Error(`Could not save players without ratings: ${error.message}`);
   }
 
-  if (reconciliation.rosterPayload.length) {
-    const { error } = await supabase.rpc("sync_imported_team_rosters", {
-      p_rosters: reconciliation.rosterPayload,
+  const rosterSyncWarnings = [];
+  const updatedRosterDivisions = [];
+  for (const division of reconciliation.completeDivisions ?? []) {
+    const divisionTeamIds = new Set(
+      allDivisionTeams
+        .filter(team => String(team.division_id) === String(division.divisionId))
+        .map(team => team.id),
+    );
+    const divisionPayload = reconciliation.rosterPayload.filter(row => divisionTeamIds.has(row.team_id));
+    if (!divisionPayload.length) continue;
+
+    const { data, error } = await supabase.rpc("sync_imported_team_rosters", {
+      p_rosters: divisionPayload,
     });
     if (error) {
       const detail = error.message?.includes("PLAYER_TRANSFER_APPROVAL_REQUIRED")
-        ? "A player who has already played is assigned to another team in this division. Use the existing Section 4.5 transfer request and approval process before importing this roster."
+        ? "A player who has already played is assigned to another team in this division. Complete the existing Section 4.5 transfer request and approval process, then re-import."
         : error.message;
-      throw new Error(`Could not reconcile official IBA rosters: ${detail}`);
+      rosterSyncWarnings.push(`Division ${division.divisionId}: roster was left unchanged. ${detail}`);
+      continue;
     }
+    updatedRosterDivisions.push({
+      ...division,
+      teamCount: Number(data?.teamCount ?? division.teamCount),
+      playerCount: Number(data?.playerCount ?? 0),
+    });
   }
 
   if (ratingRows.length) {
@@ -1428,19 +1444,22 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (error) throw new Error(`Could not save imported IBA weekly match counters: ${error.message}`);
   }
 
-  const updatedDivisions = Object.entries(byDivision).map(([divisionId, teamCount]) => ({ divisionId, teamCount }));
+  const updatedDivisions = updatedRosterDivisions;
   const unmatchedTeams = unmatchedTeamIds.map(num => ({
     teamNum: num,
     teamName: parsed.teams?.[num]?.name ?? null,
     playerNums: parsed.rosters[num] ?? [],
   }));
   return {
-    updatedDivisions: reconciliation.completeDivisions,
+    updatedDivisions,
     unmatchedTeamIds,
     unmatchedTeams,
     ambiguousTeamIds,
-    rosterSyncWarnings: reconciliation.warnings,
-    skippedRosterDivisions: reconciliation.skippedDivisions,
+    rosterSyncWarnings: [...(reconciliation.warnings ?? []), ...rosterSyncWarnings],
+    skippedRosterDivisions: [
+      ...(reconciliation.skippedDivisions ?? []),
+      ...rosterSyncWarnings.map(reason => ({ reason })),
+    ],
     weekTag,
     eligibilityImport,
   };
