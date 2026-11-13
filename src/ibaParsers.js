@@ -329,7 +329,12 @@ function parsePlayoffEligibilityRoster(raw) {
     const anchor = /(?:^|\s)(\d{1,3}|NR)\s+(\d{5})\s+([ETAS])\s+/gi;
     const matches = [...line.matchAll(anchor)];
     matches.forEach((match, index) => {
-      const team = currentTeams.reduce((closest, candidate) => Math.abs(candidate.columnStart - match.index) < Math.abs(closest.columnStart - match.index) ? candidate : closest, currentTeams[0]);
+      const nearestTeam = currentTeams.reduce((closest, candidate) => Math.abs(candidate.columnStart - match.index) < Math.abs(closest.columnStart - match.index) ? candidate : closest, currentTeams[0]);
+      // Preserve geometric column alignment when the PDF text retains it;
+      // when extraction flattens all headers before all player rows, fall
+      // back to the stable left-to-right row order.
+      const columnDistance = Math.abs(nearestTeam.columnStart - match.index);
+      const team = columnDistance <= 12 ? nearestTeam : currentTeams[index % currentTeams.length];
       const nameStart = match.index + match[0].length;
       const nameEnd = index + 1 < matches.length ? matches[index + 1].index : line.length;
       const parsedName = cleanName(line.slice(nameStart, nameEnd));
