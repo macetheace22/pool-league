@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
 import { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
+import { buildRosterSyncPlan } from "./rosterReconciliation";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -1308,6 +1309,23 @@ export async function bulkImportPlayers(parsed, weekTag) {
 
   const knownNums = new Set(Object.keys(byNum));
   const unmatchedTeamIds = teamNums.filter(n => !knownNums.has(n) && !ambiguousTeamIds.includes(n));
+  const reportDivisionIds = [...new Set(Object.values(byNum).map(row => String(row.division_id)))];
+  let allDivisionTeams = [];
+  if (reportDivisionIds.length) {
+    const { data: divisionTeams, error: divisionTeamsError } = await supabase
+      .from("teams")
+      .select("id, division_id, team_num, divisions(num)")
+      .in("division_id", reportDivisionIds);
+    if (divisionTeamsError) throw new Error(`Could not validate complete division rosters: ${divisionTeamsError.message}`);
+    allDivisionTeams = divisionTeams ?? [];
+  }
+  const reconciliation = buildRosterSyncPlan({
+    parsed,
+    matchedTeams: Object.values(byNum),
+    allDivisionTeams,
+    unmatchedTeamNums: unmatchedTeamIds,
+    ambiguousTeamNums: ambiguousTeamIds,
+  });
   const byDivision = {};
   for (const row of Object.values(byNum)) byDivision[row.division_id] = (byDivision[row.division_id] ?? 0) + 1;
 
@@ -1350,15 +1368,16 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (error) throw new Error(`Could not save players without ratings: ${error.message}`);
   }
 
-  const rosterRows = [];
-  for (const [teamNum, nums] of Object.entries(parsed.rosters ?? {})) {
-    const row = byNum[teamNum];
-    if (!row) continue;
-    for (const num of nums) rosterRows.push({ team_id: row.id, player_num: num });
-  }
-  if (rosterRows.length) {
-    const { error } = await supabase.from("rosters").upsert(rosterRows, { onConflict: "team_id,player_num" });
-    if (error) throw new Error(`Could not save roster assignments: ${error.message}`);
+  if (reconciliation.rosterPayload.length) {
+    const { error } = await supabase.rpc("sync_imported_team_rosters", {
+      p_rosters: reconciliation.rosterPayload,
+    });
+    if (error) {
+      const detail = error.message?.includes("PLAYER_TRANSFER_APPROVAL_REQUIRED")
+        ? "A player who has already played is assigned to another team in this division. Use the existing Section 4.5 transfer request and approval process before importing this roster."
+        : error.message;
+      throw new Error(`Could not reconcile official IBA rosters: ${detail}`);
+    }
   }
 
   const eligibilityImport = { imported: 0, unmatchedCount: 0, skipped: false };
@@ -1410,7 +1429,16 @@ export async function bulkImportPlayers(parsed, weekTag) {
     teamName: parsed.teams?.[num]?.name ?? null,
     playerNums: parsed.rosters[num] ?? [],
   }));
-  return { updatedDivisions, unmatchedTeamIds, unmatchedTeams, ambiguousTeamIds, weekTag, eligibilityImport };
+  return {
+    updatedDivisions: reconciliation.completeDivisions,
+    unmatchedTeamIds,
+    unmatchedTeams,
+    ambiguousTeamIds,
+    rosterSyncWarnings: reconciliation.warnings,
+    skippedRosterDivisions: reconciliation.skippedDivisions,
+    weekTag,
+    eligibilityImport,
+  };
 }
 
 // Reconciliation, path 1: the unmatched team number was actually a typo (or
