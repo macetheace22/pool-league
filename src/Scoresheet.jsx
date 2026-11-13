@@ -51,7 +51,9 @@ export function toDisplaySets(match) {
       const racks = (s.racks ?? []).map((r, i) => {
         runA += r.home ?? 0;
         runB += r.away ?? 0;
-        return { n: i + 1, a: r.home ?? 0, b: r.away ?? 0, innings: r.innings ?? 0, timeoutA: !!r.timeoutHome, timeoutB: !!r.timeoutAway, runA, runB };
+        const timeoutA = Number.isFinite(r.timeoutHomeCount) ? Math.max(0, r.timeoutHomeCount) : (r.timeoutHome ? 1 : 0);
+        const timeoutB = Number.isFinite(r.timeoutAwayCount) ? Math.max(0, r.timeoutAwayCount) : (r.timeoutAway ? 1 : 0);
+        return { n: i + 1, a: r.home ?? 0, b: r.away ?? 0, innings: r.innings ?? 0, timeoutA, timeoutB, runA, runB };
       });
       const safetiesA = (s.racks ?? []).reduce((t, r) => t + (r.safetyHome ?? 0), 0);
       const safetiesB = (s.racks ?? []).reduce((t, r) => t + (r.safetyAway ?? 0), 0);
@@ -234,7 +236,7 @@ function FrontSheetSet({ set, showInnings }) {
                 <td className="rack-grid__safeties-col"></td>
                 {set.racks.map((r) => (
                   <td key={r.n} className="rack-grid__timeout-cell">
-                    {r[timeoutKey] && <span className={`timeout-chip ${chipClass}`}>TO</span>}
+                    {r[timeoutKey] > 0 && <span className={`timeout-chip ${chipClass}`}>{r[timeoutKey] > 1 ? `TO×${r[timeoutKey]}` : "TO"}</span>}
                   </td>
                 ))}
                 <td className="rack-grid__total-col"></td>
