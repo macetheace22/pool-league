@@ -469,7 +469,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Players / rosters / ratings ──
   const handleBulkImport = async (parsed, rawReportText = "") => {
     const weekTag = currentWeekTag(viewSchedule);
-    if (viewingDiv?.id) weekTag.allowedDivisionIds = [viewingDiv.id];
+    const seasonDivisionIds = (viewingSeason?.divisions ?? []).map(division => division.id);
+    weekTag.allowedDivisionIds = seasonDivisionIds.length ? seasonDivisionIds : (viewingDiv?.id ? [viewingDiv.id] : []);
     if (rawReportText && viewingSeason?.id) {
       const reportWeek = extractIbaReportWeek(rawReportText);
       const reportWeeksByDivision = extractIbaReportWeeksByDivision(rawReportText).byDivision;
@@ -5127,6 +5128,19 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                             }} />
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {(importResult.rosterSyncWarnings?.length > 0 || importResult.skippedRosterDivisions?.length > 0) && (
+                    <div className="import-warning-block import-warning-block--amber" style={{marginTop:8}}>
+                      <div className="import-warning-block__title">
+                        <AlertCircle size={12}/> Some current rosters were not changed
+                      </div>
+                      <div className="import-warning-block__hint">
+                        The report did not provide a complete, unambiguous roster for every team in these divisions. No current memberships were removed there. Resolve the report/team mapping and import again.
+                      </div>
+                      {(importResult.rosterSyncWarnings ?? []).map((warning, index) => (
+                        <div key={index} style={{fontSize:11,marginTop:5}}>{warning}</div>
+                      ))}
                     </div>
                   )}
                   {importResult.ambiguousTeamIds?.length > 0 && (
