@@ -436,9 +436,8 @@ begin
     perform public.remove_player_from_team(v_removed.team_id, v_removed.player_num);
   end loop;
 
-  -- The transaction-local flag is already set for the removal and insert operations.
-
-  delete from public.rosters where team_id = any(v_team_ids);
+  -- Keep unchanged active roster rows in place. Only missing assignments are
+  -- inserted below; this avoids closing/reopening every history row weekly.
 
   insert into public.rosters(team_id, player_num)
   select item.team_id, player_row.player_num
