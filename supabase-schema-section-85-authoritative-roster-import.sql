@@ -4,6 +4,74 @@
 -- complete divisions. Historical completed-match JSON, player ratings, and
 -- the Section 84 player_division_team_assignments ledger are never deleted.
 
+-- Preserve current and former team-roster membership independently of the
+-- active rosters table. This includes players who never appeared in a match.
+create table if not exists public.player_team_roster_history (
+  id uuid primary key default gen_random_uuid(),
+  player_num text not null references public.players(num) on delete cascade,
+  team_id uuid not null references public.teams(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+
+create unique index if not exists player_team_roster_history_one_active
+  on public.player_team_roster_history(player_num, team_id)
+  where ended_at is null;
+create index if not exists player_team_roster_history_player
+  on public.player_team_roster_history(player_num, joined_at desc);
+
+alter table public.player_team_roster_history enable row level security;
+revoke all on public.player_team_roster_history from public, anon, authenticated;
+grant select on public.player_team_roster_history to authenticated;
+
+drop policy if exists "Authenticated users can read player team roster history"
+  on public.player_team_roster_history;
+create policy "Authenticated users can read player team roster history"
+  on public.player_team_roster_history
+  for select to authenticated using (true);
+
+insert into public.player_team_roster_history(player_num, team_id)
+select r.player_num, r.team_id
+from public.rosters r
+on conflict (player_num, team_id) where ended_at is null do nothing;
+
+create or replace function public.track_player_team_roster_history()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $history$
+begin
+  if tg_op = 'DELETE' then
+    update public.player_team_roster_history
+    set ended_at = now()
+    where player_num = old.player_num and team_id = old.team_id and ended_at is null;
+    return old;
+  elsif tg_op = 'UPDATE' then
+    if old.player_num is distinct from new.player_num or old.team_id is distinct from new.team_id then
+      update public.player_team_roster_history
+      set ended_at = now()
+      where player_num = old.player_num and team_id = old.team_id and ended_at is null;
+      insert into public.player_team_roster_history(player_num, team_id)
+      values (new.player_num, new.team_id)
+      on conflict (player_num, team_id) where ended_at is null do nothing;
+    end if;
+    return new;
+  else
+    insert into public.player_team_roster_history(player_num, team_id)
+    values (new.player_num, new.team_id)
+    on conflict (player_num, team_id) where ended_at is null do nothing;
+    return new;
+  end if;
+end;
+$history$;
+
+revoke all on function public.track_player_team_roster_history() from public, anon, authenticated;
+drop trigger if exists track_player_team_roster_history on public.rosters;
+create trigger track_player_team_roster_history
+after insert or update or delete on public.rosters
+for each row execute function public.track_player_team_roster_history();
+
 create or replace function public.roster_change_window(p_team_id uuid)
 returns table (
   week_six_date date,
