@@ -124,5 +124,13 @@ Team 85382 North Stars
     expect(parsed.teams["85382"].name).toBe("North Stars");
     expect(parsed.eligibilityRows.map(row => row.eligCode)).toEqual(["E", "T"]);
   });
+
+  it("retains eligibility for NR players without inventing a numeric rating", () => {
+    const reportWithNr = report.replace("52 23456 T John Smith", "NR 23456 T John Smith");
+    const parsed = parseLeagueRoster(reportWithNr);
+    expect(parsed.eligibilityRows.find(row => row.num === "23456")?.eligCode).toBe("T");
+    expect(parsed.registry["23456"].rating).toBeNull();
+    expect(parsed.needsRating).toContainEqual(expect.objectContaining({ num: "23456" }));
+  });
 });
 
