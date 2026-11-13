@@ -4,6 +4,7 @@ import { Plus, Check, Wifi, WifiOff, RefreshCw, Trophy, Lock, Coins, AlertTriang
 import { PageHeader, shellCss } from "./Shell";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
+import { isTimeoutEligibleFormat, timeoutAllowance, timeoutCount } from "./timeoutRules";
 import { useAuth } from "./AuthContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import { mergeLiveMatchState } from "./liveMatchSync";
@@ -1094,7 +1095,7 @@ function SetTabBar({ sets, activeSet, onSelect }) {
 }
 
 export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
-  const TIMEOUTS_ENABLED = match.format === "open" || match.format === "advanced";
+  const TIMEOUTS_ENABLED = isTimeoutEligibleFormat(match.format);
   const [homeVal, setHomeVal] = useState("");
   const [awayVal, setAwayVal] = useState("");
   const [inningsVal, setInningsVal] = useState("");
@@ -1116,6 +1117,10 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   const ratingA = set.playerAway.rating;
   const targetH = effectiveTarget(set.playerHome, set.playerAway, match.format);
   const targetA = effectiveTarget(set.playerAway, set.playerHome, match.format);
+  const timeoutAllowanceHome = timeoutAllowance(match.format, set.playerHome.rating);
+  const timeoutAllowanceAway = timeoutAllowance(match.format, set.playerAway.rating);
+  const timeoutUsedHome = timeoutCount(set, "home");
+  const timeoutUsedAway = timeoutCount(set, "away");
 
   const pctH = targetH ? Math.min(100, Math.round((runHome / targetH) * 100)) : 0;
   const pctA = targetA ? Math.min(100, Math.round((runAway / targetA) * 100)) : 0;
@@ -1123,6 +1128,19 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   const canAdd = !set.complete && homeVal !== "" && awayVal !== "" && !isNaN(Number(homeVal)) && !isNaN(Number(awayVal));
 
   const addRack = () => {
+    const timeoutSelections = [
+      { side: "home", selected: timeoutHome, used: timeoutUsedHome, allowance: timeoutAllowanceHome, name: set.playerHome.name },
+      { side: "away", selected: timeoutAway, used: timeoutUsedAway, allowance: timeoutAllowanceAway, name: set.playerAway.name },
+    ].filter(t => t.selected && t.used >= t.allowance);
+
+    if (timeoutSelections.length > 0) {
+      const names = timeoutSelections.map(t => t.name).join(" and ");
+      const message = timeoutSelections.length === 1
+        ? `${names} has already used the allotted coaching time-outs for this set. Continue only if the opponent acknowledged the time-out without giving the required warning.`
+        : `${names} have already used the allotted coaching time-outs for this set. Continue only if the opponent acknowledged the time-out(s) without giving the required warning.`;
+      if (!window.confirm(message)) return;
+    }
+
     const rack = { home: Number(homeVal), away: Number(awayVal), innings: Number(inningsVal) || 0, safetyHome: safHomeVal, safetyAway: safAwayVal, ...(TIMEOUTS_ENABLED && { timeoutHome, timeoutAway }) };
     const newRacks = [...set.racks, rack];
     const newWinner = detectSetWinner(newRacks, set.playerHome, set.playerAway, match.format);
@@ -1191,9 +1209,15 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
             <SafetyStepper label={`${set.playerAway.name.split(" ")[0]} Saf.`} value={safAwayVal} onChange={setSafAwayVal} color="away" />
           </div>
           {TIMEOUTS_ENABLED && (
-            <div className="timeout-row">
-              <ToggleChip label={`${set.playerHome.name.split(" ")[0]} TO`} active={timeoutHome} color="home" onToggle={() => setTimeoutHome((v) => !v)} />
-              <ToggleChip label={`${set.playerAway.name.split(" ")[0]} TO`} active={timeoutAway} color="away" onToggle={() => setTimeoutAway((v) => !v)} />
+            <div className="timeout-section">
+              <div className="timeout-status-row">
+                <span>{set.playerHome.name.split(" ")[0]} TO: {timeoutUsedHome}/{timeoutAllowanceHome}</span>
+                <span>{set.playerAway.name.split(" ")[0]} TO: {timeoutUsedAway}/{timeoutAllowanceAway}</span>
+              </div>
+              <div className="timeout-row">
+                <ToggleChip label={`${set.playerHome.name.split(" ")[0]} TO`} active={timeoutHome} color="home" onToggle={() => setTimeoutHome((v) => !v)} />
+                <ToggleChip label={`${set.playerAway.name.split(" ")[0]} TO`} active={timeoutAway} color="away" onToggle={() => setTimeoutAway((v) => !v)} />
+              </div>
             </div>
           )}
           <div className="rack-entry-form__actions">
@@ -1687,7 +1711,11 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
 .btn-add-rack:disabled { opacity: 0.3; cursor: not-allowed; }
 .btn-undo { background: #1E1E1E; border: 1.5px solid #3A3A3A; color: #9A9A9A; font-family: 'Archivo', sans-serif; font-size: 12px; font-weight: 600; padding: 10px 14px; border-radius: 10px; cursor: pointer; }
 
-.timeout-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.timeout-section { margin-bottom: 10px; }
+.timeout-status-row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 10px; font-weight: 700; color: #9A9A9A; }
+.timeout-status-row span { flex: 1; }
+.timeout-status-row span:last-child { text-align: right; }
+.timeout-row { display: flex; gap: 8px; }
 .toggle-chip { flex: 1; padding: 8px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1.5px solid #3A3A3A; background: #121212; color: #5A5A5A; font-family: 'Archivo', sans-serif; }
 .toggle-chip--home.toggle-chip--active { background: #16332A; border-color: #1F6B4A; color: #5FCF9E; }
 .toggle-chip--away.toggle-chip--active { background: #16273A; border-color: #1E3A5F; color: #6FA8DC; }
