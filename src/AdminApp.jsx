@@ -162,63 +162,6 @@ function parsePlayers(raw) {
 // parseSingleColumnTeams was added alongside parseMultiColumnRateFirst,
 // not guessed at ahead of time.
 //
-// Returns { weekLabel, rows: [{ teamNum, teamName, num, name, nickname, eligCode }] }
-function parsePlayoffEligibility(raw) {
-  const weekMatch = raw.match(/For\s+Week:\s*(\d+)/i);
-  const weekLabel = weekMatch ? `Playoffs Week ${weekMatch[1]}` : "Playoffs";
-
-  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-  const rows = [];
-  let currentTeams = []; // [{num, name}, ...] declared on the most recent "Team NNNNN Name" header row, left to right
-
-  const CHROME_RE = [
-    /^Division Playoffs/i, /^For\s+Week:/i, /^Ratings current as of/i,
-    /^Players noted/i, /^T=Less than/i, /^-{5,}/,
-    /^Rate\s+Num\s+Elig\s+Name$/i,
-    /^(Wed|Thu|Mon|Tue|Fri|Sat|Sun)\s/i, // e.g. "Wed North Masters" league/season label line
-    /Division #/i,
-    /^(Summer|Winter|Spring)\s/i,
-    /Sports Bar$/i, // venue line -- not needed for eligibility, safe to drop
-  ];
-
-  for (const line of lines) {
-    if (CHROME_RE.some(re => re.test(line))) continue;
-
-    const teamHeaders = [...line.matchAll(/\bTeam\s+(\d{5})\s+(.*?)(?=\s+Team\s+\d{5}\b|$)/gi)];
-    if (teamHeaders.length > 0) {
-      currentTeams = teamHeaders.map(m => ({ num: m[1], name: m[2].trim() }));
-      continue;
-    }
-
-    if (currentTeams.length === 0) continue;
-
-    // One "<rate> <num> <E|T|A|S> <name...>" entry per active team, left to
-    // right on this line -- same anchor-based splitting idea as the regular
-    // report's multi-column parser, just with a single eligibility LETTER
-    // where that one has two Play/Win numbers.
-    const anchorRe = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+([ETAS])\s+/g;
-    const anchors = [];
-    let m;
-    while ((m = anchorRe.exec(line)) !== null) {
-      anchors.push({ pos: m.index, num: m[2], elig: m[3], nameStart: m.index + m[0].length });
-    }
-    if (anchors.length === 0) continue;
-
-    anchors.forEach((a, i) => {
-      const nameEnd = i + 1 < anchors.length ? anchors[i + 1].pos : line.length;
-      const parsed = cleanName(line.slice(a.nameStart, nameEnd));
-      if (!parsed) return;
-      const team = currentTeams[i] ?? currentTeams[currentTeams.length - 1];
-      rows.push({ teamNum: team.num, teamName: team.name, num: a.num, name: parsed.name, nickname: parsed.nickname, eligCode: a.elig });
-    });
-  }
-
-  return { weekLabel, rows };
-}
-
-
-
-
 function findCurrentWeek(schedule) {
   const today = new Date(); today.setHours(0,0,0,0);
   const real = db.sortScheduleWeeks((schedule ?? []).filter(w => w.week && (w.pairings?.length ?? 0) > 0));
@@ -297,6 +240,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [viewSchedule, setViewSchedule] = useState([]);
   const [viewRosters, setViewRosters]   = useState({}); // { teamId: [{num,name,nickname,rating}] }
   const [playoffEligibility, setPlayoffEligibility] = useState({}); // { player_num: {code, weekKey, label} }
+  const [playoffEligibilityRows, setPlayoffEligibilityRows] = useState([]);
   const [divisionLoading, setDivisionLoading] = useState(false);
   const [captainsByTeam, setCaptainsByTeam] = useState({}); // { teamId: {username, phone} }
   const [locations, setLocations] = useState([]);
@@ -325,6 +269,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
       setViewSchedule([]);
       setViewRosters({});
       setPlayoffEligibility({});
+      setPlayoffEligibilityRows([]);
       setDivisionLoading(false);
       return;
     }
@@ -340,6 +285,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
       setViewSchedule(schedule);
       setViewRosters(rostersByTeam);
       setPlayoffEligibility(db.eligibilityByPlayerNum(eligRows));
+      setPlayoffEligibilityRows(eligRows ?? []);
     } finally {
       setDivisionLoading(false);
     }
@@ -610,7 +556,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Dedicated season-maintenance pages ──
   if (["playoff-eligibility", "playoffs", "locations"].includes(page)) {
     const titles = {
-      "playoff-eligibility": "Playoff Eligibility",
+      "playoff-eligibility": "Playoff Eligibility Status",
       playoffs: "Playoffs",
       locations: "Locations",
     };
@@ -623,14 +569,11 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
               viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           )}
-          {page === "playoff-eligibility" && viewingDiv && isViewingActive && (
-            <SeedPlayoffEligibilityImport divisionId={viewingDiv.id} existingCount={Object.keys(playoffEligibility).length} onImported={refreshCurrentDivision} />
+          {page === "playoff-eligibility" && viewingDiv && (
+            <PlayoffEligibilityStatus rows={playoffEligibilityRows} teams={viewTeams} rosters={viewRosters} />
           )}
           {page === "playoff-eligibility" && !viewingDiv && (
-            <div className="empty-state">Select a season and division to import playoff eligibility.</div>
-          )}
-          {page === "playoff-eligibility" && viewingDiv && !isViewingActive && (
-            <div className="empty-state">Activate this season to import playoff eligibility.</div>
+            <div className="empty-state">Select a season and division to view imported playoff eligibility.</div>
           )}
           {page === "playoffs" && viewingDiv && (
             <PlayoffsTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} />
@@ -3397,74 +3340,104 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
   );
 }
 
-// Playoff eligibility only gets pasted during playoff weeks -- see
-// parsePlayoffEligibility() for the report parser. The "as of" date is a
-// manual date picker (like Standings/MVP) rather than auto-extracted from
-// the report's own "Ratings current as of: MM/DD/YY" line, since that's a
-// 2-digit year in a different shape than the 4-digit dates used everywhere
-// else in the app -- safer to let the manager confirm it than to guess.
-function SeedPlayoffEligibilityImport({ divisionId, onImported, existingCount }) {
-  const [open, setOpen] = useState(false);
-  const [raw, setRaw] = useState("");
-  const [parsed, setParsed] = useState(null); // { weekLabel, rows }
-  const [parseErr, setParseErr] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [unmatchedCount, setUnmatchedCount] = useState(0);
-  const [asOfDate, setAsOfDate] = useState(todayIsoKey());
+// Read-only view of the latest official IBA eligibility import. Corrections are made
+// by importing the official playoff roster through Weekly League Data → Ratings.
+function PlayoffEligibilityStatus({ rows, teams = [], rosters = {} }) {
+  const [search, setSearch] = useState("");
+  const snapshot = db.latestPlayoffEligibilityRows(rows);
+  const latest = snapshot[0]?.week_key ?? null;
+  const latestLabel = snapshot.find(row => row.label)?.label ?? null;
+  const byPlayerNum = Object.fromEntries(snapshot.filter(row => row.player_num).map(row => [row.player_num, row]));
+  const reportWeek = latestLabel?.match(/Week\s+\d+/i)?.[0] ?? null;
+  const rosterPlayers = teams.flatMap(team => (rosters[team.id] ?? []).map(player => {
+    const official = byPlayerNum[player.num] ?? null;
+    const code = official?.elig_code ?? null;
+    const status = code === "E" ? "Eligible" : ["T", "A", "S"].includes(code) ? "Ineligible" : "Unverified";
+    return { ...player, team, official, code, status };
+  }));
+  const normalizedSearch = search.trim().toLowerCase();
+  const visiblePlayers = rosterPlayers.filter(player => !normalizedSearch || [
+    player.num, player.name, player.nickname, player.team.teamNum, player.team.name,
+    player.code, player.status,
+  ].some(value => String(value ?? "").toLowerCase().includes(normalizedSearch)));
+  const grouped = teams.map(team => ({
+    team,
+    players: visiblePlayers.filter(player => player.team.id === team.id),
+  })).filter(group => group.players.length);
+  const eligibleCount = rosterPlayers.filter(player => player.status === "Eligible").length;
+  const ineligibleCount = rosterPlayers.filter(player => player.status === "Ineligible").length;
+  const unverifiedCount = rosterPlayers.filter(player => player.status === "Unverified").length;
+  const unmatched = snapshot.filter(row => !row.player_num);
+  const hasSnapshot = !!latest;
 
-  const handleParse = () => {
-    const result = parsePlayoffEligibility(raw);
-    if (!result.rows.length) {
-      setParseErr("No valid rows found. Make sure this is the \"Division Playoffs - Roster and Handicap Report\" (has an Elig column), not the regular weekly ratings report.");
-      return;
-    }
-    setParseErr(""); setParsed(result);
-  };
-  const handleImport = async () => {
-    const weekTag = {
-      weekKey: asOfDate,
-      label: `${parsed.weekLabel} · As of ${new Date(asOfDate + "T00:00:00").toLocaleDateString()}`,
-    };
-    const result = await db.importPlayoffEligibilityForWeek(divisionId, parsed.rows, weekTag);
-    setOpen(false); setRaw(""); setParsed(null); setSaved(true); setUnmatchedCount(result?.unmatchedCount ?? 0);
-    setTimeout(() => setSaved(false), 1800);
-    onImported();
-  };
-
-  if (!open) {
-    return (
-      <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-start"}}>
-        <button className="btn-sm" onClick={()=>setOpen(true)}>
-          <Plus size={12}/> {existingCount>0 ? `Edit imported eligibility (${existingCount})` : "Import Playoff Eligibility"}
-        </button>
-        {unmatchedCount > 0 && (
-          <div style={{fontSize:10.5,color:"#F59E0B"}}>{unmatchedCount} player number{unmatchedCount!==1?"s":""} from the last import didn't match a known player and won't gate anyone's draft eligibility.</div>
-        )}
-      </div>
-    );
-  }
   return (
-    <PasteImporter label="Import Playoff Eligibility" hint="Paste the &quot;Division Playoffs - Roster and Handicap Report&quot; — only issued during playoff weeks"
-      raw={raw} setRaw={setRaw} onParse={handleParse} parseErr={parseErr}
-      onClear={()=>{setRaw("");setParsed(null);setParseErr("");}}
-      preHint={
-        <div className="field" style={{marginBottom:8}}>
-          <Label>Eligibility as of</Label>
-          <input className="input" type="date" value={asOfDate} onChange={e=>setAsOfDate(e.target.value)} />
-          <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Matches the report's own "Ratings current as of" date. Each import is kept as a dated snapshot, same as ratings/standings/MVP.</div>
+    <div>
+      <div className="card" style={{padding:12,marginBottom:12}}>
+        <div className="card__title">Official IBA playoff eligibility</div>
+        <div style={{fontSize:12,color:"#BDBDBD",marginTop:4}}>
+          {hasSnapshot ? `${reportWeek ? `${reportWeek} · ` : ""}Ratings current as of ${latest}. ${snapshot.length} official player rows in the latest dated snapshot.` : "Eligibility data not yet available. Import the official playoff roster through Update Weekly League Data → Import Ratings."}
         </div>
-      }
-      preview={parsed && (
-        <>
-          <div style={{fontSize:11,fontWeight:700,color:"#5FCF9E",marginBottom:6}}>{parsed.weekLabel} · {parsed.rows.length} players</div>
-          <PreviewList rows={parsed.rows.map(r=>({id:r.eligCode, name:`${r.name}${r.nickname?` "${r.nickname}"`:""}`, sub:`Team ${r.teamNum} · ${r.teamName}`}))}/>
-        </>
+        <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,marginTop:9}}>
+          <span>Eligible: <strong>{eligibleCount}</strong></span>
+          <span>Ineligible: <strong>{ineligibleCount}</strong></span>
+          <span>Unverified: <strong>{unverifiedCount}</strong></span>
+        </div>
+        <div style={{fontSize:11,color:"#AAA",marginTop:7}}>
+          These are official IBA codes, not an app-calculated eligibility decision. Only players present in the latest dated report are verified; players missing from it or from the player registry remain Unverified.
+        </div>
+        {unmatched.length > 0 && <div style={{fontSize:11,color:"#F0C36D",marginTop:7}}>{unmatched.length} report row(s) could not be linked to a known player number. They remain visible below and do not gate player selection.</div>}
+      </div>
+      <input
+        type="search"
+        value={search}
+        onChange={event => setSearch(event.target.value)}
+        placeholder="Search player, number, team, or eligibility code"
+        aria-label="Search playoff eligibility"
+        style={{width:"100%",boxSizing:"border-box",marginBottom:12}}
+      />
+      {grouped.length === 0 && <div className="empty-state">{normalizedSearch ? "No roster players match this search." : "No roster players are available for this division yet."}</div>}
+      {grouped.map(({ team, players }) => (
+        <section key={team.id} style={{marginBottom:16}}>
+          <div className="card__title" style={{marginBottom:6}}>Team {team.teamNum} · {team.name}</div>
+          <div className="list">
+            {players.map(player => (
+              <div className="list-row" key={player.num}>
+                <div className="list-row__body">
+                  <span className="list-row__id">{player.num}</span>
+                  <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                    <span className="list-row__name">{player.name}{player.nickname ? ` "${player.nickname}"` : ""}</span>
+                    <span className="list-row__sub">Rating {player.rating ?? "NR"} · {player.official?.label ?? (hasSnapshot ? "Not listed in latest report" : "No official report imported")}</span>
+                  </div>
+                  <span className="player-rating-badge">{player.code ? `${player.code} · ${player.status}` : "Unverified"}</span>
+                </div>
+                {player.code && <div style={{fontSize:10.5,color:"#AAA",padding:"0 10px 7px 52px"}}>{db.ELIGIBILITY_REASONS[player.code] ?? "Official IBA eligibility code"}</div>}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+      {unmatched.length > 0 && (
+        <section style={{marginTop:16}}>
+          <div className="card__title" style={{marginBottom:6}}>Unmatched report entries</div>
+          <div className="list">
+            {unmatched.filter(row => !normalizedSearch || [row.player_name,row.team_num,row.elig_code].some(value => String(value ?? "").toLowerCase().includes(normalizedSearch))).map((row,index) => (
+              <div className="list-row" key={row.id ?? `unmatched-${index}`}>
+                <div className="list-row__body">
+                  <span className="list-row__id">—</span>
+                  <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                    <span className="list-row__name">{row.player_name ?? "Unknown player"}</span>
+                    <span className="list-row__sub">Team {row.team_num} · {row.label ?? row.week_key}</span>
+                  </div>
+                  <span className="player-rating-badge">Unverified</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
-      onImport={parsed?.rows?.length ? handleImport : null} importLabel={parsed ? `Import ${parsed.rows.length} players` : ""} saved={saved}/>
+    </div>
   );
 }
-
-
 // ─── Weekly import panel (standings / mvp) for Update Weekly League Data ──────
 function WeeklyImportPanel({ divisionId, teams, mode }) {
   const [standingsAdj, setStandingsAdj] = useState([]);
@@ -5518,7 +5491,7 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
   const parseBulk = () => {
     const result = parseLeagueRoster(raw);
     if (Object.keys(result.rosters).length === 0) {
-      setParseErr("No teams found. Try these steps: 1) Open the PDF directly in your browser (not a PDF app). 2) Select All (⌘A or Ctrl+A). 3) Copy & paste here. The text must include the \"Division Roster and Handicap Report\" header & \"Team NNNNN\" lines to parse correctly.");
+      setParseErr("No teams found. Try these steps: 1) Open the PDF directly in your browser (not a PDF app). 2) Select All (⌘A or Ctrl+A). 3) Copy & paste here. The text must include team headers and player rows from either the regular weekly roster or playoff-format roster report.");
       return;
     }
     if (Object.keys(result.registry).length === 0) {
@@ -5617,6 +5590,28 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                   </div>
                   <PreviewList rows={bulkTeamList}/>
 
+                  {parsed.eligibilityRows?.length > 0 && (
+                    <div style={{fontSize:11,color:"#5FCF9E",margin:"6px 0"}}>
+                      Official playoff eligibility detected: {parsed.eligibilityRows.length} players · as of {parsed.eligibilityAsOfDate ?? "date unavailable"}.
+                      {!parsed.eligibilityAsOfDate && " Ratings and rosters can still be imported, but eligibility will remain unchanged until a valid report date is available."}
+                    </div>
+                  )}
+                  {parsed.eligibilityRows?.length > 0 && (
+                    <div className="list" style={{marginTop:6,maxHeight:220,overflowY:"auto"}}>
+                      {parsed.eligibilityRows.map((row,index) => (
+                        <div className="list-row" key={`${row.num}-${index}`}>
+                          <div className="list-row__body">
+                            <span className="list-row__id">{row.num}</span>
+                            <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                              <span className="list-row__name">{row.name}</span>
+                              <span className="list-row__sub">Team {row.teamNum} · Rating {parsed.registry?.[row.num]?.rating ?? "NR"}</span>
+                            </div>
+                            <span className="player-rating-badge">{row.eligCode}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {parsed.needsRating?.length > 0 && (
                     <div className="import-warning-block">
                       <div className="import-warning-block__title">
@@ -5630,7 +5625,7 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                           </div>
                         ))}
                       </div>
-                      <div className="import-warning-block__hint">These players were NOT added to any roster. Set their rating manually below after importing.</div>
+                      <div className="import-warning-block__hint">These players are included on their teams' rosters but have no numeric rating yet. Set their rating manually before they can be selected for a match.</div>
                     </div>
                   )}
 
@@ -5681,6 +5676,15 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                     <div style={{fontSize:11,color:"#E0E0E0"}}>
                       Updated {importResult.updatedDivisions.length} division{importResult.updatedDivisions.length!==1?"s":""} ({importResult.updatedDivisions.reduce((s,d)=>s+d.teamCount,0)} teams total).
                     </div>
+                  )}
+                  {importResult.eligibilityImport?.imported > 0 && (
+                    <div style={{fontSize:11,color:"#E0E0E0"}}>Imported official playoff eligibility for {importResult.eligibilityImport.imported} players.</div>
+                  )}
+                  {importResult.eligibilityImport?.skipped && (
+                    <div style={{fontSize:11,color:"#F59E0B"}}>Eligibility was detected but not updated because the report's as-of date could not be validated. Ratings and rosters were imported normally.</div>
+                  )}
+                  {importResult.eligibilityImport?.unmatchedCount > 0 && (
+                    <div style={{fontSize:11,color:"#F59E0B"}}>{importResult.eligibilityImport.unmatchedCount} eligibility player numbers did not match known players and will not gate draft eligibility.</div>
                   )}
                   {importResult.unmatchedTeams?.length > 0 && (
                     <div className="import-warning-block" style={{marginTop:0}}>

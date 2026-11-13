@@ -1,5 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
+import { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
+export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
 export function normalizeUSDate(str) {
@@ -1238,8 +1240,8 @@ export function buildIbaPlayerWeeklyCounterRows(parsed, teamRows, snapshotsByDiv
     }
   }
 
-  // No Play/Win columns means this is not a match-counter snapshot (e.g. a
-  // playoff eligibility-only report). When any counters exist for a division,
+  // No Play/Win columns means this is not a match-counter snapshot (e.g. the
+  // playoff-format roster, which includes ratings and eligibility but no counters). When any counters exist for a division,
   // retain other roster rows with nulls so missing OCR values are not zeroed.
   return candidates.filter(row => divisionsWithCounters.has(String(row.division_id)));
 }
@@ -1322,6 +1324,32 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (error) throw new Error(`Could not save roster assignments: ${error.message}`);
   }
 
+  const eligibilityImport = { imported: 0, unmatchedCount: 0, skipped: false };
+  if ((parsed.eligibilityRows ?? []).length) {
+    const asOfDate = parsed.eligibilityAsOfDate;
+    if (!asOfDate) {
+      eligibilityImport.skipped = true;
+    } else {
+      const rowsByDivision = {};
+      for (const row of parsed.eligibilityRows) {
+        const team = byNum[row.teamNum];
+        if (!team) continue;
+        (rowsByDivision[team.division_id] ??= []).push(row);
+      }
+      for (const [divisionId, rows] of Object.entries(rowsByDivision)) {
+        const reportWeekTag = weekTag?.byReportDivision?.[`rost:${divisionId}`];
+        const weekLabel = parsed.eligibilityWeek != null ? `Week ${parsed.eligibilityWeek}` : (reportWeekTag?.label ?? "Playoffs");
+        const imported = await importPlayoffEligibilityForWeek(divisionId, rows, {
+          weekKey: asOfDate,
+          label: `${weekLabel} · Eligibility as of ${asOfDate}`,
+        });
+        if (!imported?.ok) throw new Error(`Could not save playoff eligibility for division ${divisionId}.`);
+        eligibilityImport.imported += rows.length;
+        eligibilityImport.unmatchedCount += imported.unmatchedCount ?? 0;
+      }
+    }
+  }
+
   const weeklyCounterRows = buildIbaPlayerWeeklyCounterRows(
     parsed,
     Object.values(byNum),
@@ -1345,7 +1373,7 @@ export async function bulkImportPlayers(parsed, weekTag) {
     teamName: parsed.teams?.[num]?.name ?? null,
     playerNums: parsed.rosters[num] ?? [],
   }));
-  return { updatedDivisions, unmatchedTeamIds, unmatchedTeams, ambiguousTeamIds, weekTag };
+  return { updatedDivisions, unmatchedTeamIds, unmatchedTeams, ambiguousTeamIds, weekTag, eligibilityImport };
 }
 
 // Reconciliation, path 1: the unmatched team number was actually a typo (or
@@ -2169,30 +2197,40 @@ export async function importPlayoffEligibilityForWeek(divisionId, rows, weekTag)
     elig_code: r.eligCode,
     week_key: weekTag.weekKey, label: weekTag.label,
   }));
-  const unmatchedCount = rows.filter(r => r.num && !knownNums.has(r.num)).length;
-  if (inserted.length === 0) return { ok: true, unmatchedCount: 0 };
-  const { error } = await supabase.from("player_playoff_eligibility").upsert(inserted, { onConflict: "season_id,division_id,player_num,week_key" });
-  return { ok: !error, unmatchedCount };
+  const linkedRows = inserted.filter(row => row.player_num);
+  const unmatchedRows = inserted.filter(row => !row.player_num);
+  const unmatchedCount = unmatchedRows.length;
+  if (linkedRows.length) {
+    const { error } = await supabase.from("player_playoff_eligibility").upsert(linkedRows, { onConflict: "season_id,division_id,player_num,week_key" });
+    if (error) return { ok: false, unmatchedCount };
+  }
+  // PostgreSQL unique constraints treat NULL player_num values as distinct,
+  // so an upsert cannot de-duplicate unlinked report rows. Replace the
+  // unmatched portion of this exact dated snapshot on every re-import.
+  const { error: deleteError } = await supabase.from("player_playoff_eligibility")
+    .delete().eq("season_id", seasonId).eq("division_id", divisionId)
+    .eq("week_key", weekTag.weekKey).is("player_num", null);
+  if (deleteError) return { ok: false, unmatchedCount };
+  if (unmatchedRows.length) {
+    const { error: insertError } = await supabase.from("player_playoff_eligibility").insert(unmatchedRows);
+    if (insertError) return { ok: false, unmatchedCount };
+  }
+  return { ok: true, unmatchedCount };
 }
 
 export async function listPlayoffEligibility(divisionId) {
   if (!divisionId) return [];
-  const { data } = await supabase.from("player_playoff_eligibility_current").select("*").eq("division_id", divisionId);
+  // Read the source rows rather than the current-player view: the view omits
+  // unmatched (player_num = null) report entries, which must remain visible
+  // as Unverified on the manager status page. Consumers use the latest
+  // division-wide dated snapshot before trusting any code.
+  const { data, error } = await supabase.from("player_playoff_eligibility")
+    .select("*").eq("division_id", divisionId).order("week_key", { ascending: false });
+  if (error) throw error;
   return data ?? [];
 }
 
-// { [player_num]: { code: 'E'|'T'|'A'|'S', weekKey, label } } -- only rows
-// that actually resolved to a real player_num can gate a specific roster
-// player's draft eligibility; an unmatched (name-only) row can't be tied to
-// anyone in particular, so it's left out of this map even though it still
-// exists in the raw table for reference.
-export function eligibilityByPlayerNum(rows) {
-  const map = {};
-  for (const r of rows ?? []) {
-    if (r.player_num) map[r.player_num] = { code: r.elig_code, weekKey: r.week_key, label: r.label };
-  }
-  return map;
-}
+
 
 
 // ─── Live match ─────────────────────────────────────────────────────────────
@@ -2595,9 +2633,15 @@ export async function getPlayerMvpRankRow(playerNum, divisionId) {
 // code) -- null if that report has never been imported for this division or
 // this player never resolved to a real player_num in it.
 export async function getPlayerPlayoffEligibility(playerNum, divisionId) {
-  const { data } = await supabase.from("player_playoff_eligibility_current")
-    .select("*").eq("division_id", divisionId).eq("player_num", playerNum).maybeSingle();
-  return data;
+  const rows = await listPlayoffEligibility(divisionId);
+  const current = eligibilityByPlayerNum(rows)[playerNum];
+  if (!current) return null;
+  return {
+    player_num: playerNum,
+    elig_code: current.code,
+    week_key: current.weekKey,
+    label: current.label,
+  };
 }
 // ─── Team-vs-team head-to-head ─────────────────────────────────────────────
 // Pure aggregation over a list of completed_matches rows (typically a

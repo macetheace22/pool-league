@@ -292,7 +292,68 @@ const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\
 // ==================================================================
 // Section-level dispatch
 // ==================================================================
+function parsePlayoffEligibilityRoster(raw) {
+  const text = String(raw || "");
+  if (!/Division Playoffs[\s\S]*?Rate\s+Num\s+Elig\s+Name/i.test(text) && !/Rate\s+Num\s+Elig\s+Name/i.test(text)) return null;
+  const week = extractIbaReportWeek(text);
+  const asOfMatches = [...text.matchAll(/Ratings\s+current\s+as\s+of\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/gi)];
+  const parsedAsOfDates = asOfMatches.map(match => {
+    const [month, day, rawYear] = match[1].split("/").map(Number);
+    const year = rawYear < 100 ? rawYear + (rawYear >= 70 ? 1900 : 2000) : rawYear;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+      ? date.toISOString().slice(0, 10)
+      : null;
+  });
+  const distinctAsOfDates = [...new Set(parsedAsOfDates)];
+  const eligibilityAsOfDate = parsedAsOfDates.length && parsedAsOfDates.every(Boolean) && distinctAsOfDates.length === 1
+    ? distinctAsOfDates[0]
+    : null;
+  const registry = {}, rosters = {}, teams = {}, eligibilityRows = [], needsRating = [];
+  let currentTeams = [];
+  for (const line of text.split(/\r?\n/).filter(value => value.trim())) {
+    const teamHeaders = [...line.matchAll(/\bTeam\s+([A-Z0-9]{3,8})\s+(.*?)(?=\s+Team\s+[A-Z0-9]{3,8}\b|$)/gi)];
+    if (teamHeaders.length) {
+      currentTeams = teamHeaders.map(match => {
+        const rowStart = match[2].search(/(?:^|\s)(?:\d{1,3}|NR)\s+\d{5}\s+[ETAS]\s+/);
+        return { num: match[1], name: rowStart >= 0 ? match[2].slice(0, rowStart).trim() : match[2].trim(), columnStart: match.index };
+      });
+      for (const team of currentTeams) {
+        teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\bBYE\b/i.test(team.name) };
+        rosters[team.num] = rosters[team.num] || [];
+      }
+    }
+    const hasPlayerRows = /(?:^|\s)(?:\d{1,3}|NR)\s+\d{5}\s+[ETAS]\s+/i.test(line);
+    if (/^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line.trim()) && !teamHeaders.length && !hasPlayerRows) continue;
+    if (!currentTeams.length) continue;
+    const anchor = /(?:^|\s)(\d{1,3}|NR)\s+(\d{5})\s+([ETAS])\s+/gi;
+    const matches = [...line.matchAll(anchor)];
+    matches.forEach((match, index) => {
+      const nearestTeam = currentTeams.reduce((closest, candidate) => Math.abs(candidate.columnStart - match.index) < Math.abs(closest.columnStart - match.index) ? candidate : closest, currentTeams[0]);
+      // Preserve geometric column alignment when the PDF text retains it;
+      // when extraction flattens all headers before all player rows, fall
+      // back to the stable left-to-right row order.
+      const columnDistance = Math.abs(nearestTeam.columnStart - match.index);
+      const team = columnDistance <= 12 ? nearestTeam : currentTeams[index % currentTeams.length];
+      const nameStart = match.index + match[0].length;
+      const nameEnd = index + 1 < matches.length ? matches[index + 1].index : line.length;
+      const parsedName = cleanName(line.slice(nameStart, nameEnd));
+      if (!parsedName || !team) return;
+      const num = match[2], rating = /^NR$/i.test(match[1]) ? null : Number(match[1]);
+      const hasRating = rating != null && rating > 0;
+      registry[num] = { num, name: parsedName.name, nickname: parsedName.nickname, rating: hasRating ? rating : null, firstName: splitName(parsedName.name).firstName, lastName: splitName(parsedName.name).lastName };
+      if (!hasRating) needsRating.push({ teamId: team.num, num, name: parsedName.name, nickname: parsedName.nickname, ...splitName(parsedName.name) });
+      if (!rosters[team.num].includes(num)) rosters[team.num].push(num);
+      eligibilityRows.push({ teamNum: team.num, teamName: team.name, num, name: parsedName.name, nickname: parsedName.nickname, eligCode: match[3] });
+    });
+  }
+  if (!eligibilityRows.length) return { registry, rosters, teams, needsRating, ambiguousRoster: [], eligibilityRows: [], eligibilityWeek: week.weekNumber, eligibilityAsOfDate, eligibilityParseError: "The playoff-format roster was detected, but no player eligibility rows could be read." };
+  return { registry, rosters, teams, needsRating, ambiguousRoster: [], eligibilityRows, eligibilityWeek: week.weekNumber, eligibilityAsOfDate, eligibilityParseError: eligibilityAsOfDate ? null : "The playoff-format roster was detected, but its Ratings current as of date could not be read." };
+}
+
 function parseLeagueRoster(raw) {
+  const playoffRoster = parsePlayoffEligibilityRoster(raw);
+  if (playoffRoster) return playoffRoster;
   // The current PDF extractor can collapse an entire roster page into one
   // line. Restore player-row boundaries from the stable numeric prefix
   // (five-digit player number + play/win counts) before the established
@@ -618,4 +679,4 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 }
 
 
-export { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster };
+export { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster, parsePlayoffEligibilityRoster };

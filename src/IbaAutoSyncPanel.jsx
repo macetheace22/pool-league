@@ -85,7 +85,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         sourceContext: `${section.formatLabel} · ${section.dayLabel}`,
         sourceKey: section.key,
         teamNum: Object.entries(section.parsed?.rosters || {}).find(([, nums]) => nums.includes(playerNum))?.[0] || "",
-        playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—",
+        playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—", eligibilityCode: section.parsed?.eligibilityRows?.find(row => String(row.num) === String(playerNum))?.eligCode || "—",
       })));
     }
     if (type === "rost") {
@@ -94,6 +94,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
       return Object.entries(parsed.registry || {}).map(([playerNum, player]) => ({
         teamNum: Object.entries(parsed.rosters || {}).find(([, nums]) => nums.includes(playerNum))?.[0] || "",
         playerNum, playerName: player.name, nickname: player.nickname || "", rating: player.rating ?? "—",
+        eligibilityCode: parsed.eligibilityRows?.find(row => String(row.num) === String(playerNum))?.eligCode || "—",
       }));
     }
     if (sections.length) return sections.flatMap(section => (section.rows || []).map(row => ({
@@ -109,7 +110,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
     return Number(parsedReport?.detectedRows ?? 0) === 0;
   });
   const columnsFor = (type) => type === "rost"
-    ? [{ key:"sourceContext", label:"IBA group" }, { key:"teamNum", label:"Team" }, { key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"nickname", label:"Nickname" }, { key:"rating", label:"Rating" }]
+    ? [{ key:"sourceContext", label:"IBA group" }, { key:"teamNum", label:"Team" }, { key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"nickname", label:"Nickname" }, { key:"rating", label:"Rating" }, { key:"eligibilityCode", label:"Playoff eligibility" }]
     : type === "div"
       ? [{ key:"sourceContext", label:"IBA group" }, { key:"teamNum", label:"Team #" }, { key:"teamName", label:"Team" }, { key:"pointsLastWk", label:"Last week" }, { key:"totalPoints", label:"Total points" }, { key:"setsPlayed", label:"Sets played" }]
       : [{ key:"sourceContext", label:"IBA group" }, { key:"playerNum", label:"Player #" }, { key:"playerName", label:"Player" }, { key:"teamNum", label:"Team #" }, { key:"wins", label:"Sets won" }, { key:"mvpRankingPoints", label:"MVP points" }, { key:"losses", label:"Sets lost" }, { key:"pointsScored", label:"Points scored" }];
@@ -232,7 +233,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
         {manualMode ? "Choose a PDF for this report type. The report week and division schedule are checked before import." : <>{reportType ? `Checks each ${selectedReportLabel} report against its division schedule before import.` : "Checks roster/ratings, team standings, and MVP reports against their division schedules before import."} Missing reports are allowed when a league is not playing.</>}
       </div>
       {!reportType && <div style={{fontSize:11.5,color:"#D0D0D0",lineHeight:1.5,marginTop:8,padding:"8px 10px",background:"#141414",border:"1px solid #2A2A2A",borderRadius:8}}>
-        <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings, IBA team-standings reports, and IBA MVP reports. It does not import playoff eligibility; use season management for that manual-only report. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
+        <strong style={{color:"#E0E0E0"}}>What this sync covers:</strong> roster/ratings (including official playoff eligibility codes when the IBA issues its playoff-format roster), IBA team-standings reports, and IBA MVP reports. Playoff eligibility is read from that same roster PDF; it is not a separate report or manual import. Imported IBA standings and MVP reports are source snapshots, distinct from the app's computed standings and MVP results.
       </div>}
       {!manualMode && (
         <section style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #303030" }}>
@@ -461,6 +462,12 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
                     </div>
                   );
                 })()}
+                {r.reportType === "rost" && Number(parsedReport?.eligibilityRows ?? 0) > 0 && (
+                  <div style={{padding:"7px 10px",fontSize:11,color:parsedReport.eligibilityAsOfDate ? "#5FCF9E" : "#F0C36D",borderTop:"1px solid #292929"}}>
+                    Official playoff eligibility detected: {parsedReport.eligibilityRows} players · as of {parsedReport.eligibilityAsOfDate || "date unavailable"}.
+                    {parsedReport.eligibilityParseError ? ` ${parsedReport.eligibilityParseError} Ratings and rosters remain importable; eligibility will not be changed.` : " Ratings and eligibility will be imported together."}
+                  </div>
+                )}
                 {expandedPreview[r.key] && (
                   <div style={{padding:10}}>
                     {empty ? (
@@ -531,7 +538,7 @@ export default function IbaAutoSyncPanel({ season, schedule, onComplete, reportT
             <div className="import-warning-block" style={{background:"#0F2D1F",borderColor:"#1F6B4A",marginTop:10}}>
               <div className="import-warning-block__title" style={{color:"#5FCF9E"}}><Check size={12}/> IBA reports imported</div>
               <div style={{fontSize:11,color:"#E0E0E0"}}>
-                {result.roster ? `${result.roster.updatedDivisions?.length ?? 0} divisions received roster/rating updates.` : "No roster report imported."}
+                {result.roster ? `${result.roster.updatedDivisions?.length ?? 0} divisions received roster/rating updates.` : "No roster report imported."}{result.roster?.eligibilityImported ? ` ${result.roster.eligibilityImported} official playoff eligibility rows imported.` : ""}
                 {result.standings ? ` ${result.standings.imported} standings rows imported.` : ""}
                 {result.mvp ? ` ${result.mvp.imported} MVP rows imported.` : ""}
               </div>

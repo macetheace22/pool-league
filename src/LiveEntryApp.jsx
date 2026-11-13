@@ -916,6 +916,12 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
           : <>{opponentPlayer?.name} ({opponentPlayer?.rating}) is on the table — {team.name} picks a counter</>
         }
       </div>
+      {match.isPlayoff && availableRoster.some(player => !player.eligCode) && (
+        <div className="import-warning-block" style={{marginBottom:8}}>
+          <div className="import-warning-block__title"><AlertTriangle size={12}/> Eligibility unverified</div>
+          <div style={{fontSize:11,color:"#D0D0D0"}}>One or more players have no linked official IBA eligibility code. They remain selectable, but confirm their status with the official report.</div>
+        </div>
+      )}
       <div className="draft-roster-list">
         {availableRoster.length === 0 && <div className="empty-state">No available players left on this roster.</div>}
         {availableRoster
@@ -934,6 +940,7 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
             return (
               <button key={p.num} className="draft-roster-row" onClick={()=>onAssign(setIdx, side, p)}>
                 <span className="draft-roster-row__name">{p.name}{p.nickname?<span className="player-nickname"> "{p.nickname}"</span>:""}</span>
+                {match.isPlayoff && !p.eligCode && <span style={{fontSize:10,color:"#F0C36D",fontWeight:700}}>Unverified</span>}
                 <span className="draft-roster-row__rating">{p.rating}</span>
               </button>
             );
@@ -990,22 +997,17 @@ function ForfeitTableForm({ match, setIdx, used, defaultForfeitingSide, lockForf
 
       <div className="card">
         <div className="card__title">{forfeitingTeam.name} — forfeiting player (hasn't played yet)</div>
-        {forfeitingRoster.length === 0 && <div className="empty-state" style={{border:"none"}}>No eligible players left.</div>}
+        {match.isPlayoff && forfeitingRoster.some(player => !player.eligCode) && <div style={{fontSize:11,color:"#F0C36D",marginBottom:7}}>Eligibility unverified for one or more players; they remain selectable pending official confirmation.</div>}
+        {forfeitingRoster.length === 0 && <div className="empty-state" style={{border:"none"}}>No unused team members remain.</div>}
         <div className="draft-roster-list">
           {forfeitingRoster.slice().sort((a,b)=>b.rating-a.rating).map(p => {
             const ineligibleReason = playoffIneligibleReason(match, p);
-            if (ineligibleReason) {
-              return (
-                <div key={p.num} className="draft-roster-row draft-roster-row--ineligible">
-                  <span className="draft-roster-row__name">{p.name}{p.nickname?<span className="player-nickname"> "{p.nickname}"</span>:""}</span>
-                  <span className="draft-roster-row__ineligible-tag">{p.eligCode} — {ineligibleReason}</span>
-                </div>
-              );
-            }
             return (
               <button key={p.num} className={`draft-roster-row ${forfeitingPlayer?.num===p.num?"draft-roster-row--selected":""}`} onClick={()=>setForfeitingPlayer(p)}>
                 <span className="draft-roster-row__name">{p.name}{p.nickname?<span className="player-nickname"> "{p.nickname}"</span>:""}</span>
-                <span className="draft-roster-row__rating">{p.rating}</span>
+                {ineligibleReason
+                  ? <span className="draft-roster-row__ineligible-tag">{p.eligCode} — forfeit listing · Rating {p.rating}</span>
+                  : <span className="draft-roster-row__rating">{p.rating}</span>}
               </button>
             );
           })}
@@ -1015,6 +1017,7 @@ function ForfeitTableForm({ match, setIdx, used, defaultForfeitingSide, lockForf
       {!lockedReceivingPlayer && (
         <div className="card">
           <div className="card__title">{receivingTeam.name} — receiving player (present, hasn't played yet)</div>
+          {match.isPlayoff && receivingRoster.some(player => !player.eligCode) && <div style={{fontSize:11,color:"#F0C36D",marginBottom:7}}>Eligibility unverified for one or more players; they remain selectable pending official confirmation.</div>}
           {receivingRoster.length === 0 && <div className="empty-state" style={{border:"none"}}>No eligible players left.</div>}
           <div className="draft-roster-list">
             {receivingRoster.slice().sort((a,b)=>b.rating-a.rating).map(p => {

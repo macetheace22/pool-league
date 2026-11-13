@@ -234,7 +234,7 @@ export async function validateIbaReports(reports, season, options = {}) {
 }
 
 export async function buildIbaPreview(reports) {
-  const preview = { reports: [], sections: [], roster: null, standings: null, mvp: null, errors: [] };
+  const preview = { reports: [], sections: [], roster: null, standings: null, mvp: null, errors: [], eligibility: null };
   const rosterSections = [];
   const standingsSections = [];
   const mvpSections = [];
@@ -256,6 +256,9 @@ export async function buildIbaPreview(reports) {
         section.parsed = parseLeagueRoster(report.text);
         section.teamCount = Object.keys(section.parsed.rosters || {}).length;
         section.playerCount = Object.keys(section.parsed.registry || {}).length;
+        section.eligibilityCount = (section.parsed.eligibilityRows || []).length;
+        section.eligibilityAsOfDate = section.parsed.eligibilityAsOfDate ?? null;
+        section.eligibilityParseError = section.parsed.eligibilityParseError ?? null;
         rosterSections.push(section);
       } else if (report.reportType === "div") {
         section.rows = parseStandingsImport(report.text);
@@ -277,15 +280,21 @@ export async function buildIbaPreview(reports) {
       formatLabel: section.formatLabel,
       dayLabel: section.dayLabel,
       detectedRows: section.reportType === "rost" ? section.playerCount : section.rows?.length,
+      eligibilityRows: section.reportType === "rost" ? section.eligibilityCount ?? 0 : undefined,
+      eligibilityAsOfDate: section.reportType === "rost" ? section.eligibilityAsOfDate : undefined,
+      eligibilityParseError: section.reportType === "rost" ? section.eligibilityParseError : undefined,
       teamCount: section.teamCount,
     });
     preview.sections.push(section);
   }
 
   const mergeRosterSections = sections => {
-    const parsed = { registry: {}, rosters: {}, teams: {}, needsRating: [], ambiguousRoster: [] };
+    const parsed = { registry: {}, rosters: {}, teams: {}, needsRating: [], ambiguousRoster: [], eligibilityRows: [], eligibilityWeek: null, eligibilityAsOfDate: null, eligibilityParseError: null };
     let playerCount = 0;
     let teamCount = 0;
+    const eligibilityDates = new Set();
+    const eligibilityWeeks = new Set();
+    let hasUndatedEligibilityRows = false;
     for (const section of sections) {
       const current = section.parsed;
       if (!current) continue;
@@ -298,12 +307,29 @@ export async function buildIbaPreview(reports) {
       }
       parsed.needsRating.push(...(current.needsRating || []));
       parsed.ambiguousRoster.push(...(current.ambiguousRoster || []));
+      parsed.eligibilityRows.push(...(current.eligibilityRows || []));
+      if ((current.eligibilityRows || []).length) {
+        if (current.eligibilityAsOfDate) eligibilityDates.add(current.eligibilityAsOfDate);
+        else hasUndatedEligibilityRows = true;
+        if (current.eligibilityWeek != null) eligibilityWeeks.add(current.eligibilityWeek);
+        if (current.eligibilityParseError) parsed.eligibilityParseError = current.eligibilityParseError;
+      }
+    }
+    if (parsed.eligibilityRows.length) {
+      parsed.eligibilityAsOfDate = !hasUndatedEligibilityRows && eligibilityDates.size === 1
+        ? [...eligibilityDates][0]
+        : null;
+      parsed.eligibilityWeek = eligibilityWeeks.size === 1 ? [...eligibilityWeeks][0] : null;
+      if (!parsed.eligibilityAsOfDate) {
+        parsed.eligibilityParseError = "The playoff roster reports do not share one validated Ratings current as of date. Ratings and rosters remain importable; eligibility will not be changed.";
+      }
     }
     return { parsed, playerCount, teamCount };
   };
   if (rosterSections.length) {
     const merged = mergeRosterSections(rosterSections);
     preview.roster = { ...merged, sections: rosterSections };
+    if (merged.parsed.eligibilityRows.length) preview.eligibility = { count: merged.parsed.eligibilityRows.length, asOfDate: merged.parsed.eligibilityAsOfDate, error: merged.parsed.eligibilityParseError };
   }
   if (standingsSections.length) {
     preview.standings = { rows: standingsSections.flatMap(section => section.rows || []), sections: standingsSections };
@@ -319,7 +345,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
   const fallbackWeekTag = currentWeekTag(schedule);
   const result = {
     weekTag: fallbackWeekTag,
-    roster: { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], warnings: [] },
+    roster: { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], warnings: [], eligibilityImported: 0 },
     standings: { imported: 0, skipped: [] },
     mvp: { imported: 0, skipped: [] },
     warnings: [],
@@ -397,6 +423,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       registry: Object.fromEntries(Object.entries(parsed.registry || {}).filter(([, player]) => eligiblePlayerNums.has(player.num))),
       needsRating: (parsed.needsRating || []).filter(player => eligiblePlayerNums.has(player.num)),
       ambiguousRoster: (parsed.ambiguousRoster || []).filter(item => eligiblePlayerNums.has(item.playerNum || item.num)),
+      eligibilityRows: (parsed.eligibilityRows || []).filter(row => eligibleTeamNums.has(row.teamNum)),
     };
     if (!eligibleTeamNums.size) continue;
     const weeklyCounterSnapshotsByDivision = Object.fromEntries(
@@ -422,6 +449,9 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     result.roster.unmatchedTeams.push(...(imported?.unmatchedTeams || []));
     result.roster.ambiguousTeamIds.push(...(imported?.ambiguousTeamIds || []));
     result.roster.warnings.push(...(imported?.warnings || []));
+    result.roster.eligibilityImported += imported?.eligibilityImport?.imported ?? 0;
+    if (imported?.eligibilityImport?.skipped) result.warnings.push(`${report.key}: playoff eligibility rows were detected, but the report's as-of date could not be validated. Ratings and rosters were imported; eligibility was not updated.`);
+    if (imported?.eligibilityImport?.unmatchedCount) result.warnings.push(`${report.key}: ${imported.eligibilityImport.unmatchedCount} eligibility player numbers did not match known players and will not gate player eligibility.`);
     const updatedIds = (imported?.updatedDivisions || []).map(item => item.divisionId);
     if (updatedIds.length) await recordHistory(report, "rost", updatedIds);
   }
