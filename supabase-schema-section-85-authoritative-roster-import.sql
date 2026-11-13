@@ -434,6 +434,16 @@ begin
   if exists (
     select 1
     from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
+    join public.teams t on t.id = item.team_id
+    where jsonb_array_length(item.player_nums) = 0
+      and coalesce(t.is_bye, false) = false
+  ) then
+    raise exception 'ROSTER_IMPORT_EMPTY_NON_BYE_TEAM';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
     cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
     where nullif(trim(player_row.player_num), '') is null
        or not exists (select 1 from public.players p where p.num = player_row.player_num)
