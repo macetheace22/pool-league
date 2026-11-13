@@ -311,7 +311,7 @@ function parsePlayoffEligibilityRoster(raw) {
     const teamHeaders = [...line.matchAll(/\bTeam\s+([A-Z0-9]{3,8})\s+(.*?)(?=\s+Team\s+[A-Z0-9]{3,8}\b|$)/gi)];
     if (teamHeaders.length) {
       currentTeams = teamHeaders.map(match => {
-        const rowStart = match[2].search(/(?:^|\s)\d{1,3}\s+\d{5}\s+[ETAS]\s+/);
+        const rowStart = match[2].search(/(?:^|\s)(?:\d{1,3}|NR)\s+\d{5}\s+[ETAS]\s+/);
         return { num: match[1], name: rowStart >= 0 ? match[2].slice(0, rowStart).trim() : match[2].trim() };
       });
       for (const team of currentTeams) {
@@ -322,7 +322,7 @@ function parsePlayoffEligibilityRoster(raw) {
     const hasPlayerRows = /(?:^|\s)\d{1,3}\s+\d{5}\s+[ETAS]\s+/.test(line);
     if (/^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line) && !teamHeaders.length && !hasPlayerRows) continue;
     if (!currentTeams.length) continue;
-    const anchor = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+([ETAS])\s+/g;
+    const anchor = /(?:^|\s)(\d{1,3}|NR)\s+(\d{5})\s+([ETAS])\s+/gi;
     const matches = [...line.matchAll(anchor)];
     matches.forEach((match, index) => {
       const team = currentTeams.length === 1 ? currentTeams[0] : (currentTeams[index] || currentTeams[currentTeams.length - 1]);
@@ -330,8 +330,8 @@ function parsePlayoffEligibilityRoster(raw) {
       const nameEnd = index + 1 < matches.length ? matches[index + 1].index : line.length;
       const parsedName = cleanName(line.slice(nameStart, nameEnd));
       if (!parsedName || !team) return;
-      const num = match[2], rating = Number(match[1]);
-      const hasRating = rating > 0;
+      const num = match[2], rating = /^NR$/i.test(match[1]) ? null : Number(match[1]);
+      const hasRating = rating != null && rating > 0;
       registry[num] = { num, name: parsedName.name, nickname: parsedName.nickname, rating: hasRating ? rating : null, firstName: splitName(parsedName.name).firstName, lastName: splitName(parsedName.name).lastName };
       if (!hasRating) needsRating.push({ teamId: team.num, num, name: parsedName.name, nickname: parsedName.nickname, ...splitName(parsedName.name) });
       if (!rosters[team.num].includes(num)) rosters[team.num].push(num);
