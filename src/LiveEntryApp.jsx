@@ -1144,7 +1144,9 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
       </div>
       {set.complete && (
         <div className={`set-winner-badge set-winner-badge--${set.winnerSlot}`}>
-          <Trophy size={14} />{set.winnerSlot === "home" ? set.playerHome.name : set.playerAway.name} wins this set!
+          {set.forfeited
+            ? `FORFEIT — ${set.forfeitedBy === "home" ? set.playerHome.name : set.playerAway.name} forfeited; ${set.winnerSlot === "home" ? set.playerHome.name : set.playerAway.name} receives the set.`
+            : <><Trophy size={14} />{set.winnerSlot === "home" ? set.playerHome.name : set.playerAway.name} wins this set!</>}
         </div>
       )}
       {set.racks.length > 0 && (
@@ -1461,7 +1463,7 @@ function FinalSubmitScreen({ match, onSave, homeSets, awaySets, matchWinner }) {
         {match.sets.map((s) => (
           <div key={s.setNum} className="sets-summary__row">
             <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-            <span className="sets-summary__score">{s.forfeited ? `FORFEIT · ${s.forfeitPoints}pt` : s.complete ? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}` : "UNPLAYED"}</span>
+            <span className="sets-summary__score">{s.forfeited ? `FORFEIT · ${s.forfeitPoints}pt` : s.complete ? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}` : s.racks?.length ? "IN PROGRESS" : "UNPLAYED"}</span>
             <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
           </div>
         ))}
@@ -1516,7 +1518,7 @@ function DoneScreen({ match, onReset }) {
               return (
                 <div key={s.setNum} className="sets-summary__row">
                   <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-                  <span className="sets-summary__score">{s.forfeited ? `FORFEIT · ${s.forfeitPoints}pt` : s.complete ? `${runH}–${runA}` : "UNPLAYED"}</span>
+                  <span className="sets-summary__score">{s.forfeited ? `FORFEIT · ${s.forfeitPoints}pt` : s.complete ? `${runH}–${runA}` : s.racks?.length ? "IN PROGRESS" : "UNPLAYED"}</span>
                   <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
                 </div>
               );
