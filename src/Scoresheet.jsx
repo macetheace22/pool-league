@@ -236,7 +236,7 @@ function FrontSheetSet({ set, showInnings }) {
                 <td className="rack-grid__safeties-col"></td>
                 {set.racks.map((r) => (
                   <td key={r.n} className="rack-grid__timeout-cell">
-                    {r[timeoutKey] > 0 && <span className={`timeout-chip ${chipClass}`}>{r[timeoutKey] > 1 ? `TO×${r[timeoutKey]}` : "TO"}</span>}
+                    {r[timeoutKey] > 0 && <span className={`timeout-chip ${chipClass}`}>{r[timeoutKey] > 1 ? `${r[timeoutKey]} TO` : "TO"}</span>}
                   </td>
                 ))}
                 <td className="rack-grid__total-col"></td>
