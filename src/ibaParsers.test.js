@@ -115,6 +115,14 @@ Team 85382 North Stars
   it("does not classify a standard weekly roster as an eligibility report", () => {
     expect(parsePlayoffEligibilityRoster("Rate Num Play Win Name")).toBeNull();
   });
+
+  it("parses a playoff roster when PDF text is flattened onto one line", () => {
+    const flattened = "Division Playoffs - Roster and Handicap Report For Week: 17 Ratings current as of: 11/02/26 Rate Num Elig Name Team 85382 North Stars 45 12345 E Jane Doe 52 23456 T John Smith";
+    const parsed = parseLeagueRoster(flattened);
+    expect(parsed.eligibilityRows).toHaveLength(2);
+    expect(parsed.teams["85382"].name).toBe("North Stars");
+    expect(parsed.eligibilityRows.map(row => row.eligCode)).toEqual(["E", "T"]);
+  });
 });
 
 
