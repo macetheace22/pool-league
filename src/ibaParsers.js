@@ -292,7 +292,50 @@ const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\
 // ==================================================================
 // Section-level dispatch
 // ==================================================================
+function parsePlayoffEligibilityRoster(raw) {
+  const text = String(raw || "");
+  if (!/Division Playoffs[\\s\\S]*?Rate\\s+Num\\s+Elig\\s+Name/i.test(text) && !/Rate\\s+Num\\s+Elig\\s+Name/i.test(text)) return null;
+  const week = extractIbaReportWeek(text);
+  const asOf = text.match(/Ratings\\s+current\\s+as\\s+of\\s*:?\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/i);
+  let eligibilityAsOfDate = null;
+  if (asOf) {
+    const parts = asOf[1].split("/").map(Number);
+    let [month, day, year] = parts;
+    if (year < 100) year += year >= 70 ? 1900 : 2000;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) eligibilityAsOfDate = date.toISOString().slice(0, 10);
+  }
+  const registry = {}, rosters = {}, teams = {}, eligibilityRows = [], needsRating = [];
+  let currentTeams = [];
+  for (const line of text.split(/\\r?\\n/).map(value => value.trim()).filter(Boolean)) {
+    const teamHeaders = [...line.matchAll(/\\bTeam\\s+([A-Z0-9]{3,8})\\s+(.*?)(?=\\s+Team\\s+[A-Z0-9]{3,8}\\b|$)/gi)];
+    if (teamHeaders.length) {
+      currentTeams = teamHeaders.map(match => ({ num: match[1], name: match[2].trim() }));
+      for (const team of currentTeams) { teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\\bBYE\\b/i.test(team.name) }; rosters[team.num] = rosters[team.num] || []; }
+      continue;
+    }
+    if (!currentTeams.length || /^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\\s+Num\\s+Elig\\s+Name|[-]{5,}|Division #)/i.test(line)) continue;
+    const anchor = /(?:^|\\s)(\\d{1,3})\\s+(\\d{5})\\s+([ETAS])\\s+/g;
+    const matches = [...line.matchAll(anchor)];
+    matches.forEach((match, index) => {
+      const team = currentTeams[index] || currentTeams[currentTeams.length - 1];
+      const start = match.index + match[0].length;
+      const end = index + 1 < matches.length ? matches[index + 1].index : line.length;
+      const parsedName = cleanName(line.slice(start, end));
+      if (!parsedName) return;
+      const num = match[2], rating = Number(match[1]);
+      registry[num] = { num, name: parsedName.name, nickname: parsedName.nickname, rating, firstName: splitName(parsedName.name).firstName, lastName: splitName(parsedName.name).lastName };
+      if (!rosters[team.num].includes(num)) rosters[team.num].push(num);
+      eligibilityRows.push({ teamNum: team.num, teamName: team.name, num, name: parsedName.name, nickname: parsedName.nickname, eligCode: match[3] });
+    });
+  }
+  if (!eligibilityRows.length) return { registry, rosters, teams, needsRating, ambiguousRoster: [], eligibilityRows: [], eligibilityWeek: week.weekNumber, eligibilityAsOfDate, eligibilityParseError: "The playoff-format roster was detected, but no player eligibility rows could be read." };
+  return { registry, rosters, teams, needsRating, ambiguousRoster: [], eligibilityRows, eligibilityWeek: week.weekNumber, eligibilityAsOfDate, eligibilityParseError: eligibilityAsOfDate ? null : "The playoff-format roster was detected, but its Ratings current as of date could not be read." };
+}
+
 function parseLeagueRoster(raw) {
+  const playoffRoster = parsePlayoffEligibilityRoster(raw);
+  if (playoffRoster) return playoffRoster;
   // The current PDF extractor can collapse an entire roster page into one
   // line. Restore player-row boundaries from the stable numeric prefix
   // (five-digit player number + play/win counts) before the established
@@ -618,4 +661,4 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 }
 
 
-export { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster };
+export { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster, parsePlayoffEligibilityRoster };
