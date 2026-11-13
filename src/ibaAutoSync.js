@@ -414,7 +414,13 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       const matches = reportRouting[teamNum] || [];
       return matches.length > 1 && matches.some(team => readyDivisionIds.has(team.divisionId));
     });
+    const unmatchedTeamNums = Object.keys(parsed.rosters || {}).filter(teamNum =>
+      (reportRouting[teamNum] || []).length === 0
+    );
     if (ambiguousTeamNums.length) result.warnings.push(`${report.key}: ${ambiguousTeamNums.length} roster team numbers matched multiple active divisions and were skipped.`);
+    if (unmatchedTeamNums.length) {
+      result.roster.warnings.push(`${report.key}: ${unmatchedTeamNums.length} roster team number(s) did not match an active team. Resolve the team mapping and re-import; current rosters for this report were left unchanged.`);
+    }
     const eligiblePlayerNums = new Set([...eligibleTeamNums].flatMap(teamNum => parsed.rosters[teamNum] || []));
     const filteredParsed = {
       ...parsed,
@@ -443,6 +449,8 @@ export async function importIbaReports(reports, season, schedule, preflight) {
       byReportDivision: preflight.weekTagsByReportDivision,
       allowedDivisionIds: [...readyDivisionIds],
       weeklyCounterSnapshotsByDivision,
+      unmatchedTeamNums,
+      ambiguousTeamNums,
       fallback: fallbackWeekTag,
     });
     result.roster.updatedDivisions.push(...(imported?.updatedDivisions || []));
