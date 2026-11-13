@@ -309,3 +309,29 @@ describe("Section 8.1 import retains official roster and player history", () => 
     expect(db).toContain('.from("player_team_roster_history")');
   });
 });
+
+describe("Section 8.1 roster window and import safeguards", () => {
+  it("keeps Week 6 captain lock, final-four and postseason freezes, and the restricted six-player limit", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
+    expect(sql).toContain("ROSTER_CHANGES_FROZEN");
+    expect(sql).toContain("v_roster_limit := 6");
+    expect(sql).toContain("v_roster_limit := 8");
+    expect(sql).toContain("v_last_regular_week - 3");
+    expect(sql).toContain("sw.is_playoff = true");
+    expect(sql).toContain("create or replace function public.can_captain_change_roster");
+    expect(sql).toContain("return false;");
+  });
+
+  it("allows the official manager import to reconcile published rosters without disabling Section 84", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    const transfer = read("supabase-schema-section-84-player-transfer-approval.sql");
+    expect(sql).toContain("public.current_role_name() is distinct from 'manager'");
+    expect(sql).toContain("set_config('app.official_iba_roster_import', 'true', true)");
+    expect(sql).toContain("ROSTER_IMPORT_INCOMPLETE_DIVISION");
+    expect(sql).toContain("ROSTER_IMPORT_PLAYER_ON_MULTIPLE_TEAMS");
+    expect(sql).toContain("ROSTER_LIMIT_EIGHT");
+    expect(transfer).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
+    expect(transfer).toContain("if v_has_played then");
+  });
+});
