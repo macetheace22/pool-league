@@ -166,13 +166,13 @@ returns void
 language sql
 security definer
 set search_path = public
-as $
+as $$
   update public.player_division_team_assignments
   set has_played = true
   where division_id = p_division_id
     and team_id = p_team_id
     and player_num = p_player_num;
-$;
+$$;
 
 revoke all on function public.mark_division_players_as_played(uuid, uuid, text) from public, anon, authenticated;
 
@@ -181,7 +181,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 declare
   v_set jsonb;
   v_division_id uuid;
@@ -209,7 +209,7 @@ begin
   end loop;
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.track_live_match_player_participation() from public, anon, authenticated;
 drop trigger if exists track_live_match_player_participation on public.live_match;
@@ -222,7 +222,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 declare
   v_set jsonb;
   v_player_num text;
@@ -242,7 +242,7 @@ begin
   end loop;
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.track_completed_match_player_participation() from public, anon, authenticated;
 drop trigger if exists track_completed_match_player_participation on public.completed_matches;
