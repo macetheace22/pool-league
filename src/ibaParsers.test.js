@@ -139,7 +139,7 @@ describe("playoff eligibility roster parsing", () => {
     ]);
     expect(parsed.registry["34567"].rating).toBe(70);
     expect(parsed.registry["45678"].rating).toBe(62);
-    expect(parsed.registry["12345"].matchesPlayed).toBeUndefined();
+    expect(parsed.registry["34567"].matchesPlayed).toBeUndefined();
     expect(parseLeagueRoster(playoffRoster).eligibilityRows).toHaveLength(2);
   });
 
