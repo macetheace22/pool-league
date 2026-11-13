@@ -1335,9 +1335,11 @@ export async function bulkImportPlayers(parsed, weekTag) {
         (rowsByDivision[team.division_id] ??= []).push(row);
       }
       for (const [divisionId, rows] of Object.entries(rowsByDivision)) {
+        const reportWeekTag = weekTag?.byReportDivision?.[`rost:${divisionId}`];
+        const weekLabel = parsed.eligibilityWeek != null ? `Week ${parsed.eligibilityWeek}` : (reportWeekTag?.label ?? "Playoffs");
         const imported = await importPlayoffEligibilityForWeek(divisionId, rows, {
           weekKey: asOfDate,
-          label: `Playoffs Week ${parsed.eligibilityWeek ?? "—"} · As of ${asOfDate}`,
+          label: `${weekLabel} · Eligibility as of ${asOfDate}`,
         });
         if (!imported?.ok) throw new Error(`Could not save playoff eligibility for division ${divisionId}.`);
         eligibilityImport.imported += rows.length;
