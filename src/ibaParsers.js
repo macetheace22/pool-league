@@ -325,7 +325,7 @@ function parsePlayoffEligibilityRoster(raw) {
     const anchor = /(?:^|\s)(\d{1,3}|NR)\s+(\d{5})\s+([ETAS])\s+/gi;
     const matches = [...line.matchAll(anchor)];
     matches.forEach((match, index) => {
-      const team = currentTeams.length === 1 ? currentTeams[0] : (currentTeams[index] || currentTeams[currentTeams.length - 1]);
+      const team = currentTeams[index % currentTeams.length];
       const nameStart = match.index + match[0].length;
       const nameEnd = index + 1 < matches.length ? matches[index + 1].index : line.length;
       const parsedName = cleanName(line.slice(nameStart, nameEnd));
