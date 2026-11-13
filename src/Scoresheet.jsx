@@ -19,8 +19,8 @@ export function toDisplaySets(match) {
       if (status === "unplayed" || status === "makeup-pending") {
         return {
           setNum: s.setNum, venue, status,
-          playerA: s.playerHome ? { name: s.playerHome.name, num: s.playerHome.num ?? null, rating: s.playerHome.rating ?? null, team: "home" } : null,
-          playerB: s.playerAway ? { name: s.playerAway.name, num: s.playerAway.num ?? null, rating: s.playerAway.rating ?? null, team: "away" } : null,
+          playerA: { name: s.playerHome?.name ?? "Home player not assigned", num: s.playerHome?.num ?? null, rating: s.playerHome?.rating ?? null, team: "home" },
+          playerB: { name: s.playerAway?.name ?? "Away player not assigned", num: s.playerAway?.num ?? null, rating: s.playerAway?.rating ?? null, team: "away" },
           racks: [], finalA: 0, finalB: 0, winnerSide: null, source: match.source,
           totalInnings: 0, safetiesA: 0, safetiesB: 0,
           forfeited: false,
@@ -82,6 +82,9 @@ function computeSetRollup(set, format) {
   const isMasters = (format || "masters").toLowerCase() === "masters";
   const homeSlot = set.playerA.team === "home" ? "a" : "b";
   const awaySlot = homeSlot === "a" ? "b" : "a";
+  if (set.status === "unplayed" || set.status === "makeup-pending") {
+    return { marginHome: 0, marginAway: 0, addOnHome: 0, addOnAway: 0, winBonusHome: 0, winBonusAway: 0, totalHome: 0, totalAway: 0, homeSlot, awaySlot };
+  }
   if (set.forfeited) {
     const totalHome = set.forfeitedBy === "home" ? 0 : set.forfeitPoints;
     const totalAway = set.forfeitedBy === "home" ? set.forfeitPoints : 0;
@@ -323,8 +326,9 @@ function ratingForTeamTotal(rating, format) {
 
 function BackSheet({ match, sets }) {
   const isMasters = match.format === "masters";
-  const teamHomeRatingTotal = sets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "home" ? set.playerA.rating : set.playerB.rating, match.format), 0);
-  const teamAwayRatingTotal = sets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "away" ? set.playerA.rating : set.playerB.rating, match.format), 0);
+  const ratedSets = sets.filter(set => set.status !== "unplayed" && set.status !== "makeup-pending");
+  const teamHomeRatingTotal = ratedSets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "home" ? set.playerA.rating : set.playerB.rating, match.format), 0);
+  const teamAwayRatingTotal = ratedSets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "away" ? set.playerA.rating : set.playerB.rating, match.format), 0);
   const rollups = sets.map((set) => ({ set, rollup: computeSetRollup(set, match.format) }));
   const subTotalHome = rollups.reduce((s, r) => s + r.rollup.totalHome, 0);
   const subTotalAway = rollups.reduce((s, r) => s + r.rollup.totalAway, 0);
