@@ -9,6 +9,7 @@ create table if not exists public.player_division_team_assignments (
   player_num text not null references public.players(num) on delete cascade,
   division_id uuid not null references public.divisions(id) on delete cascade,
   team_id uuid not null references public.teams(id) on delete restrict,
+  has_played boolean not null default false,
   assigned_at timestamptz not null default now(),
   primary key (player_num, division_id)
 );
@@ -16,8 +17,39 @@ create table if not exists public.player_division_team_assignments (
 alter table public.player_division_team_assignments enable row level security;
 revoke all on public.player_division_team_assignments from anon, authenticated;
 
--- Backfill only unambiguous existing assignments. Existing duplicate assignments
--- are deliberately left for the manager to resolve; new duplicates are blocked.
+-- Seed historical participation first, so a player who has already played
+-- remains assigned even if they were later removed from the current roster.
+-- The app has no completed matches in the connected project today, but this
+-- also makes the migration safe for existing deployments with match history.
+insert into public.player_division_team_assignments
+  (player_num, division_id, team_id, has_played)
+select played.player_num, played.division_id, min(played.team_id::text)::uuid, true
+from (
+  select distinct
+    set_player->'playerHome'->>'num' as player_num,
+    cm.division_id,
+    cm.team_home_id as team_id
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) set_player
+  where jsonb_array_length(coalesce(set_player->'racks', '[]'::jsonb)) > 0
+    and nullif(set_player->'playerHome'->>'num', '') is not null
+  union all
+  select distinct
+    set_player->'playerAway'->>'num' as player_num,
+    cm.division_id,
+    cm.team_away_id as team_id
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) set_player
+  where jsonb_array_length(coalesce(set_player->'racks', '[]'::jsonb)) > 0
+    and nullif(set_player->'playerAway'->>'num', '') is not null
+) played
+where played.division_id is not null and played.team_id is not null
+group by played.player_num, played.division_id
+having count(distinct played.team_id) = 1
+on conflict (player_num, division_id) do nothing;
+
+-- Current roster entries are provisional until the player actually participates
+-- in a set. Existing roster conflicts are left untouched for manager review.
 insert into public.player_division_team_assignments (player_num, division_id, team_id)
 select r.player_num, t.division_id, min(r.team_id::text)::uuid
 from public.rosters r
@@ -42,7 +74,7 @@ create table if not exists public.player_transfer_requests (
 );
 
 create unique index if not exists player_transfer_one_pending_per_player
-  on public.player_transfer_requests(player_num)
+  on public.player_transfer_requests(player_num, division_id)
   where status = 'pending';
 create index if not exists player_transfer_requests_status_created
   on public.player_transfer_requests(status, created_at desc);
@@ -68,6 +100,7 @@ as $$
 declare
   v_division_id uuid;
   v_assigned_team_id uuid;
+  v_has_played boolean;
 begin
   select division_id into v_division_id
   from public.teams
@@ -77,8 +110,8 @@ begin
     return new;
   end if;
 
-  -- Also protect legacy duplicate assignments that predate the durable
-  -- assignment ledger; never allow a new roster row to add a third team.
+  -- Do not allow an active duplicate roster row, even for a player whose
+  -- assignment is still provisional (has not yet played a set).
   if exists (
     select 1
     from public.rosters r
@@ -89,28 +122,132 @@ begin
   ) then
     raise exception 'PLAYER_TRANSFER_APPROVAL_REQUIRED'
       using errcode = '23514',
-        detail = 'This player already appears on another team in this division. A League Manager-approved transfer is required.';
+        detail = 'Remove the player from the existing team roster first. A player who has already played requires League Manager transfer approval.';
   end if;
 
   insert into public.player_division_team_assignments (player_num, division_id, team_id)
   values (new.player_num, v_division_id, new.team_id)
   on conflict (player_num, division_id) do nothing;
 
-  select team_id into v_assigned_team_id
+  select team_id, has_played into v_assigned_team_id, v_has_played
   from public.player_division_team_assignments
   where player_num = new.player_num
     and division_id = v_division_id
   for update;
 
   if v_assigned_team_id <> new.team_id then
-    raise exception 'PLAYER_TRANSFER_APPROVAL_REQUIRED'
-      using errcode = '23514',
-        detail = 'This player is already assigned to another team in this division for the season. The receiving team captain must submit a transfer request for League Manager approval.';
+    if v_has_played then
+      raise exception 'PLAYER_TRANSFER_APPROVAL_REQUIRED'
+        using errcode = '23514',
+          detail = 'This player has already played for another team in this division this season. The receiving team captain must submit a transfer request for League Manager approval.';
+    end if;
+
+    -- Before the player has participated in a set, a roster correction or
+    -- team change is permitted without the special transfer approval.
+    update public.player_division_team_assignments
+    set team_id = new.team_id, assigned_at = now()
+    where player_num = new.player_num and division_id = v_division_id;
   end if;
 
   return new;
 end;
 $$;
+
+-- Mark a player's division assignment as locked once they actually participate
+-- in a rack. Live scoring writes live_match.state; manual match entry writes
+-- completed_matches.state, so both paths feed the same durable flag.
+create or replace function public.mark_division_players_as_played(
+  p_division_id uuid,
+  p_team_id uuid,
+  p_player_num text
+)
+returns void
+language sql
+security definer
+set search_path = public
+as $
+  update public.player_division_team_assignments
+  set has_played = true
+  where division_id = p_division_id
+    and team_id = p_team_id
+    and player_num = p_player_num;
+$;
+
+revoke all on function public.mark_division_players_as_played(uuid, uuid, text) from public, anon, authenticated;
+
+create or replace function public.track_live_match_player_participation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  v_set jsonb;
+  v_division_id uuid;
+  v_home_team_id uuid;
+  v_away_team_id uuid;
+  v_player_num text;
+begin
+  v_division_id := nullif(new.state->>'divisionId', '')::uuid;
+  v_home_team_id := nullif(new.state #>> '{teamHome,id}', '')::uuid;
+  v_away_team_id := nullif(new.state #>> '{teamAway,id}', '')::uuid;
+  if v_division_id is null then return new; end if;
+
+  for v_set in select value from jsonb_array_elements(coalesce(new.state->'sets', '[]'::jsonb))
+  loop
+    if jsonb_array_length(coalesce(v_set->'racks', '[]'::jsonb)) > 0 then
+      v_player_num := nullif(v_set #>> '{playerHome,num}', '');
+      if v_player_num is not null and v_home_team_id is not null then
+        perform public.mark_division_players_as_played(v_division_id, v_home_team_id, v_player_num);
+      end if;
+      v_player_num := nullif(v_set #>> '{playerAway,num}', '');
+      if v_player_num is not null and v_away_team_id is not null then
+        perform public.mark_division_players_as_played(v_division_id, v_away_team_id, v_player_num);
+      end if;
+    end if;
+  end loop;
+  return new;
+end;
+$;
+
+revoke all on function public.track_live_match_player_participation() from public, anon, authenticated;
+drop trigger if exists track_live_match_player_participation on public.live_match;
+create trigger track_live_match_player_participation
+after insert or update of state on public.live_match
+for each row execute function public.track_live_match_player_participation();
+
+create or replace function public.track_completed_match_player_participation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  v_set jsonb;
+  v_player_num text;
+begin
+  for v_set in select value from jsonb_array_elements(coalesce(new.state->'sets', '[]'::jsonb))
+  loop
+    if jsonb_array_length(coalesce(v_set->'racks', '[]'::jsonb)) > 0 then
+      v_player_num := nullif(v_set #>> '{playerHome,num}', '');
+      if v_player_num is not null and new.team_home_id is not null then
+        perform public.mark_division_players_as_played(new.division_id, new.team_home_id, v_player_num);
+      end if;
+      v_player_num := nullif(v_set #>> '{playerAway,num}', '');
+      if v_player_num is not null and new.team_away_id is not null then
+        perform public.mark_division_players_as_played(new.division_id, new.team_away_id, v_player_num);
+      end if;
+    end if;
+  end loop;
+  return new;
+end;
+$;
+
+revoke all on function public.track_completed_match_player_participation() from public, anon, authenticated;
+drop trigger if exists track_completed_match_player_participation on public.completed_matches;
+create trigger track_completed_match_player_participation
+after insert or update of state on public.completed_matches
+for each row execute function public.track_completed_match_player_participation();
 
 revoke all on function public.enforce_player_division_team_assignment() from public, anon, authenticated;
 drop trigger if exists enforce_player_division_team_assignment on public.rosters;
@@ -131,6 +268,7 @@ declare
   v_role text;
   v_division_id uuid;
   v_from_team_id uuid;
+  v_has_played boolean;
   v_request_id uuid;
 begin
   v_role := public.current_role_name();
@@ -150,22 +288,22 @@ begin
     raise exception 'PLAYER_NOT_FOUND';
   end if;
 
-  select team_id into v_from_team_id
+  select team_id, has_played into v_from_team_id, v_has_played
   from public.player_division_team_assignments
   where player_num = p_player_num and division_id = v_division_id;
 
   -- No previous assignment in this division (or already assigned to this
   -- team): the caller should use the ordinary roster-add RPC instead.
-  if v_from_team_id is null or v_from_team_id = p_to_team_id then
+  if v_from_team_id is null or v_from_team_id = p_to_team_id or not coalesce(v_has_played, false) then
     return jsonb_build_object('status', 'add');
   end if;
 
   if exists (
     select 1 from public.player_transfer_requests
-    where player_num = p_player_num and status = 'pending'
+    where player_num = p_player_num and division_id = v_division_id and status = 'pending'
   ) then
     select id into v_request_id from public.player_transfer_requests
-    where player_num = p_player_num and status = 'pending';
+    where player_num = p_player_num and division_id = v_division_id and status = 'pending';
     return jsonb_build_object('status', 'pending', 'request_id', v_request_id);
   end if;
 
