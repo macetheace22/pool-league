@@ -1224,8 +1224,8 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
                 <span>{set.playerAway.name.split(" ")[0]} TO: {timeoutUsedAway}/{timeoutAllowanceAway}</span>
               </div>
               <div className="timeout-row">
-                <TimeoutStepper label={`${set.playerHome.name.split(" ")[0]} TO`} value={timeoutHomeCount} onChange={setTimeoutHomeCount} color="home" />
-                <TimeoutStepper label={`${set.playerAway.name.split(" ")[0]} TO`} value={timeoutAwayCount} onChange={setTimeoutAwayCount} color="away" />
+                <TimeoutToggle label={`${set.playerHome.name.split(" ")[0]} TO`} count={timeoutHomeCount} onChange={setTimeoutHomeCount} color="home" />
+                <TimeoutToggle label={`${set.playerAway.name.split(" ")[0]} TO`} count={timeoutAwayCount} onChange={setTimeoutAwayCount} color="away" />
               </div>
             </div>
           )}
@@ -1250,15 +1250,23 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   );
 }
 
-function TimeoutStepper({ label, value, onChange, color }) {
+function TimeoutToggle({ label, count, onChange, color }) {
   return (
-    <div className={`safety-stepper safety-stepper--${color}`}>
-      <span className="safety-stepper__label">{label}</span>
-      <div className="safety-stepper__controls">
-        <button type="button" className="safety-stepper__btn" onClick={() => onChange(Math.max(0, value - 1))}>−</button>
-        <span className="safety-stepper__value">{value}</span>
-        <button type="button" className="safety-stepper__btn" onClick={() => onChange(value + 1)}>+</button>
-      </div>
+    <div className="timeout-toggle-group">
+      <ToggleChip
+        label={label}
+        active={count > 0}
+        color={color}
+        onToggle={() => onChange(count > 0 ? 0 : 1)}
+      />
+      {count > 0 && (
+        <ToggleChip
+          label="2nd TO"
+          active={count > 1}
+          color={color}
+          onToggle={() => onChange(count > 1 ? 1 : 2)}
+        />
+      )}
     </div>
   );
 }
