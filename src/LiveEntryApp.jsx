@@ -934,6 +934,7 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
             return (
               <button key={p.num} className="draft-roster-row" onClick={()=>onAssign(setIdx, side, p)}>
                 <span className="draft-roster-row__name">{p.name}{p.nickname?<span className="player-nickname"> "{p.nickname}"</span>:""}</span>
+                {match.isPlayoff && !p.eligCode && <span style={{fontSize:10,color:"#F0C36D",fontWeight:700}}>Unverified</span>}
                 <span className="draft-roster-row__rating">{p.rating}</span>
               </button>
             );
