@@ -1,8 +1,8 @@
 # IBA Pool League App — Master Rulebook Audit & Implementation Plan
 
-Last reconciled: 2026-11-10 (local project date; GitHub timestamps may display the following UTC date)  
+Last reconciled: 2026-11-13 (local project date; GitHub timestamps may display the following UTC date)  
 Code baseline: `main` through merge commits `be5a1f3` (PR #137), `166c8b0` (PR #138), and `27e190c` (PR #140).  
-Documentation update: PR #131, branch `docs/rulebook-audit-continuity-6-11` (merged); PR #132 implementation recorded after merge; PRs #137–#138 reconciled; PR #140 optional per-game innings display merged.
+Documentation update: PR #131, branch `docs/rulebook-audit-continuity-6-11` (merged); PR #132 implementation recorded after merge; PRs #137–#138 reconciled; PR #140 optional per-game innings display merged; Section 6.4 trailing-forfeit correction is in the current implementation PR.
 
 This file is the single source of truth for rulebook scope, decisions, current implementation, outstanding audit, data entry/import needs, and delivery order. It is deliberately honest about what has and has not been checked: a complete inventory is not the same as a completed clause-by-clause audit.
 
@@ -78,7 +78,7 @@ This is the known baseline from merged PRs and prior user-confirmed SQL actions.
 | PR #137 — Section 6.8 team-rating test coverage | Merged (`be5a1f3`). Adds tests for Advanced NR=50 versus established ratings, Open below/above 325, individual-forfeit over-limit penalty with receiver bonus, and exact-325 no-adjustment boundary. PR-head CI run 42941877619 passed tests, production build, and SQL-access guard. Vercel status on merge commit is success. Test coverage expanded; full five-set/makeup/manual acceptance remains open. |
 | PR #138 — full-match forfeit zero team points | Merged (`166c8b0`). Explicit full-match-forfeit designation is persisted from the existing whole-match action; the forfeiting team receives exactly zero points even if over 325. Individual set forfeits retain Section 6.4 over-limit penalty behavior, including lone-shooter remaining sets. Symmetric tests distinguish the two cases. PR-head CI run 42943922380 passed tests, production build, and SQL-access guard. Vercel status on merge commit is success. No SQL migration or new live-scoring prompts/timers/foul fields. |
 | PR #140 — optional per-game innings on completed Scoresheet (Section 6.11) | Merged (`27e190c`). Game Detail has a compact Show innings / Hide innings toggle; hidden by default to preserve phone space, with total innings still visible. Per-game innings already existed in saved rack data; no live-scoring change, new input, schema migration, or saved-data format change. Regression coverage added for per-game innings mapping, player identifiers on forfeited sets, and archived team-number persistence. PR merge-commit status currently reports Vercel pending; visual phone/desktop acceptance remains open. |
-
+| Current PR — individual-forfeit trailing-set enforcement (Section 6.4) | Implementation in review. A set may be forfeited only when no later set has started or been completed. Once recorded, every later set is locked, including the simultaneously available Sets 1–2 path. Regression coverage adds later-started detection. |
 ### Database / SQL baseline
 
 - Active Supabase project: `iba-pool-league`, ref `mijhllycghzdryfvfgzv`. Never use the inactive project named `pool-league`.

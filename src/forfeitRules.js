@@ -18,3 +18,7 @@ export function isMakeupDeadlinePassed(playoffsStartDate, now = new Date()) {
   const deadline = makeupDeadlineFromPlayoffsStart(playoffsStartDate);
   return !!deadline && now.getTime() > deadline.getTime();
 }
+
+export function hasLaterStartedSet(sets, setIdx) {
+  return (sets ?? []).some((set, index) => index > setIdx && (set?.complete || set?.playerHome || set?.playerAway));
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hasLaterCompletedSet,
+  hasLaterStartedSet,
   makeupDeadlineFromPlayoffsStart,
   isMakeupDeadlinePassed,
 } from "../src/forfeitRules";
@@ -16,6 +17,24 @@ describe("forfeit lifecycle rules", () => {
     ];
     expect(hasLaterCompletedSet(sets, 1)).toBe(true);
     expect(hasLaterCompletedSet(sets, 2)).toBe(false);
+  });
+
+  it("detects a later set that has started even before completion", () => {
+    const sets = [
+      { complete: false },
+      { complete: false, playerHome: { num: "2" } },
+      { complete: false },
+    ];
+    expect(hasLaterStartedSet(sets, 0)).toBe(true);
+    expect(hasLaterStartedSet(sets, 1)).toBe(false);
+  });
+
+  it("detects later completed sets as started", () => {
+    const sets = [
+      { complete: false },
+      { complete: true, forfeited: false },
+    ];
+    expect(hasLaterStartedSet(sets, 0)).toBe(true);
   });
 
   it("calculates the makeup deadline from the final regular-season week", () => {

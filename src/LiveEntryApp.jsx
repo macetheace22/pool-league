@@ -9,7 +9,7 @@ import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import { mergeLiveMatchState } from "./liveMatchSync";
 import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
-import { hasLaterCompletedSet } from "./forfeitRules";
+import { hasLaterStartedSet } from "./forfeitRules";
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -129,6 +129,10 @@ function setDraftState(match, setIdx) {
   if (set.playerHome && set.playerAway) return "live"; // both assigned, scoring in progress
   const setNum = setIdx + 1;
 
+  // A forfeited set must be the last set of the match. Once a forfeit has
+  // been recorded, no later set may be opened or played.
+  if (match.sets.slice(0, setIdx).some(s => s.complete && s.forfeited)) return "locked";
+
   // Sets 1 & 2 are always open from the start (simultaneous)
   if (setNum <= 2) {
     const firstRole = PUTUP_FIRST[setNum]; // "block" or "choice"
@@ -137,10 +141,6 @@ function setDraftState(match, setIdx) {
     if (!firstAssigned) return `putup_${firstRole}`;
     return `counter_${firstRole === "block" ? "choice" : "block"}`;
   }
-
-  // A forfeited set must be the last set of the match. Once a forfeit has
-  // been recorded, no later set may be opened or played.
-  if (match.sets.slice(0, setIdx).some(s => s.complete && s.forfeited)) return "locked";
 
   // Sets 3-5 unlock when enough prior sets are complete/in-progress-resolved
   // Set 3 unlocks once 1 of {1,2} is complete. Set 4 unlocks once 2 total sets complete. Set 5 once 3 complete.
@@ -796,8 +796,8 @@ function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
   };
 
   const forfeitSet = (setIdx, forfeitingSide, forfeitingPlayer, receivingPlayer) => {
-    if (hasLaterCompletedSet(match.sets, setIdx)) {
-      window.alert("A forfeited set must be the last set of the match. Later sets have already been played.");
+    if (hasLaterStartedSet(match.sets, setIdx)) {
+      window.alert("A forfeited set must be the last set of the match. A later set has already started or been played.");
       return;
     }
     const receivingSide = forfeitingSide === "home" ? "away" : "home";
