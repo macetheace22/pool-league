@@ -330,7 +330,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
   const fallbackWeekTag = currentWeekTag(schedule);
   const result = {
     weekTag: fallbackWeekTag,
-    roster: { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], warnings: [] },
+    roster: { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], warnings: [], eligibilityImported: 0 },
     standings: { imported: 0, skipped: [] },
     mvp: { imported: 0, skipped: [] },
     warnings: [],
@@ -434,7 +434,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     result.roster.unmatchedTeams.push(...(imported?.unmatchedTeams || []));
     result.roster.ambiguousTeamIds.push(...(imported?.ambiguousTeamIds || []));
     result.roster.warnings.push(...(imported?.warnings || []));
-    if (imported?.eligibilityImport?.skipped) result.warnings.push(`${report.key}: playoff eligibility rows were detected, but the report's as-of date could not be validated. Ratings and rosters were imported; eligibility was not updated.`);
+    result.roster.eligibilityImported += imported?.eligibilityImport?.imported ?? 0;\n    if (imported?.eligibilityImport?.skipped) result.warnings.push(`${report.key}: playoff eligibility rows were detected, but the report's as-of date could not be validated. Ratings and rosters were imported; eligibility was not updated.`);
     if (imported?.eligibilityImport?.unmatchedCount) result.warnings.push(`${report.key}: ${imported.eligibilityImport.unmatchedCount} eligibility player numbers did not match known players and will not gate player eligibility.`);
     const updatedIds = (imported?.updatedDivisions || []).map(item => item.divisionId);
     if (updatedIds.length) await recordHistory(report, "rost", updatedIds);
