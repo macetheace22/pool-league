@@ -1300,7 +1300,7 @@ export async function bulkImportPlayers(parsed, weekTag) {
   );
 
   const byNum = {};
-  const ambiguousTeamIds = [];
+  const ambiguousTeamIds = [...new Set((weekTag?.ambiguousTeamNums ?? []).map(String))];
   for (const row of activeRows) {
     if (byNum[row.team_num]) { if (!ambiguousTeamIds.includes(row.team_num)) ambiguousTeamIds.push(row.team_num); continue; }
     byNum[row.team_num] = row;
@@ -1310,7 +1310,10 @@ export async function bulkImportPlayers(parsed, weekTag) {
   const knownActiveTeamNums = new Set((teamRows ?? [])
     .filter(row => row.divisions?.seasons?.is_active)
     .map(row => String(row.team_num)));
-  const unmatchedTeamIds = teamNums.filter(n => !knownActiveTeamNums.has(String(n)) && !ambiguousTeamIds.includes(n));
+  const unmatchedTeamIds = [...new Set([
+    ...teamNums.filter(n => !knownActiveTeamNums.has(String(n)) && !ambiguousTeamIds.includes(String(n))),
+    ...(weekTag?.unmatchedTeamNums ?? []).map(String),
+  ])];
   const reportDivisionIds = [...new Set(Object.values(byNum).map(row => String(row.division_id)))];
   let allDivisionTeams = [];
   if (reportDivisionIds.length) {
