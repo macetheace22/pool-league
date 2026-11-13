@@ -5528,6 +5528,12 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                   </div>
                   <PreviewList rows={bulkTeamList}/>
 
+                  {parsed.eligibilityRows?.length > 0 && (
+                    <div style={{fontSize:11,color:"#5FCF9E",margin:"6px 0"}}>
+                      Official playoff eligibility detected: {parsed.eligibilityRows.length} players · as of {parsed.eligibilityAsOfDate ?? "date unavailable"}.
+                      {!parsed.eligibilityAsOfDate && " Ratings and rosters can still be imported, but eligibility will remain unchanged until a valid report date is available."}
+                    </div>
+                  )}
                   {parsed.needsRating?.length > 0 && (
                     <div className="import-warning-block">
                       <div className="import-warning-block__title">
@@ -5592,6 +5598,15 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                     <div style={{fontSize:11,color:"#E0E0E0"}}>
                       Updated {importResult.updatedDivisions.length} division{importResult.updatedDivisions.length!==1?"s":""} ({importResult.updatedDivisions.reduce((s,d)=>s+d.teamCount,0)} teams total).
                     </div>
+                  )}
+                  {importResult.eligibilityImport?.imported > 0 && (
+                    <div style={{fontSize:11,color:"#E0E0E0"}}>Imported official playoff eligibility for {importResult.eligibilityImport.imported} players.</div>
+                  )}
+                  {importResult.eligibilityImport?.skipped && (
+                    <div style={{fontSize:11,color:"#F59E0B"}}>Eligibility was detected but not updated because the report's as-of date could not be validated. Ratings and rosters were imported normally.</div>
+                  )}
+                  {importResult.eligibilityImport?.unmatchedCount > 0 && (
+                    <div style={{fontSize:11,color:"#F59E0B"}}>{importResult.eligibilityImport.unmatchedCount} eligibility player numbers did not match known players and will not gate draft eligibility.</div>
                   )}
                   {importResult.unmatchedTeams?.length > 0 && (
                     <div className="import-warning-block" style={{marginTop:0}}>
