@@ -3801,8 +3801,10 @@ function ManageMyTeamPage({ teamId, profileId }) {
     const result = await db.addExistingPlayerToRoster(teamId, playerNum);
     if (!result?.ok) {
       const message = result?.error?.includes("PLAYER_TRANSFER_APPROVAL_REQUIRED")
-        ? "This player is already assigned to another team in this division. A transfer request is required."
-        : result?.error || "Could not add player.";
+        ? "This player has already played for another team in this division. A League Manager-approved transfer is required."
+        : result?.error?.includes("TRANSFER_REQUEST_ALREADY_PENDING")
+          ? "A transfer request for this player is already pending for another team in this division."
+          : result?.error || "Could not add player.";
       setError(message); return;
     }
     if (result.status === "pending") {
