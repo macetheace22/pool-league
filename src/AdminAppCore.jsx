@@ -469,6 +469,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Players / rosters / ratings ──
   const handleBulkImport = async (parsed, rawReportText = "") => {
     const weekTag = currentWeekTag(viewSchedule);
+    if (viewingDiv?.id) weekTag.allowedDivisionIds = [viewingDiv.id];
     if (rawReportText && viewingSeason?.id) {
       const reportWeek = extractIbaReportWeek(rawReportText);
       const reportWeeksByDivision = extractIbaReportWeeksByDivision(rawReportText).byDivision;
