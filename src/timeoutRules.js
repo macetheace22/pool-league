@@ -25,7 +25,7 @@ export function timeoutCount(set, side) {
   const boolKey = side === "home" ? "timeoutHome" : "timeoutAway";
   const countKey = side === "home" ? "timeoutHomeCount" : "timeoutAwayCount";
   return (set?.racks || []).reduce((count, rack) => {
-    // New records store the number of periods in a rack. Fall back to the
+    // New records store the number of timeouts in a rack. Fall back to the
     // legacy boolean marker so existing saved matches remain fully readable.
     const rackCount = Number.isFinite(rack?.[countKey]) ? Math.max(0, rack[countKey]) : (rack?.[boolKey] ? 1 : 0);
     return count + rackCount;
