@@ -28,3 +28,15 @@ describe("listCaptainPendingMakeups", () => {
       .toEqual(["a-pending"]);
   });
 });
+
+
+describe("liveSetDisposition", () => {
+  it("distinguishes forfeits, pending makeups, unplayed, and in-progress sets", async () => {
+    const { liveSetDisposition } = await import("../src/liveSetDisposition.js");
+    expect(liveSetDisposition({ forfeited: true, forfeitPoints: 125 }, true)).toBe("FORFEIT · 125pt");
+    expect(liveSetDisposition({ complete: false, racks: [] }, true)).toBe("AWAITING MAKEUP");
+    expect(liveSetDisposition({ complete: false, racks: [] }, false)).toBe("UNPLAYED");
+    expect(liveSetDisposition({ complete: false, racks: [{ home: 10, away: 5 }] }, false)).toBe("IN PROGRESS");
+    expect(liveSetDisposition({ complete: true, racks: [{ home: 50, away: 20 }] }, false)).toBeNull();
+  });
+});
