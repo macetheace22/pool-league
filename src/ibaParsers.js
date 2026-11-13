@@ -316,7 +316,7 @@ function parsePlayoffEligibilityRoster(raw) {
     if (teamHeaders.length) {
       currentTeams = teamHeaders.map(match => {
         const rowStart = match[2].search(/(?:^|\s)(?:\d{1,3}|NR)\s+\d{5}\s+[ETAS]\s+/);
-        return { num: match[1], name: rowStart >= 0 ? match[2].slice(0, rowStart).trim() : match[2].trim() };
+        return { num: match[1], name: rowStart >= 0 ? match[2].slice(0, rowStart).trim() : match[2].trim(), columnStart: match.index };
       });
       for (const team of currentTeams) {
         teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\bBYE\b/i.test(team.name) };
@@ -329,7 +329,7 @@ function parsePlayoffEligibilityRoster(raw) {
     const anchor = /(?:^|\s)(\d{1,3}|NR)\s+(\d{5})\s+([ETAS])\s+/gi;
     const matches = [...line.matchAll(anchor)];
     matches.forEach((match, index) => {
-      const team = currentTeams[index % currentTeams.length];
+      const team = currentTeams.reduce((closest, candidate) => Math.abs(candidate.columnStart - match.index) < Math.abs(closest.columnStart - match.index) ? candidate : closest, currentTeams[0]);
       const nameStart = match.index + match[0].length;
       const nameEnd = index + 1 < matches.length ? matches[index + 1].index : line.length;
       const parsedName = cleanName(line.slice(nameStart, nameEnd));
