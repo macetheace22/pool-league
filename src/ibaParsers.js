@@ -331,7 +331,9 @@ function parsePlayoffEligibilityRoster(raw) {
       const parsedName = cleanName(line.slice(nameStart, nameEnd));
       if (!parsedName || !team) return;
       const num = match[2], rating = Number(match[1]);
-      registry[num] = { num, name: parsedName.name, nickname: parsedName.nickname, rating, firstName: splitName(parsedName.name).firstName, lastName: splitName(parsedName.name).lastName };
+      const hasRating = rating > 0;
+      registry[num] = { num, name: parsedName.name, nickname: parsedName.nickname, rating: hasRating ? rating : null, firstName: splitName(parsedName.name).firstName, lastName: splitName(parsedName.name).lastName };
+      if (!hasRating) needsRating.push({ teamId: team.num, num, name: parsedName.name, nickname: parsedName.nickname, ...splitName(parsedName.name) });
       if (!rosters[team.num].includes(num)) rosters[team.num].push(num);
       eligibilityRows.push({ teamNum: team.num, teamName: team.name, num, name: parsedName.name, nickname: parsedName.nickname, eligCode: match[3] });
     });
