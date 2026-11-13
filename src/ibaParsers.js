@@ -310,19 +310,27 @@ function parsePlayoffEligibilityRoster(raw) {
   for (const line of text.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
     const teamHeaders = [...line.matchAll(/\bTeam\s+([A-Z0-9]{3,8})\s+(.*?)(?=\s+Team\s+[A-Z0-9]{3,8}\b|$)/gi)];
     if (teamHeaders.length) {
-      currentTeams = teamHeaders.map(match => ({ num: match[1], name: match[2].trim() }));
-      for (const team of currentTeams) { teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\bBYE\b/i.test(team.name) }; rosters[team.num] = rosters[team.num] || []; }
-      continue;
+      currentTeams = teamHeaders.map((match, index) => {
+        const nextHeader = teamHeaders[index + 1]?.index ?? line.length;
+        const segment = line.slice(match.index + match[0].length, nextHeader);
+        const rowStart = segment.search(/(?:^|\s)\d{1,3}\s+\d{5}\s+[ETAS]\s+/);
+        return { num: match[1], name: rowStart >= 0 ? segment.slice(0, rowStart).trim() : match[2].trim() };
+      });
+      for (const team of currentTeams) {
+        teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\bBYE\b/i.test(team.name) };
+        rosters[team.num] = rosters[team.num] || [];
+      }
     }
-    if (!currentTeams.length || /^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line)) continue;
+    if (/^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line)) continue;
+    if (!currentTeams.length) continue;
     const anchor = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+([ETAS])\s+/g;
     const matches = [...line.matchAll(anchor)];
     matches.forEach((match, index) => {
-      const team = currentTeams[index] || currentTeams[currentTeams.length - 1];
-      const start = match.index + match[0].length;
-      const end = index + 1 < matches.length ? matches[index + 1].index : line.length;
-      const parsedName = cleanName(line.slice(start, end));
-      if (!parsedName) return;
+      const team = currentTeams.length === 1 ? currentTeams[0] : (currentTeams[index] || currentTeams[currentTeams.length - 1]);
+      const nameStart = match.index + match[0].length;
+      const nameEnd = index + 1 < matches.length ? matches[index + 1].index : line.length;
+      const parsedName = cleanName(line.slice(nameStart, nameEnd));
+      if (!parsedName || !team) return;
       const num = match[2], rating = Number(match[1]);
       registry[num] = { num, name: parsedName.name, nickname: parsedName.nickname, rating, firstName: splitName(parsedName.name).firstName, lastName: splitName(parsedName.name).lastName };
       if (!rosters[team.num].includes(num)) rosters[team.num].push(num);
