@@ -14,7 +14,7 @@ create table if not exists public.player_division_team_assignments (
 );
 
 alter table public.player_division_team_assignments enable row level security;
-revoke all on public.player_division_team_assignments from anon, authenticated;
+revoke all on public.player_division_team_assignments from public, anon, authenticated;
 -- Explicit Data API grant is paired with RLS and no policies, so authenticated
 -- clients cannot read or mutate this internal assignment ledger directly.
 grant select on public.player_division_team_assignments to authenticated;
@@ -83,7 +83,7 @@ create index if not exists player_transfer_requests_status_created
   on public.player_transfer_requests(status, created_at desc);
 
 alter table public.player_transfer_requests enable row level security;
-revoke all on public.player_transfer_requests from anon;
+revoke all on public.player_transfer_requests from public, anon;
 grant select on public.player_transfer_requests to authenticated;
 
 drop policy if exists "Managers can review player transfer requests" on public.player_transfer_requests;
@@ -273,6 +273,7 @@ declare
   v_from_team_id uuid;
   v_has_played boolean;
   v_request_id uuid;
+  v_pending_to_team_id uuid;
 begin
   v_role := public.current_role_name();
   if v_role not in ('captain', 'manager') or not public.is_team_captain(p_to_team_id) then
@@ -301,12 +302,14 @@ begin
     return jsonb_build_object('status', 'add');
   end if;
 
-  if exists (
-    select 1 from public.player_transfer_requests
-    where player_num = p_player_num and division_id = v_division_id and status = 'pending'
-  ) then
-    select id into v_request_id from public.player_transfer_requests
-    where player_num = p_player_num and division_id = v_division_id and status = 'pending';
+  select id, to_team_id into v_request_id, v_pending_to_team_id
+  from public.player_transfer_requests
+  where player_num = p_player_num and division_id = v_division_id and status = 'pending';
+
+  if v_request_id is not null then
+    if v_pending_to_team_id <> p_to_team_id then
+      raise exception 'TRANSFER_REQUEST_ALREADY_PENDING';
+    end if;
     return jsonb_build_object('status', 'pending', 'request_id', v_request_id);
   end if;
 
