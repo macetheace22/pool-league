@@ -319,7 +319,8 @@ function parsePlayoffEligibilityRoster(raw) {
         rosters[team.num] = rosters[team.num] || [];
       }
     }
-    if (/^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line)) continue;
+    const hasPlayerRows = /(?:^|\s)\d{1,3}\s+\d{5}\s+[ETAS]\s+/.test(line);
+    if (/^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line) && !teamHeaders.length && !hasPlayerRows) continue;
     if (!currentTeams.length) continue;
     const anchor = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+([ETAS])\s+/g;
     const matches = [...line.matchAll(anchor)];
