@@ -2641,8 +2641,14 @@ export function downloadCSV(filename, csvContent) {
 // (they really were on two different rosters), and the UI groups rows by
 // season_id itself where a single "which season" selection is needed.
 export async function listPlayerTeamHistory(playerNum) {
-  const { data: rosterRows } = await supabase.from("rosters").select("team_id").eq("player_num", playerNum);
-  const teamIds = [...new Set((rosterRows ?? []).map(r => r.team_id))];
+  // Read the durable roster-history ledger so removed players retain their
+  // former team associations after authoritative imports.
+  const { data: historyRows, error: historyError } = await supabase
+    .from("player_team_roster_history")
+    .select("team_id")
+    .eq("player_num", playerNum);
+  if (historyError) return [];
+  const teamIds = [...new Set((historyRows ?? []).map(r => r.team_id))];
   if (teamIds.length === 0) return [];
   const { data: teamRows } = await supabase.from("teams")
     .select("id, name, team_num, division_id, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active))")
