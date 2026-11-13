@@ -165,7 +165,11 @@ declare
   v_team_id uuid;
   v_role text;
   v_import boolean;
+  v_week_six_date date;
+  v_final_four_start_date date;
+  v_postseason_start_date date;
   v_roster_count integer;
+  v_roster_limit integer := 8;
 begin
   v_role := public.current_role_name();
   v_import := coalesce(current_setting('app.official_iba_roster_import', true), 'false') = 'true';
@@ -182,22 +186,43 @@ begin
     v_team_id := new.team_id;
   end if;
 
+  select w.week_six_date, w.final_four_start_date, w.postseason_start_date
+    into v_week_six_date, v_final_four_start_date, v_postseason_start_date
+  from public.roster_change_window(v_team_id) w;
+
+  -- Section 4.2 allows one to eight roster members. During the restricted
+  -- Week 6-to-final-four window, a manager's approved change must leave no
+  -- more than six. Deletions remain possible so an over-limit roster can be
+  -- reduced one member at a time. Official imports retain the published IBA
+  -- roster (up to the structural eight-member maximum).
+  if v_week_six_date is not null
+     and current_date >= v_week_six_date
+     and (v_final_four_start_date is null or current_date < v_final_four_start_date)
+     and (v_postseason_start_date is null or current_date < v_postseason_start_date) then
+    v_roster_limit := 6;
+  end if;
+
   if tg_op <> 'DELETE' then
-    select count(*) into v_roster_count
-    from public.rosters
-    where team_id = v_team_id
-      and (tg_op <> 'UPDATE' or player_num <> old.player_num or team_id <> old.team_id);
+    if tg_op = 'UPDATE' then
+      select count(*) into v_roster_count
+      from public.rosters r
+      where r.team_id = new.team_id
+        and not (r.team_id = old.team_id and r.player_num = old.player_num);
+    else
+      select count(*) into v_roster_count
+      from public.rosters r
+      where r.team_id = new.team_id;
+    end if;
 
     if not exists (
-      select 1 from public.rosters
-      where team_id = new.team_id and player_num = new.player_num
-    ) and v_roster_count >= 6 then
-      raise exception 'ROSTER_LIMIT_SIX: a team may not have more than six current roster members'
+      select 1 from public.rosters r
+      where r.team_id = new.team_id and r.player_num = new.player_num
+    ) and v_roster_count >= v_roster_limit then
+      raise exception 'ROSTER_LIMIT: resulting roster may not exceed % members in this period', v_roster_limit
         using errcode = '23514';
     end if;
   end if;
 
-  if tg_op = 'DELETE' then return old; end if;
   return new;
 end;
 $$;
@@ -308,9 +333,9 @@ begin
     from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
     cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
     group by item.team_id
-    having count(distinct player_row.player_num) > 6
+    having count(distinct player_row.player_num) > 8
   ) then
-    raise exception 'ROSTER_LIMIT_SIX';
+    raise exception 'ROSTER_LIMIT_EIGHT';
   end if;
 
   select array_agg(team_id), count(*)
