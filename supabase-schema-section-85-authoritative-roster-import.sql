@@ -306,6 +306,129 @@ for each row execute function public.enforce_roster_change_cutoff();
 -- The caller supplies every active team in each division, including empty
 -- player arrays. This RPC never deletes player, match, rating, or assignment
 -- history. Section 84 continues to reject unapproved played-player transfers.
+-- Preserve player-to-team affiliation after current roster removal.
+-- Separate from the Section 84 current assignment/transfer-lock ledger.
+create table if not exists public.player_team_history (
+  id uuid primary key default gen_random_uuid(),
+  player_num text not null references public.players(num) on delete cascade,
+  team_id uuid not null references public.teams(id) on delete cascade,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz,
+  source text not null default 'roster' check (source in ('roster', 'completed_match', 'backfill'))
+);
+
+create index if not exists player_team_history_player_started
+  on public.player_team_history(player_num, started_at desc);
+create unique index if not exists player_team_history_one_active_period
+  on public.player_team_history(player_num, team_id)
+  where ended_at is null;
+
+alter table public.player_team_history enable row level security;
+revoke all on public.player_team_history from public, anon;
+grant select on public.player_team_history to authenticated;
+
+drop policy if exists "Authenticated users can read player team history" on public.player_team_history;
+create policy "Authenticated users can read player team history"
+  on public.player_team_history for select to authenticated
+  using (auth.uid() is not null);
+
+-- Backfill prior affiliations from completed-match participation.
+with match_players as (
+  select set_row.value->'playerHome'->>'num' as player_num, cm.team_home_id as team_id, cm.created_at
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where cm.team_home_id is not null
+    and jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerHome'->>'num', '') is not null
+  union all
+  select set_row.value->'playerAway'->>'num' as player_num, cm.team_away_id as team_id, cm.created_at
+  from public.completed_matches cm
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where cm.team_away_id is not null
+    and jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerAway'->>'num', '') is not null
+),
+match_summary as (
+  select player_num, team_id, min(created_at) as first_match_at, max(created_at) as last_match_at
+  from match_players
+  group by player_num, team_id
+)
+insert into public.player_team_history(player_num, team_id, started_at, ended_at, source)
+select
+  ms.player_num,
+  ms.team_id,
+  ms.first_match_at,
+  case
+    when season.is_active is true and exists (
+      select 1 from public.rosters r where r.player_num = ms.player_num and r.team_id = ms.team_id
+    ) then null
+    else ms.last_match_at
+  end,
+  'completed_match'
+from match_summary ms
+join public.teams team on team.id = ms.team_id
+join public.divisions division on division.id = team.division_id
+join public.seasons season on season.id = division.season_id
+where exists (select 1 from public.players p where p.num = ms.player_num)
+  and not exists (
+    select 1 from public.player_team_history h
+    where h.player_num = ms.player_num and h.team_id = ms.team_id and h.source = 'completed_match'
+  );
+
+-- Include roster-only affiliations too, including players who have not yet
+-- played. Old inactive-season roster rows are recorded as ended history.
+insert into public.player_team_history(player_num, team_id, started_at, ended_at, source)
+select roster.player_num, roster.team_id, now(),
+  case when season.is_active is true then null else now() end,
+  'backfill'
+from public.rosters roster
+join public.teams team on team.id = roster.team_id
+join public.divisions division on division.id = team.division_id
+join public.seasons season on season.id = division.season_id
+where not exists (
+  select 1 from public.player_team_history h
+  where h.player_num = roster.player_num and h.team_id = roster.team_id
+);
+
+create or replace function public.track_player_team_history()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if tg_op = 'INSERT' then
+    insert into public.player_team_history(player_num, team_id, source)
+    values (new.player_num, new.team_id, 'roster')
+    on conflict (player_num, team_id) where ended_at is null do nothing;
+    return new;
+  end if;
+
+  if not exists (
+    select 1 from public.rosters r
+    where r.player_num = old.player_num and r.team_id = old.team_id
+  ) then
+    update public.player_team_history
+    set ended_at = now()
+    where id = (
+      select h.id from public.player_team_history h
+      where h.player_num = old.player_num
+        and h.team_id = old.team_id
+        and h.ended_at is null
+      order by h.started_at desc
+      limit 1
+    );
+  end if;
+  return old;
+end;
+$;
+
+revoke all on function public.track_player_team_history() from public, anon, authenticated;
+drop trigger if exists track_player_team_history on public.rosters;
+create trigger track_player_team_history
+after insert or delete on public.rosters
+for each row execute function public.track_player_team_history();
+
 create or replace function public.sync_imported_team_rosters(p_rosters jsonb)
 returns jsonb
 language plpgsql
