@@ -10,6 +10,13 @@ describe("detectSetWinner — Rule 6.7", () => {
     expect(detectSetWinner([{ home: 50, away: 53 }], home, away, "advanced")).toBe("away");
   });
 
+  it("uses the last game's winner when cumulative set scores are tied", () => {
+    expect(detectSetWinner([
+      { home: 25, away: 30 },
+      { home: 30, away: 25 },
+    ], home, away, "advanced")).toBe("home");
+  });
+
   it("uses the final game's winner, not the cumulative point differential", () => {
     expect(detectSetWinner([
       { home: 30, away: 20 },
@@ -34,7 +41,7 @@ describe("detectSetWinner — Rule 6.7", () => {
     expect(detectSetWinner([{ home: 53, away: 45 }], { rating: 1 }, { rating: 70 }, "open")).toBe("home");
   });
 
-  it("does not infer a winner from tied game scores or missing ratings", () => {
+  it("does not invent a winner for an invalid tied single-game score or missing ratings", () => {
     expect(detectSetWinner([{ home: 50, away: 50 }], home, away, "advanced")).toBeNull();
     expect(detectSetWinner([{ home: 50, away: 30 }], { rating: null }, away, "advanced")).toBeNull();
   });

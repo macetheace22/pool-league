@@ -12,8 +12,8 @@ export function effectiveSetTarget(player, otherPlayer, format) {
   return player?.rating ?? null;
 }
 
-// Each rack is one completed 8-ball game. Its recorded per-game scores are
-// used to identify the last-game winner when both set targets are reached.
+// Each rack is one completed 8-ball game. When both set targets are reached
+// in the same game, the player with more points in that game wins the set.
 export function detectSetWinner(games, playerHome, playerAway, format) {
   if (playerHome?.rating == null || playerAway?.rating == null) return null;
 
@@ -34,7 +34,9 @@ export function detectSetWinner(games, playerHome, playerAway, format) {
     if (homeReached && awayReached) {
       if (pointsHome > pointsAway) return "home";
       if (pointsAway > pointsHome) return "away";
-      return game.tiebreak === "home" || game.tiebreak === "away" ? game.tiebreak : null;
+      // A tied single-game score is invalid under 8-ball scoring. Do not
+      // invent a winner if malformed data nevertheless reaches this branch.
+      return null;
     }
     if (homeReached) return "home";
     if (awayReached) return "away";
