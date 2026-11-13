@@ -1,46 +1,33 @@
--- Section 85: authoritative IBA roster reconciliation and Section 8.1 freeze
+-- Section 85: authoritative IBA roster reconciliation and Section 8.1 safeguards.
 --
--- Official weekly roster imports replace current roster membership for every
--- fully represented division. Historical match JSON and the Section 84
--- player_division_team_assignments ledger are deliberately retained.
+-- A validated official IBA import replaces current roster memberships for
+-- complete divisions. Historical completed-match JSON, player ratings, and
+-- the Section 84 player_division_team_assignments ledger are never deleted.
 
-create or replace function public.assert_team_roster_change_allowed(p_team_id uuid)
-returns void
+create or replace function public.roster_change_window(p_team_id uuid)
+returns table (
+  week_six_date date,
+  final_four_start_date date,
+  postseason_start_date date
+)
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  v_role text;
   v_division_id uuid;
-  v_week_six_date date;
   v_last_regular_week integer;
-  v_final_four_start_date date;
-  v_postseason_start_date date;
 begin
-  v_role := public.current_role_name();
-  if v_role is null then
-    raise exception 'AUTH_REQUIRED' using errcode = '42501';
-  end if;
-
-  select division_id into v_division_id
-  from public.teams
-  where id = p_team_id;
+  select t.division_id into v_division_id
+  from public.teams t
+  where t.id = p_team_id;
 
   if v_division_id is null then
     raise exception 'TEAM_NOT_FOUND';
   end if;
 
-  -- The official IBA import RPC is manager-only and has already validated
-  -- complete division coverage. It may reconcile the published roster even
-  -- during a manual-change freeze; Section 84 transfer safeguards still run.
-  if v_role = 'manager'
-     and coalesce(current_setting('app.official_iba_roster_import', true), 'false') = 'true' then
-    return;
-  end if;
-
   select to_date(trim(sw.date), 'FMMM/FMDD/YYYY')
-    into v_week_six_date
+    into week_six_date
   from public.schedule_weeks sw
   where sw.division_id = v_division_id
     and sw.week_num = 6
@@ -57,7 +44,7 @@ begin
 
   if v_last_regular_week is not null then
     select to_date(trim(sw.date), 'FMMM/FMDD/YYYY')
-      into v_final_four_start_date
+      into final_four_start_date
     from public.schedule_weeks sw
     where sw.division_id = v_division_id
       and coalesce(sw.is_playoff, false) = false
@@ -68,19 +55,50 @@ begin
   end if;
 
   select min(to_date(trim(sw.date), 'FMMM/FMDD/YYYY'))
-    into v_postseason_start_date
+    into postseason_start_date
   from public.schedule_weeks sw
   where sw.division_id = v_division_id
     and sw.is_playoff = true
     and trim(sw.date) ~ '^\d{1,2}/\d{1,2}/\d{4}$';
 
-  if v_postseason_start_date is not null and current_date >= v_postseason_start_date then
-    raise exception 'ROSTER_CHANGES_FROZEN: postseason roster changes are not allowed'
-      using errcode = '42501';
+  return next;
+end;
+$$;
+
+revoke all on function public.roster_change_window(uuid) from public, anon, authenticated;
+
+create or replace function public.assert_team_roster_change_allowed(p_team_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role text;
+  v_week_six_date date;
+  v_final_four_start_date date;
+  v_postseason_start_date date;
+begin
+  v_role := public.current_role_name();
+  if v_role is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
   end if;
 
-  if v_final_four_start_date is not null and current_date >= v_final_four_start_date then
-    raise exception 'ROSTER_CHANGES_FROZEN: roster changes are not allowed during the final four weeks'
+  select w.week_six_date, w.final_four_start_date, w.postseason_start_date
+    into v_week_six_date, v_final_four_start_date, v_postseason_start_date
+  from public.roster_change_window(p_team_id) w;
+
+  -- This bypass is set only inside the manager-only, SECURITY DEFINER
+  -- authoritative import RPC below. Section 84's played-player transfer
+  -- trigger remains in force for all imported assignments.
+  if v_role = 'manager'
+     and coalesce(current_setting('app.official_iba_roster_import', true), 'false') = 'true' then
+    return;
+  end if;
+
+  if (v_postseason_start_date is not null and current_date >= v_postseason_start_date)
+     or (v_final_four_start_date is not null and current_date >= v_final_four_start_date) then
+    raise exception 'ROSTER_CHANGES_FROZEN: manual roster changes are not allowed during the final four weeks or postseason'
       using errcode = '42501';
   end if;
 
@@ -101,58 +119,24 @@ $$;
 
 revoke all on function public.assert_team_roster_change_allowed(uuid) from public, anon, authenticated;
 
--- UI capability check mirrors the database guard: managers can edit during
--- the restricted middle period, but nobody can make manual changes in the
--- final four weeks or postseason. Captains remain blocked from Week 6 onward.
 create or replace function public.can_captain_change_roster(p_team_id uuid)
 returns boolean
 language plpgsql
 security definer
 set search_path = public
-as $function$
+as $$
 declare
   v_role text;
-  v_division_id uuid;
   v_week_six_date date;
-  v_last_regular_week integer;
   v_final_four_start_date date;
   v_postseason_start_date date;
 begin
   v_role := public.current_role_name();
   if v_role is null then return false; end if;
 
-  select division_id into v_division_id from public.teams where id = p_team_id;
-  if v_division_id is null then return false; end if;
-
-  select to_date(trim(sw.date), 'FMMM/FMDD/YYYY')
-    into v_week_six_date
-  from public.schedule_weeks sw
-  where sw.division_id = v_division_id and sw.week_num = 6
-    and trim(sw.date) ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'
-  order by sw.created_at desc limit 1;
-
-  select max(sw.week_num) into v_last_regular_week
-  from public.schedule_weeks sw
-  where sw.division_id = v_division_id
-    and coalesce(sw.is_playoff, false) = false
-    and sw.week_num is not null;
-
-  if v_last_regular_week is not null then
-    select to_date(trim(sw.date), 'FMMM/FMDD/YYYY')
-      into v_final_four_start_date
-    from public.schedule_weeks sw
-    where sw.division_id = v_division_id
-      and coalesce(sw.is_playoff, false) = false
-      and sw.week_num = greatest(v_last_regular_week - 3, 1)
-      and trim(sw.date) ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'
-    order by sw.created_at desc limit 1;
-  end if;
-
-  select min(to_date(trim(sw.date), 'FMMM/FMDD/YYYY'))
-    into v_postseason_start_date
-  from public.schedule_weeks sw
-  where sw.division_id = v_division_id and sw.is_playoff = true
-    and trim(sw.date) ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$';
+  select w.week_six_date, w.final_four_start_date, w.postseason_start_date
+    into v_week_six_date, v_final_four_start_date, v_postseason_start_date
+  from public.roster_change_window(p_team_id) w;
 
   if (v_postseason_start_date is not null and current_date >= v_postseason_start_date)
      or (v_final_four_start_date is not null and current_date >= v_final_four_start_date) then
@@ -163,14 +147,14 @@ begin
   if v_role <> 'captain' or not public.is_team_captain(p_team_id) then return false; end if;
   return v_week_six_date is null or current_date < v_week_six_date;
 end;
-$function$;
+$$;
 
 revoke all on function public.can_captain_change_roster(uuid) from public, anon;
 grant execute on function public.can_captain_change_roster(uuid) to authenticated;
 
--- Add the Section 8.1 six-player ceiling for manager-initiated changes in the
--- restricted Week 6-to-final-four window. Survival purpose remains a League
--- Manager judgment; the app does not attempt to infer it.
+-- The six-player roster ceiling applies to manual additions and official
+-- imports. The manager retains discretion over survival-related changes
+-- between the Week 6 cutoff and the final-four freeze.
 create or replace function public.enforce_roster_change_cutoff()
 returns trigger
 language plpgsql
@@ -179,14 +163,12 @@ set search_path = public
 as $$
 declare
   v_team_id uuid;
-  v_division_id uuid;
   v_role text;
-  v_week_six_date date;
-  v_last_regular_week integer;
-  v_final_four_start_date date;
+  v_import boolean;
   v_roster_count integer;
 begin
   v_role := public.current_role_name();
+  v_import := coalesce(current_setting('app.official_iba_roster_import', true), 'false') = 'true';
 
   if tg_op = 'DELETE' then
     perform public.assert_team_roster_change_allowed(old.team_id);
@@ -200,68 +182,18 @@ begin
     v_team_id := new.team_id;
   end if;
 
-  if v_role = 'manager'
-     and coalesce(current_setting('app.official_iba_roster_import', true), 'false') <> 'true'
-     and (tg_op = 'INSERT' or (tg_op = 'UPDATE' and new.team_id is distinct from old.team_id)) then
-    select division_id into v_division_id from public.teams where id = v_team_id;
+  if tg_op <> 'DELETE' then
+    select count(*) into v_roster_count
+    from public.rosters
+    where team_id = v_team_id
+      and (tg_op <> 'UPDATE' or player_num <> old.player_num or team_id <> old.team_id);
 
-    select to_date(trim(sw.date), 'FMMM/FMDD/YYYY')
-      into v_week_six_date
-    from public.schedule_weeks sw
-    where sw.division_id = v_division_id
-      and sw.week_num = 6
-      and trim(sw.date) ~ '^\d{1,2}/\d{1,2}/\d{4}$'
-    order by sw.created_at desc
-    limit 1;
-
-    select max(sw.week_num)
-      into v_last_regular_week
-    from public.schedule_weeks sw
-    where sw.division_id = v_division_id
-      and coalesce(sw.is_playoff, false) = false
-      and sw.week_num is not null;
-
-    if v_last_regular_week is not null then
-      select to_date(trim(sw.date), 'FMMM/FMDD/YYYY')
-        into v_final_four_start_date
-      from public.schedule_weeks sw
-      where sw.division_id = v_division_id
-        and coalesce(sw.is_playoff, false) = false
-        and sw.week_num = greatest(v_last_regular_week - 3, 1)
-        and trim(sw.date) ~ '^\d{1,2}/\d{1,2}/\d{4}$'
-      order by sw.created_at desc
-      limit 1;
-    end if;
-
-    if v_week_six_date is not null
-       and v_final_four_start_date is not null
-       and current_date >= v_week_six_date
-       and current_date < v_final_four_start_date then
-      select count(*) into v_roster_count
-      from public.rosters
-      where team_id = v_team_id;
-
-      if tg_op = 'INSERT'
-         and not exists (
-           select 1 from public.rosters
-           where team_id = new.team_id and player_num = new.player_num
-         )
-         and v_roster_count >= 6 then
-        raise exception 'ROSTER_LIMIT_SIX: restricted-period roster changes may not result in more than six members'
-          using errcode = '23514';
-      end if;
-
-      if tg_op = 'UPDATE'
-         and new.team_id is distinct from old.team_id
-         and v_roster_count >= 6 then
-        raise exception 'ROSTER_LIMIT_SIX: restricted-period roster changes may not result in more than six members'
-          using errcode = '23514';
-      end if;
-
-      if tg_op = 'DELETE' and v_roster_count - 1 > 6 then
-        raise exception 'ROSTER_LIMIT_SIX: restricted-period roster changes may not result in more than six members'
-          using errcode = '23514';
-      end if;
+    if not exists (
+      select 1 from public.rosters
+      where team_id = new.team_id and player_num = new.player_num
+    ) and v_roster_count >= 6 then
+      raise exception 'ROSTER_LIMIT_SIX: a team may not have more than six current roster members'
+        using errcode = '23514';
     end if;
   end if;
 
@@ -276,9 +208,10 @@ create trigger enforce_roster_change_cutoff
 before insert or update or delete on public.rosters
 for each row execute function public.enforce_roster_change_cutoff();
 
--- Atomically replace current roster rows for complete divisions. The Section
--- 84 BEFORE INSERT trigger still checks the durable assignment ledger and
--- rejects a played player's unapproved same-division transfer.
+-- Atomic, manager-only replacement of current rosters for complete divisions.
+-- The caller supplies every active team in each division, including empty
+-- player arrays. This RPC never deletes player, match, rating, or assignment
+-- history. Section 84 continues to reject unapproved played-player transfers.
 create or replace function public.sync_imported_team_rosters(p_rosters jsonb)
 returns jsonb
 language plpgsql
@@ -327,8 +260,8 @@ begin
     raise exception 'ROSTER_IMPORT_TEAM_NOT_IN_ACTIVE_SEASON';
   end if;
 
-  -- Refuse partial division reports. An incomplete PDF must never remove
-  -- current members from teams whose roster section was not parsed.
+  -- Do not clear a division unless every team currently configured in it is
+  -- present in the import payload. Parser omissions and partial PDFs fail closed.
   if exists (
     select 1
     from (
@@ -347,12 +280,19 @@ begin
   end if;
 
   if exists (
+    select 1
+    from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
+    cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
+    where nullif(trim(player_row.player_num), '') is null
+       or not exists (select 1 from public.players p where p.num = player_row.player_num)
+  ) then
+    raise exception 'ROSTER_IMPORT_UNKNOWN_PLAYER';
+  end if;
+
+  if exists (
     select player_num, division_id
     from (
-      select
-        t.division_id,
-        player_row.player_num,
-        t.id as team_id
+      select t.division_id, player_row.player_num, t.id as team_id
       from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
       join public.teams t on t.id = item.team_id
       cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
@@ -367,10 +307,10 @@ begin
     select 1
     from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
     cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
-    left join public.players p on p.num = player_row.player_num
-    where p.num is null or nullif(trim(player_row.player_num), '') is null
+    group by item.team_id
+    having count(distinct player_row.player_num) > 6
   ) then
-    raise exception 'ROSTER_IMPORT_UNKNOWN_PLAYER';
+    raise exception 'ROSTER_LIMIT_SIX';
   end if;
 
   select array_agg(team_id), count(*)
@@ -381,9 +321,8 @@ begin
   from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
   cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num);
 
-  -- Keep profile/team access aligned with current roster membership, but end
-  -- memberships rather than deleting them. Captain assignments are separate
-  -- and are not changed by an IBA roster import.
+  -- End current account/team access for removed players; preserve membership
+  -- rows and history. Captain assignments are separate and remain untouched.
   update public.profile_team_memberships membership
   set ended_at = now()
   from public.profiles profile, public.rosters roster
@@ -400,12 +339,11 @@ begin
         and player_row.player_num = roster.player_num
     );
 
-  -- This flag bypasses only the manual Section 8.1 date/captain/cap guard.
-  -- Section 84 assignment protection remains active for every inserted row.
+  -- Trigger bypass is transaction-local and can only be set inside this
+  -- manager-only SECURITY DEFINER function.
   perform set_config('app.official_iba_roster_import', 'true', true);
 
-  delete from public.rosters
-  where team_id = any(v_team_ids);
+  delete from public.rosters where team_id = any(v_team_ids);
 
   insert into public.rosters(team_id, player_num)
   select item.team_id, player_row.player_num
@@ -413,6 +351,7 @@ begin
   cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
   on conflict (team_id, player_num) do nothing;
 
+  -- Restore current profile/team access for members on the newly imported roster.
   insert into public.profile_team_memberships(profile_id, team_id)
   select distinct profile.id, item.team_id
   from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
@@ -420,10 +359,7 @@ begin
   join public.profiles profile on profile.player_num = player_row.player_num
   on conflict (profile_id, team_id) where ended_at is null do nothing;
 
-  return jsonb_build_object(
-    'teamCount', v_team_count,
-    'playerCount', v_player_count
-  );
+  return jsonb_build_object('teamCount', v_team_count, 'playerCount', v_player_count);
 end;
 $$;
 
