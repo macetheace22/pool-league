@@ -116,3 +116,41 @@ Team 85382 North Stars
     expect(parsePlayoffEligibilityRoster("Rate Num Play Win Name")).toBeNull();
   });
 });
+
+
+describe("playoff eligibility roster parsing", () => {
+  const playoffRoster = [
+    "Division Playoffs - Roster and Handicap Report",
+    "For Week: 18",
+    "Ratings current as of: 11/08/26",
+    "Rate Num Elig Name",
+    "Team 12345 North Stars",
+    "70 12345 E Alex Player",
+    "62 23456 T Sam Player",
+  ].join("\\n");
+
+  it("extracts ratings and official eligibility codes from the playoff roster layout", () => {
+    const parsed = parsePlayoffEligibilityRoster(playoffRoster);
+    expect(parsed.eligibilityWeek).toBe(18);
+    expect(parsed.eligibilityAsOfDate).toBe("2026-11-08");
+    expect(parsed.eligibilityRows).toEqual([
+      { teamNum: "12345", teamName: "North Stars", num: "12345", name: "Alex Player", nickname: "", eligCode: "E" },
+      { teamNum: "12345", teamName: "North Stars", num: "23456", name: "Sam Player", nickname: "", eligCode: "T" },
+    ]);
+    expect(parsed.registry["12345"].rating).toBe(70);
+    expect(parsed.registry["23456"].rating).toBe(62);
+    expect(parsed.registry["12345"].matchesPlayed).toBeUndefined();
+    expect(parseLeagueRoster(playoffRoster).eligibilityRows).toHaveLength(2);
+  });
+
+  it("does not produce eligibility rows when the as-of date is invalid", () => {
+    const parsed = parsePlayoffEligibilityRoster(playoffRoster.replace("11/08/26", "02/31/26"));
+    expect(parsed.eligibilityRows).toHaveLength(2);
+    expect(parsed.eligibilityAsOfDate).toBeNull();
+    expect(parsed.eligibilityParseError).toMatch(/as-of date could not be read/i);
+  });
+
+  it("does not classify a regular weekly roster as a playoff eligibility report", () => {
+    expect(parsePlayoffEligibilityRoster("For Week: 18\\nRate Num Play Win Name")).toBeNull();
+  });
+});
