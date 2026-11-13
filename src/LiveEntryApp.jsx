@@ -997,6 +997,7 @@ function ForfeitTableForm({ match, setIdx, used, defaultForfeitingSide, lockForf
 
       <div className="card">
         <div className="card__title">{forfeitingTeam.name} — forfeiting player (hasn't played yet)</div>
+        {match.isPlayoff && forfeitingRoster.some(player => !player.eligCode) && <div style={{fontSize:11,color:"#F0C36D",marginBottom:7}}>Eligibility unverified for one or more players; they remain selectable pending official confirmation.</div>}
         {forfeitingRoster.length === 0 && <div className="empty-state" style={{border:"none"}}>No eligible players left.</div>}
         <div className="draft-roster-list">
           {forfeitingRoster.slice().sort((a,b)=>b.rating-a.rating).map(p => {
@@ -1022,6 +1023,7 @@ function ForfeitTableForm({ match, setIdx, used, defaultForfeitingSide, lockForf
       {!lockedReceivingPlayer && (
         <div className="card">
           <div className="card__title">{receivingTeam.name} — receiving player (present, hasn't played yet)</div>
+          {match.isPlayoff && receivingRoster.some(player => !player.eligCode) && <div style={{fontSize:11,color:"#F0C36D",marginBottom:7}}>Eligibility unverified for one or more players; they remain selectable pending official confirmation.</div>}
           {receivingRoster.length === 0 && <div className="empty-state" style={{border:"none"}}>No eligible players left.</div>}
           <div className="draft-roster-list">
             {receivingRoster.slice().sort((a,b)=>b.rating-a.rating).map(p => {
