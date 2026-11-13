@@ -155,7 +155,7 @@ describe("Section 4.5 player division transfers", () => {
     expect(db).toContain('supabase.rpc("create_player_transfer_request"');
     expect(db).toContain('supabase.rpc("decide_player_transfer_request"');
     expect(admin).toContain("PlayerTransferRequestsTab");
-    expect(admin).toContain("Receiving team");
+    expect(admin).toContain("receiving team");
     expect(admin).toContain("League Manager for approval");
   });
 });
