@@ -13,7 +13,7 @@ describe("security migration contracts", () => {
     expect(sql).toContain("public.current_role_name() is distinct from 'manager'");
     expect(sql).toContain("where profile_id = auth.uid()");
     expect(sql).toContain("and ended_at is null");
-    expect(sql).toContain("public.remove_player_from_team");
+    expect(sql).toContain("set ended_at = now()");
     expect(sql).toContain("revoke execute on function public.remove_own_team_membership(uuid) from public, anon");
     expect(sql).toContain("grant execute on function public.remove_own_team_membership(uuid) to authenticated");
     expect(sql.toLowerCase()).not.toContain("delete from public.rosters");
@@ -261,7 +261,7 @@ describe("Section 4.5 player division transfers", () => {
     expect(sql).toContain("revoke all on function public.decide_player_transfer_request(uuid, boolean) from public, anon");
     expect(sql).toContain("grant execute on function public.decide_player_transfer_request(uuid, boolean) to authenticated");
     expect(sql).toContain("update public.player_division_team_assignments");
-    expect(sql).toContain("for v_removed in");
+    expect(sql).toContain("public.remove_player_from_team(v_request.from_team_id, v_request.player_num)");
   });
 
   it("routes captain roster additions through transfer requests and exposes manager decisions", () => {
@@ -316,7 +316,7 @@ describe("Section 8.1 roster window and import safeguards", () => {
     expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
     expect(sql).toContain("ROSTER_CHANGES_FROZEN");
     expect(sql).toContain("v_roster_limit := 6");
-    expect(sql).toContain("v_roster_limit := 8");
+    expect(sql).toContain("v_roster_limit integer := 8;");
     expect(sql).toContain("v_last_regular_week - 3");
     expect(sql).toContain("sw.is_playoff = true");
     expect(sql).toContain("create or replace function public.can_captain_change_roster");
