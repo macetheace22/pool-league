@@ -3346,7 +3346,9 @@ function PlayoffEligibilityStatus({ rows, teams = [], rosters = {} }) {
   const [search, setSearch] = useState("");
   const snapshot = db.latestPlayoffEligibilityRows(rows);
   const latest = snapshot[0]?.week_key ?? null;
+  const latestLabel = snapshot.find(row => row.label)?.label ?? null;
   const byPlayerNum = Object.fromEntries(snapshot.filter(row => row.player_num).map(row => [row.player_num, row]));
+  const reportWeek = latestLabel?.match(/Week\\s+\\d+/i)?.[0] ?? null;
   const rosterPlayers = teams.flatMap(team => (rosters[team.id] ?? []).map(player => {
     const official = byPlayerNum[player.num] ?? null;
     const code = official?.elig_code ?? null;
@@ -3373,7 +3375,7 @@ function PlayoffEligibilityStatus({ rows, teams = [], rosters = {} }) {
       <div className="card" style={{padding:12,marginBottom:12}}>
         <div className="card__title">Official IBA playoff eligibility</div>
         <div style={{fontSize:12,color:"#BDBDBD",marginTop:4}}>
-          {hasSnapshot ? `Latest report snapshot: ${latest}. ${snapshot.length} official report rows.` : "Eligibility data not yet available. Import the official playoff roster through Update Weekly League Data → Import Ratings."}
+          {hasSnapshot ? `${reportWeek ? `${reportWeek} · ` : ""}Ratings current as of ${latest}. ${snapshot.length} official player rows in the latest dated snapshot.` : "Eligibility data not yet available. Import the official playoff roster through Update Weekly League Data → Import Ratings."}
         </div>
         <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,marginTop:9}}>
           <span>Eligible: <strong>{eligibleCount}</strong></span>
