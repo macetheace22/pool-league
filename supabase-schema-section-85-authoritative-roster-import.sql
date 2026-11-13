@@ -187,7 +187,7 @@ join public.teams t on t.id = r.team_id
 where t.division_id is not null
 on conflict (player_num, team_id) do nothing;
 
-create or replace function public.record_player_team_roster_history()
+create or replace function public.track_player_team_roster_history()
 returns trigger
 language plpgsql
 security definer
@@ -213,11 +213,11 @@ begin
 end;
 $$;
 
-revoke all on function public.record_player_team_roster_history() from public, anon, authenticated;
-drop trigger if exists record_player_team_roster_history on public.rosters;
-create trigger record_player_team_roster_history
+revoke all on function public.track_player_team_roster_history() from public, anon, authenticated;
+drop trigger if exists track_player_team_roster_history on public.rosters;
+create trigger track_player_team_roster_history
 after insert or update of team_id, player_num on public.rosters
-for each row execute function public.record_player_team_roster_history();
+for each row execute function public.track_player_team_roster_history();
 
 create or replace function public.roster_change_window(p_team_id uuid)
 returns table (
