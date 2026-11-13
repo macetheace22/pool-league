@@ -123,3 +123,15 @@ describe("official IBA roster reconciliation planning", () => {
   });
 
 });
+
+
+it("does not require schedule BYE placeholders in the official roster PDF", () => {
+  const bye = { id: "bye", team_num: "BYE", division_id: "div-1", is_bye: true };
+  const result = buildRosterSyncPlan({
+    parsed,
+    matchedTeams: teams,
+    allDivisionTeams: [...teams, bye],
+  });
+  expect(result.completeDivisions).toContainEqual({ divisionId: "div-1", teamCount: 2 });
+  expect(result.rosterPayload.some(row => row.team_id === "bye")).toBe(false);
+});
