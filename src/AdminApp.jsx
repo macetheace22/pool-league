@@ -479,6 +479,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Players / rosters / ratings ──
   const handleBulkImport = async (parsed) => {
     const weekTag = currentWeekTag(viewSchedule);
+    if (viewingDiv?.id) weekTag.allowedDivisionIds = [viewingDiv.id];
     const result = await db.bulkImportPlayers(parsed, weekTag);
     await refreshCurrentDivision();
     return result;
