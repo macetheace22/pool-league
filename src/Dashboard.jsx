@@ -639,7 +639,7 @@ export function SeasonManagementHub() {
               </Link>
             </div>
             <div className="season-hub-section">
-              <div className="season-hub-section__title">3. Maintain playoff setup & locations</div>
+              <div className="season-hub-section__title">3. Review playoff eligibility, playoffs & locations</div>
               <Link to="/playoff-eligibility" className="season-hub-card">
                 <div className="season-hub-card__icon"><AlertCircle size={19} /></div>
                 <div className="season-hub-card__body">
