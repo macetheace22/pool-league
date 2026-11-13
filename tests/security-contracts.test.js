@@ -261,7 +261,8 @@ describe("Section 4.5 player division transfers", () => {
     expect(sql).toContain("revoke all on function public.decide_player_transfer_request(uuid, boolean) from public, anon");
     expect(sql).toContain("grant execute on function public.decide_player_transfer_request(uuid, boolean) to authenticated");
     expect(sql).toContain("update public.player_division_team_assignments");
-    expect(sql).toContain("public.remove_player_from_team(v_request.from_team_id, v_request.player_num)");
+    expect(sql).toContain("delete from public.rosters");
+    expect(sql).toContain("insert into public.rosters");
   });
 
   it("routes captain roster additions through transfer requests and exposes manager decisions", () => {
