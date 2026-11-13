@@ -11,6 +11,8 @@ export function buildRosterSyncPlan({
 } = {}) {
   const teamsByDivision = new Map();
   for (const team of allDivisionTeams) {
+    // Bye placeholders are schedule entries, not IBA roster teams.
+    if (team.is_bye === true) continue;
     const divisionId = String(team.division_id ?? "");
     if (!divisionId) continue;
     if (!teamsByDivision.has(divisionId)) teamsByDivision.set(divisionId, []);
