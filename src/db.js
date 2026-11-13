@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient";
-import { getActiveTeamIds } from "./teamMembership";
+import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
 
 // Legacy compatibility helpers retained from the prior version.
 export function normalizeUSDate(str) {
@@ -2226,7 +2226,7 @@ export async function setLiveMatch(pairingId, state) {
 // system.
 export function eligibleSide(match, profile) {
   if (!profile) return null;
-  const teamIds = getActiveTeamIds(profile);
+  const teamIds = [...new Set([...getActiveTeamIds(profile), ...getCaptainTeamIds(profile)])];
   if (teamIds.includes(match.teamHome?.id)) return "home";
   if (teamIds.includes(match.teamAway?.id)) return "away";
   if (profile.player_num) {
