@@ -1099,8 +1099,8 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   const [homeVal, setHomeVal] = useState("");
   const [awayVal, setAwayVal] = useState("");
   const [inningsVal, setInningsVal] = useState("");
-  const [timeoutHome, setTimeoutHome] = useState(false);
-  const [timeoutAway, setTimeoutAway] = useState(false);
+  const [timeoutHomeCount, setTimeoutHomeCount] = useState(0);
+  const [timeoutAwayCount, setTimeoutAwayCount] = useState(0);
   const [safHomeVal, setSafHomeVal] = useState(0);
   const [safAwayVal, setSafAwayVal] = useState(0);
 
@@ -1129,23 +1129,32 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
 
   const addRack = () => {
     const timeoutSelections = [
-      { side: "home", selected: timeoutHome, used: timeoutUsedHome, allowance: timeoutAllowanceHome, name: set.playerHome.name },
-      { side: "away", selected: timeoutAway, used: timeoutUsedAway, allowance: timeoutAllowanceAway, name: set.playerAway.name },
-    ].filter(t => t.selected && t.used >= t.allowance);
+      { selected: timeoutHomeCount, used: timeoutUsedHome, allowance: timeoutAllowanceHome, name: set.playerHome.name },
+      { selected: timeoutAwayCount, used: timeoutUsedAway, allowance: timeoutAllowanceAway, name: set.playerAway.name },
+    ].filter(t => t.selected > 0 && t.used + t.selected > t.allowance);
 
     if (timeoutSelections.length > 0) {
       const names = timeoutSelections.map(t => t.name).join(" and ");
       const message = timeoutSelections.length === 1
-        ? `${names} has already used the allotted coaching time-outs for this set. Continue only if the opponent acknowledged the time-out without giving the required warning.`
-        : `${names} have already used the allotted coaching time-outs for this set. Continue only if the opponent acknowledged the time-out(s) without giving the required warning.`;
+        ? `${names} is being recorded for more coaching time-outs than the remaining allowance for this set. Continue only if the opponent acknowledged the time-out(s) without giving the required warning.`
+        : `${names} are being recorded for more coaching time-outs than the remaining allowance for this set. Continue only if the opponent acknowledged the time-out(s) without giving the required warning.`;
       if (!window.confirm(message)) return;
     }
 
-    const rack = { home: Number(homeVal), away: Number(awayVal), innings: Number(inningsVal) || 0, safetyHome: safHomeVal, safetyAway: safAwayVal, ...(TIMEOUTS_ENABLED && { timeoutHome, timeoutAway }) };
+    const rack = {
+      home: Number(homeVal), away: Number(awayVal), innings: Number(inningsVal) || 0,
+      safetyHome: safHomeVal, safetyAway: safAwayVal,
+      ...(TIMEOUTS_ENABLED && {
+        timeoutHome: timeoutHomeCount > 0,
+        timeoutAway: timeoutAwayCount > 0,
+        ...(timeoutHomeCount > 0 && { timeoutHomeCount }),
+        ...(timeoutAwayCount > 0 && { timeoutAwayCount }),
+      }),
+    };
     const newRacks = [...set.racks, rack];
     const newWinner = detectSetWinner(newRacks, set.playerHome, set.playerAway, match.format);
     onUpdateSet({ ...set, racks: newRacks, winnerSlot: newWinner, complete: newWinner !== null });
-    setHomeVal(""); setAwayVal(""); setInningsVal(""); setTimeoutHome(false); setTimeoutAway(false); setSafHomeVal(0); setSafAwayVal(0);
+    setHomeVal(""); setAwayVal(""); setInningsVal(""); setTimeoutHomeCount(0); setTimeoutAwayCount(0); setSafHomeVal(0); setSafAwayVal(0);
   };
 
   const removeLastRack = () => {
@@ -1215,8 +1224,8 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
                 <span>{set.playerAway.name.split(" ")[0]} TO: {timeoutUsedAway}/{timeoutAllowanceAway}</span>
               </div>
               <div className="timeout-row">
-                <ToggleChip label={`${set.playerHome.name.split(" ")[0]} TO`} active={timeoutHome} color="home" onToggle={() => setTimeoutHome((v) => !v)} />
-                <ToggleChip label={`${set.playerAway.name.split(" ")[0]} TO`} active={timeoutAway} color="away" onToggle={() => setTimeoutAway((v) => !v)} />
+                <TimeoutToggle label={`${set.playerHome.name.split(" ")[0]} TO`} count={timeoutHomeCount} allowance={timeoutAllowanceHome} onChange={setTimeoutHomeCount} color="home" />
+                <TimeoutToggle label={`${set.playerAway.name.split(" ")[0]} TO`} count={timeoutAwayCount} allowance={timeoutAllowanceAway} onChange={setTimeoutAwayCount} color="away" />
               </div>
             </div>
           )}
@@ -1236,6 +1245,27 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
             player={{ num: set.playerAway.num, name: set.playerAway.name }} teamId={match.teamAway?.id ?? null}
             opponentNum={set.playerHome.num} gameType="8ball" divisionId={match.divisionId ?? null} />
         </>
+      )}
+    </div>
+  );
+}
+
+function TimeoutToggle({ label, count, allowance, onChange, color }) {
+  return (
+    <div className="timeout-toggle-group">
+      <ToggleChip
+        label={label}
+        active={count > 0}
+        color={color}
+        onToggle={() => onChange(count > 0 ? 0 : 1)}
+      />
+      {allowance > 1 && count > 0 && (
+        <ToggleChip
+          label="2nd TO"
+          active={count > 1}
+          color={color}
+          onToggle={() => onChange(count > 1 ? 1 : 2)}
+        />
       )}
     </div>
   );
