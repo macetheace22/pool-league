@@ -159,7 +159,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
 
   const opponentKey = (g) => g.opponent_player_num ? `p:${g.opponent_player_num}` : `o:${g.opponent_id}`;
   const byOpponent = {};
-  (history ?? []).forEach(g => {
+  (history ?? []).filter(g => g.practice_type !== "skills_drills").forEach(g => {
     const key = opponentKey(g);
     if (!byOpponent[key]) byOpponent[key] = { key, name: g.opponent_name, wins: 0, losses: 0, opponentId: g.opponent_id ?? null };
     if (g.winner === "me") byOpponent[key].wins++; else if (g.winner === "opponent") byOpponent[key].losses++;
@@ -225,11 +225,17 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
           {history && visibleGames.map(g => (
             <div key={g.id} className="match-row">
               <div className="match-row__opponent">
-                vs {g.opponent_name} <span style={{color: g.winner === "me" ? "#5FCF9E" : "#F87171", fontWeight:700}}>
+                {g.practice_type === "skills_drills" ? "Skills & Drills" : `vs ${g.opponent_name}`}
+                {g.practice_type !== "skills_drills" && <span style={{color: g.winner === "me" ? "#5FCF9E" : "#F87171", fontWeight:700, marginLeft:6}}>
                   {g.winner === "me" ? "Won" : g.winner === "opponent" ? "Lost" : "—"}
-                </span>
+                </span>}
               </div>
-              <div className="match-row__meta">{gameTypeLabel(g.game_type)} · {g.my_score}–{g.opponent_score} · {new Date(g.played_at).toLocaleDateString()}</div>
+              <div className="match-row__meta">
+                {gameTypeLabel(g.game_type)}
+                {g.scoring_method ? ` · ${scoringMethodLabel(g.scoring_method)}` : ""}
+                {g.practice_type !== "skills_drills" ? ` · ${g.my_score}–${g.opponent_score}` : ""}
+                {g.practice_type === "skills_drills" ? "" : ` · ${new Date(g.played_at).toLocaleDateString()}`}
+              </div>
             </div>
           ))}
           {filterOpponent && <button className="btn-secondary" style={{marginTop:8}} onClick={() => setFilterOpponent(null)}>Show All</button>}
