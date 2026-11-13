@@ -157,6 +157,68 @@ create trigger track_player_team_roster_history
 after insert or update or delete on public.rosters
 for each row execute function public.track_player_team_roster_history();
 
+-- Preserve the fact that a player has ever been rostered on a team even
+-- after an authoritative weekly import removes the current roster row.
+create table if not exists public.player_team_roster_history (
+  player_num text not null references public.players(num) on delete cascade,
+  team_id uuid not null references public.teams(id) on delete restrict,
+  division_id uuid not null references public.divisions(id) on delete restrict,
+  first_added_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  primary key (player_num, team_id)
+);
+
+alter table public.player_team_roster_history enable row level security;
+revoke all on public.player_team_roster_history from public, anon, authenticated;
+grant select on public.player_team_roster_history to authenticated;
+
+drop policy if exists "Authenticated users can read roster history" on public.player_team_roster_history;
+create policy "Authenticated users can read roster history"
+  on public.player_team_roster_history
+  for select to authenticated
+  using (true);
+
+-- Seed current/legacy roster links before future imports begin removing rows.
+insert into public.player_team_roster_history
+  (player_num, team_id, division_id)
+select distinct r.player_num, r.team_id, t.division_id
+from public.rosters r
+join public.teams t on t.id = r.team_id
+where t.division_id is not null
+on conflict (player_num, team_id) do nothing;
+
+create or replace function public.record_player_team_roster_history()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_division_id uuid;
+begin
+  select t.division_id into v_division_id
+  from public.teams t
+  where t.id = new.team_id;
+
+  if v_division_id is not null then
+    insert into public.player_team_roster_history
+      (player_num, team_id, division_id, first_added_at, last_seen_at)
+    values
+      (new.player_num, new.team_id, v_division_id, now(), now())
+    on conflict (player_num, team_id)
+    do update set last_seen_at = now();
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.record_player_team_roster_history() from public, anon, authenticated;
+drop trigger if exists record_player_team_roster_history on public.rosters;
+create trigger record_player_team_roster_history
+after insert or update of team_id, player_num on public.rosters
+for each row execute function public.record_player_team_roster_history();
+
 create or replace function public.roster_change_window(p_team_id uuid)
 returns table (
   week_six_date date,
