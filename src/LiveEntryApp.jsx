@@ -1513,7 +1513,7 @@ function DoneScreen({ match, onReset }) {
         <div className="archived-badge"><Check size={12}/> Saved to league history as pending</div>
         {completedCount > 0 && (
           <div className="sets-summary">
-            {match.sets.filter(s=>s.complete).map((s) => {
+            {match.sets.map((s) => {
               const runH = runningTotal(s.racks, "home");
               const runA = runningTotal(s.racks, "away");
               return (
