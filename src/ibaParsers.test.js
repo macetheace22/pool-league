@@ -101,7 +101,7 @@ Team 85382 North Stars
     expect(parsed.registry["23456"]).toMatchObject({ rating: 52, name: "John Smith" });
     expect(parsed.eligibilityRows.map(row => row.eligCode)).toEqual(["E", "T"]);
     expect(parsed.eligibilityAsOfDate).toBe("2026-11-02");
-    expect(parsed.registry["12345"].matchesPlayed).toBeNull();
+    expect(parsed.registry["34567"].matchesPlayed).toBeUndefined();
     expect(parsed.registry["12345"].matchesWon).toBeNull();
   });
 
@@ -125,20 +125,20 @@ describe("playoff eligibility roster parsing", () => {
     "Ratings current as of: 11/08/26",
     "Rate Num Elig Name",
     "Team 12345 North Stars",
-    "70 12345 E Alex Player",
-    "62 23456 T Sam Player",
-  ].join("\\n");
+    "70 34567 E Alex Player",
+    "62 45678 T Sam Player",
+  ].join("\n");
 
   it("extracts ratings and official eligibility codes from the playoff roster layout", () => {
     const parsed = parsePlayoffEligibilityRoster(playoffRoster);
     expect(parsed.eligibilityWeek).toBe(18);
     expect(parsed.eligibilityAsOfDate).toBe("2026-11-08");
     expect(parsed.eligibilityRows).toEqual([
-      { teamNum: "12345", teamName: "North Stars", num: "12345", name: "Alex Player", nickname: "", eligCode: "E" },
-      { teamNum: "12345", teamName: "North Stars", num: "23456", name: "Sam Player", nickname: "", eligCode: "T" },
+      { teamNum: "12345", teamName: "North Stars", num: "34567", name: "Alex Player", nickname: "", eligCode: "E" },
+      { teamNum: "12345", teamName: "North Stars", num: "45678", name: "Sam Player", nickname: "", eligCode: "T" },
     ]);
-    expect(parsed.registry["12345"].rating).toBe(70);
-    expect(parsed.registry["23456"].rating).toBe(62);
+    expect(parsed.registry["34567"].rating).toBe(70);
+    expect(parsed.registry["45678"].rating).toBe(62);
     expect(parsed.registry["12345"].matchesPlayed).toBeUndefined();
     expect(parseLeagueRoster(playoffRoster).eligibilityRows).toHaveLength(2);
   });
