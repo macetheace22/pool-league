@@ -390,3 +390,15 @@ describe("Section 8.1 authoritative roster import", () => {
     expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
   });
 });
+
+describe("Section 8.1 roster history preservation", () => {
+  it("preserves former roster membership and reads player team history from its ledger", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    const db = read("src/db.js");
+    expect(sql).toContain("create table if not exists public.player_team_roster_history");
+    expect(sql).toContain("track_player_team_roster_history");
+    expect(sql).toContain("set ended_at = now()");
+    expect(sql).toContain("grant select on public.player_team_roster_history to authenticated");
+    expect(db).toContain('.from("player_team_roster_history")');
+  });
+});
