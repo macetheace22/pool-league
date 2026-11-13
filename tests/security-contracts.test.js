@@ -174,7 +174,7 @@ describe("Section 8.1 authoritative roster import", () => {
     expect(db).toContain('supabase.rpc("sync_imported_team_rosters"');
     expect(db).toContain("unmatchedTeamNums: unmatchedTeamIds");
     expect(helper).toContain("every team in this division");
-    expect(helper).toContain("ambiguous player");
+    expect(helper).toContain("ambiguous team placement");
   });
 
   it("keeps historical assignments and profile memberships while ending current memberships", () => {
