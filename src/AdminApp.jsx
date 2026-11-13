@@ -569,14 +569,11 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             <SeasonDivBanner seasons={seasons} activeSeasons={activeSeasons}
               viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           )}
-          {page === "playoff-eligibility" && viewingDiv && isViewingActive && (
+          {page === "playoff-eligibility" && viewingDiv && (
             <PlayoffEligibilityStatus rows={playoffEligibilityRows} />
           )}
           {page === "playoff-eligibility" && !viewingDiv && (
             <div className="empty-state">Select a season and division to view imported playoff eligibility.</div>
-          )}
-          {page === "playoff-eligibility" && viewingDiv && !isViewingActive && (
-            <div className="empty-state">This season is read-only. Select the active season to view current eligibility status.</div>
           )}
           {page === "playoffs" && viewingDiv && (
             <PlayoffsTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} />
