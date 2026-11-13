@@ -311,7 +311,7 @@ function parsePlayoffEligibilityRoster(raw) {
     : null;
   const registry = {}, rosters = {}, teams = {}, eligibilityRows = [], needsRating = [];
   let currentTeams = [];
-  for (const line of text.split(/\\r?\\n/).filter(value => value.trim())) {
+  for (const line of text.split(/\r?\n/).filter(value => value.trim())) {
     const teamHeaders = [...line.matchAll(/\bTeam\s+([A-Z0-9]{3,8})\s+(.*?)(?=\s+Team\s+[A-Z0-9]{3,8}\b|$)/gi)];
     if (teamHeaders.length) {
       currentTeams = teamHeaders.map(match => {
