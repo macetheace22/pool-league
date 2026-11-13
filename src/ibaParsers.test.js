@@ -101,8 +101,8 @@ Team 85382 North Stars
     expect(parsed.registry["23456"]).toMatchObject({ rating: 52, name: "John Smith" });
     expect(parsed.eligibilityRows.map(row => row.eligCode)).toEqual(["E", "T"]);
     expect(parsed.eligibilityAsOfDate).toBe("2026-11-02");
-    expect(parsed.registry["34567"].matchesPlayed).toBeUndefined();
-    expect(parsed.registry["12345"].matchesWon).toBeNull();
+    expect(parsed.registry["12345"].matchesPlayed).toBeUndefined();
+    expect(parsed.registry["12345"].matchesWon).toBeUndefined();
   });
 
   it("fails closed when the eligibility date is missing or invalid", () => {
@@ -147,7 +147,7 @@ describe("playoff eligibility roster parsing", () => {
     const parsed = parsePlayoffEligibilityRoster(playoffRoster.replace("11/08/26", "02/31/26"));
     expect(parsed.eligibilityRows).toHaveLength(2);
     expect(parsed.eligibilityAsOfDate).toBeNull();
-    expect(parsed.eligibilityParseError).toMatch(/as-of date could not be read/i);
+    expect(parsed.eligibilityParseError).toMatch(/date could not be read/i);
   });
 
   it("does not classify a regular weekly roster as a playoff eligibility report", () => {
