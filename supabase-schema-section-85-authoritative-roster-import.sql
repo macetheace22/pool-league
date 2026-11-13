@@ -4,34 +4,50 @@
 -- complete divisions. Historical completed-match JSON, player ratings, and
 -- the Section 84 player_division_team_assignments ledger are never deleted.
 
--- Preserve current and former team-roster membership independently of the
--- active rosters table. This includes players who never appeared in a match.
+-- Preserve every player/team roster association independently of the
+-- current rosters table. This includes players who never appeared in a match.
+-- A player/team pair is stored once; active membership remains in public.rosters.
 create table if not exists public.player_team_roster_history (
-  id uuid primary key default gen_random_uuid(),
   player_num text not null references public.players(num) on delete cascade,
   team_id uuid not null references public.teams(id) on delete cascade,
-  joined_at timestamptz not null default now(),
-  ended_at timestamptz
+  division_id uuid not null references public.divisions(id) on delete cascade,
+  first_added_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  primary key (player_num, team_id)
 );
-
-create unique index if not exists player_team_roster_history_one_active
-  on public.player_team_roster_history(player_num, team_id)
-  where ended_at is null;
-create index if not exists player_team_roster_history_player
-  on public.player_team_roster_history(player_num, joined_at desc);
 
 alter table public.player_team_roster_history enable row level security;
 revoke all on public.player_team_roster_history from public, anon, authenticated;
 grant select on public.player_team_roster_history to authenticated;
 
-drop policy if exists "Authenticated users can read player team roster history"
+drop policy if exists "Authenticated users can read roster history"
   on public.player_team_roster_history;
-create policy "Authenticated users can read player team roster history"
+create policy "Authenticated users can read roster history"
   on public.player_team_roster_history
   for select to authenticated using (true);
 
--- Recover prior affiliations from completed matches too. This matters for
--- historical team transfers where the former roster row was already removed.
+-- Backfill existing account/team membership history, including ended
+-- memberships for players who had already left a team before this migration.
+insert into public.player_team_roster_history
+  (player_num, team_id, division_id, first_added_at, last_seen_at)
+select
+  profile.player_num,
+  membership.team_id,
+  team.division_id,
+  min(coalesce(membership.joined_at, now())),
+  max(coalesce(membership.ended_at, membership.joined_at, now()))
+from public.profile_team_memberships membership
+join public.profiles profile on profile.id = membership.profile_id
+join public.teams team on team.id = membership.team_id
+where profile.player_num is not null
+  and team.division_id is not null
+group by profile.player_num, membership.team_id, team.division_id
+on conflict (player_num, team_id) do update
+set first_added_at = least(public.player_team_roster_history.first_added_at, excluded.first_added_at),
+    last_seen_at = greatest(public.player_team_roster_history.last_seen_at, excluded.last_seen_at);
+
+-- Completed matches recover prior team associations for players whose old
+-- roster row and/or account membership had already been removed.
 with match_players as (
   select set_row.value->'playerHome'->>'num' as player_num, cm.team_home_id as team_id, cm.created_at
   from public.completed_matches cm
@@ -52,73 +68,31 @@ match_summary as (
   from match_players
   group by player_num, team_id
 )
-insert into public.player_team_roster_history(player_num, team_id, joined_at, ended_at)
+insert into public.player_team_roster_history
+  (player_num, team_id, division_id, first_added_at, last_seen_at)
 select
-  ms.player_num,
-  ms.team_id,
-  ms.first_match_at,
-  case when exists (
-    select 1 from public.rosters r where r.player_num = ms.player_num and r.team_id = ms.team_id
-  ) then null else ms.last_match_at end
-from match_summary ms
-where exists (select 1 from public.players p where p.num = ms.player_num)
-  and not exists (
-    select 1 from public.player_team_roster_history h
-    where h.player_num = ms.player_num
-      and h.team_id = ms.team_id
-      and h.joined_at = ms.first_match_at
-  )
-on conflict (player_num, team_id) where ended_at is null do nothing;
+  summary.player_num,
+  summary.team_id,
+  team.division_id,
+  summary.first_match_at,
+  summary.last_match_at
+from match_summary summary
+join public.teams team on team.id = summary.team_id
+join public.players player on player.num = summary.player_num
+where team.division_id is not null
+on conflict (player_num, team_id) do update
+set first_added_at = least(public.player_team_roster_history.first_added_at, excluded.first_added_at),
+    last_seen_at = greatest(public.player_team_roster_history.last_seen_at, excluded.last_seen_at);
 
-insert into public.player_team_roster_history(player_num, team_id)
-select r.player_num, r.team_id
-from public.rosters r
-on conflict (player_num, team_id) where ended_at is null do nothing;
-
--- Recover historical profile-team memberships where the account retained a
--- player number, including memberships that ended before this migration.
-insert into public.player_team_roster_history(player_num, team_id, joined_at, ended_at)
-select profile.player_num, membership.team_id, membership.joined_at, membership.ended_at
-from public.profile_team_memberships membership
-join public.profiles profile on profile.id = membership.profile_id
-where profile.player_num is not null
-  and membership.ended_at is not null
-  and not exists (
-    select 1 from public.player_team_roster_history history
-    where history.player_num = profile.player_num
-      and history.team_id = membership.team_id
-  );
-
--- Completed matches provide historical team associations for players who
--- played but no longer have a current roster or linked account membership.
-insert into public.player_team_roster_history(player_num, team_id, joined_at, ended_at)
-select played.player_num, played.team_id, min(played.created_at), max(played.created_at)
-from (
-  select
-    set_row.value->'playerHome'->>'num' as player_num,
-    cm.team_home_id as team_id,
-    cm.created_at
-  from public.completed_matches cm
-  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
-  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
-    and nullif(set_row.value->'playerHome'->>'num', '') is not null
-  union all
-  select
-    set_row.value->'playerAway'->>'num' as player_num,
-    cm.team_away_id as team_id,
-    cm.created_at
-  from public.completed_matches cm
-  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
-  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
-    and nullif(set_row.value->'playerAway'->>'num', '') is not null
-) played
-where played.team_id is not null
-  and not exists (
-    select 1 from public.player_team_roster_history history
-    where history.player_num = played.player_num
-      and history.team_id = played.team_id
-  )
-group by played.player_num, played.team_id;
+-- Seed every current roster member, including players without a linked account.
+insert into public.player_team_roster_history
+  (player_num, team_id, division_id)
+select roster.player_num, roster.team_id, team.division_id
+from public.rosters roster
+join public.teams team on team.id = roster.team_id
+where team.division_id is not null
+on conflict (player_num, team_id) do update
+set last_seen_at = greatest(public.player_team_roster_history.last_seen_at, now());
 
 create or replace function public.track_player_team_roster_history()
 returns trigger
@@ -126,92 +100,25 @@ language plpgsql
 security definer
 set search_path = public
 as $history$
-begin
-  if tg_op = 'DELETE' then
-    update public.player_team_roster_history
-    set ended_at = now()
-    where player_num = old.player_num and team_id = old.team_id and ended_at is null;
-    return old;
-  elsif tg_op = 'UPDATE' then
-    if old.player_num is distinct from new.player_num or old.team_id is distinct from new.team_id then
-      update public.player_team_roster_history
-      set ended_at = now()
-      where player_num = old.player_num and team_id = old.team_id and ended_at is null;
-      insert into public.player_team_roster_history(player_num, team_id)
-      values (new.player_num, new.team_id)
-      on conflict (player_num, team_id) where ended_at is null do nothing;
-    end if;
-    return new;
-  else
-    insert into public.player_team_roster_history(player_num, team_id)
-    values (new.player_num, new.team_id)
-    on conflict (player_num, team_id) where ended_at is null do nothing;
-    return new;
-  end if;
-end;
-$history$;
-
-revoke all on function public.track_player_team_roster_history() from public, anon, authenticated;
-drop trigger if exists track_player_team_roster_history on public.rosters;
-create trigger track_player_team_roster_history
-after insert or update or delete on public.rosters
-for each row execute function public.track_player_team_roster_history();
-
--- Preserve the fact that a player has ever been rostered on a team even
--- after an authoritative weekly import removes the current roster row.
-create table if not exists public.player_team_roster_history (
-  player_num text not null references public.players(num) on delete cascade,
-  team_id uuid not null references public.teams(id) on delete restrict,
-  division_id uuid not null references public.divisions(id) on delete restrict,
-  first_added_at timestamptz not null default now(),
-  last_seen_at timestamptz not null default now(),
-  primary key (player_num, team_id)
-);
-
-alter table public.player_team_roster_history enable row level security;
-revoke all on public.player_team_roster_history from public, anon, authenticated;
-grant select on public.player_team_roster_history to authenticated;
-
-drop policy if exists "Authenticated users can read roster history" on public.player_team_roster_history;
-create policy "Authenticated users can read roster history"
-  on public.player_team_roster_history
-  for select to authenticated
-  using (true);
-
--- Seed current/legacy roster links before future imports begin removing rows.
-insert into public.player_team_roster_history
-  (player_num, team_id, division_id)
-select distinct r.player_num, r.team_id, t.division_id
-from public.rosters r
-join public.teams t on t.id = r.team_id
-where t.division_id is not null
-on conflict (player_num, team_id) do nothing;
-
-create or replace function public.track_player_team_roster_history()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
 declare
   v_division_id uuid;
 begin
-  select t.division_id into v_division_id
-  from public.teams t
-  where t.id = new.team_id;
+  select team.division_id into v_division_id
+  from public.teams team
+  where team.id = new.team_id;
 
   if v_division_id is not null then
     insert into public.player_team_roster_history
       (player_num, team_id, division_id, first_added_at, last_seen_at)
     values
       (new.player_num, new.team_id, v_division_id, now(), now())
-    on conflict (player_num, team_id)
-    do update set last_seen_at = now();
+    on conflict (player_num, team_id) do update
+    set last_seen_at = now();
   end if;
 
   return new;
 end;
-$$;
+$history$;
 
 revoke all on function public.track_player_team_roster_history() from public, anon, authenticated;
 drop trigger if exists track_player_team_roster_history on public.rosters;
