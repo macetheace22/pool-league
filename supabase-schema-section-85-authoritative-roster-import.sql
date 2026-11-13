@@ -419,7 +419,9 @@ begin
       from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
       join public.teams t on t.id = item.team_id
     ) included
-    join public.teams expected on expected.division_id = included.division_id
+    join public.teams expected
+      on expected.division_id = included.division_id
+     and coalesce(expected.is_bye, false) = false
     where not exists (
       select 1
       from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
