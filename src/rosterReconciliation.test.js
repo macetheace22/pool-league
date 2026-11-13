@@ -4,7 +4,7 @@ import { buildRosterSyncPlan } from "./rosterReconciliation";
 const teams = [
   { id: "team-a", team_num: "76001", division_id: "div-1", divisions: { num: 151 } },
   { id: "team-b", team_num: "76002", division_id: "div-1", divisions: { num: 151 } },
-  { id: "team-c", team_num: "76003", division_id: "div-2", divisions: { num: 152 } },
+  { id: "team-c", team_num: "76003", division_id: "div-2", is_bye: true, divisions: { num: 152 } },
 ];
 
 const parsed = {
@@ -134,4 +134,20 @@ it("does not require schedule BYE placeholders in the official roster PDF", () =
   });
   expect(result.completeDivisions).toContainEqual({ divisionId: "div-1", teamCount: 2 });
   expect(result.rosterPayload.some(row => row.team_id === "bye")).toBe(false);
+
+  it("does not treat a missing regular-team player section as an empty roster", () => {
+    const incomplete = {
+      ...parsed,
+      rosters: { ...parsed.rosters, "76002": [] },
+    };
+    const result = buildRosterSyncPlan({
+      parsed: incomplete,
+      matchedTeams: teams,
+      allDivisionTeams: teams,
+    });
+
+    expect(result.completeDivisions.map(row => row.divisionId)).toEqual(["div-2"]);
+    expect(result.skippedDivisions[0].reason).toMatch(/no parsed players/i);
+  });
+
 });
