@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractIbaReportWeek, extractIbaReportWeeksByDivision } from "./ibaParsers";
+import { extractIbaReportWeek, extractIbaReportWeeksByDivision, parseLeagueRoster, parsePlayoffEligibilityRoster } from "./ibaParsers";
 
 describe("extractIbaReportWeek", () => {
   it.each([
@@ -80,5 +80,39 @@ describe("extractIbaReportWeeksByDivision", () => {
     const result = extractIbaReportWeeksByDivision(text);
     expect(result.byDivision["151"]).toMatchObject({ weekNumber: 17, missing: false });
     expect(result.byDivision["152"]).toMatchObject({ weekNumber: null, missing: true });
+  });
+});
+
+
+describe("playoff roster eligibility parsing", () => {
+  const report = `Division Playoffs - Roster and Handicap Report
+For Week: 17
+Ratings current as of: 11/02/26
+Rate Num Elig Name
+Team 85382 North Stars
+45 12345 E Jane Doe
+52 23456 T John Smith
+`;
+
+  it("recognizes the playoff roster layout and extracts ratings plus eligibility", () => {
+    const parsed = parseLeagueRoster(report);
+    expect(parsed.eligibilityRows).toHaveLength(2);
+    expect(parsed.registry["12345"]).toMatchObject({ rating: 45, name: "Jane Doe" });
+    expect(parsed.registry["23456"]).toMatchObject({ rating: 52, name: "John Smith" });
+    expect(parsed.eligibilityRows.map(row => row.eligCode)).toEqual(["E", "T"]);
+    expect(parsed.eligibilityAsOfDate).toBe("2026-11-02");
+    expect(parsed.registry["12345"].matchesPlayed).toBeNull();
+    expect(parsed.registry["12345"].matchesWon).toBeNull();
+  });
+
+  it("fails closed when the eligibility date is missing or invalid", () => {
+    const parsed = parsePlayoffEligibilityRoster(report.replace("11/02/26", "not printed"));
+    expect(parsed.eligibilityRows).toHaveLength(2);
+    expect(parsed.eligibilityAsOfDate).toBeNull();
+    expect(parsed.eligibilityParseError).toMatch(/date could not be read/i);
+  });
+
+  it("does not classify a standard weekly roster as an eligibility report", () => {
+    expect(parsePlayoffEligibilityRoster("Rate Num Play Win Name")).toBeNull();
   });
 });
