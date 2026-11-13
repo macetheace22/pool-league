@@ -5429,7 +5429,7 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
   const parseBulk = () => {
     const result = parseLeagueRoster(raw);
     if (Object.keys(result.rosters).length === 0) {
-      setParseErr("No teams found. Try these steps: 1) Open the PDF directly in your browser (not a PDF app). 2) Select All (⌘A or Ctrl+A). 3) Copy & paste here. The text must include the \"Division Roster and Handicap Report\" header & \"Team NNNNN\" lines to parse correctly.");
+      setParseErr("No teams found. Try these steps: 1) Open the PDF directly in your browser (not a PDF app). 2) Select All (⌘A or Ctrl+A). 3) Copy & paste here. The text must include team headers and player rows from either the regular weekly roster or playoff-format roster report.");
       return;
     }
     if (Object.keys(result.registry).length === 0) {
