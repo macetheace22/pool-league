@@ -2,7 +2,7 @@
 
 Last reconciled: 2026-11-13 (local project date; GitHub timestamps may display the following UTC date)  
 Code baseline: `main` through merged PR #149 (`506a11754bf75fe08276f511fc11ab57056de2e3`).  
-Documentation update: PR #131, branch `docs/rulebook-audit-continuity-6-11` (merged); PR #132 implementation recorded after merge; PRs #137–#138 reconciled; PR #140 optional per-game innings display merged; PR #142 individual-forfeit trailing-set enforcement merged; PR #147 Section 6.7 simultaneous-finish correction verified; PR #148 reconciled Section 6.7 closure and the next audit step; PR #149 implementation and Sections 6.9–6.10 audit reconciled.
+Documentation updates: PR #131, branch `docs/rulebook-audit-continuity-6-11` (merged); PR #132 implementation recorded after merge; PRs #137–#138 reconciled; PR #140 optional per-game innings display merged; PR #142 individual-forfeit trailing-set enforcement merged; PR #147 Section 6.7 simultaneous-finish correction verified; PR #148 reconciled Section 6.7 closure and the next audit step; PR #149 implementation and Sections 6.9–6.10 audit reconciled; PR #150 post-#149 documentation reconciliation merged; PR #151 Section 2.7 timeout allowance merged; PR #152 Section 2.7 multi-timeout support and final audit reconciliation merged.
 
 This file is the single source of truth for rulebook scope, decisions, current implementation, outstanding audit, data entry/import needs, and delivery order. It is deliberately honest about what has and has not been checked: a complete inventory is not the same as a completed clause-by-clause audit.
 
@@ -38,12 +38,12 @@ This file is the single source of truth for rulebook scope, decisions, current i
 
 - Formats are **Open, Advanced, Masters**.
 - Section 2.7 coaching time-outs are per player, per set:
-  - Open rating 30–50: 2 periods.
-  - Open rating 51–150: 1 period.
-  - Advanced rating 40–150: 1 period.
-  - Masters rating 50–150: 0 periods.
-  - NR uses the lowest time-out tier for that format.
-  - Coaching period duration is one minute. The exact rulebook wording around occasional vs repeated over-one-minute periods must be implemented consistently with the user's settled one-minute rule and the warning/penalty procedure already discussed; do not ask for the rating limits again.
+  - Open rating 30–50: 2 timeouts.
+  - Open rating 51–150: 1 timeout.
+  - Advanced rating 40–150: 1 timeout.
+  - Masters rating 50–150: 0 timeouts.
+  - NR uses the lowest timeout tier for that format.
+  - Coaching timeout duration is one minute. The exact rulebook wording around occasional vs repeated over-one-minute periods must be implemented consistently with the user's settled one-minute rule and the warning/penalty procedure already discussed; do not ask for the rating limits again.
 - Section 6.7: when both players reach their ratings in the same game, the winner of the last game wins the set. **Do not ask the scorekeeper who won.** Determine it from the recorded game result.
 - Section 5.7: official IBA playoff-eligibility import is authoritative. Missing data means **Unverified with a warning**, not automatically ineligible. Do not create an independent eligibility calculator that overrides the official code.
 - Eligibility thresholds previously captured for reference: Division playoffs 4 times with team + 7 IBA scores; Seasonal tournaments 5 + 8; Regional Team Championship 6 + 9. New-player exception: exactly 50% of current roster qualifies; reduces calculated-score minimums to 5/6/7 respectively, not times-played requirements. Current-year IBA membership application is required. Drop/re-add resets times with team. At most one forfeited set can count, and only if the player was present, listed on the scoresheet, and met the calculated-score requirement. The official eligibility import remains the deciding source.
@@ -82,6 +82,12 @@ This is the known baseline from merged PRs and prior user-confirmed SQL actions.
 | PR #145 — practice types/scoring methods (Sections 6.1–6.3 practice support) | Merged (`f36250efb555b6c362a14892188b9ed97cd5dc7e`). Adds the aligned Practice Skills & Drills / Practice vs. Opponent distinction, Race to Points / Race to Games / Best of X Games selection, persistence of practice type/method/completion, and restored Best of X behavior. Section 83 SQL was user-applied. No live league scoring change. |
 | PR #147 — Section 6.7 simultaneous-finish correction | Merged (`bad182ebbea8d4c7b7130e9c1e9e67769b3bc109`). Removes obsolete `tiebreak` fallback; when both ratings are reached in the same game, the higher per-game score determines the set winner. Adds regression coverage where cumulative set scores tie but the final game has a clear winner. A tied individual-game score remains a defensive invalid-data case, not a valid game outcome. Live scoring continues to derive and persist `winnerSlot`; Scoresheet displays that saved winner. PR-head CI run 43449199121 passed; merge-commit Vercel status is success. No schema/UI redesign. |
 | PR #149 — captain pending-makeup visibility and Sections 6.9–6.10 audit | **Merged** (`506a1175`). Adds pending-makeup visibility on Home and Leagues for every team the profile captains, including captain-only team assignments independent of active player membership. Extends team-overview aggregation to include captain-assigned teams. Adds regression tests for multi-team captain aggregation, captain-only team visibility, and excluding non-pending/non-captained matches. Adds explicit set dispositions to both regular live summaries and historical Scoresheet: played sets show scores; forfeits are final and labeled **FORFEIT** (with receiving/forfeiting player context); finalized incomplete sets are **UNPLAYED**; unfinished sets on a pending makeup are **AWAITING MAKEUP**. Historical team totals exclude unfinished sets from per-set rating rollups while preserving the stored match calculation. No database migration or change to live scoring calculations/forfeit rules. The audit confirms pending makeup records are excluded from official standings until finalized; resumed makeups preserve completed sets and reset unfinished sets for current-roster/current-rating selection; finalized makeups clear pending status and recalculate rating adjustments; unplayed-set calculations award points-to-date, suppress positive rating bonuses, and retain over-limit penalties. Makeup date and League Office notice date remain paper/manual by current decision. PR-head CI run 43469265215 (run 602) passed; Vercel preview was Ready; production deployment for merge commit `506a1175` is Ready. Supabase RLS inspection confirms authenticated read access for teams, schedules, divisions, and completed matches; live role acceptance with a captain who is not an active player remains open. Interactive historical Scoresheet acceptance against a saved completed match remains open because the active project has no completed match record available. |
+### PR #151 — Section 2.7 live timeout allowances
+Merged. Adds per-player/per-set timeout allowance calculation by format/rating, used/remaining display during live scoring, NR handling, per-set reset, and an over-limit confirmation rather than a hard block. Masters has no timeout controls. No subjective coaching workflow was added.
+
+### PR #152 — Section 2.7 multi-timeout support and final audit reconciliation
+Merged. Extends the Section 2.7 implementation so formats/ratings allowing two timeouts can record two distinct timeouts in one rack while preserving the familiar `Player TO` toggle and showing `2nd TO` only when a second timeout is actually allowed. Legacy boolean timeout markers remain readable; historical Scoresheet displays `TO` or `2 TO`. Focused regression coverage and the final Section 2.7 master-plan reconciliation are included. Masters and one-timeout tiers do not show a second control.
+
 ### Database / SQL baseline
 
 - Active Supabase project: `iba-pool-league`, ref `mijhllycghzdryfvfgzv`. Never use the inactive project named `pool-league`.
