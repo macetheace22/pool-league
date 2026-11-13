@@ -5546,7 +5546,7 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                           </div>
                         ))}
                       </div>
-                      <div className="import-warning-block__hint">These players were NOT added to any roster. Set their rating manually below after importing.</div>
+                      <div className="import-warning-block__hint">These players are included on their teams' rosters but have no numeric rating yet. Set their rating manually before they can be selected for a match.</div>
                     </div>
                   )}
 
