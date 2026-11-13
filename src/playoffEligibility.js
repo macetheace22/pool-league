@@ -4,7 +4,7 @@
 export function latestPlayoffEligibilityRows(rows) {
   const dated = (rows ?? []).filter(row => {
     const key = String(row.week_key ?? "");
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(key)) return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
     const date = new Date(`${key}T00:00:00Z`);
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === key;
   });
