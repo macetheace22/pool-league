@@ -3348,7 +3348,7 @@ function PlayoffEligibilityStatus({ rows, teams = [], rosters = {} }) {
   const latest = snapshot[0]?.week_key ?? null;
   const latestLabel = snapshot.find(row => row.label)?.label ?? null;
   const byPlayerNum = Object.fromEntries(snapshot.filter(row => row.player_num).map(row => [row.player_num, row]));
-  const reportWeek = latestLabel?.match(/Week\\s+\\d+/i)?.[0] ?? null;
+  const reportWeek = latestLabel?.match(/Week\s+\d+/i)?.[0] ?? null;
   const rosterPlayers = teams.flatMap(team => (rosters[team.id] ?? []).map(player => {
     const official = byPlayerNum[player.num] ?? null;
     const code = official?.elig_code ?? null;
