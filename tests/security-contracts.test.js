@@ -332,6 +332,7 @@ describe("Section 8.1 roster window and import safeguards", () => {
     expect(sql).toContain("coalesce(expected.is_bye, false) = false");
     expect(sql).toContain("ROSTER_IMPORT_PLAYER_ON_MULTIPLE_TEAMS");
     expect(sql).toContain("ROSTER_LIMIT_EIGHT");
+    expect(sql).toContain("'overSixTeams'");
     expect(transfer).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
     expect(transfer).toContain("if v_has_played then");
   });
