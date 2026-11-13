@@ -8,7 +8,8 @@ import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, navItemsForRole, LEAGUE_NAV_ITEMS, shellCss, AccessDenied } from "./Shell";
 import { css, Loader } from "./AdminApp";
 import * as db from "./db";
-import { getActiveTeamIds, isCaptainOfTeam } from "./teamMembership";
+import { getActiveTeamIds, getCaptainTeamIds, isCaptainOfTeam } from "./teamMembership";
+import { listCaptainPendingMakeups } from "./captainMakeups";
 import TeamContextSelector from "./TeamContextSelector";
 
 // Free-text schedule dates are typically M/D/YYYY (same format used
@@ -40,8 +41,8 @@ function matchOpponentName(m) {
 export function Home() {
   const { profile } = useAuth();
   // undefined = loading, [] = not linked to any current team. One entry per
-  // ACTIVE team the player is on right now -- see db.getMyTeamsOverview for
-  // why this can genuinely be more than one.
+  // Teams the user currently plays on or captains. Captain assignments are
+  // independent of player roster membership.
   const [teamOverviews, setTeamOverviews] = useState(undefined);
   const [snapshotStats, setSnapshotStats] = useState(undefined); // undefined = loading/n-a, null = no player_num linked
   const [recentPractice, setRecentPractice] = useState(undefined); // undefined = loading, null = none
@@ -50,7 +51,7 @@ export function Home() {
     if (!profile) return;
     setTeamOverviews(undefined);
     db.getMyTeamsOverview(profile).then(setTeamOverviews).catch(() => setTeamOverviews([]));
-  }, [profile?.team_memberships, profile?.player_num]);
+  }, [profile?.team_memberships, profile?.captain_team_ids, profile?.player_num]);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -91,6 +92,7 @@ export function Home() {
   const showTeamLabels = (teamOverviews ?? []).length > 1;
 
   const recentMatch = teamOverviews ? db.mostRecentCompletedMatch(teamOverviews) : undefined;
+  const captainMakeups = listCaptainPendingMakeups(teamOverviews ?? [], getCaptainTeamIds(profile));
   const homeLoading = !!profile && (teamOverviews === undefined || snapshotStats === undefined || recentPractice === undefined);
 
   const areas = [
@@ -112,6 +114,14 @@ export function Home() {
       <PageHeader title="Home" subtitle={profile ? `Welcome, ${profile.username}` : undefined} hideBack />
       <div className="tab-content">
         {homeLoading ? <Loader /> : <>
+        {captainMakeups.length > 0 && (
+          <DashCard icon={AlertCircle} title="Pending Makeups">
+            {captainMakeups.map(({ match, overview }) => (
+              <MatchRow key={match.id} item={match} overview={overview} clickable={false} />
+            ))}
+          </DashCard>
+        )}
+
         {nextMatches.map(nm => (
           <Link key={nm.teamId} to="/leagues" className="next-match-card">
             <div className="next-match-card__eyebrow">
@@ -217,7 +227,7 @@ export function LeaguesDashboard() {
   const navigate = useNavigate();
   const isManager = profile?.role === "manager";
   const [selectedTeamId, setSelectedTeamId] = useState(null);
-  const selectedTeamIds = getActiveTeamIds(profile);
+  const selectedTeamIds = [...new Set([...getActiveTeamIds(profile), ...getCaptainTeamIds(profile)])];
   const effectiveTeamId = selectedTeamId && selectedTeamIds.includes(selectedTeamId)
     ? selectedTeamId
     : selectedTeamIds[0] ?? null;
@@ -292,7 +302,7 @@ export function LeaguesDashboard() {
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, profile?.team_memberships, profile?.player_num]);
+  }, [profile?.id, profile?.team_memberships, profile?.captain_team_ids, profile?.player_num]);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,7 +324,7 @@ export function LeaguesDashboard() {
     .filter(w => w._date && w._date >= today)
     .sort((a, b) => a._date - b._date) : [];
   const previousAll = Array.isArray(overview?.myCompleted) ? overview.myCompleted : [];
-  const myMakeups = previousAll.filter(m => m.is_makeup_pending);
+  const captainMakeups = listCaptainPendingMakeups(allTeamOverviews ?? [], getCaptainTeamIds(profile));
   const upcomingWeekIds = new Set(upcomingAll.map(w => w.id));
   const safeLineupPlans = Array.isArray(lineupPlans) ? lineupPlans : [];
   const safeUnavailability = Array.isArray(unavailability) ? unavailability : [];
@@ -445,15 +455,15 @@ export function LeaguesDashboard() {
                 : previousAll.slice(0, 3).map((m, i) => <MatchRow key={i} item={m} overview={overview} clickable={false} />)}
             </DashCard>
 
-            {(isCaptainOfSelectedTeam || isManager) && (
+            {(getCaptainTeamIds(profile).length > 0 || isManager) && (
               <DashCard icon={AlertCircle} title="Makeups">
                 {isManager ? (
                   <div className="dash-empty">Manager view — see all leaguewide makeups in Match Lookup / History.
                     <button className="link-btn" onClick={()=>navigate("/match-lookup")}>Open →</button>
                   </div>
-                ) : myMakeups.length === 0 ? (
-                  <div className="dash-empty">No makeups pending for your team.</div>
-                ) : myMakeups.map((m, i) => <MatchRow key={i} item={m} overview={overview} clickable={false} />)}
+                ) : captainMakeups.length === 0 ? (
+                  <div className="dash-empty">No makeups pending for your teams.</div>
+                ) : captainMakeups.map(({ match, overview: matchOverview }) => <MatchRow key={match.id} item={match} overview={matchOverview} clickable={false} />)}
               </DashCard>
             )}
           </>

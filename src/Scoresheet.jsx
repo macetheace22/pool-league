@@ -11,9 +11,22 @@ const TEAM_RATING_LIMIT = 325; // only used in open/advanced
 export function toDisplaySets(match) {
   const venue = match.venue || "—";
   return (match.state?.sets ?? [])
-    .filter(s => s.complete && s.playerHome && s.playerAway)
     .map(s => {
-      if (s.forfeited) {
+      const status = s.forfeited ? "forfeited"
+        : s.complete ? "played"
+        : match.is_makeup_pending ? "makeup-pending"
+        : "unplayed";
+      if (status === "unplayed" || status === "makeup-pending") {
+        return {
+          setNum: s.setNum, venue, status,
+          playerA: { name: s.playerHome?.name ?? "Home player not assigned", num: s.playerHome?.num ?? null, rating: s.playerHome?.rating ?? null, team: "home" },
+          playerB: { name: s.playerAway?.name ?? "Away player not assigned", num: s.playerAway?.num ?? null, rating: s.playerAway?.rating ?? null, team: "away" },
+          racks: [], finalA: 0, finalB: 0, winnerSide: null, source: match.source,
+          totalInnings: 0, safetiesA: 0, safetiesB: 0,
+          forfeited: false,
+        };
+      }
+      if (status === "forfeited") {
         return {
           setNum: s.setNum, venue,
           playerA: { name: s.playerHome.name, num: s.playerHome.num ?? null, rating: s.playerHome.rating ?? 0, team: "home" },
@@ -22,7 +35,16 @@ export function toDisplaySets(match) {
           winnerSide: s.winnerSlot === "home" ? "a" : s.winnerSlot === "away" ? "b" : null,
           source: match.source,
           totalInnings: 0, safetiesA: 0, safetiesB: 0,
-          forfeited: true, forfeitedBy: s.forfeitedBy, forfeitPoints: s.forfeitPoints ?? 0,
+          status, forfeited: true, forfeitedBy: s.forfeitedBy, forfeitPoints: s.forfeitPoints ?? 0,
+        };
+      }
+      if (!s.playerHome || !s.playerAway) {
+        return {
+          setNum: s.setNum, venue, status: "unplayed",
+          playerA: { name: s.playerHome?.name ?? "Home player not assigned", num: s.playerHome?.num ?? null, rating: s.playerHome?.rating ?? null, team: "home" },
+          playerB: { name: s.playerAway?.name ?? "Away player not assigned", num: s.playerAway?.num ?? null, rating: s.playerAway?.rating ?? null, team: "away" },
+          racks: [], finalA: 0, finalB: 0, winnerSide: null, source: match.source,
+          totalInnings: 0, safetiesA: 0, safetiesB: 0, forfeited: false,
         };
       }
       let runA = 0, runB = 0;
@@ -36,6 +58,7 @@ export function toDisplaySets(match) {
       return {
         setNum: s.setNum,
         venue,
+        status,
         playerA: { name: s.playerHome.name, num: s.playerHome.num ?? null, rating: s.playerHome.rating ?? 0, team: "home" },
         playerB: { name: s.playerAway.name, num: s.playerAway.num ?? null, rating: s.playerAway.rating ?? 0, team: "away" },
         racks,
@@ -59,6 +82,9 @@ function computeSetRollup(set, format) {
   const isMasters = (format || "masters").toLowerCase() === "masters";
   const homeSlot = set.playerA.team === "home" ? "a" : "b";
   const awaySlot = homeSlot === "a" ? "b" : "a";
+  if (set.status === "unplayed" || set.status === "makeup-pending") {
+    return { marginHome: 0, marginAway: 0, addOnHome: 0, addOnAway: 0, winBonusHome: 0, winBonusAway: 0, totalHome: 0, totalAway: 0, homeSlot, awaySlot };
+  }
   if (set.forfeited) {
     const totalHome = set.forfeitedBy === "home" ? 0 : set.forfeitPoints;
     const totalAway = set.forfeitedBy === "home" ? set.forfeitPoints : 0;
@@ -221,6 +247,31 @@ function FrontSheetSet({ set, showInnings }) {
     );
   };
 
+  if (set.status === "unplayed" || set.status === "makeup-pending") {
+    const disposition = set.status === "makeup-pending" ? "AWAITING MAKEUP" : "UNPLAYED";
+    return (
+      <div className="set-sheet" ref={containerRef}>
+        <div className="set-sheet__header">
+          <span className="set-sheet__num">Set #{set.setNum}</span>
+          <span className="set-sheet__venue">{set.venue}</span>
+        </div>
+        <div className={`set-disposition set-disposition--${set.status}`}>
+          <strong>{disposition}</strong>
+          <span>{set.status === "makeup-pending"
+            ? "This set is not final and is awaiting completion."
+            : "No result was recorded for this set."}</span>
+        </div>
+        {(set.playerA || set.playerB) && (
+          <div className="set-disposition__players">
+            <span>{set.playerA?.name ?? "Home player not assigned"}</span>
+            <span>vs</span>
+            <span>{set.playerB?.name ?? "Away player not assigned"}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="set-sheet" ref={containerRef}>
       <div className="set-sheet__header">
@@ -232,6 +283,12 @@ function FrontSheetSet({ set, showInnings }) {
           : set.source === "manual" ? "✓ Rack-by-rack data (entered manually)"
           : "Imported record — summary only"}
       </div>
+      {set.forfeited && (
+        <div className="set-disposition set-disposition--forfeited">
+          <strong>FORFEIT</strong>
+          <span>{set.forfeitedBy === "home" ? set.playerA.name : set.playerB.name} forfeited; {set.forfeitedBy === "home" ? set.playerB.name : set.playerA.name} received the forfeit.</span>
+        </div>
+      )}
       <div className="rack-grid">
         {renderTable("a")}
         {renderTable("b")}
@@ -269,8 +326,9 @@ function ratingForTeamTotal(rating, format) {
 
 function BackSheet({ match, sets }) {
   const isMasters = match.format === "masters";
-  const teamHomeRatingTotal = sets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "home" ? set.playerA.rating : set.playerB.rating, match.format), 0);
-  const teamAwayRatingTotal = sets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "away" ? set.playerA.rating : set.playerB.rating, match.format), 0);
+  const ratedSets = sets.filter(set => set.status !== "unplayed" && set.status !== "makeup-pending");
+  const teamHomeRatingTotal = ratedSets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "home" ? set.playerA.rating : set.playerB.rating, match.format), 0);
+  const teamAwayRatingTotal = ratedSets.reduce((s, set) => s + ratingForTeamTotal(set.playerA.team === "away" ? set.playerA.rating : set.playerB.rating, match.format), 0);
   const rollups = sets.map((set) => ({ set, rollup: computeSetRollup(set, match.format) }));
   const subTotalHome = rollups.reduce((s, r) => s + r.rollup.totalHome, 0);
   const subTotalAway = rollups.reduce((s, r) => s + r.rollup.totalAway, 0);
@@ -333,6 +391,16 @@ function TeamColumn({ teamName, rollups, team, isMasters, format, ratingTotal, b
               const winBonus  = team === "home" ? rollup.winBonusHome : rollup.winBonusAway;
               const total     = team === "home" ? rollup.totalHome  : rollup.totalAway;
               const won       = set.winnerSide === mySlot;
+              if (set.status === "unplayed" || set.status === "makeup-pending") {
+                return (
+                  <tr key={set.setNum}>
+                    <td colSpan={5} style={{color:"#6B7280",fontWeight:700,fontSize:10.5}}>
+                      {set.status === "makeup-pending" ? "AWAITING MAKEUP" : "UNPLAYED"}
+                    </td>
+                    <td className="team-col__total-cell">—</td>
+                  </tr>
+                );
+              }
               if (set.forfeited) {
                 const iForfeited = set.forfeitedBy === team;
                 return (
@@ -479,6 +547,13 @@ const css = `
 .data-source-tag--verified { background: #16332A; color: #5FCF9E; }
 .data-source-tag--illustrative { background: #2A2A2A; color: #9A9A9A; }
 .set-sheet__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.set-disposition { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 18px 12px; margin: 10px 0; border: 1.5px solid #D1D5DB; border-radius: 10px; text-align: center; color: #374151; background: #F3F4F6; }
+.set-disposition strong { font-size: 13px; letter-spacing: .06em; }
+.set-disposition span { font-size: 11px; }
+.set-disposition--forfeited { color: #92400E; background: #FFFBEB; border-color: #F59E0B; }
+.set-disposition--makeup-pending { color: #92400E; background: #FFFBEB; border-color: #F59E0B; }
+.set-disposition--unplayed { color: #4B5563; background: #F3F4F6; border-color: #9CA3AF; }
+.set-disposition__players { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; color: #4B5563; font-size: 11px; margin-top: 8px; }
 .set-sheet__num { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #5A5A5A; }
 .set-sheet__venue { font-size: 11px; font-weight: 700; color: #FFFFFF; background: #3A3A3A; padding: 3px 9px; border-radius: 20px; }
 

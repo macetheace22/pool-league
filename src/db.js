@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient";
-import { getActiveTeamIds } from "./teamMembership";
+import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
 
 // Legacy compatibility helpers retained from the prior version.
 export function normalizeUSDate(str) {
@@ -2630,10 +2630,10 @@ export function computeTeamHeadToHead(matches, teamId) {
   return Object.values(byOpp).sort((a, b) => b.matchesPlayed - a.matchesPlayed);
 }
 
-// ─── Home dashboard: membership-driven team aggregation ─────────────────────
-// Current team context comes from active profile_team_memberships rows.
+// ─── Home dashboard: player- and captain-team aggregation ────────────────────
+// Include active player memberships and independently assigned captain teams.
 export async function getMyTeamsOverview(profile) {
-  const teamIds = getActiveTeamIds(profile);
+  const teamIds = [...new Set([...getActiveTeamIds(profile), ...getCaptainTeamIds(profile)])];
   if (teamIds.length === 0) return [];
   const overviews = await Promise.all(teamIds.map(id => getTeamScheduleOverview(id)));
   return overviews.filter(Boolean);
