@@ -1394,6 +1394,11 @@ export async function bulkImportPlayers(parsed, weekTag) {
       teamCount: Number(data?.teamCount ?? division.teamCount),
       playerCount: Number(data?.playerCount ?? 0),
     });
+    for (const team of data?.overSixTeams ?? []) {
+      rosterSyncWarnings.push(
+        `Team ${team.teamNum} has ${team.playerCount} players in the official IBA roster during the restricted period. The import was retained as the source of truth; League Manager review is required under Section 8.1.`
+      );
+    }
   }
 
   if (ratingRows.length) {
