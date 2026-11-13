@@ -105,4 +105,21 @@ describe("official IBA roster reconciliation planning", () => {
     expect(result.completeDivisions.map(row => row.divisionId)).toEqual(["div-2"]);
     expect(result.skippedDivisions[0].reason).toMatch(/more than one team/i);
   });
+
+  it("allows the same player to remain on teams in different divisions", () => {
+    const crossDivision = {
+      rosters: { ...parsed.rosters, "76003": ["10001"] },
+      ambiguousRoster: [],
+    };
+    const result = buildRosterSyncPlan({
+      parsed: crossDivision,
+      matchedTeams: teams,
+      allDivisionTeams: teams,
+    });
+
+    expect(result.completeDivisions.map(row => row.divisionId)).toEqual(["div-1", "div-2"]);
+    expect(result.rosterPayload).toContainEqual({ team_id: "team-a", player_nums: ["10001", "10002"] });
+    expect(result.rosterPayload).toContainEqual({ team_id: "team-c", player_nums: ["10001"] });
+  });
+
 });
