@@ -1118,10 +1118,23 @@ export async function addExistingPlayerToRoster(teamId, playerNum) {
 
 export async function listPlayerTransferRequests() {
   const { data, error } = await supabase.from("player_transfer_requests")
-    .select("id, player_num, division_id, from_team_id, to_team_id, requested_by, status, created_at, reviewed_at, reviewed_by, players:player_num(num, name), from_team:from_team_id(id, name, team_num), to_team:to_team_id(id, name, team_num), divisions:division_id(id, num, name, format, day)")
-    .order("created_at", { ascending: false });
+    .select("*").order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
-  return data ?? [];
+  const rows = data ?? [];
+  const playerNums = [...new Set(rows.map(r => r.player_num))];
+  const teamIds = [...new Set(rows.flatMap(r => [r.from_team_id, r.to_team_id]))];
+  const divisionIds = [...new Set(rows.map(r => r.division_id))];
+  const [{ data: players }, { data: teams }, { data: divisions }] = await Promise.all([
+    playerNums.length ? supabase.from("players").select("num, name").in("num", playerNums) : Promise.resolve({ data: [] }),
+    teamIds.length ? supabase.from("teams").select("id, name, team_num").in("id", teamIds) : Promise.resolve({ data: [] }),
+    divisionIds.length ? supabase.from("divisions").select("id, num, name, format, day").in("id", divisionIds) : Promise.resolve({ data: [] }),
+  ]);
+  const byPlayer = Object.fromEntries((players ?? []).map(p => [p.num, p]));
+  const byTeam = Object.fromEntries((teams ?? []).map(t => [t.id, t]));
+  const byDivision = Object.fromEntries((divisions ?? []).map(d => [d.id, d]));
+  return rows.map(r => ({ ...r, player: byPlayer[r.player_num] ?? null,
+    fromTeam: byTeam[r.from_team_id] ?? null, toTeam: byTeam[r.to_team_id] ?? null,
+    division: byDivision[r.division_id] ?? null }));
 }
 
 export async function decidePlayerTransferRequest(requestId, approve) {
