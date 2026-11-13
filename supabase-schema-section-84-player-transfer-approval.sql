@@ -19,33 +19,34 @@ revoke all on public.player_division_team_assignments from anon, authenticated;
 
 -- Seed historical participation first, so a player who has already played
 -- remains assigned even if they were later removed from the current roster.
--- The app has no completed matches in the connected project today, but this
--- also makes the migration safe for existing deployments with match history.
+-- Latest match archive wins if older data contains an already-approved move.
 insert into public.player_division_team_assignments
   (player_num, division_id, team_id, has_played)
-select played.player_num, played.division_id, min(played.team_id::text)::uuid, true
+select distinct on (played.player_num, played.division_id)
+  played.player_num, played.division_id, played.team_id, true
 from (
-  select distinct
-    set_player->'playerHome'->>'num' as player_num,
+  select
+    set_row.value->'playerHome'->>'num' as player_num,
     cm.division_id,
-    cm.team_home_id as team_id
+    cm.team_home_id as team_id,
+    cm.created_at
   from public.completed_matches cm
-  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) set_player
-  where jsonb_array_length(coalesce(set_player->'racks', '[]'::jsonb)) > 0
-    and nullif(set_player->'playerHome'->>'num', '') is not null
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerHome'->>'num', '') is not null
   union all
-  select distinct
-    set_player->'playerAway'->>'num' as player_num,
+  select
+    set_row.value->'playerAway'->>'num' as player_num,
     cm.division_id,
-    cm.team_away_id as team_id
+    cm.team_away_id as team_id,
+    cm.created_at
   from public.completed_matches cm
-  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) set_player
-  where jsonb_array_length(coalesce(set_player->'racks', '[]'::jsonb)) > 0
-    and nullif(set_player->'playerAway'->>'num', '') is not null
+  cross join lateral jsonb_array_elements(coalesce(cm.state->'sets', '[]'::jsonb)) as set_row(value)
+  where jsonb_array_length(coalesce(set_row.value->'racks', '[]'::jsonb)) > 0
+    and nullif(set_row.value->'playerAway'->>'num', '') is not null
 ) played
 where played.division_id is not null and played.team_id is not null
-group by played.player_num, played.division_id
-having count(distinct played.team_id) = 1
+order by played.player_num, played.division_id, played.created_at desc
 on conflict (player_num, division_id) do nothing;
 
 -- Current roster entries are provisional until the player actually participates
