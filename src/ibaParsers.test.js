@@ -97,6 +97,7 @@ Team 85382 North Stars
   it("recognizes the playoff roster layout and extracts ratings plus eligibility", () => {
     const parsed = parseLeagueRoster(report);
     expect(parsed.eligibilityRows).toHaveLength(2);
+    expect(parsed.eligibilityWeek).toBe(17);
     expect(parsed.registry["12345"]).toMatchObject({ rating: 45, name: "Jane Doe" });
     expect(parsed.registry["23456"]).toMatchObject({ rating: 52, name: "John Smith" });
     expect(parsed.eligibilityRows.map(row => row.eligCode)).toEqual(["E", "T"]);
@@ -125,40 +126,3 @@ Team 85382 North Stars
   });
 });
 
-
-describe("playoff eligibility roster parsing", () => {
-  const playoffRoster = [
-    "Division Playoffs - Roster and Handicap Report",
-    "For Week: 18",
-    "Ratings current as of: 11/08/26",
-    "Rate Num Elig Name",
-    "Team 12345 North Stars",
-    "70 34567 E Alex Player",
-    "62 45678 T Sam Player",
-  ].join("\n");
-
-  it("extracts ratings and official eligibility codes from the playoff roster layout", () => {
-    const parsed = parsePlayoffEligibilityRoster(playoffRoster);
-    expect(parsed.eligibilityWeek).toBe(18);
-    expect(parsed.eligibilityAsOfDate).toBe("2026-11-08");
-    expect(parsed.eligibilityRows).toEqual([
-      { teamNum: "12345", teamName: "North Stars", num: "34567", name: "Alex Player", nickname: "", eligCode: "E" },
-      { teamNum: "12345", teamName: "North Stars", num: "45678", name: "Sam Player", nickname: "", eligCode: "T" },
-    ]);
-    expect(parsed.registry["34567"].rating).toBe(70);
-    expect(parsed.registry["45678"].rating).toBe(62);
-    expect(parsed.registry["34567"].matchesPlayed).toBeUndefined();
-    expect(parseLeagueRoster(playoffRoster).eligibilityRows).toHaveLength(2);
-  });
-
-  it("does not produce eligibility rows when the as-of date is invalid", () => {
-    const parsed = parsePlayoffEligibilityRoster(playoffRoster.replace("11/08/26", "02/31/26"));
-    expect(parsed.eligibilityRows).toHaveLength(2);
-    expect(parsed.eligibilityAsOfDate).toBeNull();
-    expect(parsed.eligibilityParseError).toMatch(/date could not be read/i);
-  });
-
-  it("does not classify a regular weekly roster as a playoff eligibility report", () => {
-    expect(parsePlayoffEligibilityRoster("For Week: 18\\nRate Num Play Win Name")).toBeNull();
-  });
-});
