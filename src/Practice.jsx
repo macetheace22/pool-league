@@ -234,7 +234,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                 {gameTypeLabel(g.game_type)}
                 {g.scoring_method ? ` · ${scoringMethodLabel(g.scoring_method)}` : ""}
                 {g.practice_type !== "skills_drills" ? ` · ${g.my_score}–${g.opponent_score}` : ""}
-                {g.practice_type === "skills_drills" ? "" : ` · ${new Date(g.played_at).toLocaleDateString()}`}
+                {` · ${new Date(g.completed_at || g.played_at).toLocaleDateString()}`}
               </div>
             </div>
           ))}
@@ -644,8 +644,8 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
     setSession(s => ({
       ...s,
       gameLog: [...(s.gameLog ?? []), { myPoints: my, oppPoints: opp, winner: gameWinner }],
-      myScore: (s.myScore ?? 0) + (gameWinner === "me" ? 1 : 0),
-      opponentScore: (s.opponentScore ?? 0) + (gameWinner === "opponent" ? 1 : 0),
+      myScore: (s.myScore ?? 0) + (session.scoringMethod === "race_to_points" ? my : gameWinner === "me" ? 1 : 0),
+      opponentScore: (s.opponentScore ?? 0) + (session.scoringMethod === "race_to_points" ? opp : gameWinner === "opponent" ? 1 : 0),
       myPts: "", oppPts: "",
     }));
   };
@@ -655,8 +655,8 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
     setSession(s => ({
       ...s,
       gameLog: (s.gameLog ?? []).slice(0, -1),
-      myScore: Math.max(0, (s.myScore ?? 0) - (last.winner === "me" ? 1 : 0)),
-      opponentScore: Math.max(0, (s.opponentScore ?? 0) - (last.winner === "opponent" ? 1 : 0)),
+      myScore: Math.max(0, (s.myScore ?? 0) - (session.scoringMethod === "race_to_points" ? last.myPoints : last.winner === "me" ? 1 : 0)),
+      opponentScore: Math.max(0, (s.opponentScore ?? 0) - (session.scoringMethod === "race_to_points" ? last.oppPoints : last.winner === "opponent" ? 1 : 0)),
     }));
   };
 
