@@ -139,5 +139,22 @@ Team 85382 North Stars
     expect(parsed.rosters["76001"]).toEqual(["12345", "34567"]);
     expect(parsed.rosters["76002"]).toEqual(["23456", "45678"]);
   });
+
+  it("parses IBA multi-column team IDs containing letters", () => {
+    const multiColumn = [
+      "Division Playoffs - Roster and Handicap Report",
+      "For Week: 19",
+      "Ratings current as of: 05/13/26",
+      "Team 76B01 Eliminators Team 76B02 No esQusEs Team 76B03 9 Inch Rails",
+      "Rate Num Elig Name Rate Num Elig Name Rate Num Elig Name",
+      "47 19537 E Kruger, Bruce 97 01855 E Byrne, Randy 50 37760 E Robeck, Paul",
+      "49 00658 T Jarvis, Al 86 25046 A Boone, James 63 03294 S Johnson, Phil",
+    ].join("\n");
+    const parsed = parseLeagueRoster(multiColumn);
+    expect(parsed.rosters["76B01"]).toEqual(["19537", "00658"]);
+    expect(parsed.rosters["76B02"]).toEqual(["01855", "25046"]);
+    expect(parsed.rosters["76B03"]).toEqual(["37760", "03294"]);
+    expect(parsed.eligibilityRows.map(row => row.eligCode)).toEqual(["E", "E", "E", "T", "A", "S"]);
+  });
 });
 
