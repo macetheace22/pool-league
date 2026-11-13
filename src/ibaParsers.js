@@ -296,15 +296,19 @@ function parsePlayoffEligibilityRoster(raw) {
   const text = String(raw || "");
   if (!/Division Playoffs[\s\S]*?Rate\s+Num\s+Elig\s+Name/i.test(text) && !/Rate\s+Num\s+Elig\s+Name/i.test(text)) return null;
   const week = extractIbaReportWeek(text);
-  const asOf = text.match(/Ratings\s+current\s+as\s+of\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
-  let eligibilityAsOfDate = null;
-  if (asOf) {
-    const parts = asOf[1].split("/").map(Number);
-    let [month, day, year] = parts;
-    if (year < 100) year += year >= 70 ? 1900 : 2000;
+  const asOfMatches = [...text.matchAll(/Ratings\\s+current\\s+as\\s+of\\s*:?\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/gi)];
+  const parsedAsOfDates = asOfMatches.map(match => {
+    const [month, day, rawYear] = match[1].split("/").map(Number);
+    const year = rawYear < 100 ? rawYear + (rawYear >= 70 ? 1900 : 2000) : rawYear;
     const date = new Date(Date.UTC(year, month - 1, day));
-    if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) eligibilityAsOfDate = date.toISOString().slice(0, 10);
-  }
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+      ? date.toISOString().slice(0, 10)
+      : null;
+  });
+  const distinctAsOfDates = [...new Set(parsedAsOfDates)];
+  const eligibilityAsOfDate = parsedAsOfDates.length && parsedAsOfDates.every(Boolean) && distinctAsOfDates.length === 1
+    ? distinctAsOfDates[0]
+    : null;
   const registry = {}, rosters = {}, teams = {}, eligibilityRows = [], needsRating = [];
   let currentTeams = [];
   for (const line of text.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
