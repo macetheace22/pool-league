@@ -348,6 +348,8 @@ begin
   from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
   cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num);
 
+  perform set_config('app.official_iba_roster_import', 'true', true);
+
   -- Reuse the established removal workflow so removed captains lose their
   -- captain assignment and account/team access exactly as with a manager
   -- roster removal. The Section 84 assignment ledger is intentionally kept.
@@ -366,9 +368,7 @@ begin
     perform public.remove_player_from_team(v_removed.team_id, v_removed.player_num);
   end loop;
 
-  -- Trigger bypass is transaction-local and can only be set inside this
-  -- manager-only SECURITY DEFINER function.
-  perform set_config('app.official_iba_roster_import', 'true', true);
+  -- The transaction-local flag is already set for the removal and insert operations.
 
   delete from public.rosters where team_id = any(v_team_ids);
 
