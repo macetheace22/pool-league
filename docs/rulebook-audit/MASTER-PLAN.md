@@ -333,7 +333,7 @@ This order closes scoring, forfeits, eligibility, and scorekeeping before moving
 
 
 
-### Section 8.1 — authoritative roster reconciliation (PR #161 open; CI fixes in progress)
+### Section 8.1 — authoritative roster reconciliation (PR #161 open; GitHub CI tests, SQL access guard, and production build passed)
 - User decision: the official IBA roster import is authoritative for **current roster membership**. A complete, validated report replaces current memberships for every team in each fully covered division; a player absent from that team's report is removed from the current roster. Historical completed matches, scores, statistics, rating history, participation, and the Section 84 division/team assignment ledger are retained.
 - Automatic weekly imports and manual roster imports use the same reconciliation logic. Each division is reconciled independently and only when every configured team is present and unambiguously matched. Unmatched teams, ambiguous team numbers/player placement, duplicate player placement, and incomplete division reports fail closed for that division. An incomplete or malformed report cannot clear a current roster.
 - A new player_team_roster_history ledger preserves each player's historical team association. Existing current roster rows seed the ledger; future additions/transfers are recorded automatically. Removing a current roster row ends linked profile/team access through the established manager removal workflow and clears captaincy only when that player is no longer captain of that team. It does not delete player/profile records, completed matches, scores, stats, rating history, or Section 84 assignment history.
