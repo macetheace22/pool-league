@@ -1238,8 +1238,8 @@ export function buildIbaPlayerWeeklyCounterRows(parsed, teamRows, snapshotsByDiv
     }
   }
 
-  // No Play/Win columns means this is not a match-counter snapshot (e.g. a
-  // playoff eligibility-only report). When any counters exist for a division,
+  // No Play/Win columns means this is not a match-counter snapshot (e.g. the
+  // playoff-format roster, which includes ratings and eligibility but no counters). When any counters exist for a division,
   // retain other roster rows with nulls so missing OCR values are not zeroed.
   return candidates.filter(row => divisionsWithCounters.has(String(row.division_id)));
 }
