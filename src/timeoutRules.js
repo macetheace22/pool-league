@@ -22,8 +22,14 @@ export function timeoutAllowance(format, rating) {
 }
 
 export function timeoutCount(set, side) {
-  const key = side === "home" ? "timeoutHome" : "timeoutAway";
-  return (set?.racks || []).reduce((count, rack) => count + (rack[key] ? 1 : 0), 0);
+  const boolKey = side === "home" ? "timeoutHome" : "timeoutAway";
+  const countKey = side === "home" ? "timeoutHomeCount" : "timeoutAwayCount";
+  return (set?.racks || []).reduce((count, rack) => {
+    // New records store the number of periods in a rack. Fall back to the
+    // legacy boolean marker so existing saved matches remain fully readable.
+    const rackCount = Number.isFinite(rack?.[countKey]) ? Math.max(0, rack[countKey]) : (rack?.[boolKey] ? 1 : 0);
+    return count + rackCount;
+  }, 0);
 }
 
 export function timeoutRemaining(set, side, format) {
