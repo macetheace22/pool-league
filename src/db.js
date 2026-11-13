@@ -1307,17 +1307,19 @@ export async function bulkImportPlayers(parsed, weekTag) {
   }
   for (const num of ambiguousTeamIds) delete byNum[num];
 
-  const knownNums = new Set(Object.keys(byNum));
-  const unmatchedTeamIds = teamNums.filter(n => !knownNums.has(n) && !ambiguousTeamIds.includes(n));
+  const knownActiveTeamNums = new Set((teamRows ?? [])
+    .filter(row => row.divisions?.seasons?.is_active)
+    .map(row => String(row.team_num)));
+  const unmatchedTeamIds = teamNums.filter(n => !knownActiveTeamNums.has(String(n)) && !ambiguousTeamIds.includes(n));
   const reportDivisionIds = [...new Set(Object.values(byNum).map(row => String(row.division_id)))];
   let allDivisionTeams = [];
   if (reportDivisionIds.length) {
     const { data: divisionTeams, error: divisionTeamsError } = await supabase
       .from("teams")
-      .select("id, division_id, team_num, divisions(num)")
+      .select("id, division_id, team_num, is_bye, divisions(num, seasons(is_active))")
       .in("division_id", reportDivisionIds);
     if (divisionTeamsError) throw new Error(`Could not validate complete division rosters: ${divisionTeamsError.message}`);
-    allDivisionTeams = divisionTeams ?? [];
+    allDivisionTeams = (divisionTeams ?? []).filter(row => row.divisions?.seasons?.is_active);
   }
   const reconciliation = buildRosterSyncPlan({
     parsed,
@@ -1340,8 +1342,11 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (!team) continue;
     for (const playerNum of playerNums) {
       const prior = divisionByPlayerNum[playerNum];
-      if (prior && prior !== team.division_id) throw new Error(`Player ${playerNum} appears in more than one active division; ratings import was blocked before saving.`);
-      divisionByPlayerNum[playerNum] = team.division_id;
+      // A player may legitimately belong to teams in different divisions.
+      // Ratings are player-level, so use the first validated division's report
+      // week for the single player_ratings row; each division still receives
+      // its own roster reconciliation and weekly-counter rows.
+      if (!prior) divisionByPlayerNum[playerNum] = team.division_id;
     }
   }
   const ratingRows = Object.values(parsed.registry ?? {}).filter(player => player.rating != null).map(player => {
