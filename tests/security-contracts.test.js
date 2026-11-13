@@ -152,7 +152,7 @@ describe("Section 4.5 player division transfers", () => {
     expect(sql).toContain("revoke all on function public.decide_player_transfer_request(uuid, boolean) from public, anon");
     expect(sql).toContain("grant execute on function public.decide_player_transfer_request(uuid, boolean) to authenticated");
     expect(sql).toContain("update public.player_division_team_assignments");
-    expect(sql).toContain("for v_removed in");
+    expect(sql).toContain("delete from public.rosters");
   });
 
   it("routes captain roster additions through transfer requests and exposes manager decisions", () => {
@@ -332,7 +332,8 @@ describe("Section 8.1 roster history preservation", () => {
     const db = read("src/db.js");
     expect(sql).toContain("create table if not exists public.player_team_roster_history");
     expect(sql).toContain("track_player_team_roster_history");
-    expect(sql).toContain("set ended_at = now()");
+    expect(sql).toContain("first_added_at timestamptz not null default now()");
+    expect(sql).toContain("last_seen_at timestamptz not null default now()");
     expect(sql).toContain("grant select on public.player_team_roster_history to authenticated");
     expect(db).toContain('.from("player_team_roster_history")');
   });
@@ -354,8 +355,8 @@ describe("Section 8.1 import retains official roster and player history", () => 
     expect(sql).toContain("create table if not exists public.player_team_roster_history");
     expect(sql).toContain("track_player_team_roster_history");
     expect(sql).toContain("grant select on public.player_team_roster_history to authenticated");
-    expect(sql).toContain("profile_team_memberships membership");
-    expect(sql).toContain("public.completed_matches");
+    expect(sql).toContain("player_division_team_assignments");
+    expect(sql).not.toContain("delete from public.completed_matches");
     expect(db).toContain('.from("player_team_roster_history")');
   });
 });
