@@ -3882,7 +3882,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
       <div className="card">
         <div className="card__title">Roster ({roster.length})</div>
-        {!rosterChangesAllowed && <div className="readonly-bar">Starting Week 6, only league managers can add or remove players. You can still generate invite codes for players already on this roster.</div>}
+        {!rosterChangesAllowed && <div className="readonly-bar">Manual roster changes are restricted by Section 8.1. Captains cannot make changes starting Week 6, and no manual changes are allowed during the final four weeks or postseason. Official IBA roster imports remain available to League Managers.</div>}
         {roster.length===0 && <div className="empty-state" style={{border:"none"}}>No players on this roster yet.</div>}
         <div className="team-select-list">
           {roster.map(p => (
