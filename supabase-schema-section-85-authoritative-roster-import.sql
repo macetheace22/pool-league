@@ -195,7 +195,8 @@ begin
   -- more than six. Deletions remain possible so an over-limit roster can be
   -- reduced one member at a time. Official imports retain the published IBA
   -- roster (up to the structural eight-member maximum).
-  if v_week_six_date is not null
+  if not v_import
+     and v_week_six_date is not null
      and current_date >= v_week_six_date
      and (v_final_four_start_date is null or current_date < v_final_four_start_date)
      and (v_postseason_start_date is null or current_date < v_postseason_start_date) then
@@ -247,6 +248,7 @@ declare
   v_team_ids uuid[];
   v_team_count integer;
   v_player_count integer;
+  v_removed record;
 begin
   if auth.uid() is null or public.current_role_name() is distinct from 'manager' then
     raise exception 'MANAGER_REQUIRED' using errcode = '42501';
@@ -346,23 +348,23 @@ begin
   from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
   cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num);
 
-  -- End current account/team access for removed players; preserve membership
-  -- rows and history. Captain assignments are separate and remain untouched.
-  update public.profile_team_memberships membership
-  set ended_at = now()
-  from public.profiles profile, public.rosters roster
-  where roster.team_id = any(v_team_ids)
-    and profile.player_num = roster.player_num
-    and membership.profile_id = profile.id
-    and membership.team_id = roster.team_id
-    and membership.ended_at is null
-    and not exists (
-      select 1
-      from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
-      cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
-      where item.team_id = roster.team_id
-        and player_row.player_num = roster.player_num
-    );
+  -- Reuse the established removal workflow so removed captains lose their
+  -- captain assignment and account/team access exactly as with a manager
+  -- roster removal. The Section 84 assignment ledger is intentionally kept.
+  for v_removed in
+    select r.team_id, r.player_num
+    from public.rosters r
+    where r.team_id = any(v_team_ids)
+      and not exists (
+        select 1
+        from jsonb_to_recordset(p_rosters) as item(team_id uuid, player_nums jsonb)
+        cross join lateral jsonb_array_elements_text(item.player_nums) as player_row(player_num)
+        where item.team_id = r.team_id
+          and player_row.player_num = r.player_num
+      )
+  loop
+    perform public.remove_player_from_team(v_removed.team_id, v_removed.player_num);
+  end loop;
 
   -- Trigger bypass is transaction-local and can only be set inside this
   -- manager-only SECURITY DEFINER function.
