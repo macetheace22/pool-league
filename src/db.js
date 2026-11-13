@@ -1357,11 +1357,6 @@ export async function bulkImportPlayers(parsed, weekTag) {
     const { error } = await supabase.from("players").upsert(playerRows);
     if (error) throw new Error(`Could not save imported players: ${error.message}`);
   }
-  if (ratingRows.length) {
-    const { error } = await supabase.from("player_ratings").upsert(ratingRows, { onConflict: "player_num,week_key" });
-    if (error) throw new Error(`Could not save imported ratings: ${error.message}`);
-  }
-
   const needsRatingRows = (parsed.needsRating ?? []).map(p => ({ num: p.num, name: p.name, nickname: p.nickname ?? "" }));
   if (needsRatingRows.length) {
     const { error } = await supabase.from("players").upsert(needsRatingRows);
@@ -1378,6 +1373,11 @@ export async function bulkImportPlayers(parsed, weekTag) {
         : error.message;
       throw new Error(`Could not reconcile official IBA rosters: ${detail}`);
     }
+  }
+
+  if (ratingRows.length) {
+    const { error } = await supabase.from("player_ratings").upsert(ratingRows, { onConflict: "player_num,week_key" });
+    if (error) throw new Error(`Could not save imported ratings: ${error.message}`);
   }
 
   const eligibilityImport = { imported: 0, unmatchedCount: 0, skipped: false };
