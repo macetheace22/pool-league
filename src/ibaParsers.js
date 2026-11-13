@@ -294,9 +294,9 @@ const RE_RATE_LAST_OPT = new RegExp(`^(\\d{5})\\.?\\s+${PLAY_WIN}(.+?)(?:\\s+(\\
 // ==================================================================
 function parsePlayoffEligibilityRoster(raw) {
   const text = String(raw || "");
-  if (!/Division Playoffs[\\s\\S]*?Rate\\s+Num\\s+Elig\\s+Name/i.test(text) && !/Rate\\s+Num\\s+Elig\\s+Name/i.test(text)) return null;
+  if (!/Division Playoffs[\s\S]*?Rate\s+Num\s+Elig\s+Name/i.test(text) && !/Rate\s+Num\s+Elig\s+Name/i.test(text)) return null;
   const week = extractIbaReportWeek(text);
-  const asOf = text.match(/Ratings\\s+current\\s+as\\s+of\\s*:?\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/i);
+  const asOf = text.match(/Ratings\s+current\s+as\s+of\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
   let eligibilityAsOfDate = null;
   if (asOf) {
     const parts = asOf[1].split("/").map(Number);
@@ -307,15 +307,15 @@ function parsePlayoffEligibilityRoster(raw) {
   }
   const registry = {}, rosters = {}, teams = {}, eligibilityRows = [], needsRating = [];
   let currentTeams = [];
-  for (const line of text.split(/\\r?\\n/).map(value => value.trim()).filter(Boolean)) {
-    const teamHeaders = [...line.matchAll(/\\bTeam\\s+([A-Z0-9]{3,8})\\s+(.*?)(?=\\s+Team\\s+[A-Z0-9]{3,8}\\b|$)/gi)];
+  for (const line of text.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) {
+    const teamHeaders = [...line.matchAll(/\bTeam\s+([A-Z0-9]{3,8})\s+(.*?)(?=\s+Team\s+[A-Z0-9]{3,8}\b|$)/gi)];
     if (teamHeaders.length) {
       currentTeams = teamHeaders.map(match => ({ num: match[1], name: match[2].trim() }));
-      for (const team of currentTeams) { teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\\bBYE\\b/i.test(team.name) }; rosters[team.num] = rosters[team.num] || []; }
+      for (const team of currentTeams) { teams[team.num] = { id: team.num, name: team.name, location: null, isBye: /\bBYE\b/i.test(team.name) }; rosters[team.num] = rosters[team.num] || []; }
       continue;
     }
-    if (!currentTeams.length || /^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\\s+Num\\s+Elig\\s+Name|[-]{5,}|Division #)/i.test(line)) continue;
-    const anchor = /(?:^|\\s)(\\d{1,3})\\s+(\\d{5})\\s+([ETAS])\\s+/g;
+    if (!currentTeams.length || /^(Division Playoffs|For Week:|Ratings current as of|Players noted|T=Less than|Rate\s+Num\s+Elig\s+Name|[-]{5,}|Division #)/i.test(line)) continue;
+    const anchor = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+([ETAS])\s+/g;
     const matches = [...line.matchAll(anchor)];
     matches.forEach((match, index) => {
       const team = currentTeams[index] || currentTeams[currentTeams.length - 1];
