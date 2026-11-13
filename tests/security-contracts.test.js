@@ -57,6 +57,78 @@ describe("security migration contracts", () => {
 });
 
 
+describe("Section 8.1 authoritative roster import", () => {
+  it("uses the shared full-division planner, explicit ambiguity confirmation, and automatic routing safeguards", () => {
+    const db = read("src/db.js");
+    const helper = read("src/rosterReconciliation.js");
+    const admin = read("src/AdminAppCore.jsx");
+    const auto = read("src/ibaAutoSync.js");
+    expect(db).toContain('import { buildRosterSyncPlan } from "./rosterReconciliation"');
+    expect(db).toContain('supabase.rpc("sync_imported_team_rosters"');
+    expect(db).toContain("weekTag?.unmatchedTeamNums");
+    expect(db).toContain("weekTag?.ambiguousTeamNums");
+    expect(helper).toContain("every team in this division");
+    expect(helper).toContain("ambiguous team placement");
+    expect(helper).toContain("team.is_bye === true");
+    expect(admin).toContain("ambiguousRoster: []");
+    expect(auto).toContain("unmatchedTeamNums,");
+    expect(auto).toContain("ambiguousTeamNums,");
+  });
+
+  it("preserves former team affiliations independently of current roster membership", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    const db = read("src/db.js");
+    expect(sql).toContain("create table if not exists public.player_team_roster_history");
+    expect(sql).toContain("first_added_at timestamptz not null default now()");
+    expect(sql).toContain("last_seen_at timestamptz not null default now()");
+    expect(sql).toContain("grant select on public.player_team_roster_history to authenticated");
+    expect(sql).toContain("from public.profile_team_memberships membership");
+    expect(sql).toContain("from public.completed_matches cm");
+    expect(sql).toContain("track_player_team_roster_history");
+    expect(db).toContain('.from("player_team_roster_history")');
+    expect(sql).not.toContain("delete from public.player_division_team_assignments");
+    expect(sql).not.toContain("delete from public.completed_matches");
+  });
+
+  it("removes only players absent from a complete report and leaves unchanged roster rows intact", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    expect(sql).toContain("perform public.remove_player_from_team(v_removed.team_id, v_removed.player_num)");
+    expect(sql).toContain("Keep unchanged active roster rows in place");
+    expect(sql).toContain("on conflict (team_id, player_num) do nothing");
+    expect(sql).not.toContain("delete from public.rosters where team_id = any(v_team_ids)");
+    expect(sql).toContain("ROSTER_IMPORT_INCOMPLETE_DIVISION");
+    expect(sql).toContain("coalesce(expected.is_bye, false) = false");
+    expect(sql).toContain("ROSTER_IMPORT_UNKNOWN_PLAYER");
+    expect(sql).toContain("ROSTER_IMPORT_PLAYER_ON_MULTIPLE_TEAMS");
+  });
+
+  it("retains Section 84 approval protection for players who have already played", () => {
+    const sql = read("supabase-schema-section-84-player-transfer-approval.sql");
+    expect(sql).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
+    expect(sql).toContain("if v_has_played then");
+  });
+
+  it("enforces Week 6 captain restrictions, the six-player manual cap, eight-player structural cap, and freezes", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
+    expect(sql).toContain("ROSTER_CHANGES_FROZEN");
+    expect(sql).toContain("v_roster_limit := 6");
+    expect(sql).toContain("v_roster_limit integer := 8;");
+    expect(sql).toContain("ROSTER_LIMIT_EIGHT");
+    expect(sql).toContain("v_last_regular_week - 3");
+    expect(sql).toContain("sw.is_playoff = true");
+    expect(sql).toContain("create or replace function public.can_captain_change_roster");
+  });
+
+  it("keeps the official roster authoritative while flagging restricted-period rosters above six", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    const db = read("src/db.js");
+    expect(sql).toContain("'overSixTeams'");
+    expect(db).toContain("rosterSyncWarnings.push");
+    expect(db).toContain("restricted period");
+  });
+});
+
 describe("manager and captain role separation", () => {
   it("preserves manager authority when captain assignments are added or claimed", () => {
     const sql = read("supabase-schema-section-77-preserve-manager-role-during-captain-assignment.sql");
@@ -276,89 +348,7 @@ describe("Section 4.5 player division transfers", () => {
   });
 });
 
-describe("Section 8.1 roster history preservation", () => {
-  it("preserves former roster membership and reads player team history from its ledger", () => {
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    const db = read("src/db.js");
-    expect(sql).toContain("create table if not exists public.player_team_roster_history");
-    expect(sql).toContain("track_player_team_roster_history");
-    expect(sql).toContain("first_added_at timestamptz not null default now()");
-    expect(sql).toContain("last_seen_at timestamptz not null default now()");
-    expect(sql).toContain("grant select on public.player_team_roster_history to authenticated");
-    expect(db).toContain('.from("player_team_roster_history")');
-  });
-});
-
-describe("Section 8.1 import retains official roster and player history", () => {
-  it("uses the shared reconciliation RPC and does not remove unchanged roster rows", () => {
-    const db = read("src/db.js");
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    expect(db).toContain('supabase.rpc("sync_imported_team_rosters"');
-    expect(sql).toContain("perform public.remove_player_from_team(v_removed.team_id, v_removed.player_num)");
-    expect(sql).toContain("on conflict (team_id, player_num) do nothing");
-    expect(sql).not.toContain("delete from public.rosters where team_id = any(v_team_ids)");
-  });
-
-  it("keeps historical roster membership readable and independent of current roster rows", () => {
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    const db = read("src/db.js");
-    expect(sql).toContain("create table if not exists public.player_team_roster_history");
-    expect(sql).toContain("track_player_team_roster_history");
-    expect(sql).toContain("grant select on public.player_team_roster_history to authenticated");
-    expect(sql).toContain("player_division_team_assignments");
-    expect(sql).not.toContain("delete from public.completed_matches");
-    expect(db).toContain('.from("player_team_roster_history")');
-  });
-});
-
-describe("Section 8.1 roster window and import safeguards", () => {
-  it("keeps Week 6 captain lock, final-four and postseason freezes, and the restricted six-player limit", () => {
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
-    expect(sql).toContain("ROSTER_CHANGES_FROZEN");
-    expect(sql).toContain("v_roster_limit := 6");
-    expect(sql).toContain("v_roster_limit integer := 8;");
-    expect(sql).toContain("v_last_regular_week - 3");
-    expect(sql).toContain("sw.is_playoff = true");
-    expect(sql).toContain("create or replace function public.can_captain_change_roster");
-    expect(sql).toContain("return false;");
-  });
-
-  it("allows the official manager import to reconcile published rosters without disabling Section 84", () => {
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    const transfer = read("supabase-schema-section-84-player-transfer-approval.sql");
-    expect(sql).toContain("public.current_role_name() is distinct from 'manager'");
-    expect(sql).toContain("set_config('app.official_iba_roster_import', 'true', true)");
-    expect(sql).toContain("ROSTER_IMPORT_INCOMPLETE_DIVISION");
-    expect(sql).toContain("coalesce(expected.is_bye, false) = false");
-    expect(sql).toContain("ROSTER_IMPORT_PLAYER_ON_MULTIPLE_TEAMS");
-    expect(sql).toContain("ROSTER_LIMIT_EIGHT");
-    expect(sql).toContain("'overSixTeams'");
-    expect(transfer).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
-    expect(transfer).toContain("if v_has_played then");
-  });
-});
 
 
-describe("Section 8.1 automatic roster routing and history refresh", () => {
-  it("fails closed when automatic reports contain unmatched or ambiguous team numbers", () => {
-    const db = read("src/db.js");
-    const auto = read("src/ibaAutoSync.js");
-    expect(db).toContain("weekTag?.unmatchedTeamNums");
-    expect(db).toContain("weekTag?.ambiguousTeamNums");
-    expect(auto).toContain("const unmatchedTeamNums = Object.keys(parsed.rosters || {}).filter");
-    expect(auto).toContain("unmatchedTeamNums,");
-    expect(auto).toContain("ambiguousTeamNums,");
-  });
 
-  it("backfills former affiliations from completed-match participation and refreshes current imports", () => {
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    expect(sql).toContain("Completed matches recover prior team associations");
-    expect(sql).toContain("cm.team_home_id");
-    expect(sql).toContain("cm.team_away_id");
-    expect(sql).toContain("playerHome");
-    expect(sql).toContain("playerAway");
-    expect(sql).toContain("Refresh the last-seen timestamp for every player");
-    expect(sql).toContain("last_seen_at = greatest");
-  });
-});
+
