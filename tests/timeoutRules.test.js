@@ -22,7 +22,14 @@ describe("Section 2.7 timeout allowances", () => {
     expect(timeoutAllowance("advanced", 0)).toBe(1);
   });
 
-  it("counts coaching time-outs per player within the current set", () => {
+  it("counts multiple coaching periods recorded in one rack", () => {
+    const set = { racks: [{ timeoutHomeCount: 2, timeoutAwayCount: 1 }, { timeoutHomeCount: 1 }], playerHome: { rating: 50 }, playerAway: { rating: 51 } };
+    expect(timeoutCount(set, "home")).toBe(3);
+    expect(timeoutCount(set, "away")).toBe(1);
+    expect(timeoutRemaining(set, "home", "open")).toBe(0);
+  });
+
+  it("keeps legacy boolean timeout markers readable", () => {
     const set = {
       racks: [
         { timeoutHome: true, timeoutAway: false },
