@@ -5594,6 +5594,22 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                       {!parsed.eligibilityAsOfDate && " Ratings and rosters can still be imported, but eligibility will remain unchanged until a valid report date is available."}
                     </div>
                   )}
+                  {parsed.eligibilityRows?.length > 0 && (
+                    <div className="list" style={{marginTop:6,maxHeight:220,overflowY:"auto"}}>
+                      {parsed.eligibilityRows.map((row,index) => (
+                        <div className="list-row" key={`${row.num}-${index}`}>
+                          <div className="list-row__body">
+                            <span className="list-row__id">{row.num}</span>
+                            <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                              <span className="list-row__name">{row.name}</span>
+                              <span className="list-row__sub">Team {row.teamNum} · Rating {parsed.registry?.[row.num]?.rating ?? "NR"}</span>
+                            </div>
+                            <span className="player-rating-badge">{row.eligCode}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {parsed.needsRating?.length > 0 && (
                     <div className="import-warning-block">
                       <div className="import-warning-block__title">
