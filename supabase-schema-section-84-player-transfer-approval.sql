@@ -1,9 +1,8 @@
 -- Section 84: enforce one team per division/season and require approval for transfers
 --
--- A player's first team assignment in a division is retained for the season,
--- even if the roster row is later removed. Moving to another team in that
--- division requires a pending request from the receiving team's captain and
--- an explicit League Manager decision.
+-- A player's provisional roster assignment can change until they actually play.
+-- Once they participate in a rack, a same-division team change requires a
+-- receiving-team captain's request and an explicit League Manager decision.
 
 create table if not exists public.player_division_team_assignments (
   player_num text not null references public.players(num) on delete cascade,
@@ -16,6 +15,9 @@ create table if not exists public.player_division_team_assignments (
 
 alter table public.player_division_team_assignments enable row level security;
 revoke all on public.player_division_team_assignments from anon, authenticated;
+-- Explicit Data API grant is paired with RLS and no policies, so authenticated
+-- clients cannot read or mutate this internal assignment ledger directly.
+grant select on public.player_division_team_assignments to authenticated;
 
 -- Seed historical participation first, so a player who has already played
 -- remains assigned even if they were later removed from the current roster.
@@ -74,7 +76,7 @@ create table if not exists public.player_transfer_requests (
   check (from_team_id <> to_team_id)
 );
 
-create unique index if not exists player_transfer_one_pending_per_player
+create unique index if not exists player_transfer_one_pending_per_player_division
   on public.player_transfer_requests(player_num, division_id)
   where status = 'pending';
 create index if not exists player_transfer_requests_status_created
