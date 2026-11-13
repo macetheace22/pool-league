@@ -1224,8 +1224,8 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
                 <span>{set.playerAway.name.split(" ")[0]} TO: {timeoutUsedAway}/{timeoutAllowanceAway}</span>
               </div>
               <div className="timeout-row">
-                <TimeoutToggle label={`${set.playerHome.name.split(" ")[0]} TO`} count={timeoutHomeCount} onChange={setTimeoutHomeCount} color="home" />
-                <TimeoutToggle label={`${set.playerAway.name.split(" ")[0]} TO`} count={timeoutAwayCount} onChange={setTimeoutAwayCount} color="away" />
+                <TimeoutToggle label={`${set.playerHome.name.split(" ")[0]} TO`} count={timeoutHomeCount} allowance={timeoutAllowanceHome} onChange={setTimeoutHomeCount} color="home" />
+                <TimeoutToggle label={`${set.playerAway.name.split(" ")[0]} TO`} count={timeoutAwayCount} allowance={timeoutAllowanceAway} onChange={setTimeoutAwayCount} color="away" />
               </div>
             </div>
           )}
@@ -1250,7 +1250,7 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   );
 }
 
-function TimeoutToggle({ label, count, onChange, color }) {
+function TimeoutToggle({ label, count, allowance, onChange, color }) {
   return (
     <div className="timeout-toggle-group">
       <ToggleChip
@@ -1259,7 +1259,7 @@ function TimeoutToggle({ label, count, onChange, color }) {
         color={color}
         onToggle={() => onChange(count > 0 ? 0 : 1)}
       />
-      {count > 0 && (
+      {allowance > 1 && count > 0 && (
         <ToggleChip
           label="2nd TO"
           active={count > 1}
