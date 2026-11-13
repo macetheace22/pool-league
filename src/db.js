@@ -2226,7 +2226,7 @@ export async function setLiveMatch(pairingId, state) {
 // system.
 export function eligibleSide(match, profile) {
   if (!profile) return null;
-  const teamIds = [...new Set([...getActiveTeamIds(profile), ...getCaptainTeamIds(profile)])];
+  const teamIds = getActiveTeamIds(profile);
   if (teamIds.includes(match.teamHome?.id)) return "home";
   if (teamIds.includes(match.teamAway?.id)) return "away";
   if (profile.player_num) {
