@@ -132,5 +132,12 @@ Team 85382 North Stars
     expect(parsed.registry["23456"].rating).toBeNull();
     expect(parsed.needsRating).toContainEqual(expect.objectContaining({ num: "23456" }));
   });
+
+  it("routes flattened multi-team rows to the matching team columns", () => {
+    const flattened = "Division Playoffs - Roster and Handicap Report For Week: 17 Ratings current as of: 11/02/26 Rate Num Elig Name Team 76001 Team A Team 76002 Team B 40 12345 E Alex One 41 23456 E Sam Two 42 34567 T Pat Three 43 45678 A Kim Four";
+    const parsed = parseLeagueRoster(flattened);
+    expect(parsed.rosters["76001"]).toEqual(["12345", "34567"]);
+    expect(parsed.rosters["76002"]).toEqual(["23456", "45678"]);
+  });
 });
 
