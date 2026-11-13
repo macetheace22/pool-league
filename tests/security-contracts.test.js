@@ -13,7 +13,7 @@ describe("security migration contracts", () => {
     expect(sql).toContain("public.current_role_name() is distinct from 'manager'");
     expect(sql).toContain("where profile_id = auth.uid()");
     expect(sql).toContain("and ended_at is null");
-    expect(sql).toContain("set ended_at = now()");
+    expect(sql).toContain("public.remove_player_from_team");
     expect(sql).toContain("revoke execute on function public.remove_own_team_membership(uuid) from public, anon");
     expect(sql).toContain("grant execute on function public.remove_own_team_membership(uuid) to authenticated");
     expect(sql.toLowerCase()).not.toContain("delete from public.rosters");
@@ -152,7 +152,7 @@ describe("Section 4.5 player division transfers", () => {
     expect(sql).toContain("revoke all on function public.decide_player_transfer_request(uuid, boolean) from public, anon");
     expect(sql).toContain("grant execute on function public.decide_player_transfer_request(uuid, boolean) to authenticated");
     expect(sql).toContain("update public.player_division_team_assignments");
-    expect(sql).toContain("delete from public.rosters");
+    expect(sql).toContain("for v_removed in");
   });
 
   it("routes captain roster additions through transfer requests and exposes manager decisions", () => {
@@ -180,7 +180,7 @@ describe("Section 8.1 authoritative roster import", () => {
   it("keeps historical assignments and profile memberships while ending current memberships", () => {
     const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
     expect(sql).toContain("player_division_team_assignments");
-    expect(sql).toContain("update public.profile_team_memberships");
+    expect(sql).toContain("perform public.remove_player_from_team(v_removed.team_id, v_removed.player_num)");
     expect(sql).toContain("set ended_at = now()");
     expect(sql).toContain("delete from public.rosters");
     expect(sql).not.toContain("delete from public.player_division_team_assignments");
@@ -195,8 +195,10 @@ describe("Section 8.1 authoritative roster import", () => {
     const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
     expect(sql).toContain("ROSTER_CHANGES_FROZEN");
     expect(sql).toContain("v_roster_limit := 6");
+    expect(sql).toContain("if not v_import");
     expect(sql).toContain("v_roster_limit := 8");
     expect(sql).toContain("ROSTER_LIMIT_EIGHT");
+    expect(sql).toContain("v_roster_limit := 8");
     expect(sql).toContain("v_last_regular_week - 3");
     expect(sql).toContain("sw.is_playoff = true");
     expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
@@ -315,44 +317,6 @@ describe("Section 4.5 player division transfers", () => {
     expect(admin).toContain("PlayerTransferRequestsTab");
     expect(admin).toContain("receiving team");
     expect(admin).toContain("League Manager for approval");
-  });
-});
-
-describe("Section 8.1 authoritative roster import", () => {
-  it("uses the shared full-division reconciliation planner and skips unsafe reports", () => {
-    const db = read("src/db.js");
-    const helper = read("src/rosterReconciliation.js");
-    expect(db).toContain('import { buildRosterSyncPlan } from "./rosterReconciliation"');
-    expect(db).toContain('supabase.rpc("sync_imported_team_rosters"');
-    expect(db).toContain("unmatchedTeamNums: unmatchedTeamIds");
-    expect(helper).toContain("every team in this division");
-    expect(helper).toContain("ambiguous team placement");
-  });
-
-  it("keeps historical assignments and profile memberships while ending current memberships", () => {
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    expect(sql).toContain("player_division_team_assignments");
-    expect(sql).toContain("update public.profile_team_memberships");
-    expect(sql).toContain("set ended_at = now()");
-    expect(sql).toContain("delete from public.rosters");
-    expect(sql).not.toContain("delete from public.player_division_team_assignments");
-    expect(sql).not.toContain("delete from public.completed_matches");
-    expect(sql).toContain("set_config('app.official_iba_roster_import', 'true', true)");
-    expect(sql).toContain("ROSTER_IMPORT_INCOMPLETE_DIVISION");
-    expect(sql).toContain("ROSTER_IMPORT_PLAYER_ON_MULTIPLE_TEAMS");
-    expect(sql).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
-  });
-
-  it("enforces the Week 6 manager-only window, six-player cap, final-four freeze, and postseason freeze", () => {
-    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
-    expect(sql).toContain("ROSTER_CHANGES_FROZEN");
-    expect(sql).toContain("ROSTER_LIMIT_SIX");
-    expect(sql).toContain("v_last_regular_week - 3");
-    expect(sql).toContain("sw.is_playoff = true");
-    expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
-    expect(sql).toContain("create or replace function public.can_captain_change_roster");
-    expect(sql).toContain("return false;");
-
   });
 });
 
