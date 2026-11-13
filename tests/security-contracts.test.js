@@ -200,3 +200,38 @@ describe("Section 8.1 authoritative roster import", () => {
     expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
   });
 });
+
+describe("Section 8.1 authoritative roster import", () => {
+  it("uses the shared full-division reconciliation planner and skips unsafe reports", () => {
+    const db = read("src/db.js");
+    const helper = read("src/rosterReconciliation.js");
+    expect(db).toContain('import { buildRosterSyncPlan } from "./rosterReconciliation"');
+    expect(db).toContain('supabase.rpc("sync_imported_team_rosters"');
+    expect(db).toContain("unmatchedTeamNums: unmatchedTeamIds");
+    expect(helper).toContain("every team in this division");
+    expect(helper).toContain("ambiguous player");
+  });
+
+  it("keeps historical assignments and profile memberships while ending current memberships", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    expect(sql).toContain("player_division_team_assignments");
+    expect(sql).toContain("update public.profile_team_memberships");
+    expect(sql).toContain("set ended_at = now()");
+    expect(sql).toContain("delete from public.rosters");
+    expect(sql).not.toContain("delete from public.player_division_team_assignments");
+    expect(sql).not.toContain("delete from public.completed_matches");
+    expect(sql).toContain("set_config('app.official_iba_roster_import', 'true', true)");
+    expect(sql).toContain("ROSTER_IMPORT_INCOMPLETE_DIVISION");
+    expect(sql).toContain("ROSTER_IMPORT_PLAYER_ON_MULTIPLE_TEAMS");
+    expect(sql).toContain("PLAYER_TRANSFER_APPROVAL_REQUIRED");
+  });
+
+  it("enforces the Week 6 manager-only window, six-player cap, final-four freeze, and postseason freeze", () => {
+    const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
+    expect(sql).toContain("ROSTER_CHANGES_FROZEN");
+    expect(sql).toContain("ROSTER_LIMIT_SIX");
+    expect(sql).toContain("v_last_regular_week - 3");
+    expect(sql).toContain("sw.is_playoff = true");
+    expect(sql).toContain("ROSTER_CHANGES_MANAGER_ONLY");
+  });
+});
