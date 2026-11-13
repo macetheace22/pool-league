@@ -41,8 +41,8 @@ function matchOpponentName(m) {
 export function Home() {
   const { profile } = useAuth();
   // undefined = loading, [] = not linked to any current team. One entry per
-  // ACTIVE team the player is on right now -- see db.getMyTeamsOverview for
-  // why this can genuinely be more than one.
+  // Teams the user currently plays on or captains. Captain assignments are
+  // independent of player roster membership.
   const [teamOverviews, setTeamOverviews] = useState(undefined);
   const [snapshotStats, setSnapshotStats] = useState(undefined); // undefined = loading/n-a, null = no player_num linked
   const [recentPractice, setRecentPractice] = useState(undefined); // undefined = loading, null = none
