@@ -449,6 +449,10 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     result.roster.unmatchedTeams.push(...(imported?.unmatchedTeams || []));
     result.roster.ambiguousTeamIds.push(...(imported?.ambiguousTeamIds || []));
     result.roster.warnings.push(...(imported?.warnings || []));
+    result.roster.warnings.push(...(imported?.rosterSyncWarnings || []));
+    result.roster.warnings.push(...(imported?.skippedRosterDivisions || []).map(item =>
+      `Division ${item.divisionId}: ${item.reason} Current roster memberships were left unchanged.`
+    ));
     result.roster.eligibilityImported += imported?.eligibilityImport?.imported ?? 0;
     if (imported?.eligibilityImport?.skipped) result.warnings.push(`${report.key}: playoff eligibility rows were detected, but the report's as-of date could not be validated. Ratings and rosters were imported; eligibility was not updated.`);
     if (imported?.eligibilityImport?.unmatchedCount) result.warnings.push(`${report.key}: ${imported.eligibilityImport.unmatchedCount} eligibility player numbers did not match known players and will not gate player eligibility.`);
