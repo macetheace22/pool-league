@@ -292,6 +292,9 @@ export async function buildIbaPreview(reports) {
     const parsed = { registry: {}, rosters: {}, teams: {}, needsRating: [], ambiguousRoster: [], eligibilityRows: [], eligibilityWeek: null, eligibilityAsOfDate: null, eligibilityParseError: null };
     let playerCount = 0;
     let teamCount = 0;
+    const eligibilityDates = new Set();
+    const eligibilityWeeks = new Set();
+    let hasUndatedEligibilityRows = false;
     for (const section of sections) {
       const current = section.parsed;
       if (!current) continue;
@@ -305,9 +308,21 @@ export async function buildIbaPreview(reports) {
       parsed.needsRating.push(...(current.needsRating || []));
       parsed.ambiguousRoster.push(...(current.ambiguousRoster || []));
       parsed.eligibilityRows.push(...(current.eligibilityRows || []));
-      if (current.eligibilityWeek != null) parsed.eligibilityWeek = current.eligibilityWeek;
-      if (current.eligibilityAsOfDate) parsed.eligibilityAsOfDate = current.eligibilityAsOfDate;
-      if (current.eligibilityParseError) parsed.eligibilityParseError = current.eligibilityParseError;
+      if ((current.eligibilityRows || []).length) {
+        if (current.eligibilityAsOfDate) eligibilityDates.add(current.eligibilityAsOfDate);
+        else hasUndatedEligibilityRows = true;
+        if (current.eligibilityWeek != null) eligibilityWeeks.add(current.eligibilityWeek);
+        if (current.eligibilityParseError) parsed.eligibilityParseError = current.eligibilityParseError;
+      }
+    }
+    if (parsed.eligibilityRows.length) {
+      parsed.eligibilityAsOfDate = !hasUndatedEligibilityRows && eligibilityDates.size === 1
+        ? [...eligibilityDates][0]
+        : null;
+      parsed.eligibilityWeek = eligibilityWeeks.size === 1 ? [...eligibilityWeeks][0] : null;
+      if (!parsed.eligibilityAsOfDate) {
+        parsed.eligibilityParseError = "The playoff roster reports do not share one validated Ratings current as of date. Ratings and rosters remain importable; eligibility will not be changed.";
+      }
     }
     return { parsed, playerCount, teamCount };
   };
