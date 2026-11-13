@@ -4975,7 +4975,9 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
       finalRosters[chosen] = finalRosters[chosen] ?? [];
       if (!finalRosters[chosen].includes(a.num)) finalRosters[chosen].push(a.num);
     }
-    const finalParsed = { ...parsed, rosters: finalRosters };
+    // Clicking Import confirms the displayed guessed/selected placements;
+    // the database planner still rejects any ambiguity not resolved here.
+    const finalParsed = { ...parsed, rosters: finalRosters, ambiguousRoster: [] };
 
     const result = await onBulkImport(finalParsed, raw);
     setImportResult(result);
