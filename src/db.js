@@ -1101,9 +1101,33 @@ export async function canChangeRoster(teamId) {
 // Adds an EXISTING player (already in the registry, from a search result or
 // a past roster) to a team -- no new players row, just the roster link.
 export async function addExistingPlayerToRoster(teamId, playerNum) {
+  const { data: transfer, error: transferError } = await supabase.rpc("create_player_transfer_request", {
+    p_player_num: playerNum,
+    p_to_team_id: teamId,
+  });
+  if (transferError) return { ok: false, error: transferError.message };
+  if (transfer?.status === "pending") return { ok: true, status: "pending", requestId: transfer.request_id };
   const { data, error } = await supabase.rpc("add_player_to_team", {
     p_team_id: teamId,
     p_player_num: playerNum,
+  });
+  return !error && data === true
+    ? { ok: true, status: "added" }
+    : { ok: false, error: error?.message ?? "Could not add player." };
+}
+
+export async function listPlayerTransferRequests() {
+  const { data, error } = await supabase.from("player_transfer_requests")
+    .select("id, player_num, division_id, from_team_id, to_team_id, requested_by, status, created_at, reviewed_at, reviewed_by, players:player_num(num, name), from_team:from_team_id(id, name, team_num), to_team:to_team_id(id, name, team_num), divisions:division_id(id, num, name, format, day)")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function decidePlayerTransferRequest(requestId, approve) {
+  const { data, error } = await supabase.rpc("decide_player_transfer_request", {
+    p_request_id: requestId,
+    p_approve: !!approve,
   });
   return !error && data === true;
 }
