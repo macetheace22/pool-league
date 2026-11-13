@@ -54,6 +54,14 @@ export function buildRosterSyncPlan({
       const teamNum = String(team.team_num ?? "");
       return !parsedTeamNums.has(teamNum) || matchedByNum.get(teamNum)?.id !== team.id;
     });
+
+    const emptyNonByeTeam = teams.find(team => {
+      const teamNum = String(team.team_num ?? "");
+      return !team.is_bye && (parsedRosters[teamNum] ?? []).length === 0;
+    });
+    if (!reason && emptyNonByeTeam) {
+      reason = `Team number ${emptyNonByeTeam.team_num} has no parsed players; the report may be incomplete. No roster was cleared.`;
+    }
     if (!reason && missingTeam) {
       reason = `The report did not unambiguously include every team in this division (missing or unmatched team ${missingTeam.team_num}).`;
     }
