@@ -461,9 +461,9 @@ export function LeaguesDashboard() {
                   <div className="dash-empty">Manager view — see all leaguewide makeups in Match Lookup / History.
                     <button className="link-btn" onClick={()=>navigate("/match-lookup")}>Open →</button>
                   </div>
-                ) : myMakeups.length === 0 ? (
-                  <div className="dash-empty">No makeups pending for your team.</div>
-                ) : myMakeups.map((m, i) => <MatchRow key={i} item={m} overview={overview} clickable={false} />)}
+                ) : captainMakeups.length === 0 ? (
+                  <div className="dash-empty">No makeups pending for your teams.</div>
+                ) : captainMakeups.map(({ match, overview: matchOverview }) => <MatchRow key={match.id} item={match} overview={matchOverview} clickable={false} />)}
               </DashCard>
             )}
           </>
