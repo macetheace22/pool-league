@@ -113,6 +113,13 @@ Team 85382 North Stars
     expect(parsed.eligibilityParseError).toMatch(/date could not be read/i);
   });
 
+  it("fails closed when repeated report sections disagree on the as-of date", () => {
+    const conflicting = report.replace("For Week: 17", "For Week: 17\nRatings current as of: 11/03/26");
+    const parsed = parsePlayoffEligibilityRoster(conflicting);
+    expect(parsed.eligibilityAsOfDate).toBeNull();
+    expect(parsed.eligibilityParseError).toMatch(/date could not be read/i);
+  });
+
   it("does not classify a standard weekly roster as an eligibility report", () => {
     expect(parsePlayoffEligibilityRoster("Rate Num Play Win Name")).toBeNull();
   });
