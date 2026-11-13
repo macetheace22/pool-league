@@ -3352,11 +3352,13 @@ function PlayoffEligibilityStatus({ rows }) {
   );
   const latest = sorted.reduce((value, row) => !value || String(row.week_key ?? "") > value ? String(row.week_key ?? "") : value, "");
   if (!sorted.length) return <div className="empty-state">Eligibility data not yet available. Import the official playoff roster from Update Weekly League Data → Import Ratings. Until then, eligibility is unverified.</div>;
+  const unmatched = sorted.filter(row => !row.player_num);
   return (
     <div>
       <div className="card" style={{padding:12,marginBottom:12}}>
-        <div className="card__title">Official IBA eligibility · {sorted.length} players</div>
+        <div className="card__title">Official IBA eligibility · {sorted.length} report rows</div>
         <div style={{fontSize:12,color:"#BDBDBD"}}>Latest snapshot: {latest || "Date unavailable"}. This is an imported official status, not an app-calculated eligibility decision.</div>
+        {unmatched.length > 0 && <div style={{fontSize:11,color:"#F59E0B",marginTop:6}}>{unmatched.length} report row(s) could not be linked to a known player number and remain Unverified. They do not gate player selection.</div>}
       </div>
       <div className="list">
         {sorted.map((row,index) => (
@@ -3367,7 +3369,7 @@ function PlayoffEligibilityStatus({ rows }) {
                 <span className="list-row__name">{row.player_name}</span>
                 <span className="list-row__sub">Team {row.team_num} · {row.label ?? row.week_key}</span>
               </div>
-              <span className="player-rating-badge">{row.elig_code ?? "Unverified"}</span>
+              <span className="player-rating-badge">{row.player_num ? (row.elig_code ?? "Unverified") : "Unverified"}</span>
             </div>
           </div>
         ))}
