@@ -77,6 +77,21 @@ begin
     return new;
   end if;
 
+  -- Also protect legacy duplicate assignments that predate the durable
+  -- assignment ledger; never allow a new roster row to add a third team.
+  if exists (
+    select 1
+    from public.rosters r
+    join public.teams t on t.id = r.team_id
+    where r.player_num = new.player_num
+      and t.division_id = v_division_id
+      and r.team_id <> new.team_id
+  ) then
+    raise exception 'PLAYER_TRANSFER_APPROVAL_REQUIRED'
+      using errcode = '23514',
+        detail = 'This player already appears on another team in this division. A League Manager-approved transfer is required.';
+  end if;
+
   insert into public.player_division_team_assignments (player_num, division_id, team_id)
   values (new.player_num, v_division_id, new.team_id)
   on conflict (player_num, division_id) do nothing;
