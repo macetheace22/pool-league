@@ -20,8 +20,9 @@ const GAME_TYPES = [
   { key: "ultimate", label: "Ultimate Pool", desc: "Practice Ultimate Pool without affecting league scoring." },
 ];
 const SCORING_METHODS = [
-  { key: "race_to_points", label: "Race to Points", desc: "Track points earned in each game toward the player's target." },
-  { key: "race_to_games", label: "Race to Games", desc: "Track games won toward the selected number of games needed to win." },
+  { key: "race_to_points", label: "Race to Points", desc: "Track points earned in each game toward the player's rating target." },
+  { key: "race_to_games", label: "Race to Games", desc: "Track games won toward a selected number of game wins." },
+  { key: "best_of_games", label: "Best of X Games", desc: "Choose an odd number of games; first to win more than half wins the session." },
 ];
 
 function scoringMethodLabel(key) { return SCORING_METHODS.find(f => f.key === key)?.label ?? key; }
@@ -39,11 +40,11 @@ function practiceGameRow(profile, session) {
     opponent_name: session.practiceType === "skills_drills" ? null : session.opponentName,
     game_type: session.gameType ?? null,
     format: session.practiceType === "opponent" ? session.format : null,
-    target_config: session.format === "match"
+    target_config: session.scoringMethod === "race_to_points"
       ? { myTarget: session.myRating, oppTarget: session.opponentRating }
       : { x: session.x },
-    my_rating: session.format === "match" ? session.myRating : null,
-    opponent_rating: session.format === "match" ? session.opponentRating : null,
+    my_rating: session.scoringMethod === "race_to_points" ? session.myRating : null,
+    opponent_rating: session.scoringMethod === "race_to_points" ? session.opponentRating : null,
     my_score: session.myScore ?? 0,
     opponent_score: session.opponentScore ?? 0,
     winner: session.winner ?? null,
@@ -431,7 +432,9 @@ function ScoringMethodStep({ session, setSession, onNext, onBack }) {
             {SCORING_METHODS.map(method => (
               <button key={method.key} className={`seg-btn ${session.scoringMethod===method.key?"seg-btn--active":""}`} style={{padding:14,textAlign:"left"}}
                 onClick={() => {
-                  const format = method.key === "race_to_points" ? "match" : "race";
+                  const format = method.key === "race_to_points" ? "match"
+                    : method.key === "best_of_games" ? "bestof"
+                    : "race";
                   setSession(s => ({ ...s, scoringMethod: method.key, format }));
                   onNext();
                 }}>
@@ -463,12 +466,14 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
 
   const isRaceToPoints = session.scoringMethod === "race_to_points";
   const isRaceToGames = session.scoringMethod === "race_to_games";
+  const isBestOfGames = session.scoringMethod === "best_of_games";
 
   const next = () => {
     setErr("");
-    if (isRaceToGames) {
+    if (isRaceToGames || isBestOfGames) {
       const n = Number(x);
       if (!n || n < 1) { setErr("Enter a valid number of games."); return; }
+      if (isBestOfGames && n % 2 === 0) { setErr("Best of needs an odd number (e.g. 3, 5, 7)."); return; }
       setSession(s => ({ ...s, x: n }));
     } else if (isRaceToPoints) {
       const my = Number(myRating), opp = Number(oppRating);
@@ -486,11 +491,13 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
       <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} vs ${session.opponentName}`} onBack={onBack} />
       <div className="tab-content">
         <div className="card">
-          {isRaceToGames ? (
+          {(isRaceToGames || isBestOfGames) ? (
             <>
-              <div className="card__title">Race to How Many Games?</div>
+              <div className="card__title">{isBestOfGames ? "Best of How Many Games?" : "Race to How Many Games?"}</div>
               <div style={{fontSize:11.5,color:"#9A9A9A",marginBottom:8}}>
-                Set the number of games needed to win the practice set.
+                {isBestOfGames
+                  ? "Pick an odd number — first to win more than half takes it."
+                  : "Set the number of games needed to win the practice set."}
               </div>
               <input className="input" type="number" value={x} onChange={e=>setX(e.target.value)} />
             </>
@@ -624,8 +631,9 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
     ? { num: session.opponentPlayerNum, name: session.opponentName }
     : null;
 
-  const oppTarget = session.scoringMethod === "race_to_points" ? session.opponentRating : session.x;
-  const myTargetDisplay = session.scoringMethod === "race_to_points" ? session.myRating : session.x;
+  const gameWinTarget = session.scoringMethod === "best_of_games" ? Math.floor(session.x / 2) + 1 : session.x;
+  const oppTarget = session.scoringMethod === "race_to_points" ? session.opponentRating : gameWinTarget;
+  const myTargetDisplay = session.scoringMethod === "race_to_points" ? session.myRating : gameWinTarget;
 
   const winner = myScore >= myTargetDisplay ? "me" : oppScore >= oppTarget ? "opponent" : null;
 
