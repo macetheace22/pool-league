@@ -331,6 +331,17 @@ This order closes scoring, forfeits, eligibility, and scorekeeping before moving
 | Finance / 9.1–9.9 | Membership dues, renewal exception, sanction fees, team deposit, weekly fees, unpaid roster members, returned checks, prize holds | No app scope assumed; user decision needed. |
 | Paper scorekeeping / 6.11 | Table size, League Office message, both captain signatures, independent team scoresheet | Retained on paper by user decision; digital confirmation is not a signature. |
 
+
+
+### Section 8.1 — authoritative roster reconciliation (implementation in progress)
+- User decision: the official IBA roster import is authoritative for **current roster membership**. A complete, validated report replaces current memberships for every team in each fully covered division; a player absent from that team's report is removed from the current roster. Historical completed matches, scores, statistics, rating history, and the Section 84 division/team assignment ledger are retained.
+- Automatic weekly imports and manual roster imports use the same reconciliation logic. A division is not reconciled unless every configured team in that division is present and unambiguously matched. Unmatched teams, ambiguous team numbers/player placement, duplicate player placement, and incomplete division reports fail closed for that division. A malformed or partial report cannot clear current rosters.
+- Current roster reconciliation updates/ends linked profile-team memberships; it does not delete player/profile records, historical matches, completed scores, or Section 84 assignment history. Captain authority is not inferred from player roster membership.
+- Existing Section 84 rule remains in force: a player who has participated in a rack cannot be moved to another team in the same division by import; the existing receiving-captain request and League Manager decision must occur first. Provisional unplayed assignments can be corrected by the official import.
+- Manual Section 8.1 rules: captains may make changes through Week 5; from Week 6 until the final four weeks, changes are manager-only and the resulting roster may not exceed six players. The survival-purpose test remains the League Manager's judgment; the app does not infer it. No manual changes in the final four weeks or postseason. The official import may reconcile the published IBA roster in those periods because it is the selected source of truth; the database import path is manager-only and does not disable Section 84 transfer protection.
+- No captain change-request workflow, no separate roster reconciliation screen, and no live scoring changes.
+- Acceptance still required: tests/CI, PR merge, Section 85 SQL application, and live import verification when an actual complete IBA roster report is available.
+
 ## 7. Specific verification cautions
 
 - **Section 6.6 source table:** the available extracted text of the supplied rulebook has a blank after the Section 6.6 heading, likely because the values are in a table/image. The current code/tests contain values listed above. Do not mark 6.6 fully verified until the original page/table is checked.
