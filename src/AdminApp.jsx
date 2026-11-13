@@ -162,63 +162,6 @@ function parsePlayers(raw) {
 // parseSingleColumnTeams was added alongside parseMultiColumnRateFirst,
 // not guessed at ahead of time.
 //
-// Returns { weekLabel, rows: [{ teamNum, teamName, num, name, nickname, eligCode }] }
-function parsePlayoffEligibility(raw) {
-  const weekMatch = raw.match(/For\s+Week:\s*(\d+)/i);
-  const weekLabel = weekMatch ? `Playoffs Week ${weekMatch[1]}` : "Playoffs";
-
-  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-  const rows = [];
-  let currentTeams = []; // [{num, name}, ...] declared on the most recent "Team NNNNN Name" header row, left to right
-
-  const CHROME_RE = [
-    /^Division Playoffs/i, /^For\s+Week:/i, /^Ratings current as of/i,
-    /^Players noted/i, /^T=Less than/i, /^-{5,}/,
-    /^Rate\s+Num\s+Elig\s+Name$/i,
-    /^(Wed|Thu|Mon|Tue|Fri|Sat|Sun)\s/i, // e.g. "Wed North Masters" league/season label line
-    /Division #/i,
-    /^(Summer|Winter|Spring)\s/i,
-    /Sports Bar$/i, // venue line -- not needed for eligibility, safe to drop
-  ];
-
-  for (const line of lines) {
-    if (CHROME_RE.some(re => re.test(line))) continue;
-
-    const teamHeaders = [...line.matchAll(/\bTeam\s+(\d{5})\s+(.*?)(?=\s+Team\s+\d{5}\b|$)/gi)];
-    if (teamHeaders.length > 0) {
-      currentTeams = teamHeaders.map(m => ({ num: m[1], name: m[2].trim() }));
-      continue;
-    }
-
-    if (currentTeams.length === 0) continue;
-
-    // One "<rate> <num> <E|T|A|S> <name...>" entry per active team, left to
-    // right on this line -- same anchor-based splitting idea as the regular
-    // report's multi-column parser, just with a single eligibility LETTER
-    // where that one has two Play/Win numbers.
-    const anchorRe = /(?:^|\s)(\d{1,3})\s+(\d{5})\s+([ETAS])\s+/g;
-    const anchors = [];
-    let m;
-    while ((m = anchorRe.exec(line)) !== null) {
-      anchors.push({ pos: m.index, num: m[2], elig: m[3], nameStart: m.index + m[0].length });
-    }
-    if (anchors.length === 0) continue;
-
-    anchors.forEach((a, i) => {
-      const nameEnd = i + 1 < anchors.length ? anchors[i + 1].pos : line.length;
-      const parsed = cleanName(line.slice(a.nameStart, nameEnd));
-      if (!parsed) return;
-      const team = currentTeams[i] ?? currentTeams[currentTeams.length - 1];
-      rows.push({ teamNum: team.num, teamName: team.name, num: a.num, name: parsed.name, nickname: parsed.nickname, eligCode: a.elig });
-    });
-  }
-
-  return { weekLabel, rows };
-}
-
-
-
-
 function findCurrentWeek(schedule) {
   const today = new Date(); today.setHours(0,0,0,0);
   const real = db.sortScheduleWeeks((schedule ?? []).filter(w => w.week && (w.pairings?.length ?? 0) > 0));
@@ -297,6 +240,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [viewSchedule, setViewSchedule] = useState([]);
   const [viewRosters, setViewRosters]   = useState({}); // { teamId: [{num,name,nickname,rating}] }
   const [playoffEligibility, setPlayoffEligibility] = useState({}); // { player_num: {code, weekKey, label} }
+  const [playoffEligibilityRows, setPlayoffEligibilityRows] = useState([]);
   const [divisionLoading, setDivisionLoading] = useState(false);
   const [captainsByTeam, setCaptainsByTeam] = useState({}); // { teamId: {username, phone} }
   const [locations, setLocations] = useState([]);
@@ -325,6 +269,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
       setViewSchedule([]);
       setViewRosters({});
       setPlayoffEligibility({});
+      setPlayoffEligibilityRows([]);
       setDivisionLoading(false);
       return;
     }
@@ -340,6 +285,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
       setViewSchedule(schedule);
       setViewRosters(rostersByTeam);
       setPlayoffEligibility(db.eligibilityByPlayerNum(eligRows));
+      setPlayoffEligibilityRows(eligRows ?? []);
     } finally {
       setDivisionLoading(false);
     }
@@ -610,7 +556,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Dedicated season-maintenance pages ──
   if (["playoff-eligibility", "playoffs", "locations"].includes(page)) {
     const titles = {
-      "playoff-eligibility": "Playoff Eligibility",
+      "playoff-eligibility": "Playoff Eligibility Status",
       playoffs: "Playoffs",
       locations: "Locations",
     };
@@ -624,13 +570,13 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           )}
           {page === "playoff-eligibility" && viewingDiv && isViewingActive && (
-            <SeedPlayoffEligibilityImport divisionId={viewingDiv.id} existingCount={Object.keys(playoffEligibility).length} onImported={refreshCurrentDivision} />
+            <PlayoffEligibilityStatus rows={playoffEligibilityRows} />
           )}
           {page === "playoff-eligibility" && !viewingDiv && (
-            <div className="empty-state">Select a season and division to import playoff eligibility.</div>
+            <div className="empty-state">Select a season and division to view imported playoff eligibility.</div>
           )}
           {page === "playoff-eligibility" && viewingDiv && !isViewingActive && (
-            <div className="empty-state">Activate this season to import playoff eligibility.</div>
+            <div className="empty-state">This season is read-only. Select the active season to view current eligibility status.</div>
           )}
           {page === "playoffs" && viewingDiv && (
             <PlayoffsTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} />
@@ -3397,73 +3343,38 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
   );
 }
 
-// Playoff eligibility only gets pasted during playoff weeks -- see
-// parsePlayoffEligibility() for the report parser. The "as of" date is a
-// manual date picker (like Standings/MVP) rather than auto-extracted from
-// the report's own "Ratings current as of: MM/DD/YY" line, since that's a
-// 2-digit year in a different shape than the 4-digit dates used everywhere
-// else in the app -- safer to let the manager confirm it than to guess.
-function SeedPlayoffEligibilityImport({ divisionId, onImported, existingCount }) {
-  const [open, setOpen] = useState(false);
-  const [raw, setRaw] = useState("");
-  const [parsed, setParsed] = useState(null); // { weekLabel, rows }
-  const [parseErr, setParseErr] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [unmatchedCount, setUnmatchedCount] = useState(0);
-  const [asOfDate, setAsOfDate] = useState(todayIsoKey());
-
-  const handleParse = () => {
-    const result = parsePlayoffEligibility(raw);
-    if (!result.rows.length) {
-      setParseErr("No valid rows found. Make sure this is the \"Division Playoffs - Roster and Handicap Report\" (has an Elig column), not the regular weekly ratings report.");
-      return;
-    }
-    setParseErr(""); setParsed(result);
-  };
-  const handleImport = async () => {
-    const weekTag = {
-      weekKey: asOfDate,
-      label: `${parsed.weekLabel} · As of ${new Date(asOfDate + "T00:00:00").toLocaleDateString()}`,
-    };
-    const result = await db.importPlayoffEligibilityForWeek(divisionId, parsed.rows, weekTag);
-    setOpen(false); setRaw(""); setParsed(null); setSaved(true); setUnmatchedCount(result?.unmatchedCount ?? 0);
-    setTimeout(() => setSaved(false), 1800);
-    onImported();
-  };
-
-  if (!open) {
-    return (
-      <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-start"}}>
-        <button className="btn-sm" onClick={()=>setOpen(true)}>
-          <Plus size={12}/> {existingCount>0 ? `Edit imported eligibility (${existingCount})` : "Import Playoff Eligibility"}
-        </button>
-        {unmatchedCount > 0 && (
-          <div style={{fontSize:10.5,color:"#F59E0B"}}>{unmatchedCount} player number{unmatchedCount!==1?"s":""} from the last import didn't match a known player and won't gate anyone's draft eligibility.</div>
-        )}
-      </div>
-    );
-  }
+// Read-only view of the latest official IBA eligibility import. Corrections are made
+// by importing the official playoff roster through Weekly League Data → Ratings.
+function PlayoffEligibilityStatus({ rows }) {
+  const sorted = [...(rows ?? [])].sort((a, b) =>
+    String(a.team_num ?? "").localeCompare(String(b.team_num ?? "")) ||
+    String(a.player_name ?? "").localeCompare(String(b.player_name ?? ""))
+  );
+  const latest = sorted.reduce((value, row) => !value || String(row.week_key ?? "") > value ? String(row.week_key ?? "") : value, "");
+  if (!sorted.length) return <div className="empty-state">Eligibility data not yet available. Import the official playoff roster from Update Weekly League Data → Import Ratings. Until then, eligibility is unverified.</div>;
   return (
-    <PasteImporter label="Import Playoff Eligibility" hint="Paste the &quot;Division Playoffs - Roster and Handicap Report&quot; — only issued during playoff weeks"
-      raw={raw} setRaw={setRaw} onParse={handleParse} parseErr={parseErr}
-      onClear={()=>{setRaw("");setParsed(null);setParseErr("");}}
-      preHint={
-        <div className="field" style={{marginBottom:8}}>
-          <Label>Eligibility as of</Label>
-          <input className="input" type="date" value={asOfDate} onChange={e=>setAsOfDate(e.target.value)} />
-          <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Matches the report's own "Ratings current as of" date. Each import is kept as a dated snapshot, same as ratings/standings/MVP.</div>
-        </div>
-      }
-      preview={parsed && (
-        <>
-          <div style={{fontSize:11,fontWeight:700,color:"#5FCF9E",marginBottom:6}}>{parsed.weekLabel} · {parsed.rows.length} players</div>
-          <PreviewList rows={parsed.rows.map(r=>({id:r.eligCode, name:`${r.name}${r.nickname?` "${r.nickname}"`:""}`, sub:`Team ${r.teamNum} · ${r.teamName}`}))}/>
-        </>
-      )}
-      onImport={parsed?.rows?.length ? handleImport : null} importLabel={parsed ? `Import ${parsed.rows.length} players` : ""} saved={saved}/>
+    <div>
+      <div className="card" style={{padding:12,marginBottom:12}}>
+        <div className="card__title">Official IBA eligibility · {sorted.length} players</div>
+        <div style={{fontSize:12,color:"#BDBDBD"}}>Latest snapshot: {latest || "Date unavailable"}. This is an imported official status, not an app-calculated eligibility decision.</div>
+      </div>
+      <div className="list">
+        {sorted.map((row,index) => (
+          <div className="list-row" key={row.id ?? `${row.player_num ?? row.player_name}-${index}`}>
+            <div className="list-row__body">
+              <span className="list-row__id">{row.player_num ?? "—"}</span>
+              <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                <span className="list-row__name">{row.player_name}</span>
+                <span className="list-row__sub">Team {row.team_num} · {row.label ?? row.week_key}</span>
+              </div>
+              <span className="player-rating-badge">{row.elig_code ?? "Unverified"}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
-
 
 // ─── Weekly import panel (standings / mvp) for Update Weekly League Data ──────
 function WeeklyImportPanel({ divisionId, teams, mode }) {
