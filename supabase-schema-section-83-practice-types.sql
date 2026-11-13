@@ -18,7 +18,7 @@ alter table public.practice_games
   add constraint practice_games_practice_type_check
     check (practice_type in ('skills_drills', 'opponent')),
   add constraint practice_games_scoring_method_check
-    check (scoring_method is null or scoring_method in ('race_to_points', 'race_to_games')),
+    check (scoring_method is null or scoring_method in ('race_to_points', 'race_to_games', 'best_of_games')),
   add constraint practice_games_opponent_check
     check (
       practice_type = 'skills_drills'
@@ -35,6 +35,7 @@ update public.practice_games
 set scoring_method = case
   when format = 'match' then 'race_to_points'
   when format = 'race' then 'race_to_games'
+  when format = 'bestof' then 'best_of_games'
   else null
 end
 where scoring_method is null
@@ -44,7 +45,7 @@ comment on column public.practice_games.practice_type is
   'Practice mode: skills_drills for solo skills/drills, opponent for play against an opponent.';
 
 comment on column public.practice_games.scoring_method is
-  'Opponent-practice scoring method: race_to_points or race_to_games. Null for skills/drills.';
+  'Opponent-practice scoring method: race_to_points, race_to_games, or best_of_games. Null for skills/drills.';
 
 comment on column public.practice_games.completed_at is
   'Timestamp when the practice session was completed and saved.';
