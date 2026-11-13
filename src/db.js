@@ -2205,7 +2205,13 @@ export async function importPlayoffEligibilityForWeek(divisionId, rows, weekTag)
 
 export async function listPlayoffEligibility(divisionId) {
   if (!divisionId) return [];
-  const { data } = await supabase.from("player_playoff_eligibility_current").select("*").eq("division_id", divisionId);
+  // Read the source rows rather than the current-player view: the view omits
+  // unmatched (player_num = null) report entries, which must remain visible
+  // as Unverified on the manager status page. Consumers use the latest
+  // division-wide dated snapshot before trusting any code.
+  const { data, error } = await supabase.from("player_playoff_eligibility")
+    .select("*").eq("division_id", divisionId).order("week_key", { ascending: false });
+  if (error) throw error;
   return data ?? [];
 }
 
