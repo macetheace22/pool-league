@@ -570,7 +570,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           )}
           {page === "playoff-eligibility" && viewingDiv && (
-            <PlayoffEligibilityStatus rows={playoffEligibilityRows} />
+            <PlayoffEligibilityStatus rows={playoffEligibilityRows} teams={viewTeams} rosters={viewRosters} />
           )}
           {page === "playoff-eligibility" && !viewingDiv && (
             <div className="empty-state">Select a season and division to view imported playoff eligibility.</div>
@@ -3342,39 +3342,100 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
 
 // Read-only view of the latest official IBA eligibility import. Corrections are made
 // by importing the official playoff roster through Weekly League Data → Ratings.
-function PlayoffEligibilityStatus({ rows }) {
-  const sorted = [...(rows ?? [])].sort((a, b) =>
-    String(a.team_num ?? "").localeCompare(String(b.team_num ?? "")) ||
-    String(a.player_name ?? "").localeCompare(String(b.player_name ?? ""))
-  );
-  const latest = sorted.reduce((value, row) => !value || String(row.week_key ?? "") > value ? String(row.week_key ?? "") : value, "");
-  if (!sorted.length) return <div className="empty-state">Eligibility data not yet available. Import the official playoff roster from Update Weekly League Data → Import Ratings. Until then, eligibility is unverified.</div>;
-  const unmatched = sorted.filter(row => !row.player_num);
+function PlayoffEligibilityStatus({ rows, teams = [], rosters = {} }) {
+  const [search, setSearch] = useState("");
+  const snapshot = db.latestPlayoffEligibilityRows(rows);
+  const latest = snapshot[0]?.week_key ?? null;
+  const byPlayerNum = Object.fromEntries(snapshot.filter(row => row.player_num).map(row => [row.player_num, row]));
+  const rosterPlayers = teams.flatMap(team => (rosters[team.id] ?? []).map(player => {
+    const official = byPlayerNum[player.num] ?? null;
+    const code = official?.elig_code ?? null;
+    const status = code === "E" ? "Eligible" : ["T", "A", "S"].includes(code) ? "Ineligible" : "Unverified";
+    return { ...player, team, official, code, status };
+  }));
+  const normalizedSearch = search.trim().toLowerCase();
+  const visiblePlayers = rosterPlayers.filter(player => !normalizedSearch || [
+    player.num, player.name, player.nickname, player.team.teamNum, player.team.name,
+    player.code, player.status,
+  ].some(value => String(value ?? "").toLowerCase().includes(normalizedSearch)));
+  const grouped = teams.map(team => ({
+    team,
+    players: visiblePlayers.filter(player => player.team.id === team.id),
+  })).filter(group => group.players.length);
+  const eligibleCount = rosterPlayers.filter(player => player.status === "Eligible").length;
+  const ineligibleCount = rosterPlayers.filter(player => player.status === "Ineligible").length;
+  const unverifiedCount = rosterPlayers.filter(player => player.status === "Unverified").length;
+  const unmatched = snapshot.filter(row => !row.player_num);
+  const hasSnapshot = !!latest;
+
   return (
     <div>
       <div className="card" style={{padding:12,marginBottom:12}}>
-        <div className="card__title">Official IBA eligibility · {sorted.length} report rows</div>
-        <div style={{fontSize:12,color:"#BDBDBD"}}>Latest snapshot: {latest || "Date unavailable"}. This is an imported official status, not an app-calculated eligibility decision.</div>
-        {unmatched.length > 0 && <div style={{fontSize:11,color:"#F59E0B",marginTop:6}}>{unmatched.length} report row(s) could not be linked to a known player number and remain Unverified. They do not gate player selection.</div>}
+        <div className="card__title">Official IBA playoff eligibility</div>
+        <div style={{fontSize:12,color:"#BDBDBD",marginTop:4}}>
+          {hasSnapshot ? `Latest report snapshot: ${latest}. ${snapshot.length} official report rows.` : "Eligibility data not yet available. Import the official playoff roster through Update Weekly League Data → Import Ratings."}
+        </div>
+        <div style={{display:"flex",gap:14,flexWrap:"wrap",fontSize:12,marginTop:9}}>
+          <span>Eligible: <strong>{eligibleCount}</strong></span>
+          <span>Ineligible: <strong>{ineligibleCount}</strong></span>
+          <span>Unverified: <strong>{unverifiedCount}</strong></span>
+        </div>
+        <div style={{fontSize:11,color:"#AAA",marginTop:7}}>
+          These are official IBA codes, not an app-calculated eligibility decision. Only players present in the latest dated report are verified; players missing from it or from the player registry remain Unverified.
+        </div>
+        {unmatched.length > 0 && <div style={{fontSize:11,color:"#F0C36D",marginTop:7}}>{unmatched.length} report row(s) could not be linked to a known player number. They remain visible below and do not gate player selection.</div>}
       </div>
-      <div className="list">
-        {sorted.map((row,index) => (
-          <div className="list-row" key={row.id ?? `${row.player_num ?? row.player_name}-${index}`}>
-            <div className="list-row__body">
-              <span className="list-row__id">{row.player_num ?? "—"}</span>
-              <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
-                <span className="list-row__name">{row.player_name}</span>
-                <span className="list-row__sub">Team {row.team_num} · {row.label ?? row.week_key}</span>
+      <input
+        type="search"
+        value={search}
+        onChange={event => setSearch(event.target.value)}
+        placeholder="Search player, number, team, or eligibility code"
+        aria-label="Search playoff eligibility"
+        style={{width:"100%",boxSizing:"border-box",marginBottom:12}}
+      />
+      {grouped.length === 0 && <div className="empty-state">{normalizedSearch ? "No roster players match this search." : "No roster players are available for this division yet."}</div>}
+      {grouped.map(({ team, players }) => (
+        <section key={team.id} style={{marginBottom:16}}>
+          <div className="card__title" style={{marginBottom:6}}>Team {team.teamNum} · {team.name}</div>
+          <div className="list">
+            {players.map(player => (
+              <div className="list-row" key={player.num}>
+                <div className="list-row__body">
+                  <span className="list-row__id">{player.num}</span>
+                  <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                    <span className="list-row__name">{player.name}{player.nickname ? ` "${player.nickname}"` : ""}</span>
+                    <span className="list-row__sub">Rating {player.rating ?? "NR"} · {player.official?.label ?? (hasSnapshot ? "Not listed in latest report" : "No official report imported")}</span>
+                  </div>
+                  <span className="player-rating-badge">{player.code ? `${player.code} · ${player.status}` : "Unverified"}</span>
+                </div>
+                {player.code && <div style={{fontSize:10.5,color:"#AAA",padding:"0 10px 7px 52px"}}>{db.ELIGIBILITY_REASONS[player.code] ?? "Official IBA eligibility code"}</div>}
               </div>
-              <span className="player-rating-badge">{row.player_num ? (row.elig_code ?? "Unverified") : "Unverified"}</span>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </section>
+      ))}
+      {unmatched.length > 0 && (
+        <section style={{marginTop:16}}>
+          <div className="card__title" style={{marginBottom:6}}>Unmatched report entries</div>
+          <div className="list">
+            {unmatched.filter(row => !normalizedSearch || [row.player_name,row.team_num,row.elig_code].some(value => String(value ?? "").toLowerCase().includes(normalizedSearch))).map((row,index) => (
+              <div className="list-row" key={row.id ?? `unmatched-${index}`}>
+                <div className="list-row__body">
+                  <span className="list-row__id">—</span>
+                  <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
+                    <span className="list-row__name">{row.player_name ?? "Unknown player"}</span>
+                    <span className="list-row__sub">Team {row.team_num} · {row.label ?? row.week_key}</span>
+                  </div>
+                  <span className="player-rating-badge">Unverified</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
-
 // ─── Weekly import panel (standings / mvp) for Update Weekly League Data ──────
 function WeeklyImportPanel({ divisionId, teams, mode }) {
   const [standingsAdj, setStandingsAdj] = useState([]);
