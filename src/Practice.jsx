@@ -29,6 +29,14 @@ function scoringMethodLabel(key) { return SCORING_METHODS.find(f => f.key === ke
 
 function gameTypeLabel(key) { return GAME_TYPES.find(g => g.key === key)?.label ?? key; }
 
+function practiceSessionSnapshot(session) {
+  const {
+    gameLog, myScore, opponentScore, myPts, oppPts, winner, completedAt,
+    ...setupAndIdentity
+  } = session ?? {};
+  return setupAndIdentity;
+}
+
 function practiceGameRow(profile, session) {
   return {
     created_by: profile.id,
@@ -72,7 +80,7 @@ export default function Practice() {
       const gameType = session.gameType ? gameTypeLabel(session.gameType) : "Practice setup";
       const score = session.gameType ? `${session.myScore ?? 0}–${session.opponentScore ?? 0}` : "";
       setActiveSession((current) => current?.type === "practice"
-        ? { ...current, title: session.opponentName ? `vs ${session.opponentName}` : "Practice session", subtitle: [gameType, score].filter(Boolean).join(" · "), data: { phase, session } }
+        ? { ...current, title: session.opponentName ? `vs ${session.opponentName}` : "Practice session", subtitle: [gameType, score].filter(Boolean).join(" · "), data: { phase, session: practiceSessionSnapshot(session) } }
         : current);
     }
   }, [phase, session]);
@@ -95,7 +103,7 @@ export default function Practice() {
     const initial = {
       practiceType: null, scoringMethod: null,
       opponentType: null, opponentPlayerNum: null, opponentId: null, opponentName: "", opponentRating: null,
-      gameType: null, format: null, tableSizeFeet: null, x: 5, myRating: null, myScore: 0, opponentScore: 0, gameLog: [], myPts: "", oppPts: "",
+      gameType: null, format: null, tableSizeFeet: null, x: 5, myRating: null,
     };
     setSessionState(initial);
     setPhase("type");
@@ -146,7 +154,7 @@ export default function Practice() {
   }
   if (phase === "play") {
     return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
-      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: finalSession } }); }} onBack={() => changePhase("config")} />);
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={() => changePhase("config")} />);
   }
   if (phase === "done") {
     return wrap(<DoneStep profile={profile} session={session}

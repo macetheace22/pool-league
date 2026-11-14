@@ -418,6 +418,8 @@ describe("Practice game result persistence", () => {
     expect(practice).toContain("db.listPracticeGameResults");
     expect(practice).toContain("Record Rack Win");
     expect(practice).not.toContain("game_log:");
+    expect(practice).toContain("function practiceSessionSnapshot(session)");
+    expect(practice).toContain("gameLog, myScore, opponentScore, myPts, oppPts, winner, completedAt");
     expect(db).toContain('from("practice_game_results")');
     expect(db).toContain("record_practice_game_result");
     expect(db).toContain("undo_last_practice_game_result");

@@ -414,3 +414,5 @@ For every implementation PR:
 - 8-ball requires both nonnegative whole-number point totals; Race to Points adds points, while Race to Games/Best of X adds one win. Other game types record a winner-only rack result and add one to that player's score.
 - SQL backfills legacy `game_log` arrays before dropping the JSONB column. Shot events remain linked to the parent session UUID.
 - PR, SQL application, CI, and live acceptance are pending.
+
+- Active-session browser storage is retained only as a setup/navigation draft and session UUID; submitted game/rack results and aggregate scores are deliberately stripped from that JSON snapshot and rehydrated from Supabase.
