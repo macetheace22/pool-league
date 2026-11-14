@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { Plus, Minus, Search, Check, ChevronRight, Trophy } from "lucide-react";
+import { Search, Check, ChevronRight, Trophy } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
 import { css, Loader } from "./AdminApp";
@@ -49,7 +49,6 @@ function practiceGameRow(profile, session) {
     my_score: session.myScore ?? 0,
     opponent_score: session.opponentScore ?? 0,
     winner: session.winner ?? null,
-    game_log: session.gameLog ?? [],
   };
 }
 
@@ -650,7 +649,19 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
           if (!existing) existing = await db.getPracticeGame(session.gameId, profile.id);
         }
         if (!existing) throw new Error("The practice game could not be created or recovered.");
-        if (!cancelled) setRecordStatus("ready");
+        const results = await db.listPracticeGameResults(session.gameId);
+        if (!cancelled) {
+          setSession(current => ({
+            ...current,
+            myScore: existing.my_score ?? 0,
+            opponentScore: existing.opponent_score ?? 0,
+            gameLog: results.map(result => ({
+              id: result.id, gameNumber: result.game_number,
+              myPoints: result.my_points, oppPoints: result.opponent_points, winner: result.winner,
+            })),
+          }));
+          setRecordStatus("ready");
+        }
       } catch (error) {
         if (!cancelled) {
           setRecordError(error?.message || "Unable to prepare this practice game.");
@@ -681,35 +692,55 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
 
   const winner = myScore >= myTargetDisplay ? "me" : oppScore >= oppTarget ? "opponent" : null;
 
-  const bump = (who, delta) => {
-    setSession(s => who === "me"
-      ? { ...s, myScore: Math.max(0, (s.myScore ?? 0) + delta) }
-      : { ...s, opponentScore: Math.max(0, (s.opponentScore ?? 0) + delta) });
+  const [savingResult, setSavingResult] = useState(false);
+
+  const saveGameResult = async ({ myPoints = null, oppPoints = null, gameWinner }) => {
+    setErr("");
+    setSavingResult(true);
+    try {
+      const saved = await db.recordPracticeGameResult({
+        practiceGameId: session.gameId, myPoints, opponentPoints: oppPoints, winner: gameWinner,
+      });
+      if (!saved) throw new Error("The game result could not be saved. Please retry.");
+      setSession(s => ({
+        ...s, myScore: saved.my_score, opponentScore: saved.opponent_score,
+        gameLog: [...(s.gameLog ?? []), {
+          id: saved.result.id, gameNumber: saved.result.game_number,
+          myPoints: saved.result.my_points, oppPoints: saved.result.opponent_points,
+          winner: saved.result.winner,
+        }],
+        myPts: "", oppPts: "",
+      }));
+    } catch (error) {
+      setErr(error?.message || "The game result could not be saved. Please retry.");
+    } finally { setSavingResult(false); }
   };
 
   const recordGame = () => {
     setErr("");
     const my = Number(myPts), opp = Number(oppPts);
-    if (myPts === "" || oppPts === "" || Number.isNaN(my) || Number.isNaN(opp)) { setErr("Enter both scores."); return; }
+    if (myPts === "" || oppPts === "" || !Number.isInteger(my) || !Number.isInteger(opp) || my < 0 || opp < 0) {
+      setErr("Enter nonnegative whole-number scores for both players."); return;
+    }
     if (my === opp) { setErr("Scores can't be tied — one side has to win the game."); return; }
-    const gameWinner = my > opp ? "me" : "opponent";
-    setSession(s => ({
-      ...s,
-      gameLog: [...(s.gameLog ?? []), { myPoints: my, oppPoints: opp, winner: gameWinner }],
-      myScore: (s.myScore ?? 0) + (session.scoringMethod === "race_to_points" ? my : gameWinner === "me" ? 1 : 0),
-      opponentScore: (s.opponentScore ?? 0) + (session.scoringMethod === "race_to_points" ? opp : gameWinner === "opponent" ? 1 : 0),
-      myPts: "", oppPts: "",
-    }));
+    void saveGameResult({ myPoints: my, oppPoints: opp, gameWinner: my > opp ? "me" : "opponent" });
   };
-  const undoLastGame = () => {
-    if (gameLog.length === 0) return;
-    const last = gameLog[gameLog.length - 1];
-    setSession(s => ({
-      ...s,
-      gameLog: (s.gameLog ?? []).slice(0, -1),
-      myScore: Math.max(0, (s.myScore ?? 0) - (session.scoringMethod === "race_to_points" ? last.myPoints : last.winner === "me" ? 1 : 0)),
-      opponentScore: Math.max(0, (s.opponentScore ?? 0) - (session.scoringMethod === "race_to_points" ? last.oppPoints : last.winner === "opponent" ? 1 : 0)),
-    }));
+
+  const recordRackWin = (who) => { void saveGameResult({ gameWinner: who }); };
+
+  const undoLastGame = async () => {
+    if (gameLog.length === 0 || savingResult) return;
+    setErr(""); setSavingResult(true);
+    try {
+      const undone = await db.undoLastPracticeGameResult(session.gameId);
+      if (!undone) throw new Error("The last game could not be undone. Please retry.");
+      setSession(s => ({
+        ...s, myScore: undone.my_score, opponentScore: undone.opponent_score,
+        gameLog: (s.gameLog ?? []).slice(0, -1),
+      }));
+    } catch (error) {
+      setErr(error?.message || "The last game could not be undone. Please retry.");
+    } finally { setSavingResult(false); }
   };
 
   const finish = () => {
@@ -720,7 +751,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
     <>
       <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${scoringMethodLabel(session.scoringMethod)}`} backFallback="/" />
       <div className="tab-content">
-        <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Your session is saved as you go. You can leave this screen and resume from the active-session bar.</div>
+        <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Game results and scores are saved to your account as you go. You can leave this screen and resume from the active-session bar.</div>
         {recordStatus === "checking" && <div className="card"><Loader /><div className="card__title">Preparing your practice game…</div></div>}
         {recordStatus === "error" && (
           <div className="card">
@@ -752,24 +783,14 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
             <div className="play-tally__name">You</div>
             <div className="play-tally__score">{myScore}</div>
             <div className="play-tally__target">of {myTargetDisplay}</div>
-            {!isEightBall && (
-              <div className="play-tally__btns">
-                <button className="btn-icon" onClick={()=>bump("me",-1)}><Minus size={14}/></button>
-                <button className="btn-icon btn-icon--confirm" onClick={()=>bump("me",1)}><Plus size={14}/></button>
-              </div>
-            )}
+            {!isEightBall && <button className="btn-primary" style={{marginTop:8,padding:"8px 10px",fontSize:11}} disabled={savingResult || !!winner || recordStatus !== "ready"} onClick={() => recordRackWin("me")}>Record Rack Win</button>}
           </div>
           <div className="play-tally__vs">vs</div>
           <div className="play-tally__side">
             <div className="play-tally__name">{session.opponentName}</div>
             <div className="play-tally__score">{oppScore}</div>
             <div className="play-tally__target">of {oppTarget}</div>
-            {!isEightBall && (
-              <div className="play-tally__btns">
-                <button className="btn-icon" onClick={()=>bump("opponent",-1)}><Minus size={14}/></button>
-                <button className="btn-icon btn-icon--confirm" onClick={()=>bump("opponent",1)}><Plus size={14}/></button>
-              </div>
-            )}
+            {!isEightBall && <button className="btn-primary" style={{marginTop:8,padding:"8px 10px",fontSize:11}} disabled={savingResult || !!winner || recordStatus !== "ready"} onClick={() => recordRackWin("opponent")}>Record Rack Win</button>}
           </div>
         </div>
 
@@ -784,8 +805,8 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
                 <input className="input" type="number" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="0" /></div>
             </div>
             {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
-            <button className="btn-primary" style={{marginTop:10}} onClick={recordGame}>Submit Game Score</button>
-            {gameLog.length > 0 && <button className="btn-secondary" style={{marginTop:8}} onClick={undoLastGame}>Undo Last Game</button>}
+            <button className="btn-primary" style={{marginTop:10}} onClick={recordGame} disabled={savingResult || recordStatus !== "ready"}>{savingResult ? "Saving…" : "Submit Game Score"}</button>
+            {gameLog.length > 0 && <button className="btn-secondary" style={{marginTop:8}} onClick={undoLastGame} disabled={savingResult}>{savingResult ? "Saving…" : "Undo Last Game"}</button>}
           </div>
         )}
 
@@ -793,7 +814,8 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
           <div className="card" style={{textAlign:"center",borderColor:"#1F6B4A",background:"#0F2D1F"}}>
             <Trophy size={22} color="#5FCF9E" style={{margin:"0 auto 8px"}}/>
             <div className="card__title" style={{color:"#5FCF9E"}}>{winner === "me" ? "You win!" : `${session.opponentName} wins!`}</div>
-            <button className="btn-primary" style={{marginTop:10}} onClick={finish} disabled={recordStatus !== "ready"}>Save Game</button>
+            <button className="btn-primary" style={{marginTop:10}} onClick={finish} disabled={recordStatus !== "ready" || savingResult}>Save Game</button>
+            {gameLog.length > 0 && <button className="btn-secondary" style={{marginTop:8}} onClick={undoLastGame} disabled={savingResult}>Undo Last Game</button>}
           </div>
         )}
 
