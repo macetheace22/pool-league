@@ -214,7 +214,7 @@ The register covers every numbered clause in the supplied rulebook. "Not audited
 |---|---|---|
 | 8.1 | Roster windows: Weeks 1–5; survival-only through four weeks before end; max six; final four weeks closed; no postseason changes; extreme manager exception | Implementation in PR #162 (open; Section 85 SQL pending). Official IBA imports reconcile complete, unambiguous divisions as the source of truth for current roster membership; removed members retain match/rating/account/team-history records; Section 4.5 played-player transfer approval remains enforced. Manual changes are captain-allowed through Week 5, manager-only from Week 6, capped at six during the restricted middle period, and frozen in the final four weeks/postseason. Official imports remain authoritative through freezes; imports above six in the restricted middle period are retained and flagged for manager review. Survival/exception judgment remains with the League Manager. Apply Section 85 SQL and verify a real import after merge. |
 | 8.2 | Home team's table choice; one/two-table demand at one hour; no delay/harassment | Not audited. Determine whether scheduling/live match needs table count/choice/time records or whether this remains captain/referee process. |
-| 8.3 | Illegal substitution / false identity / match points and postseason disqualification | Partial. PR #113 hardened player-number identity linking; it does not by itself implement investigation, match-point reversal, postseason disqualification, suspension, or captain consequences. |
+| 8.3 | Illegal substitution / false identity / match points and postseason disqualification | **Implementation added on Section 8.3 branch.** Existing trusted player-number identity linking remains the preventative control. Manager-only post-match decision path records the League Management outcome: accept the recorded result or apply the rulebook's five-set forfeit. Investigation, proof-of-identity, suspension/expulsion, captain discipline, and postseason/prize consequences remain manual League Management processes. Live acceptance remains open. |
 | 8.4 | Schedule publication, odd-team BYE, first five weeks provisional, rotating byes, incomplete-cycle average points | Partial: schedule import/management exists. Audit BYE rotation, incomplete-cycle average-point treatment, and conversion of provisional TBA matches into makeups/byes. |
 | 8.5 | Make-up scheduling responsibility, 7-day cutoff, 5-day League Office notice, failure-to-agree consequences, suspend during regular play | Gap. No complete deadline/notice/exception enforcement verified. |
 | 8.6 | Official weather emergency and holiday reschedule rights/notice | Not audited. Likely manager/manual workflow; decide if app needs reason, notice timestamp, and approval record. |
@@ -272,7 +272,7 @@ This order closes scoring, forfeits, eligibility, and scorekeeping before moving
 
 ### Phase 3 — Roster, schedule, makeup, and match administration (Sections 4.1–4.3, 8.1–8.8)
 1. Complete Section 8.1 acceptance: PR #162 is merged and Section 85 SQL is confirmed applied. Verify a real roster import, current-roster reconciliation, retained roster history, warnings/failed-closed safeguards, and live Supabase population. Survival/exception decisions remain League Manager judgment; do not add a separate captain request workflow.
-2. Audit Section 8.3 illegal substitution consequences and the evidence/manager workflow beyond identity-link security.
+2. Complete Section 8.3 live acceptance of the manager decision path on an appropriate completed match. Implementation is otherwise code/rule validated.
 3. Audit Sections 8.2/8.4 table choice, one/two-table timing, schedule publication, TBA conversion, BYE rotation, and incomplete-cycle average points.
 4. Implement or explicitly manualize Section 8.5 deadlines, five-day office notice, no-agreement consequences, and makeup suspension/resumption.
 5. Audit Section 8.6 weather emergency and holiday notice requirements.
@@ -388,3 +388,12 @@ For every implementation PR:
 > 11. If a genuine unresolved business decision is required, present the rulebook requirement and concrete options, explain the consequences, and wait for my decision before implementation.
 >
 > **Completion goal:** Continue this process until the entire rulebook Sections 1–9 has been audited and every clause has a final disposition of Verified, Import-only, or Manual process — agreed (or a clearly documented exception/decision), with required implementation/data persistence/import behavior/manual responsibilities, SQL, tests, and verification completed. Do not declare the audit complete merely because the PR queue is empty.
+
+### Section 8.3 implementation record
+- Preventative identity control remains the existing trusted player-number linking from PR #113 / Sections 77–78.
+- Added a manager-only post-match decision path for a confirmed Section 8.3 incident.
+- The manager can record either **Accept recorded match result** or **Five-set forfeit**.
+- Five-set forfeit reuses the existing whole-match-forfeit scoring model rather than creating a second scoring implementation.
+- The decision is retained in `completed_matches.correction_history` and the match state.
+- The app deliberately does **not** adjudicate identity, collect proof of identity, determine suspension/expulsion, discipline captains, or determine postseason/prize consequences; those remain manual League Management processes.
+- Remaining acceptance: execute the workflow against suitable live completed-match data and verify historical Scoresheet/standings behavior.
