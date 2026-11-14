@@ -379,3 +379,30 @@ describe("Section 8.3 illegal substitution decision path", () => {
     expect(admin).toContain("five_set_forfeit");
   });
 });
+
+
+describe("Practice data persistence", () => {
+  it("stores practice configuration in typed columns rather than target_config JSON", () => {
+    const practice = read("src/Practice.jsx");
+    const sql = read("supabase-schema-practice-data.sql");
+
+    expect(practice).toContain("my_target:");
+    expect(practice).toContain("opponent_target:");
+    expect(practice).toContain("target_games:");
+    expect(practice).toContain("table_size_feet:");
+    expect(practice).not.toContain("target_config:");
+
+    expect(sql).toContain("add column if not exists my_target integer");
+    expect(sql).toContain("add column if not exists opponent_target integer");
+    expect(sql).toContain("add column if not exists target_games integer");
+    expect(sql).toContain("add column if not exists table_size_feet numeric(4,1)");
+    expect(sql).toContain("update public.practice_games");
+    expect(sql).toContain("set target_config = '{}'::jsonb");
+  });
+
+  it("requires a positive practice table size", () => {
+    const practice = read("src/Practice.jsx");
+    expect(practice).toContain("Number.isFinite(n) || n <= 0");
+    expect(practice).toContain("step=\"0.1\"");
+  });
+});
