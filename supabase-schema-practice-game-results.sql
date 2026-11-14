@@ -150,3 +150,62 @@ revoke all on function public.undo_last_practice_game_result(uuid) from public, 
 grant execute on function public.undo_last_practice_game_result(uuid) to authenticated;
 comment on table public.practice_game_results is
   'One durable row per game/rack in an opponent practice session; shot-level detail remains in shot_events.';
+
+
+-- Finalize an in-progress practice session without deleting any recorded results.
+-- Used by the active-session bar when the player explicitly ends the session
+-- after navigating away from the Practice screen.
+create or replace function public.finish_practice_game(p_practice_game_id uuid)
+returns jsonb
+language plpgsql security invoker set search_path = public, pg_temp
+as $$
+declare
+  v_parent public.practice_games%rowtype;
+  v_winner text := null;
+  v_my_target integer;
+  v_opponent_target integer;
+begin
+  select * into v_parent
+  from public.practice_games
+  where id = p_practice_game_id
+    and created_by = (select auth.uid())
+  for update;
+
+  if not found then
+    raise exception 'Practice session not found or access denied';
+  end if;
+
+  if v_parent.practice_type = 'opponent' then
+    v_my_target := case
+      when v_parent.scoring_method = 'race_to_points' then v_parent.my_target
+      when v_parent.scoring_method = 'best_of_games' then floor(v_parent.target_games / 2.0)::integer + 1
+      else v_parent.target_games
+    end;
+    v_opponent_target := case
+      when v_parent.scoring_method = 'race_to_points' then v_parent.opponent_target
+      when v_parent.scoring_method = 'best_of_games' then floor(v_parent.target_games / 2.0)::integer + 1
+      else v_parent.target_games
+    end;
+
+    if v_parent.my_score >= v_my_target then
+      v_winner := 'me';
+    elsif v_parent.opponent_score >= v_opponent_target then
+      v_winner := 'opponent';
+    end if;
+  end if;
+
+  update public.practice_games
+  set completed_at = coalesce(completed_at, now()),
+      winner = coalesce(winner, v_winner)
+  where id = p_practice_game_id;
+
+  return jsonb_build_object(
+    'id', p_practice_game_id,
+    'completed_at', (select completed_at from public.practice_games where id = p_practice_game_id),
+    'winner', (select winner from public.practice_games where id = p_practice_game_id)
+  );
+end;
+$$;
+
+revoke all on function public.finish_practice_game(uuid) from public, anon;
+grant execute on function public.finish_practice_game(uuid) to authenticated;
