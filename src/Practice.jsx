@@ -40,12 +40,10 @@ function practiceGameRow(profile, session) {
     opponent_name: session.practiceType === "skills_drills" ? null : session.opponentName,
     game_type: session.gameType ?? null,
     format: session.practiceType === "opponent" ? session.format : null,
-    target_config: {
-      ...(session.scoringMethod === "race_to_points"
-        ? { myTarget: session.myRating, oppTarget: session.opponentRating }
-        : { x: session.x }),
-      tableSizeFeet: session.tableSizeFeet ?? null,
-    },
+    my_target: session.scoringMethod === "race_to_points" ? session.myRating : null,
+    opponent_target: session.scoringMethod === "race_to_points" ? session.opponentRating : null,
+    target_games: session.scoringMethod && session.scoringMethod !== "race_to_points" ? session.x : null,
+    table_size_feet: session.tableSizeFeet ?? null,
     my_rating: session.scoringMethod === "race_to_points" ? session.myRating : null,
     opponent_rating: session.scoringMethod === "race_to_points" ? session.opponentRating : null,
     my_score: session.myScore ?? 0,
@@ -98,7 +96,7 @@ export default function Practice() {
     const initial = {
       practiceType: null, scoringMethod: null,
       opponentType: null, opponentPlayerNum: null, opponentId: null, opponentName: "", opponentRating: null,
-      gameType: null, format: null, x: 5, myRating: null, myScore: 0, opponentScore: 0, gameLog: [], myPts: "", oppPts: "",
+      gameType: null, format: null, tableSizeFeet: null, x: 5, myRating: null, myScore: 0, opponentScore: 0, gameLog: [], myPts: "", oppPts: "",
     };
     setSessionState(initial);
     setPhase("type");
