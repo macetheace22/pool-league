@@ -362,3 +362,20 @@ describe("Section 8.1 automatic roster routing and history refresh", () => {
     expect(sql).toContain("last_seen_at = greatest");
   });
 });
+
+
+describe("Section 8.3 illegal substitution decision path", () => {
+  it("records the manager decision and preserves the existing five-set forfeit model", () => {
+    const db = read("src/db.js");
+    const admin = read("src/AdminApp.jsx");
+    expect(db).toContain("applyIllegalSubstitutionDecision");
+    expect(db).toContain("section_8_3_illegal_substitution");
+    expect(db).toContain("five_set_forfeit");
+    expect(db).toContain("buildFullMatchForfeitSets");
+    expect(db).toContain("computeMatchPoints(nextState)");
+    expect(admin).toContain("Illegal Substitution");
+    expect(admin).toContain("League Management decision");
+    expect(admin).toContain("accept_result");
+    expect(admin).toContain("five_set_forfeit");
+  });
+});
