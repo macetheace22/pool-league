@@ -2460,22 +2460,32 @@ export async function listPracticeGameResults(practiceGameId) {
   if (!practiceGameId) return [];
   const { data, error } = await supabase.from("practice_game_results").select("*")
     .eq("practice_game_id", practiceGameId).order("game_number", { ascending: true });
-  return error ? [] : (data ?? []);
+  if (error) throw error;
+  return data ?? [];
 }
 export async function recordPracticeGameResult({ practiceGameId, myPoints = null, opponentPoints = null, winner }) {
-  if (!practiceGameId || !winner) return null;
+  if (!practiceGameId || !winner) throw new Error("A practice game and winner are required.");
   const { data, error } = await supabase.rpc("record_practice_game_result", {
     p_practice_game_id: practiceGameId, p_my_points: myPoints,
     p_opponent_points: opponentPoints, p_winner: winner,
   });
-  return error ? null : data;
+  if (error) throw error;
+  return data;
 }
 export async function undoLastPracticeGameResult(practiceGameId) {
-  if (!practiceGameId) return null;
+  if (!practiceGameId) throw new Error("A practice game is required.");
   const { data, error } = await supabase.rpc("undo_last_practice_game_result", {
     p_practice_game_id: practiceGameId,
   });
-  return error ? null : data;
+  if (error) throw error;
+  return data;
+}
+export async function finishPracticeGame(practiceGameId) {
+  if (!practiceGameId) return false;
+  const { error } = await supabase.rpc("finish_practice_game", {
+    p_practice_game_id: practiceGameId,
+  });
+  return !error;
 }
 // Retained for compatibility with any older callers.
 export async function savePracticeGame(row) {
