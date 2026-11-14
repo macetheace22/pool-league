@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useLocation, useNavigate } from "react-router-dom";
 import { Play, X } from "lucide-react";
 import { useAuth } from "./AuthContext";
+import * as db from "./db";
 
 const STORAGE_KEY = "iba-active-session-v1";
 const ActiveSessionContext = createContext(null);
@@ -54,7 +55,7 @@ export function ActiveSessionProvider({ children }) {
             <div style={{fontSize:11,color:"#C5E3D3",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{activeSession.title}{activeSession.subtitle ? " · " + activeSession.subtitle : ""}</div>
           </div>
           <button type="button" onClick={() => navigate(activeSession.route)} style={{border:0,borderRadius:9,padding:"9px 12px",background:"#5FCF9E",color:"#082719",fontWeight:800,fontSize:12,cursor:"pointer"}}>Resume</button>
-          {activeSession.type === "practice" && <button type="button" aria-label="End practice session" title="End practice session" onClick={() => { if (window.confirm("End this unfinished practice session? Its unsaved score will be discarded.")) clearActiveSession(); }} style={{border:0,background:"transparent",color:"#D5E9DF",padding:5,cursor:"pointer"}}><X size={17}/></button>}
+          {activeSession.type === "practice" && <button type="button" aria-label="End practice session" title="End practice session" onClick={async () => { if (!window.confirm("End this practice session? Any recorded games and scores will be saved.")) return; const gameId = activeSession?.data?.session?.gameId; const ok = gameId ? await db.finishPracticeGame(gameId) : true; if (ok) clearActiveSession(); else window.alert("The practice session could not be finished. Your recorded results are still saved; tap Resume to try again."); }} style={{border:0,background:"transparent",color:"#D5E9DF",padding:5,cursor:"pointer"}}><X size={17}/></button>}
         </div>
       )}
     </ActiveSessionContext.Provider>
