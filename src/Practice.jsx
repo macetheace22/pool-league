@@ -701,8 +701,11 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
   const winner = myScore >= myTargetDisplay ? "me" : oppScore >= oppTarget ? "opponent" : null;
 
   const [savingResult, setSavingResult] = useState(false);
+  const savingResultRef = useRef(false);
 
   const saveGameResult = async ({ myPoints = null, oppPoints = null, gameWinner }) => {
+    if (savingResultRef.current) return;
+    savingResultRef.current = true;
     setErr("");
     setSavingResult(true);
     try {
@@ -721,7 +724,10 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
       }));
     } catch (error) {
       setErr(error?.message || "The game result could not be saved. Please retry.");
-    } finally { setSavingResult(false); }
+    } finally {
+      savingResultRef.current = false;
+      setSavingResult(false);
+    }
   };
 
   const recordGame = () => {
@@ -737,7 +743,8 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
   const recordRackWin = (who) => { void saveGameResult({ gameWinner: who }); };
 
   const undoLastGame = async () => {
-    if (gameLog.length === 0 || savingResult) return;
+    if (gameLog.length === 0 || savingResultRef.current) return;
+    savingResultRef.current = true;
     setErr(""); setSavingResult(true);
     try {
       const undone = await db.undoLastPracticeGameResult(session.gameId);
@@ -748,7 +755,10 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
       }));
     } catch (error) {
       setErr(error?.message || "The last game could not be undone. Please retry.");
-    } finally { setSavingResult(false); }
+    } finally {
+      savingResultRef.current = false;
+      setSavingResult(false);
+    }
   };
 
   const finish = () => {
