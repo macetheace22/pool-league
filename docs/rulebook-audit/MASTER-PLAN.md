@@ -326,7 +326,7 @@ This order closes scoring, forfeits, eligibility, and scorekeeping before moving
 | Standings/MVP / 5.1–5.6 | Official positions, team points, sets, opponent totals, MVP points/wins/losses, tie-break evidence | Official positions and audit helpers exist; finish data completeness/edge-case audit. |
 | Regional / 5.11–5.12 | Seasonal rosters, common players, match counts, ranking points, points/set average, singles score/match/season thresholds, flight rating | No complete ledger/workflow identified; user decision required. |
 | Roster / 8.1 | Effective week/date, add/drop, roster size, survival eligibility, manager exception, postseason freeze, retained team history | PR #162 merged: complete official roster reconciliation and history ledger; manual Week 6/final-four/postseason guards; Section 4.5 transfer lock preserved. Section 85 SQL confirmed applied. Verify a real live import/history scenario. Survival/exception determination remains League Manager responsibility. |
-| Scheduling / 8.2, 8.4–8.6 | Table choice, one/two-table request time, schedule version, BYE cycle, makeup date, notice, weather declaration, holiday notice | 8.2 is manual by agreement; 8.4–8.6 remain the next scheduling audit. Practice separately captures table size in practice_games.target_config.tableSizeFeet. |
+| Scheduling / 8.2, 8.4–8.6 | Table choice, one/two-table request time, schedule version, BYE cycle, makeup date, notice, weather declaration, holiday notice | 8.2 is manual by agreement; 8.4–8.6 remain the next scheduling audit. Practice separately captures table size as the typed `practice_games.table_size_feet` column; practice configuration is normalized into typed database columns rather than stored in generic JSON. |
 | Dropped/replacement teams / 8.7–8.8 | Manager adjustment decision, affected match history/points, replacement team, inherited points, makeup entitlement | User decision needed; do not assume a calculation. |
 | Conduct / 1.22, 2, 3, 5.10, 5.13–5.14 | Warning, player/team, incident, time, referee/TD, penalty, evidence, appeal | No complete workflow identified; decide app vs League Office/manual. |
 | Finance / 9.1–9.9 | Membership dues, renewal exception, sanction fees, team deposit, weekly fees, unpaid roster members, returned checks, prize holds | No app scope assumed; user decision needed. |
@@ -388,6 +388,14 @@ For every implementation PR:
 > 11. If a genuine unresolved business decision is required, present the rulebook requirement and concrete options, explain the consequences, and wait for my decision before implementation.
 >
 > **Completion goal:** Continue this process until the entire rulebook Sections 1–9 has been audited and every clause has a final disposition of Verified, Import-only, or Manual process — agreed (or a clearly documented exception/decision), with required implementation/data persistence/import behavior/manual responsibilities, SQL, tests, and verification completed. Do not declare the audit complete merely because the PR queue is empty.
+
+### Practice data persistence normalization
+- PR #164 remains open and unmerged.
+- Practice table size is a separate user-requested practice attribute, not a Section 8.2 league-match enforcement feature.
+- The practice session model now stores durable configuration in first-class `practice_games` columns: `my_target`, `opponent_target`, `target_games`, and `table_size_feet`.
+- Existing `target_config` values are backfilled by the migration and then cleared to `{}` so there is no second source of truth.
+- `game_log` remains JSONB for now because it represents the detailed game-level event history; it is a separate data-model audit item from configuration fields.
+- SQL migration is included in PR #164 and has **not** been claimed as applied; user must apply it manually and confirm before live schema verification.
 
 ### Section 8.3 implementation record
 - Preventative identity control remains the existing trusted player-number linking from PR #113 / Sections 77–78.
