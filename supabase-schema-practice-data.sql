@@ -52,15 +52,45 @@ set
     end
   );
 
-alter table public.practice_games
-  add constraint practice_games_my_target_positive
-    check (my_target is null or my_target > 0),
-  add constraint practice_games_opponent_target_positive
-    check (opponent_target is null or opponent_target > 0),
-  add constraint practice_games_target_games_positive
-    check (target_games is null or target_games > 0),
-  add constraint practice_games_table_size_feet_positive
-    check (table_size_feet is null or table_size_feet > 0);
+do $
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.practice_games'::regclass
+      and conname = 'practice_games_my_target_positive'
+  ) then
+    alter table public.practice_games
+      add constraint practice_games_my_target_positive
+      check (my_target is null or my_target > 0);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.practice_games'::regclass
+      and conname = 'practice_games_opponent_target_positive'
+  ) then
+    alter table public.practice_games
+      add constraint practice_games_opponent_target_positive
+      check (opponent_target is null or opponent_target > 0);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.practice_games'::regclass
+      and conname = 'practice_games_target_games_positive'
+  ) then
+    alter table public.practice_games
+      add constraint practice_games_target_games_positive
+      check (target_games is null or target_games > 0);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.practice_games'::regclass
+      and conname = 'practice_games_table_size_feet_positive'
+  ) then
+    alter table public.practice_games
+      add constraint practice_games_table_size_feet_positive
+      check (table_size_feet is null or table_size_feet > 0);
+  end if;
+end $;
 
 -- All currently-known target_config values are now represented by typed
 -- columns. Clear the JSON payload rather than maintaining two sources of truth.
