@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
 import { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
+import { buildRosterSyncPlan } from "./rosterReconciliation";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -1299,15 +1300,37 @@ export async function bulkImportPlayers(parsed, weekTag) {
   );
 
   const byNum = {};
-  const ambiguousTeamIds = [];
+  const ambiguousTeamIds = [...new Set((weekTag?.ambiguousTeamNums ?? []).map(String))];
   for (const row of activeRows) {
     if (byNum[row.team_num]) { if (!ambiguousTeamIds.includes(row.team_num)) ambiguousTeamIds.push(row.team_num); continue; }
     byNum[row.team_num] = row;
   }
   for (const num of ambiguousTeamIds) delete byNum[num];
 
-  const knownNums = new Set(Object.keys(byNum));
-  const unmatchedTeamIds = teamNums.filter(n => !knownNums.has(n) && !ambiguousTeamIds.includes(n));
+  const knownActiveTeamNums = new Set((teamRows ?? [])
+    .filter(row => row.divisions?.seasons?.is_active)
+    .map(row => String(row.team_num)));
+  const unmatchedTeamIds = [...new Set([
+    ...teamNums.filter(n => !knownActiveTeamNums.has(String(n)) && !ambiguousTeamIds.includes(String(n))),
+    ...(weekTag?.unmatchedTeamNums ?? []).map(String),
+  ])];
+  const reportDivisionIds = [...new Set(Object.values(byNum).map(row => String(row.division_id)))];
+  let allDivisionTeams = [];
+  if (reportDivisionIds.length) {
+    const { data: divisionTeams, error: divisionTeamsError } = await supabase
+      .from("teams")
+      .select("id, division_id, team_num, is_bye, divisions(num, seasons(is_active))")
+      .in("division_id", reportDivisionIds);
+    if (divisionTeamsError) throw new Error(`Could not validate complete division rosters: ${divisionTeamsError.message}`);
+    allDivisionTeams = (divisionTeams ?? []).filter(row => row.divisions?.seasons?.is_active);
+  }
+  const reconciliation = buildRosterSyncPlan({
+    parsed,
+    matchedTeams: Object.values(byNum),
+    allDivisionTeams,
+    unmatchedTeamNums: unmatchedTeamIds,
+    ambiguousTeamNums: ambiguousTeamIds,
+  });
   const byDivision = {};
   for (const row of Object.values(byNum)) byDivision[row.division_id] = (byDivision[row.division_id] ?? 0) + 1;
 
@@ -1322,8 +1345,11 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (!team) continue;
     for (const playerNum of playerNums) {
       const prior = divisionByPlayerNum[playerNum];
-      if (prior && prior !== team.division_id) throw new Error(`Player ${playerNum} appears in more than one active division; ratings import was blocked before saving.`);
-      divisionByPlayerNum[playerNum] = team.division_id;
+      // A player may legitimately belong to teams in different divisions.
+      // Ratings are player-level, so use the first validated division's report
+      // week for the single player_ratings row; each division still receives
+      // its own roster reconciliation and weekly-counter rows.
+      if (!prior) divisionByPlayerNum[playerNum] = team.division_id;
     }
   }
   const ratingRows = Object.values(parsed.registry ?? {}).filter(player => player.rating != null).map(player => {
@@ -1339,26 +1365,48 @@ export async function bulkImportPlayers(parsed, weekTag) {
     const { error } = await supabase.from("players").upsert(playerRows);
     if (error) throw new Error(`Could not save imported players: ${error.message}`);
   }
-  if (ratingRows.length) {
-    const { error } = await supabase.from("player_ratings").upsert(ratingRows, { onConflict: "player_num,week_key" });
-    if (error) throw new Error(`Could not save imported ratings: ${error.message}`);
-  }
-
   const needsRatingRows = (parsed.needsRating ?? []).map(p => ({ num: p.num, name: p.name, nickname: p.nickname ?? "" }));
   if (needsRatingRows.length) {
     const { error } = await supabase.from("players").upsert(needsRatingRows);
     if (error) throw new Error(`Could not save players without ratings: ${error.message}`);
   }
 
-  const rosterRows = [];
-  for (const [teamNum, nums] of Object.entries(parsed.rosters ?? {})) {
-    const row = byNum[teamNum];
-    if (!row) continue;
-    for (const num of nums) rosterRows.push({ team_id: row.id, player_num: num });
+  const rosterSyncWarnings = [];
+  const updatedRosterDivisions = [];
+  for (const division of reconciliation.completeDivisions ?? []) {
+    const divisionTeamIds = new Set(
+      allDivisionTeams
+        .filter(team => String(team.division_id) === String(division.divisionId))
+        .map(team => team.id),
+    );
+    const divisionPayload = reconciliation.rosterPayload.filter(row => divisionTeamIds.has(row.team_id));
+    if (!divisionPayload.length) continue;
+
+    const { data, error } = await supabase.rpc("sync_imported_team_rosters", {
+      p_rosters: divisionPayload,
+    });
+    if (error) {
+      const detail = error.message?.includes("PLAYER_TRANSFER_APPROVAL_REQUIRED")
+        ? "A player who has already played is assigned to another team in this division. Complete the existing Section 4.5 transfer request and approval process, then re-import."
+        : error.message;
+      rosterSyncWarnings.push(`Division ${division.divisionId}: roster was left unchanged. ${detail}`);
+      continue;
+    }
+    updatedRosterDivisions.push({
+      ...division,
+      teamCount: Number(data?.teamCount ?? division.teamCount),
+      playerCount: Number(data?.playerCount ?? 0),
+    });
+    for (const team of data?.overSixTeams ?? []) {
+      rosterSyncWarnings.push(
+        `Team ${team.teamNum} has ${team.playerCount} players in the official IBA roster during the restricted period. The import was retained as the source of truth; League Manager review is required under Section 8.1.`
+      );
+    }
   }
-  if (rosterRows.length) {
-    const { error } = await supabase.from("rosters").upsert(rosterRows, { onConflict: "team_id,player_num" });
-    if (error) throw new Error(`Could not save roster assignments: ${error.message}`);
+
+  if (ratingRows.length) {
+    const { error } = await supabase.from("player_ratings").upsert(ratingRows, { onConflict: "player_num,week_key" });
+    if (error) throw new Error(`Could not save imported ratings: ${error.message}`);
   }
 
   const eligibilityImport = { imported: 0, unmatchedCount: 0, skipped: false };
@@ -1404,13 +1452,25 @@ export async function bulkImportPlayers(parsed, weekTag) {
     if (error) throw new Error(`Could not save imported IBA weekly match counters: ${error.message}`);
   }
 
-  const updatedDivisions = Object.entries(byDivision).map(([divisionId, teamCount]) => ({ divisionId, teamCount }));
+  const updatedDivisions = updatedRosterDivisions;
   const unmatchedTeams = unmatchedTeamIds.map(num => ({
     teamNum: num,
     teamName: parsed.teams?.[num]?.name ?? null,
     playerNums: parsed.rosters[num] ?? [],
   }));
-  return { updatedDivisions, unmatchedTeamIds, unmatchedTeams, ambiguousTeamIds, weekTag, eligibilityImport };
+  return {
+    updatedDivisions,
+    unmatchedTeamIds,
+    unmatchedTeams,
+    ambiguousTeamIds,
+    rosterSyncWarnings: [...(reconciliation.warnings ?? []), ...rosterSyncWarnings],
+    skippedRosterDivisions: [
+      ...(reconciliation.skippedDivisions ?? []),
+      ...rosterSyncWarnings.map(reason => ({ reason })),
+    ],
+    weekTag,
+    eligibilityImport,
+  };
 }
 
 // Reconciliation, path 1: the unmatched team number was actually a typo (or
@@ -2608,8 +2668,14 @@ export function downloadCSV(filename, csvContent) {
 // (they really were on two different rosters), and the UI groups rows by
 // season_id itself where a single "which season" selection is needed.
 export async function listPlayerTeamHistory(playerNum) {
-  const { data: rosterRows } = await supabase.from("rosters").select("team_id").eq("player_num", playerNum);
-  const teamIds = [...new Set((rosterRows ?? []).map(r => r.team_id))];
+  // Read the durable roster-history ledger so removed players retain their
+  // former team associations after authoritative imports.
+  const { data: historyRows, error: historyError } = await supabase
+    .from("player_team_roster_history")
+    .select("team_id")
+    .eq("player_num", playerNum);
+  if (historyError) return [];
+  const teamIds = [...new Set((historyRows ?? []).map(r => r.team_id))];
   if (teamIds.length === 0) return [];
   const { data: teamRows } = await supabase.from("teams")
     .select("id, name, team_num, division_id, divisions(id, num, name, season_id, format, day, seasons(id, type, year, format, day, is_active))")

@@ -479,6 +479,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // ── Players / rosters / ratings ──
   const handleBulkImport = async (parsed) => {
     const weekTag = currentWeekTag(viewSchedule);
+    const seasonDivisionIds = (viewingSeason?.divisions ?? []).map(division => division.id);
+    weekTag.allowedDivisionIds = seasonDivisionIds.length ? seasonDivisionIds : (viewingDiv?.id ? [viewingDiv.id] : []);
     const result = await db.bulkImportPlayers(parsed, weekTag);
     await refreshCurrentDivision();
     return result;
@@ -5597,7 +5599,10 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
       finalRosters[chosen] = finalRosters[chosen] ?? [];
       if (!finalRosters[chosen].includes(a.num)) finalRosters[chosen].push(a.num);
     }
-    const finalParsed = { ...parsed, rosters: finalRosters };
+    // The user has resolved each parser ambiguity in the preview. The
+    // reconciler consumes these selected placements rather than treating the
+    // original parser guesses as unresolved.
+    const finalParsed = { ...parsed, rosters: finalRosters, ambiguousRoster: [] };
 
     const result = await onBulkImport(finalParsed);
     setImportResult(result);
@@ -5781,6 +5786,14 @@ function PlayersTab({ teams, rosters, schedule, eligByNum, onBulkImport, onManua
                             }} />
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {importResult.rosterSyncWarnings?.map((warning, index) => (
+                    <div key={index} style={{fontSize:11,color:"#F59E0B"}}>{warning}</div>
+                  ))}
+                  {importResult.skippedRosterDivisions?.length > 0 && (
+                    <div style={{fontSize:11,color:"#F59E0B"}}>
+                      Current roster membership was left unchanged for {importResult.skippedRosterDivisions.length} division{importResult.skippedRosterDivisions.length!==1?"s":""}; correct the report/team mapping and re-import.
                     </div>
                   )}
                   {importResult.ambiguousTeamIds?.length > 0 && (
