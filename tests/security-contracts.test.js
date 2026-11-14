@@ -437,3 +437,28 @@ describe("Practice game result persistence", () => {
     expect(practice).toContain('saveGameResult({ gameWinner: who })');
   });
 });
+
+
+describe("Practice active-session finalization", () => {
+  it("finishes an active practice through the database instead of discarding it", () => {
+    const active = read("src/ActiveSessionContext.jsx");
+    const db = read("src/db.js");
+    const sql = read("supabase-schema-practice-game-results.sql");
+    expect(active).toContain('db.finishPracticeGame(gameId)');
+    expect(active).toContain("Any recorded games and scores will be saved");
+    expect(active).not.toContain("unsaved score will be discarded");
+    expect(db).toContain('supabase.rpc("finish_practice_game"');
+    expect(sql).toContain("create or replace function public.finish_practice_game(p_practice_game_id uuid)");
+    expect(sql).toContain("completed_at = coalesce(completed_at, now())");
+    expect(sql).toContain("revoke all on function public.finish_practice_game(uuid) from public, anon");
+    expect(sql).toContain("grant execute on function public.finish_practice_game(uuid) to authenticated");
+  });
+
+  it("guards result writes against same-render rapid repeats", () => {
+    const practice = read("src/Practice.jsx");
+    expect(practice).toContain("const savingResultRef = useRef(false);");
+    expect(practice).toContain("if (savingResultRef.current) return;");
+    expect(practice).toContain("savingResultRef.current = true;");
+    expect(practice).toContain("savingResultRef.current = false;");
+  });
+});
