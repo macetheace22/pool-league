@@ -405,3 +405,14 @@ For every implementation PR:
 - The decision is retained in `completed_matches.correction_history` and the match state.
 - The app deliberately does **not** adjudicate identity, collect proof of identity, determine suspension/expulsion, discipline captains, or determine postseason/prize consequences; those remain manual League Management processes.
 - Remaining acceptance: execute the workflow against suitable live completed-match data and verify historical Scoresheet/standings behavior.
+
+
+### Practice game-result persistence (implementation PR pending)
+- User approved normalizing `game_log` and recording every individual result for 8-ball, 9-ball, 10-ball, and Ultimate Pool.
+- `practice_games` remains the session parent/configuration/summary; `practice_game_results` stores one row per individual game/rack with sequence, optional 8-ball point totals, winner, and timestamp. `shot_events` remains the separate optional shot-level ledger.
+- Result entry and undo use transactional database RPCs that lock the parent, mutate the result ledger, and update aggregate scores together. Resume reloads result rows and totals from Supabase; browser active-session storage is not the authoritative result ledger.
+- 8-ball requires both nonnegative whole-number point totals; Race to Points adds points, while Race to Games/Best of X adds one win. Other game types record a winner-only rack result and add one to that player's score.
+- SQL backfills legacy `game_log` arrays before dropping the JSONB column. Shot events remain linked to the parent session UUID.
+- PR, SQL application, CI, and live acceptance are pending.
+
+- Active-session browser storage is retained only as a setup/navigation draft and session UUID; submitted game/rack results and aggregate scores are deliberately stripped from that JSON snapshot and rehydrated from Supabase.
