@@ -406,3 +406,59 @@ describe("Practice data persistence", () => {
     expect(practice).toContain("step=\"0.1\"");
   });
 });
+
+
+describe("Practice game result persistence", () => {
+  it("stores individual results relationally and synchronizes session totals", () => {
+    const practice = read("src/Practice.jsx");
+    const db = read("src/db.js");
+    const sql = read("supabase-schema-practice-game-results.sql");
+    expect(practice).toContain("db.recordPracticeGameResult");
+    expect(practice).toContain("db.undoLastPracticeGameResult");
+    expect(practice).toContain("db.listPracticeGameResults");
+    expect(practice).toContain("Record Rack Win");
+    expect(practice).not.toContain("game_log:");
+    expect(practice).toContain("function practiceSessionSnapshot(session)");
+    expect(practice).toContain("gameLog, myScore, opponentScore, myPts, oppPts, winner, completedAt");
+    expect(db).toContain('from("practice_game_results")');
+    expect(db).toContain("record_practice_game_result");
+    expect(db).toContain("undo_last_practice_game_result");
+    expect(sql).toContain("create table if not exists public.practice_game_results");
+    expect(sql).toContain("enable row level security");
+    expect(sql).toContain("grant select, insert, update, delete on public.practice_game_results to authenticated");
+    expect(sql).toContain("create or replace function public.record_practice_game_result");
+    expect(sql).toContain("create or replace function public.undo_last_practice_game_result");
+    expect(sql).toContain("drop column if exists game_log");
+  });
+  it("records point scores for 8-ball and one winner-only row per other rack", () => {
+    const practice = read("src/Practice.jsx");
+    expect(practice).toContain("Number.isInteger(my)");
+    expect(practice).toContain('saveGameResult({ myPoints: my, oppPoints: opp');
+    expect(practice).toContain('saveGameResult({ gameWinner: who })');
+  });
+});
+
+
+describe("Practice active-session finalization", () => {
+  it("finishes an active practice through the database instead of discarding it", () => {
+    const active = read("src/ActiveSessionContext.jsx");
+    const db = read("src/db.js");
+    const sql = read("supabase-schema-practice-game-results.sql");
+    expect(active).toContain('db.finishPracticeGame(gameId)');
+    expect(active).toContain("Any recorded games and scores will be saved");
+    expect(active).not.toContain("unsaved score will be discarded");
+    expect(db).toContain('supabase.rpc("finish_practice_game"');
+    expect(sql).toContain("create or replace function public.finish_practice_game(p_practice_game_id uuid)");
+    expect(sql).toContain("completed_at = coalesce(completed_at, now())");
+    expect(sql).toContain("revoke all on function public.finish_practice_game(uuid) from public, anon");
+    expect(sql).toContain("grant execute on function public.finish_practice_game(uuid) to authenticated");
+  });
+
+  it("guards result writes against same-render rapid repeats", () => {
+    const practice = read("src/Practice.jsx");
+    expect(practice).toContain("const savingResultRef = useRef(false);");
+    expect(practice).toContain("if (savingResultRef.current) return;");
+    expect(practice).toContain("savingResultRef.current = true;");
+    expect(practice).toContain("savingResultRef.current = false;");
+  });
+});

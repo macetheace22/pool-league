@@ -2454,6 +2454,39 @@ export async function updatePracticeGame(id, profileId, row) {
     .eq("id", id).eq("created_by", profileId).select().single();
   return error ? null : data;
 }
+
+ // Durable game/rack ledger. RPCs lock the parent and update totals atomically.
+export async function listPracticeGameResults(practiceGameId) {
+  if (!practiceGameId) return [];
+  const { data, error } = await supabase.from("practice_game_results").select("*")
+    .eq("practice_game_id", practiceGameId).order("game_number", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+export async function recordPracticeGameResult({ practiceGameId, myPoints = null, opponentPoints = null, winner }) {
+  if (!practiceGameId || !winner) throw new Error("A practice game and winner are required.");
+  const { data, error } = await supabase.rpc("record_practice_game_result", {
+    p_practice_game_id: practiceGameId, p_my_points: myPoints,
+    p_opponent_points: opponentPoints, p_winner: winner,
+  });
+  if (error) throw error;
+  return data;
+}
+export async function undoLastPracticeGameResult(practiceGameId) {
+  if (!practiceGameId) throw new Error("A practice game is required.");
+  const { data, error } = await supabase.rpc("undo_last_practice_game_result", {
+    p_practice_game_id: practiceGameId,
+  });
+  if (error) throw error;
+  return data;
+}
+export async function finishPracticeGame(practiceGameId) {
+  if (!practiceGameId) return false;
+  const { error } = await supabase.rpc("finish_practice_game", {
+    p_practice_game_id: practiceGameId,
+  });
+  return !error;
+}
 // Retained for compatibility with any older callers.
 export async function savePracticeGame(row) {
   const { data, error } = await supabase.from("practice_games").insert(row).select().single();
