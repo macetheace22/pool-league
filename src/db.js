@@ -2843,3 +2843,89 @@ export async function deleteLeagueNews(id) {
   if (error) throw error;
   return true;
 }
+
+
+/**
+ * Record a manager decision for an alleged Section 8.3 illegal substitution.
+ * The app does not adjudicate identity or disciplinary consequences.
+ */
+export async function applyIllegalSubstitutionDecision(matchId, offendingSide, outcome, reason = "") {
+  if (!["home", "away"].includes(offendingSide)) return { ok: false, reason: "INVALID_SIDE" };
+  if (!["accept_result", "five_set_forfeit"].includes(outcome)) return { ok: false, reason: "INVALID_OUTCOME" };
+
+  const { data: prior, error: readError } = await supabase.from("completed_matches")
+    .select("id,state,team_home_total,team_away_total,team_home_points,team_away_points,correction_history,reopened_at,reopened_by,is_makeup_pending")
+    .eq("id", matchId).maybeSingle();
+  if (readError || !prior) return { ok: false, reason: "NOT_FOUND" };
+  if (prior.is_makeup_pending) return { ok: false, reason: "MAKEUP_PENDING" };
+  if (prior.state?.illegalSubstitution?.decision) return { ok: false, reason: "ALREADY_DECIDED" };
+
+  const now = new Date().toISOString();
+  const history = prior.correction_history ?? [];
+  const entryBase = {
+    type: "section_8_3_illegal_substitution",
+    offendingSide,
+    outcome,
+    reason: String(reason ?? "").trim() || null,
+    decidedAt: now,
+  };
+
+  if (outcome === "accept_result") {
+    const { error } = await supabase.from("completed_matches").update({
+      correction_history: [...history, entryBase],
+      reopened_at: null,
+      reopened_by: null,
+    }).eq("id", matchId);
+    return error ? { ok: false, reason: "SAVE_FAILED" } : { ok: true };
+  }
+
+  const sets = prior.state?.sets ?? [];
+  if (sets.length !== 5) return { ok: false, reason: "MATCH_REQUIRES_FIVE_SETS" };
+
+  const forfeitingPlayers = sets.map(s => offendingSide === "home" ? s.playerHome : s.playerAway);
+  const receivingPlayers = sets.map(s => offendingSide === "home" ? s.playerAway : s.playerHome);
+  if (forfeitingPlayers.some(p => !p) || receivingPlayers.some(p => !p)) {
+    return { ok: false, reason: "PLAYER_DATA_INCOMPLETE" };
+  }
+
+  const forfeitedSets = buildFullMatchForfeitSets(
+    { state: prior.state },
+    offendingSide,
+    forfeitingPlayers,
+    receivingPlayers,
+  );
+  const nextState = {
+    ...prior.state,
+    sets: forfeitedSets,
+    fullMatchForfeit: { forfeitingSide },
+    phase: "confirm",
+    illegalSubstitution: {
+      section: "8.3",
+      offendingSide,
+      outcome,
+      decidedAt: now,
+    },
+  };
+  const { homePoints, awayPoints } = computeMatchPoints(nextState);
+  const entry = {
+    ...entryBase,
+    priorTeamHomeTotal: prior.team_home_total,
+    priorTeamAwayTotal: prior.team_away_total,
+    priorTeamHomePoints: prior.team_home_points,
+    priorTeamAwayPoints: prior.team_away_points,
+    newTeamHomeTotal: offendingSide === "home" ? 0 : 5,
+    newTeamAwayTotal: offendingSide === "away" ? 0 : 5,
+  };
+  const { error } = await supabase.from("completed_matches").update({
+    state: nextState,
+    team_home_total: entry.newTeamHomeTotal,
+    team_away_total: entry.newTeamAwayTotal,
+    team_home_points: homePoints,
+    team_away_points: awayPoints,
+    correction_history: [...history, entry],
+    reopened_at: null,
+    reopened_by: null,
+    pending_correction: null,
+  }).eq("id", matchId);
+  return error ? { ok: false, reason: "SAVE_FAILED" } : { ok: true };
+}

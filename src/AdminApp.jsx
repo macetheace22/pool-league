@@ -2423,6 +2423,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   // { mode: "pick" | "edit" | "respond", match, set? }
   const [correctionFlow, setCorrectionFlow] = useState(null);
+  const [illegalSubstitutionMatch, setIllegalSubstitutionMatch] = useState(null);
 
   // Rule 8.5: no make-ups are allowed less than seven days before the
   // last scheduled regular-season date. The schedule's playoff start is the
@@ -2524,6 +2525,16 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
           seasonLabelText={seasonLabelText} playoffsStartDate={playoffsStartDate}
           onCancel={()=>setManualEntryOpen(false)}
           onDone={()=>{ setManualEntryOpen(false); refresh(); }} />
+      </div>
+    );
+  }
+
+  if (illegalSubstitutionMatch) {
+    return (
+      <div className="tab-content">
+        <IllegalSubstitutionPanel match={illegalSubstitutionMatch}
+          onCancel={()=>setIllegalSubstitutionMatch(null)}
+          onDone={()=>{ setIllegalSubstitutionMatch(null); refresh(); }} />
       </div>
     );
   }
@@ -2730,6 +2741,11 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                 {isManager && m.is_makeup_pending && !pastDeadline && (
                   <button className="btn-sm" onClick={()=>resumeMakeup(m)} disabled={resuming===m.id}>
                     {resuming===m.id ? "Loading…" : "Resume Makeup"}
+                  </button>
+                )}
+                {isManager && !m.is_makeup_pending && !m.pending_correction && !m.state?.illegalSubstitution?.decision && (
+                  <button className="btn-sm" style={{color:"#F59E0B",borderColor:"#92400E"}} onClick={()=>setIllegalSubstitutionMatch(m)}>
+                    Illegal Substitution
                   </button>
                 )}
                 {isManager && m.is_makeup_pending && pastDeadline && (
@@ -3261,6 +3277,70 @@ function RespondToCorrection({ match, onDone }) {
       <div style={{display:"flex",gap:8}}>
         <button className="btn-primary" onClick={()=>respond(true)} disabled={saving} style={{flex:1}}>Confirm Correction</button>
         <button className="btn-secondary" onClick={()=>respond(false)} disabled={saving}>Reject</button>
+      </div>
+    </div>
+  );
+}
+
+function IllegalSubstitutionPanel({ match, onCancel, onDone }) {
+  const [offendingSide, setOffendingSide] = useState("home");
+  const [outcome, setOutcome] = useState("five_set_forfeit");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setSaving(true); setError("");
+    const result = await db.applyIllegalSubstitutionDecision(match.id, offendingSide, outcome, reason);
+    setSaving(false);
+    if (!result?.ok) {
+      setError(result?.reason === "ALREADY_DECIDED"
+        ? "A Section 8.3 decision has already been recorded for this match."
+        : result?.reason === "PLAYER_DATA_INCOMPLETE"
+          ? "The archived match is missing player identity/rating data for one or more sets, so the five-set forfeit cannot be applied safely."
+          : "The Section 8.3 decision could not be saved.");
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <div className="tab-content">
+      <button className="btn-secondary" onClick={onCancel} style={{marginBottom:12}}>← Back</button>
+      <div className="card">
+        <div className="card__title">Section 8.3 — Illegal Substitution</div>
+        <div style={{fontSize:12.5,color:"#9A9A9A",marginBottom:12}}>
+          {match.team_home_name} vs {match.team_away_name}
+          {match.week_num ? " · Week " + match.week_num : ""}
+        </div>
+        <div className="field">
+          <Label>Offending team</Label>
+          <select className="input" value={offendingSide} onChange={e=>setOffendingSide(e.target.value)}>
+            <option value="home">{match.team_home_name}</option>
+            <option value="away">{match.team_away_name}</option>
+          </select>
+        </div>
+        <div className="field">
+          <Label>League Management decision</Label>
+          <select className="input" value={outcome} onChange={e=>setOutcome(e.target.value)}>
+            <option value="five_set_forfeit">Five-set forfeit</option>
+            <option value="accept_result">Accept recorded match result</option>
+          </select>
+        </div>
+        <div className="field">
+          <Label>Decision notes (optional)</Label>
+          <textarea className="input" rows={3} value={reason} onChange={e=>setReason(e.target.value)}
+            placeholder="Record the manager's decision/evidence summary if useful." />
+        </div>
+        <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:12}}>
+          This records the League Management decision; it does not determine whether an identity violation occurred.
+          Investigation, proof-of-identity, suspension/expulsion, captain discipline, and postseason/prize decisions remain manual.
+        </div>
+        {error && <ErrorMsg>{error}</ErrorMsg>}
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn-primary" onClick={submit} disabled={saving}>{saving ? "Saving…" : "Record Section 8.3 Decision"}</button>
+          <button className="btn-secondary" onClick={onCancel} disabled={saving}>Cancel</button>
+        </div>
       </div>
     </div>
   );
