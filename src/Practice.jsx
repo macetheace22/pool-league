@@ -40,9 +40,12 @@ function practiceGameRow(profile, session) {
     opponent_name: session.practiceType === "skills_drills" ? null : session.opponentName,
     game_type: session.gameType ?? null,
     format: session.practiceType === "opponent" ? session.format : null,
-    target_config: session.scoringMethod === "race_to_points"
-      ? { myTarget: session.myRating, oppTarget: session.opponentRating }
-      : { x: session.x },
+    target_config: {
+      ...(session.scoringMethod === "race_to_points"
+        ? { myTarget: session.myRating, oppTarget: session.opponentRating }
+        : { x: session.x }),
+      tableSizeFeet: session.tableSizeFeet ?? null,
+    },
     my_rating: session.scoringMethod === "race_to_points" ? session.myRating : null,
     opponent_rating: session.scoringMethod === "race_to_points" ? session.opponentRating : null,
     my_score: session.myScore ?? 0,
@@ -128,8 +131,13 @@ export default function Practice() {
   }
   if (phase === "gametype") {
     return wrap(<GameTypeStep session={session} setSession={setSession}
-      onNext={() => changePhase(session.practiceType === "skills_drills" ? "skillsplay" : "scoring")}
+      onNext={() => changePhase("tablesize")}
       onBack={() => changePhase(session.practiceType === "skills_drills" ? "type" : "opponent")} />);
+  }
+  if (phase === "tablesize") {
+    return wrap(<TableSizeStep session={session} setSession={setSession}
+      onNext={() => changePhase(session.practiceType === "skills_drills" ? "skillsplay" : "scoring")}
+      onBack={() => changePhase("gametype")} />);
   }
   if (phase === "scoring") {
     return wrap(<ScoringMethodStep session={session} setSession={setSession}
@@ -413,6 +421,44 @@ function GameTypeStep({ session, setSession, onNext, onBack }) {
               </button>
             ))}
           </div>
+        </div>
+        <button className="btn-secondary" onClick={onBack}>← Back</button>
+      </div>
+    </>
+  );
+}
+
+// ─── Step 3: table size ───────────────────────────────────────────────────
+function TableSizeStep({ session, setSession, onNext, onBack }) {
+  const [value, setValue] = useState(session.tableSizeFeet ?? "");
+  const [err, setErr] = useState("");
+
+  const next = () => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) {
+      setErr("Enter the table size in feet (for example, 7, 8, or 9).");
+      return;
+    }
+    setSession(s => ({ ...s, tableSizeFeet: n }));
+    onNext();
+  };
+
+  return (
+    <>
+      <PageHeader title="Practice" subtitle={session.practiceType === "skills_drills" ? "Skills & Drills" : "vs " + session.opponentName} onBack={onBack} />
+      <div className="tab-content">
+        <div className="card">
+          <div className="card__title">Table Size</div>
+          <div style={{fontSize:11.5,color:"#9A9A9A",marginBottom:8}}>
+            Enter the table size in feet used for this practice session.
+          </div>
+          <div className="field">
+            <div className="form-label">Size (feet)</div>
+            <input className="input" type="number" min="1" step="0.1" value={value}
+              onChange={e => { setValue(e.target.value); setErr(""); }} placeholder="7, 8, or 9" />
+          </div>
+          {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
+          <button className="btn-primary" style={{marginTop:10}} onClick={next}>Continue</button>
         </div>
         <button className="btn-secondary" onClick={onBack}>← Back</button>
       </div>
