@@ -1056,7 +1056,7 @@ function seasonLabelFor(row) {
 // concept at all, so they're included under Career but excluded whenever a
 // specific season is selected -- called out inline rather than silently
 // dropped.
-function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "all", defaultCareer = false, hideNameHeader = false }) {
+function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "all", defaultCareer = false, hideNameHeader = false, includedSources = null, practiceGames = [], practiceGamesLoading = false, practiceGamesError = "", practiceProfile = null }) {
   const navigate = useNavigate();
   const [nameInfo, setNameInfo] = useState(null);
   const [currentRating, setCurrentRating] = useState(null);
@@ -1079,6 +1079,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [headToHead, setHeadToHead] = useState([]);
   const [matchHistory, setMatchHistory] = useState(undefined);
   const [selectedHistoryMatch, setSelectedHistoryMatch] = useState(null);
+  const [selectedHistoryPractice, setSelectedHistoryPractice] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1157,32 +1158,37 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     return [...bySeasonId.values()];
   };
 
+  const selectedSources = includedSources ?? (playCategory === "practice" ? ["practice"] : playCategory === "league" ? ["league"] : playCategory === "tournaments" ? ["tournaments"] : ["league", "practice"]);
+  const includeLeague = selectedSources.includes("league");
+  const includePractice = selectedSources.includes("practice");
+  const includeTournaments = selectedSources.includes("tournaments");
+
   // My Stats All Play and Practice are career-wide. The season scope only
   // applies to League; Player Lookup keeps its existing season/career control.
-  const showScope = playCategory === "league" || !defaultCareer;
-  const effectiveScopeMode = defaultCareer && playCategory !== "league" ? "career" : scopeMode;
+  const showScope = includeLeague || !defaultCareer;
+  const effectiveScopeMode = defaultCareer && !includeLeague ? "career" : scopeMode;
   const activeDivisionIds = effectiveScopeMode === "career"
     ? [...new Set((teamHistory ?? []).map(t => t.divisionId).filter(Boolean))]
     : (seasonOptionsForYear(selectedYear).find(s => s.seasonId === selectedSeasonId)?.divisionIds ?? []);
 
   useEffect(() => {
     if (teamHistory === undefined) return;
-    if (playCategory === "practice" || playCategory === "tournaments") {
+    if (!includeLeague) {
       setMatchHistory([]);
       return;
     }
     setMatchHistory(undefined);
     db.listPlayerMatchHistory(playerNum, activeDivisionIds).then(rows => setMatchHistory(rows ?? [])).catch(() => setMatchHistory([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerNum, teamHistory, effectiveScopeMode, selectedSeasonId, playCategory]);
+  }, [playerNum, teamHistory, effectiveScopeMode, selectedSeasonId, includeLeague]);
 
   useEffect(() => {
     if (teamHistory === undefined) return;
     setSeasonRecord(undefined);
-    if (playCategory === "practice") { setSeasonRecord(null); return; }
+    if (!includeLeague) { setSeasonRecord(null); return; }
     db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord).catch(() => setSeasonRecord(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerNum, scopeMode, selectedSeasonId, teamHistory, playCategory]);
+  }, [playerNum, scopeMode, selectedSeasonId, teamHistory, includeLeague]);
 
   // MVP rank and playoff eligibility are both scoped to a single division's
   // real standings/report -- meaningless across a career spanning multiple
@@ -1211,9 +1217,14 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const scopedSeasonLabel = scopedSeasonRow ? `Div ${scopedSeasonRow.divisionNum} · ${seasonLabelFor(scopedSeasonRow)} ${scopedSeasonRow.seasonYear}` : "";
 
   const scopedEvents = rawEvents
-    ? (effectiveScopeMode === "career" ? rawEvents : rawEvents.filter(e => activeDivisionIds.includes(e.division_id)))
+    ? (effectiveScopeMode === "career"
+        ? rawEvents
+        : rawEvents.filter(e => matchesPlayType(e, "practice") || activeDivisionIds.includes(e.division_id)))
     : [];
-  const sourceEvents = scopedEvents.filter(e => playCategory === "all" || (playCategory === "league" ? matchesPlayType(e, "league") : playCategory === "practice" ? matchesPlayType(e, "practice") : false));
+  const sourceEvents = scopedEvents.filter(e =>
+    (matchesPlayType(e, "league") && includeLeague) ||
+    (matchesPlayType(e, "practice") && includePractice)
+  );
   const filteredEvents = sourceEvents.filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && (playCategory === "all" ? matchesPlayType(e, playTypeFilter) : true));
   const shotStats = rawEvents ? db.computeShotStats(filteredEvents) : null;
 
@@ -1225,14 +1236,35 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawEvents, gameTypeFilter, playTypeFilter, effectiveScopeMode, selectedSeasonId, playCategory]);
 
-  const winPct = seasonRecord && seasonRecord.sets > 0 ? Math.round((seasonRecord.wins / seasonRecord.sets) * 100) : null;
-  const statBoxes = seasonRecord ? [
-    { label: "Sets Played", value: seasonRecord.sets },
-    { label: "Wins", value: seasonRecord.wins },
-    { label: "Losses", value: seasonRecord.losses },
-    { label: "Win %", value: winPct != null ? `${winPct}%` : "—" },
-    { label: "Points Scored", value: seasonRecord.pointsScored },
-    { label: "MVP Ranking Pts", value: seasonRecord.mvpRanking },
+  const leagueWins = seasonRecord?.wins ?? 0;
+  const leagueLosses = seasonRecord?.losses ?? 0;
+  const leagueSets = seasonRecord?.sets ?? 0;
+  const practiceWins = (practiceGames ?? []).filter(g => g.winner === "me" && g.practice_type !== "skills_drills").length;
+  const practiceLosses = (practiceGames ?? []).filter(g => g.winner === "opponent" && g.practice_type !== "skills_drills").length;
+  const practiceGamesPlayed = (practiceGames ?? []).filter(g => g.practice_type !== "skills_drills").length;
+  const combinedWins = (includeLeague ? leagueWins : 0) + (includePractice ? practiceWins : 0);
+  const combinedLosses = (includeLeague ? leagueLosses : 0) + (includePractice ? practiceLosses : 0);
+  const combinedDecided = combinedWins + combinedLosses;
+  const combinedWinPct = combinedDecided ? Math.round((combinedWins / combinedDecided) * 100) : null;
+  const statBoxes = includeLeague && includePractice ? [
+    { label: "League Sets", value: leagueSets },
+    { label: "Practice Games", value: practiceGamesPlayed },
+    { label: "Wins", value: combinedWins },
+    { label: "Losses", value: combinedLosses },
+    { label: "Win %", value: combinedWinPct != null ? combinedWinPct + "%" : "—" },
+    { label: "MVP Ranking Pts", value: seasonRecord?.mvpRanking ?? "—" },
+  ] : includeLeague ? [
+    { label: "Sets Played", value: leagueSets },
+    { label: "Wins", value: leagueWins },
+    { label: "Losses", value: leagueLosses },
+    { label: "Win %", value: leagueSets ? Math.round((leagueWins / leagueSets) * 100) + "%" : "—" },
+    { label: "Points Scored", value: seasonRecord?.pointsScored ?? "—" },
+    { label: "MVP Ranking Pts", value: seasonRecord?.mvpRanking ?? "—" },
+  ] : includePractice ? [
+    { label: "Games", value: practiceGamesPlayed },
+    { label: "Wins", value: practiceWins },
+    { label: "Losses", value: practiceLosses },
+    { label: "Win %", value: combinedWinPct != null ? combinedWinPct + "%" : "—" },
   ] : [];
 
   const exportAll = () => {
@@ -1240,7 +1272,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || matchHistory === undefined || (playCategory !== "practice" && playCategory !== "tournaments" && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
+  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || (includeLeague && matchHistory === undefined) || (includeLeague && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
 
   return (
     <>
@@ -1274,12 +1306,11 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         )}
       </div>}
 
-      {playCategory !== "practice" && seasonRecord === undefined && <Loader />}
-      {playCategory !== "practice" && seasonRecord && (
+      {includeLeague && seasonRecord === undefined && <Loader />}
+      {(includeLeague || includePractice) && (
         <div className="card">
-          <div className="card__title">{effectiveScopeMode === "career" ? "Career Record" : "Season Record"}</div>
-          {seasonRecord.sets === 0
-            ? <div className="dash-empty">No matches recorded for this scope.</div>
+          <div className="card__title">{includeLeague && includePractice ? "Combined Record" : includePractice ? "Practice Record" : effectiveScopeMode === "career" ? "Career Record" : "Season Record"}</div>
+          {(!includeLeague && practiceGamesLoading) ? <Loader /> : practiceGamesError && includePractice ? <div className="error-msg">Unable to load practice stats: {practiceGamesError}</div> : statBoxes.every(box => box.value === 0 || box.value === "—") ? <div className="dash-empty">No completed results are recorded for the selected play.</div>
             : (
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:6}}>
                 {statBoxes.map(b => (
@@ -1312,32 +1343,50 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         </div>
       )}
 
-      {playCategory !== "practice" && playCategory !== "tournaments" && (
+      {(includeLeague || includePractice) && (
         <div className="card">
-          <div className="card__title">Match History</div>
-          <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Select a completed match to view the saved scoresheet.</div>
-          {matchHistory.length === 0 ? <div className="dash-empty">No individual match results are recorded for this scope.</div> : (
-            <div className="list" style={{marginTop:6}}>
-              {matchHistory.map(m => (
-                <button key={m.id} type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} onClick={() => setSelectedHistoryMatch(m)}>
+          <div className="card__title">History</div>
+          <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>League and practice results are shown together based on your selected play filters. Select any result to view its saved scoresheet.</div>
+          {(() => {
+            const leagueRows = includeLeague ? (matchHistory ?? []).map(m => ({ ...m, _source: "league", _sortDate: m.confirmed_at || m.created_at })) : [];
+            const practiceRows = includePractice ? (practiceGames ?? []).filter(g => g.practice_type !== "skills_drills").map(g => ({ ...g, _source: "practice", _sortDate: g.completed_at || g.played_at })) : [];
+            const rows = [...leagueRows, ...practiceRows].sort((a,b) => new Date(b._sortDate || 0) - new Date(a._sortDate || 0));
+            if (rows.length === 0) return <div className="dash-empty">No completed results are recorded for the selected play.</div>;
+            return <div className="list" style={{marginTop:6}}>
+              {rows.map(row => row._source === "league" ? (
+                <button key={"league-" + row.id} type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} onClick={() => setSelectedHistoryMatch(row)}>
                   <div className="list-row__body">
                     <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
-                      <span className="list-row__name">vs {m.opponentTeamName}</span>
-                      <span className="list-row__sub">{m.week_num ? "Week " + m.week_num + " · " : ""}{m.week_date || new Date(m.confirmed_at || m.created_at).toLocaleDateString()} · {m.playerSetsWon}–{m.playerSetsLost} sets</span>
+                      <span className="list-row__name"><span style={{fontSize:9.5,fontWeight:800,color:"#8A8A8A",textTransform:"uppercase",marginRight:6}}>League</span>vs {row.opponentTeamName}</span>
+                      <span className="list-row__sub">{row.week_num ? "Week " + row.week_num + " · " : ""}{row.week_date || new Date(row.confirmed_at || row.created_at).toLocaleDateString()} · {row.playerSetsWon}–{row.playerSetsLost} sets</span>
                     </div>
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
-                      {(m.team_home_total != null || m.team_away_total != null) && <span className="player-rating-badge">{m.team_home_total ?? 0}–{m.team_away_total ?? 0}</span>}
+                      {(row.team_home_total != null || row.team_away_total != null) && <span className="player-rating-badge">{row.team_home_total ?? 0}–{row.team_away_total ?? 0}</span>}
+                      <ChevronRight size={14} color="#6A6A6A" />
+                    </div>
+                  </div>
+                </button>
+              ) : (
+                <button key={"practice-" + row.id} type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} onClick={() => setSelectedHistoryPractice(row)}>
+                  <div className="list-row__body">
+                    <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
+                      <span className="list-row__name"><span style={{fontSize:9.5,fontWeight:800,color:"#8A8A8A",textTransform:"uppercase",marginRight:6}}>Practice</span>vs {row.opponent_name}</span>
+                      <span className="list-row__sub">{({"8ball":"8-Ball","9ball":"9-Ball","10ball":"10-Ball",ultimate:"Ultimate Pool"})[row.game_type] ?? row.game_type ?? "Practice"}{row.scoring_method ? " · " + ({"race_to_points":"Race to Points","race_to_games":"Race to Games","best_of_games":"Best of X Games"})[row.scoring_method] : ""} · {row.my_score}–{row.opponent_score} · {new Date(row.completed_at || row.played_at).toLocaleDateString()}</span>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:11,fontWeight:800,color:row.winner === "me" ? "#5FCF9E" : "#F87171"}}>{row.winner === "me" ? "W" : row.winner === "opponent" ? "L" : "—"}</span>
                       <ChevronRight size={14} color="#6A6A6A" />
                     </div>
                   </div>
                 </button>
               ))}
-            </div>
-          )}
+            </div>;
+          })()}
         </div>
       )}
       {selectedHistoryMatch && <div className="card" style={{padding:0}}><Scoresheet match={selectedHistoryMatch} onClose={() => setSelectedHistoryMatch(null)} closeLabel="Back to My Stats" /></div>}
-      {playCategory !== "practice" && teamHistory.length > 0 && (
+      {selectedHistoryPractice && <div className="card" style={{padding:0}}><Scoresheet practiceGame={selectedHistoryPractice} profile={practiceProfile} onClose={() => setSelectedHistoryPractice(null)} closeLabel="Back to My Stats" /></div>}
+      {includeLeague && teamHistory.length > 0 && (
         <div className="card">
           <div className="card__title">Team History</div>
           <div className="list" style={{marginTop:6}}>
@@ -1357,7 +1406,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         </div>
       )}
 
-      {playCategory !== "practice" && ratingHistory.length > 0 && (
+      {includeLeague && ratingHistory.length > 0 && (
         <div className="card">
           <div className="card__title">Rating History</div>
           <div className="list" style={{marginTop:6}}>
@@ -1383,7 +1432,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       {rawEvents && playCategory !== "tournaments" && (
         <>
           <div className="card">
-            <div className="card__title">Advanced Stats (Track a Rack)</div>
+            <div className="card__title">Track a Rack — Individual Stats</div>
             <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:4}}>
               <FilterChips options={PLAY_TYPE_FILTERS} value={playTypeFilter} onChange={setPlayTypeFilter} />
               <FilterChips options={GAME_TYPE_FILTERS} value={gameTypeFilter} onChange={setGameTypeFilter} />
@@ -1400,26 +1449,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
                 </>}
           </div>
 
-          <div className="card">
-            <div className="card__title">Head-to-Head</div>
-            {headToHead.length === 0 ? (
-              <div className="dash-empty">No opponent shot data is available for this play type yet. Head-to-Head includes league and practice Track a Rack sessions when opponent details are available.</div>
-            ) : (
-              <div className="list" style={{marginTop:6}}>
-                {headToHead.map(h => (
-                  <div key={h.opponentKey ?? h.opponentNum ?? "unknown"} className="list-row">
-                    <div className="list-row__body">
-                      <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
-                        <span className="list-row__name">{h.name}{h.nickname ? ` "${h.nickname}"` : ""}</span>
-                        <span className="list-row__sub">{h.stats.totalShots} shots · {h.stats.makePct}% makes · {h.stats.runouts} runouts</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
+      </>
       )}
       {rawEvents === null && !rawEventsError && playCategory !== "tournaments" && (
         <>
@@ -1429,7 +1459,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
           </div>
           <div className="card">
             <div className="card__title">Head-to-Head</div>
-            <div className="dash-empty">No opponent shot data is available yet. Track shots during league matches or practice sessions to build this breakdown.</div>
+            <div className="dash-empty">No Track a Rack shots have been recorded yet for this play type.</div>
           </div>
         </>
       )}
@@ -1439,11 +1469,11 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
 function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
-  const [playCategory, setPlayCategory] = useState("all");
+  const [includedSources, setIncludedSources] = useState(["league", "practice"]);
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
   const [practiceGamesError, setPracticeGamesError] = useState("");
-  const [selectedHistoryPractice, setSelectedHistoryPractice] = useState(null);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -1477,37 +1507,39 @@ function MyStatsPage({ profile }) {
   const practiceLosses = completedPractice.filter(g => g.winner === "opponent").length;
   const practiceDecided = practiceWins + practiceLosses;
   const practiceWinPct = practiceDecided ? Math.round((practiceWins / practiceDecided) * 100) : null;
-  const showPractice = playCategory === "all" || playCategory === "practice";
-  const showLeague = playCategory === "all" || playCategory === "league";
+  const includeLeague = includedSources.includes("league");
+  const includePractice = includedSources.includes("practice");
+  const includeTournaments = includedSources.includes("tournaments");
+  const allSourcesSelected = ["league", "practice", "tournaments"].every(source => includedSources.includes(source));
+  const toggleSource = source => setIncludedSources(current => current.includes(source) ? current.filter(s => s !== source) : [...s, source]);
+  const toggleAllSources = () => setIncludedSources(allSourcesSelected ? [] : ["league", "practice", "tournaments"]);
 
-  const categories = [
-    { key: "all", label: "All Play", description: "Combined player performance" },
-    { key: "practice", label: "Practice", description: "Practice sessions and shot tracking" },
-    { key: "league", label: "League", description: "IBA league match performance" },
-    { key: "tournaments", label: "Tournaments", description: "Tournament results and performance" },
-  ];
+
 
   return (
     <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
         <div className="card">
-          <div className="card__title">Choose Statistics</div>
-          <div style={{fontSize:11.5,color:"#8A8A8A",marginBottom:10}}>
-            Select the type of play you want to review. All Play combines the available practice and league information.
-          </div>
+          <div className="card__title">Include in My Stats</div>
+          <div style={{fontSize:11.5,color:"#8A8A8A",marginBottom:10}}>Choose which types of play are included throughout this page. The same selection drives your record, history, Track a Rack stats, and Match Head-to-Head.</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>
-            {categories.map(category => (
-              <button key={category.key} type="button"
-                className={playCategory === category.key ? "btn-primary" : "btn-secondary"}
-                aria-pressed={playCategory === category.key}
-                onClick={() => setPlayCategory(category.key)}
-                style={{minHeight:58,textAlign:"left",padding:"10px 12px",whiteSpace:"normal"}}>
-                <span style={{display:"block",fontWeight:800,fontSize:12}}>{category.label}</span>
-                <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3}}>{category.description}</span>
+            <button type="button" className={allSourcesSelected ? "btn-primary" : "btn-secondary"} aria-pressed={allSourcesSelected} onClick={toggleAllSources} style={{minHeight:48,textAlign:"left",padding:"10px 12px"}}>
+              <span style={{display:"block",fontWeight:800,fontSize:12}}>All Play</span>
+              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3}}>Include every available source</span>
+            </button>
+            {[
+              {key:"league",label:"League",description:"IBA league matches"},
+              {key:"practice",label:"Practice",description:"Practice games and drills"},
+              {key:"tournaments",label:"Tournaments",description:"Tournament results (when available)"},
+            ].map(source => (
+              <button key={source.key} type="button" className={includedSources.includes(source.key) ? "btn-primary" : "btn-secondary"} aria-pressed={includedSources.includes(source.key)} onClick={() => toggleSource(source.key)} style={{minHeight:48,textAlign:"left",padding:"10px 12px"}}>
+                <span style={{display:"block",fontWeight:800,fontSize:12}}>{source.label}</span>
+                <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3}}>{source.description}</span>
               </button>
             ))}
           </div>
+          {includedSources.length === 0 && <div className="dash-empty" style={{marginTop:10}}>Select at least one type of play.</div>}
         </div>
 
         {profile?.player_num && (
@@ -1520,16 +1552,14 @@ function MyStatsPage({ profile }) {
           </div>
         )}
 
-        {playCategory === "tournaments" ? (
+        {includedSources.length === 0 ? null : includeTournaments && !includeLeague && !includePractice ? (
           <div className="card">
             <div className="card__title">Tournament Statistics</div>
             <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app.</div>
           </div>
         ) : (
           <>
-            {showPractice && (
-              <div className="card">
-                <div className="card__title">Practice History</div>
+            {false && (
                 <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Select a completed practice session to view its saved scoresheet.</div>
                 {completedPractice.length === 0 ? <div className="dash-empty">No completed practice sessions recorded yet.</div> : (
                   <div className="list" style={{marginTop:6}}>
@@ -1548,9 +1578,7 @@ function MyStatsPage({ profile }) {
                 )}
               </div>
             )}
-            {showPractice && (
-              <div className="card">
-                <div className="card__title">Practice Record</div>
+            {false && (
                 {practiceGames === undefined ? <Loader /> : practiceGamesError ? (
                   <div className="error-msg">Unable to load practice stats: {practiceGamesError}</div>
                 ) : completedPractice.length === 0 ? (
@@ -1576,7 +1604,7 @@ function MyStatsPage({ profile }) {
               </div>
             )}
 
-            {showLeague && !profile?.player_num && (
+            {includeLeague && !profile?.player_num && (
               <div className="card">
                 <div className="card__title">Link Your Player Number</div>
                 <div style={{fontSize:12.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
@@ -1586,8 +1614,8 @@ function MyStatsPage({ profile }) {
               </div>
             )}
 
-            {profile?.player_num && (showLeague || showPractice) && (
-              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory={playCategory} defaultCareer hideNameHeader />
+            {profile?.player_num && includedSources.length > 0 && (
+              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory="all" includedSources={includedSources} practiceGames={completedPractice} practiceGamesLoading={practiceGames === undefined} practiceGamesError={practiceGamesError} practiceProfile={profile} defaultCareer hideNameHeader />
             )}
           </>
         )}
