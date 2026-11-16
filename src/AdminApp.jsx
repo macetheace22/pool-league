@@ -375,15 +375,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     if (page !== "manual-import" || !requestedSeasonId || !seasons.length) return;
     const target = seasons.find(season => season.id === requestedSeasonId);
     if (!target || target.id === viewingSeason?.id) return;
-    let cancelled = false;
     const targetDivision = target.divisions?.[0] ?? null;
-    (async () => {
-      await loadDivisionData(targetDivision);
-      if (cancelled) return;
-      setViewingSeason(target);
-      setViewingDiv(targetDivision);
-    })();
-    return () => { cancelled = true; };
+    setViewingSeason(target);
+    setViewingDiv(targetDivision);
   }, [page, requestedSeasonId, seasons, viewingSeason?.id]);
 
   useEffect(() => {
