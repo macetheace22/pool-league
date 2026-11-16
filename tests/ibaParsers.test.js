@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLeagueRoster, parseStandingsImport, parseMvpImport } from "../src/ibaParsers";
+import { parseLeagueRoster, parseStandingsImport, parseMvpImport, parsePlayoffEligibilityRoster } from "../src/ibaParsers";
 
 describe("IBA parsers", () => {
   it("keeps standings compatible with tab-delimited paste and supports PDF space extraction", () => {
@@ -142,4 +142,76 @@ describe("IBA parsers", () => {
     expect(result.rosters["15101"]).toEqual(["12345"]);
     expect(result.registry["12345"]).toMatchObject({ name:"Billy Macy", rating:50 });
   });
+  describe("playoff eligibility roster parser", () => {
+    it("extracts player eligibility, team association, week, and a two-digit effective date", () => {
+      const result = parsePlayoffEligibilityRoster([
+        "Division Playoffs - Roster and Handicap Report",
+        "For Week: 17",
+        "Ratings current as of: 11/15/25",
+        "Team 15101 Team One",
+        "Rate Num Elig Name",
+        "105 12345 E Player One",
+        "NR 23456 T Player Two",
+      ].join("\\n"));
+
+      expect(result.eligibilityWeek).toBe(17);
+      expect(result.eligibilityAsOfDate).toBe("2025-11-15");
+      expect(result.eligibilityParseError).toBeNull();
+      expect(result.teams["15101"]).toMatchObject({ name: "Team One" });
+      expect(result.eligibilityRows).toEqual([
+        expect.objectContaining({ teamNum: "15101", num: "12345", name: "Player One", eligCode: "E" }),
+        expect.objectContaining({ teamNum: "15101", num: "23456", name: "Player Two", eligCode: "T" }),
+      ]);
+      expect(result.rosters["15101"]).toEqual(["12345", "23456"]);
+    });
+
+    it("maps rows to the correct team when a flattened report contains multiple team columns", () => {
+      const result = parsePlayoffEligibilityRoster([
+        "Division Playoffs - Roster and Handicap Report",
+        "Ratings current as of: 11/15/2025",
+        "Team 15101 Team One Team 15102 Team Two",
+        "Rate Num Elig Name",
+        "105 12345 E Player One 106 23456 A Player Two",
+      ].join("\\n"));
+
+      expect(result.eligibilityRows).toEqual([
+        expect.objectContaining({ teamNum: "15101", num: "12345", eligCode: "E" }),
+        expect.objectContaining({ teamNum: "15102", num: "23456", eligCode: "A" }),
+      ]);
+    });
+
+    it("does not guess an effective date when it is missing or conflicting", () => {
+      const missing = parsePlayoffEligibilityRoster([
+        "Division Playoffs - Roster and Handicap Report",
+        "Team 15101 Team One",
+        "105 12345 E Player One",
+      ].join("\\n"));
+      const conflicting = parsePlayoffEligibilityRoster([
+        "Division Playoffs - Roster and Handicap Report",
+        "Ratings current as of: 11/15/25",
+        "Ratings current as of: 11/22/25",
+        "Team 15101 Team One",
+        "105 12345 E Player One",
+      ].join("\\n"));
+
+      expect(missing.eligibilityAsOfDate).toBeNull();
+      expect(missing.eligibilityParseError).toMatch(/date could not be read/i);
+      expect(conflicting.eligibilityAsOfDate).toBeNull();
+      expect(conflicting.eligibilityParseError).toMatch(/date could not be read/i);
+      expect(conflicting.eligibilityRows).toHaveLength(1);
+    });
+
+    it("rejects an invalid calendar date rather than normalizing it", () => {
+      const result = parsePlayoffEligibilityRoster([
+        "Division Playoffs - Roster and Handicap Report",
+        "Ratings current as of: 02/30/2025",
+        "Team 15101 Team One",
+        "105 12345 E Player One",
+      ].join("\\n"));
+
+      expect(result.eligibilityAsOfDate).toBeNull();
+      expect(result.eligibilityParseError).toMatch(/date could not be read/i);
+    });
+  });
+
 });
