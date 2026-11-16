@@ -561,7 +561,8 @@ export async function updateDivision(divisionId, num, name, format, day) {
 // which season(s) still need teams imported, without pulling full team rows.
 export async function countTeamsByDivisions(divisionIds) {
   if (!divisionIds.length) return {};
-  const { data } = await supabase.from("teams").select("division_id").in("division_id", divisionIds);
+  const { data, error } = await supabase.from("teams").select("division_id").in("division_id", divisionIds);
+  if (error) throw error;
   const counts = {};
   (data ?? []).forEach(t => { counts[t.division_id] = (counts[t.division_id] ?? 0) + 1; });
   return counts;
