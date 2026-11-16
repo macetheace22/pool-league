@@ -36,4 +36,14 @@ describe("groupHeadToHeadEvents", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].key).toBe("unknown");
   });
+  it("excludes solo skills-and-drills sessions from opponent comparisons", () => {
+    const events = [
+      { context_type: "practice_game", context_id: "drill-1", opponent_player_num: null },
+      { context_type: "practice_game", context_id: "opponent-1", opponent_player_num: null },
+    ];
+    const groups = groupHeadToHeadEvents(events, { "opponent-1": "Alex" }, ["drill-1"]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].key).toBe("manual:alex");
+  });
+
 });
