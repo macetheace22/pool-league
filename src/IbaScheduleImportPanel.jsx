@@ -8,6 +8,7 @@ export function clearIbaSchedulePanelState() {
 import { useNavigate } from "react-router-dom";
 import { Check, Calendar, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import * as db from "./db";
+import { compareIbaSchedules } from "./ibaScheduleComparison";
 
 async function postSchedule(body) {
   const r = await fetch("/api/iba-schedules", {
@@ -52,6 +53,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   const [expanded, setExpanded] = useState(() => cachedState.expanded ?? null);
   const [result, setResult] = useState(() => cachedState.result ?? null);
   const [diagnostic, setDiagnostic] = useState(() => cachedState.diagnostic ?? null);
+  const [comparisonResults, setComparisonResults] = useState(() => cachedState.comparisonResults ?? {});
   const [retrieveProgress, setRetrieveProgress] = useState({ current: 0, total: 0 });
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [currentImportLabel, setCurrentImportLabel] = useState("");
@@ -76,9 +78,9 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
   useEffect(() => {
     if (!season?.id) return;
     schedulePanelStateBySeason.set(season.id, {
-      divisions, selected, previews, rowErrors, expanded, result, diagnostic,
+      divisions, selected, previews, rowErrors, expanded, result, diagnostic, comparisonResults,
     });
-  }, [season?.id, divisions, selected, previews, rowErrors, expanded, result, diagnostic]);
+  }, [season?.id, divisions, selected, previews, rowErrors, expanded, result, diagnostic, comparisonResults]);
 
   const discover = async () => {
     setLoading(true);
@@ -159,6 +161,37 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       }
     } catch (e) {
       setError(e?.message || "Unable to discover IBA divisions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const compareSchedule = async (division) => {
+    const key = divisionKey(division);
+    setLoading(true);
+    setError("");
+    try {
+      let data = previews[key];
+      if (!data) {
+        data = await postSchedule({ action: "fetch", format: division.format, day: division.day, division: division.value || division.label });
+        setPreviews(p => ({ ...p, [key]: data }));
+      }
+      setRowErrors(p => { const next = { ...p }; delete next[key]; return next; });
+      const savedSnapshot = await db.getIbaScheduleComparisonSnapshot(season.id, extractDivisionNum(division));
+      const report = compareIbaSchedules({
+        saved: { teams: savedSnapshot.teams, weeks: savedSnapshot.weeks },
+        official: data,
+        errors: [],
+      });
+      setComparisonResults(p => ({ ...p, [key]: report }));
+      setExpanded(key);
+    } catch (e) {
+      setComparisonResults(p => ({ ...p, [key]: {
+        status: "incomplete",
+        reason: e?.message || "Unable to compare the saved and official schedules.",
+        changes: [],
+        summary: { added: 0, removed: 0, changed: 0, dateChanges: 0, tbaResolutions: 0 },
+      }}));
     } finally {
       setLoading(false);
     }
@@ -414,8 +447,38 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                         {data ? (open ? "Hide preview" : "Preview") : (rowErrors[key] ? "Retry retrieval" : "Retrieve preview")}
                       </button>
                       {data && <button className="btn-sm" onClick={() => fetchPreview(d)} disabled={loading || importing}>Retry from IBA</button>}
+                      <button className="btn-sm" onClick={() => compareSchedule(d)} disabled={loading || importing || !season?.id}>
+                        Compare with saved
+                      </button>
                     </div>
                   </div>
+
+                  {comparisonResults[key] && (
+                    <div role="status" style={{ padding: "8px 9px", background: "#101010", border: "1px solid #333", borderRadius: 7, fontSize: 11, lineHeight: 1.5 }}>
+                      <strong style={{ color: comparisonResults[key].status === "incomplete" ? "#F59E0B" : "#E0E0E0" }}>
+                        {comparisonResults[key].status === "incomplete" ? "Comparison incomplete" : comparisonResults[key].status === "no_changes" ? "No schedule changes found" : "Schedule changes found — review only"}
+                      </strong>
+                      {comparisonResults[key].reason && <div>{comparisonResults[key].reason}</div>}
+                      {comparisonResults[key].status !== "incomplete" && (
+                        <>
+                          <div>{comparisonResults[key].summary.added} added · {comparisonResults[key].summary.removed} removed · {comparisonResults[key].summary.changed} matchup changes · {comparisonResults[key].summary.dateChanges} date changes · {comparisonResults[key].summary.tbaResolutions} TBA resolutions · {comparisonResults[key].summary.teamDetailsChanged || 0} team detail changes</div>
+                          {comparisonResults[key].changes.map((change, index) => (
+                            <div key={index} style={{ marginTop: 3, color: "#BDBDBD" }}>
+                              Week {change.week ?? "—"}: {change.type.replaceAll("_", " ")}
+                              {change.homeTeamNum ? ` · Team ${change.homeTeamNum}` : ""}
+                              {change.teamNum ? ` · Team ${change.teamNum}` : ""}
+                              {change.awayTeamNum ? ` vs ${change.awayTeamNum}` : ""}
+                              {change.fromAwayTeamNum != null || change.toAwayTeamNum != null ? ` · ${change.fromAwayTeamNum ?? "TBA"} → ${change.toAwayTeamNum ?? "TBA"}` : ""}
+                              {change.from || change.to ? ` · ${change.from ?? "—"} → ${change.to ?? "—"}` : ""}
+                              {change.fromName != null || change.toName != null ? ` · ${change.fromName ?? "—"} → ${change.toName ?? "—"}` : ""}
+                              {change.fromVenue != null || change.toVenue != null ? ` · ${change.fromVenue ?? "—"} → ${change.toVenue ?? "—"}` : ""}
+                            </div>
+                          ))}
+                          <div style={{ marginTop: 5, color: "#A3A3A3" }}>Read-only comparison. No schedule data was changed. Previously discarded TBA pairings cannot be reconstructed from the saved schedule.</div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {open && data && <SchedulePreview data={data}/>}
                 </div>
               );
