@@ -67,7 +67,7 @@ describe("computeShotStats", () => {
     expect(stats.makePct).toBe(0);
     expect(stats.byDistance.short).toEqual({ attempts: 0, makes: 0, pct: 0 });
     expect(stats.safeties).toEqual({ attempts: 0, successful: 0, pct: 0 });
-    expect(stats.breaks).toEqual({ attempts: 0, made: 0, scratches: 0 });
+    expect(stats.breaks).toEqual({ attempts: 0, made: 0, scratches: 0, eightBall: { attempts: 0, madeOnBreak: 0 } });
     expect(stats.runouts).toBe(0);
   });
 
