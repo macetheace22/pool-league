@@ -113,6 +113,20 @@ export default function Practice() {
     if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
   }, [location.search]);
   const cancelSession = () => { clearActiveSession(); setSessionState(null); setPhase("landing"); };
+  const discardSession = async () => {
+    if (!session?.gameId || !profile?.id) return;
+    const confirmed = window.confirm("Discard this practice session? All saved game results and Track a Rack shot details for this unfinished session will be permanently deleted.");
+    if (!confirmed) return;
+    try {
+      await db.discardPracticeGame(session.gameId);
+      clearActiveSession();
+      setSessionState(null);
+      setPhase("landing");
+      refreshHistory();
+    } catch (error) {
+      window.alert(error?.message || "The practice session could not be discarded. Please try again.");
+    }
+  };
 
   const wrap = (children) => (
     <div className="app">
@@ -152,9 +166,14 @@ export default function Practice() {
     return wrap(<ConfigStep profile={profile} session={session} setSession={setSession}
       onNext={() => changePhase("play")} onBack={() => changePhase("scoring")} onCancel={cancelSession} />);
   }
+  if (phase === "skillsplay") {
+    return wrap(<SkillsDrillsStep profile={profile} session={session} setSession={setSession}
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: "Skills & Drills", data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }}
+      onBack={() => changePhase("gametype")} onDiscard={discardSession} />);
+  }
   if (phase === "play") {
     return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
-      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={() => changePhase("config")} />);
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={() => changePhase("config")} onDiscard={discardSession} />);
   }
   if (phase === "done") {
     return wrap(<DoneStep profile={profile} session={session}
@@ -514,10 +533,26 @@ function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) 
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    if (session.format !== "match") return;
+    if (session.format !== "match") { setLoadingMyRating(false); return; }
+    // A rating entered in an earlier setup pass is authoritative for this
+    // session. Only fetch the league default when no session value exists.
+    if (session.myRating != null && session.myRating !== "") {
+      setMyRating(session.myRating);
+      setLoadingMyRating(false);
+      return;
+    }
     if (!profile?.player_num) { setLoadingMyRating(false); return; }
-    db.getPlayerRating(profile.player_num).then(r => { setMyRating(r ?? ""); setLoadingMyRating(false); });
-  }, [session.format, profile?.player_num]);
+    let cancelled = false;
+    db.getPlayerRating(profile.player_num).then(r => {
+      if (cancelled) return;
+      const rating = r ?? "";
+      setMyRating(rating);
+      if (rating !== "") setSession(current => current?.myRating != null && current.myRating !== ""
+        ? current : { ...current, myRating: rating });
+      setLoadingMyRating(false);
+    });
+    return () => { cancelled = true; };
+  }, [session.format, session.myRating, profile?.player_num]);
 
   const isRaceToPoints = session.scoringMethod === "race_to_points";
   const isRaceToGames = session.scoringMethod === "race_to_games";
@@ -584,7 +619,7 @@ function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) 
 }
 
 // ─── Skills & Drills play ─────────────────────────────────────────────────
-function SkillsDrillsStep({ profile, session, setSession, onDone, onBack }) {
+function SkillsDrillsStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
   const [recordStatus, setRecordStatus] = useState("checking");
   const [recordError, setRecordError] = useState("");
   const [recordAttempt, setRecordAttempt] = useState(0);
@@ -622,6 +657,7 @@ function SkillsDrillsStep({ profile, session, setSession, onDone, onBack }) {
           {profile?.player_num ? <ShotTracker contextType="practice_game" contextId={session.gameId} player={{ num: profile.player_num, name: profile.username || "You" }} opponentNum={null} gameType={session.gameType} /> :
             <div className="dash-empty">Your league player profile is not linked, so shot tracking is unavailable for your account.</div>}
           <button className="btn-primary" style={{marginTop:12}} onClick={finish}>Finish Practice</button>
+          <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard} disabled={recordStatus !== "ready"}>Discard Practice</button>
         </div>}
         <button className="btn-secondary" onClick={onBack}>← Back to Game Type</button>
       </div>
@@ -630,7 +666,7 @@ function SkillsDrillsStep({ profile, session, setSession, onDone, onBack }) {
 }
 
 // ─── Step 5: play (running tally) ───────────────────────────────────────────
-function PlayStep({ profile, session, setSession, onDone, onBack }) {
+function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
   const [recordStatus, setRecordStatus] = useState("checking");
   const [recordError, setRecordError] = useState("");
   const [recordAttempt, setRecordAttempt] = useState(0);
@@ -842,6 +878,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
         )}
 
         <button className="btn-secondary" onClick={onBack}>← Back to Setup</button>
+        <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard} disabled={savingResult || recordStatus !== "ready"}>Discard Practice</button>
       </div>
     </>
   );

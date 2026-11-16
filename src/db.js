@@ -2480,6 +2480,14 @@ export async function undoLastPracticeGameResult(practiceGameId) {
   if (error) throw error;
   return data;
 }
+export async function discardPracticeGame(practiceGameId) {
+  if (!practiceGameId) throw new Error("A practice game is required.");
+  const { error } = await supabase.rpc("discard_practice_game", {
+    p_practice_game_id: practiceGameId,
+  });
+  if (error) throw error;
+}
+
 export async function finishPracticeGame(practiceGameId) {
   if (!practiceGameId) return false;
   const { error } = await supabase.rpc("finish_practice_game", {
