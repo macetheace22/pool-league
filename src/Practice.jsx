@@ -341,7 +341,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
   }, [query]);
 
   const pickPlayer = (p) => {
-    setSession(s => ({ ...s, opponentType: "player", opponentPlayerNum: p.num, opponentId: null, opponentName: p.nickname || p.name, opponentRating: p.rating }));
+    setSession(s => ({ ...s, opponentType: "player", opponentPlayerNum: p.num, opponentId: null, opponentName: p.name, opponentRating: p.rating }));
     onNext();
   };
   const pickManualExisting = (o) => {
@@ -372,7 +372,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
               <div key={p.num} className="list-row" style={{cursor:"pointer"}} onClick={() => pickPlayer(p)}>
                 <div className="list-row__body">
                   <div style={{flex:1}}>
-                    <div className="list-row__name">{p.nickname || db.shortPlayerName(p)}</div>
+                    <div className="list-row__name">{p.name}</div>
                     <div className="list-row__sub">{p.rating != null ? `Rating: ${p.rating}` : "No current rating"}</div>
                   </div>
                   <ChevronRight size={14} color="#6A6A6A" />
