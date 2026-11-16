@@ -1772,6 +1772,17 @@ export async function getTeamScheduleOverview(teamId) {
   return { team: teamRow, teams, myWeeks, myCompleted };
 }
 
+export async function listPlayerMatchHistory(playerNum, divisionIds = []) {
+  const ids = [...new Set((divisionIds ?? []).filter(Boolean))];
+  if (!playerNum || ids.length === 0) return [];
+  const results = await Promise.all(ids.map(id => listCompletedMatches(id)));
+  return results.flat().map(match => {
+    const sets = (match.state?.sets ?? []).filter(s => s?.complete && (s.playerHome?.num === playerNum || s.playerAway?.num === playerNum));
+    if (sets.length === 0) return null;
+    const playerSide = sets[0].playerHome?.num === playerNum ? "home" : "away";
+    return { ...match, playerSide, playerSets: sets, playerSetsWon: sets.filter(s => s.winnerSlot === playerSide).length, playerSetsLost: sets.filter(s => s.winnerSlot && s.winnerSlot !== playerSide).length, opponentTeamName: playerSide === "home" ? match.team_away_name : match.team_home_name };
+  }).filter(Boolean).sort((a,b) => new Date(b.confirmed_at || b.created_at || 0) - new Date(a.confirmed_at || a.created_at || 0));
+}
 export async function getCompletedMatch(id) {
   const { data } = await supabase.from("completed_matches").select("*").eq("id", id).maybeSingle();
   return data;
