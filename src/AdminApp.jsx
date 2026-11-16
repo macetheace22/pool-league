@@ -1526,6 +1526,27 @@ function MyStatsPage({ profile }) {
           <>
             {showPractice && (
               <div className="card">
+                <div className="card__title">Practice History</div>
+                <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Select a completed practice session to view its saved scoresheet.</div>
+                {completedPractice.length === 0 ? <div className="dash-empty">No completed practice sessions recorded yet.</div> : (
+                  <div className="list" style={{marginTop:6}}>
+                    {completedPractice.map(g => (
+                      <div key={g.id} style={{marginBottom:6}}>
+                        <button type="button" className="match-row practice-history-button" aria-expanded={selectedHistoryPractice?.id === g.id} onClick={() => setSelectedHistoryPractice(current => current?.id === g.id ? null : g)}>
+                          <span style={{flex:1,minWidth:0,textAlign:"left"}}>
+                            <span className="match-row__opponent" style={{display:"block"}}>{g.practice_type === "skills_drills" ? "Skills & Drills" : "vs " + g.opponent_name} {g.practice_type !== "skills_drills" && <span style={{color:g.winner === "me" ? "#5FCF9E" : "#F87171",fontWeight:700,marginLeft:6}}>{g.winner === "me" ? "Won" : g.winner === "opponent" ? "Lost" : "—"}</span>}</span>
+                            <span className="match-row__meta" style={{display:"block"}}>{({ "8ball":"8-Ball","9ball":"9-Ball","10ball":"10-Ball",ultimate:"Ultimate Pool" })[g.game_type] ?? g.game_type ?? "Practice"}{g.scoring_method ? " · " + ({race_to_points:"Race to Points",race_to_games:"Race to Games",best_of_games:"Best of X Games"})[g.scoring_method] : ""}{g.practice_type !== "skills_drills" ? " · " + g.my_score + "–" + g.opponent_score : ""}{" · " + new Date(g.completed_at || g.played_at).toLocaleDateString()}</span>
+                          </span><ChevronRight size={16} color="#6A6A6A" />
+                        </button>
+                        {selectedHistoryPractice?.id === g.id && <Scoresheet practiceGame={g} profile={profile} onClose={() => setSelectedHistoryPractice(null)} closeLabel="Back to My Stats" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {showPractice && (
+              <div className="card">
                 <div className="card__title">Practice Record</div>
                 {practiceGames === undefined ? <Loader /> : practiceGamesError ? (
                   <div className="error-msg">Unable to load practice stats: {practiceGamesError}</div>
