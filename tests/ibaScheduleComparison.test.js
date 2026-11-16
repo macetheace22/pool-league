@@ -54,7 +54,7 @@ describe("read-only IBA schedule comparison", () => {
     expect(result.changes).toContainEqual(expect.objectContaining({ type: "team_added", teamNum: "15104" }));
     expect(result.changes).toContainEqual(expect.objectContaining({ type: "team_removed", teamNum: "15102" }));
     expect(result.changes).toContainEqual(expect.objectContaining({
-      type: "team_details_changed", teamNum: "15101", fromName: "", toName: "Alpha Renamed",
+      type: "team_details_changed", teamNum: "15101", fromName: "Alpha", toName: "Alpha Renamed",
     }));
     expect(result.summary.teamDetailsChanged).toBe(1);
   });
