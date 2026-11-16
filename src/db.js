@@ -2480,6 +2480,21 @@ export async function undoLastPracticeGameResult(practiceGameId) {
   if (error) throw error;
   return data;
 }
+export async function discardPracticeGame(practiceGameId, profileId) {
+  if (!practiceGameId || !profileId) throw new Error("A practice game and signed-in user are required.");
+  // These records use a polymorphic context pointer rather than a foreign key,
+  // so remove shot events explicitly before deleting the practice parent.
+  const { error: shotsError } = await supabase.from("shot_events").delete()
+    .eq("context_type", "practice_game").eq("context_id", practiceGameId);
+  if (shotsError) throw shotsError;
+  const { error: resultsError } = await supabase.from("practice_game_results").delete()
+    .eq("practice_game_id", practiceGameId);
+  if (resultsError) throw resultsError;
+  const { error: gameError } = await supabase.from("practice_games").delete()
+    .eq("id", practiceGameId).eq("created_by", profileId);
+  if (gameError) throw gameError;
+}
+
 export async function finishPracticeGame(practiceGameId) {
   if (!practiceGameId) return false;
   const { error } = await supabase.rpc("finish_practice_game", {
