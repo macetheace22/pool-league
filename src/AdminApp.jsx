@@ -1386,6 +1386,54 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       )}
       {selectedHistoryMatch && <div className="card" style={{padding:0}}><Scoresheet match={selectedHistoryMatch} onClose={() => setSelectedHistoryMatch(null)} closeLabel="Back to My Stats" /></div>}
       {selectedHistoryPractice && <div className="card" style={{padding:0}}><Scoresheet practiceGame={selectedHistoryPractice} profile={practiceProfile} onClose={() => setSelectedHistoryPractice(null)} closeLabel="Back to My Stats" /></div>}
+      {(includeLeague || includePractice) && (
+        <div className="card">
+          <div className="card__title">Match Head-to-Head</div>
+          <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Your actual completed league sets and practice games against each opponent, based on the play sources selected above.</div>
+          {(() => {
+            const groups = {};
+            if (includeLeague) {
+              for (const match of matchHistory ?? []) {
+                for (const set of match.playerSets ?? []) {
+                  const opponent = set.playerHome?.num === playerNum ? set.playerAway : set.playerHome;
+                  if (!opponent?.num) continue;
+                  const key = "league:" + opponent.num;
+                  const row = groups[key] ??= { key, name: opponent.name ?? opponent.num, wins: 0, losses: 0, matches: 0 };
+                  if (set.winnerSlot === match.playerSide) row.wins++;
+                  else if (set.winnerSlot) row.losses++;
+                  row.matches++;
+                }
+              }
+            }
+            if (includePractice) {
+              for (const game of practiceGames ?? []) {
+                if (game.practice_type === "skills_drills" || !game.opponent_name?.trim()) continue;
+                const name = game.opponent_name.trim();
+                const key = "practice:" + name.toLocaleLowerCase();
+                const row = groups[key] ??= { key, name, wins: 0, losses: 0, matches: 0 };
+                if (game.winner === "me") row.wins++;
+                else if (game.winner === "opponent") row.losses++;
+                row.matches++;
+              }
+            }
+            const rows = Object.values(groups).sort((a,b) => (b.matches - a.matches) || a.name.localeCompare(b.name));
+            if (rows.length === 0) return <div className="dash-empty">No completed head-to-head results are available for the selected play.</div>;
+            return <div className="list" style={{marginTop:6}}>
+              {rows.map(row => (
+                <div key={row.key} className="list-row">
+                  <div className="list-row__body">
+                    <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
+                      <span className="list-row__name">{row.name}</span>
+                      <span className="list-row__sub">{row.matches} {row.matches === 1 ? "match" : "matches"} · {row.wins} wins · {row.losses} losses · {row.wins + row.losses ? Math.round((row.wins / (row.wins + row.losses)) * 100) : 0}%</span>
+                    </div>
+                    <span style={{fontSize:11,fontWeight:800}}>{row.wins}–{row.losses}</span>
+                  </div>
+                </div>
+              ))}
+            </div>;
+          })()}
+        </div>
+      )}
       {includeLeague && teamHistory.length > 0 && (
         <div className="card">
           <div className="card__title">Team History</div>
