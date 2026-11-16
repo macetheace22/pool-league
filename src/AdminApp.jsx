@@ -1234,7 +1234,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     setHeadToHead(undefined);
     db.computeHeadToHead(filteredEvents).then(setHeadToHead).catch(() => setHeadToHead([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawEvents, gameTypeFilter, playTypeFilter, effectiveScopeMode, selectedSeasonId, playCategory]);
+  }, [rawEvents, gameTypeFilter, playTypeFilter, effectiveScopeMode, selectedSeasonId, playCategory, includeLeague, includePractice]);
 
   const leagueWins = seasonRecord?.wins ?? 0;
   const leagueLosses = seasonRecord?.losses ?? 0;
@@ -1598,7 +1598,12 @@ function MyStatsPage({ profile }) {
           </div>
         )}
 
-        {includedSources.length === 0 ? null : includeTournaments && !includeLeague && !includePractice ? (
+        {includedSources.length === 0 ? (
+          <div className="card">
+            <div className="card__title">No Play Types Selected</div>
+            <div className="dash-empty">Select League, Practice, or Tournaments above to display your stats. Your filters and player information will remain available.</div>
+          </div>
+        ) : includeTournaments && !includeLeague && !includePractice ? (
           <div className="card">
             <div className="card__title">Tournament Statistics</div>
             <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app.</div>
