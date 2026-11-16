@@ -31,6 +31,27 @@ describe("read-only IBA schedule comparison", () => {
     expect(result.summary.dateChanges).toBe(1);
   });
 
+  it("reports team additions, removals, and team detail changes", () => {
+    const result = compareIbaSchedules({
+      saved: { teams, weeks: [week("9/9/2026", [{ home: 1, away: 2 }])] },
+      official: {
+        hasSchedule: true,
+        teams: [
+          { teamNum: "15101", name: "Alpha Renamed", venue: "New Hall" },
+          { teamNum: "15103", name: "Gamma", venue: "Club" },
+          { teamNum: "15104", name: "Delta", venue: "Club" },
+        ],
+        weeks: [week("9/9/2026", [{ home: 1, away: 2 }])],
+      },
+    });
+    expect(result.changes).toContainEqual(expect.objectContaining({ type: "team_added", teamNum: "15104" }));
+    expect(result.changes).toContainEqual(expect.objectContaining({ type: "team_removed", teamNum: "15102" }));
+    expect(result.changes).toContainEqual(expect.objectContaining({
+      type: "team_details_changed", teamNum: "15101", fromName: "", toName: "Alpha Renamed",
+    }));
+    expect(result.summary.teamDetailsChanged).toBe(1);
+  });
+
   it("reports added and removed matchups", () => {
     const result = compareIbaSchedules({
       saved: saved([week("9/9/2026", [{ home: 1, away: 2 }])]),
