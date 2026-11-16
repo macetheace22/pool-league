@@ -184,6 +184,7 @@ describe("IBA parsers", () => {
       const missing = parsePlayoffEligibilityRoster([
         "Division Playoffs - Roster and Handicap Report",
         "Team 15101 Alpha",
+        "Rate Num Elig Name",
         "105 12345 E Player One",
       ].join("\n"));
       const conflicting = parsePlayoffEligibilityRoster([
@@ -191,6 +192,7 @@ describe("IBA parsers", () => {
         "Ratings current as of: 11/15/25",
         "Ratings current as of: 11/22/25",
         "Team 15101 Alpha",
+        "Rate Num Elig Name",
         "105 12345 E Player One",
       ].join("\n"));
 
@@ -206,6 +208,7 @@ describe("IBA parsers", () => {
         "Division Playoffs - Roster and Handicap Report",
         "Ratings current as of: 02/30/2025",
         "Team 15101 Alpha",
+        "Rate Num Elig Name",
         "105 12345 E Player One",
       ].join("\n"));
 
