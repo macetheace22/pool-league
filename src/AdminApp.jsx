@@ -1285,7 +1285,27 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
                   <div key={h.opponentNum ?? "unknown"} className="list-row">
                     <div className="list-row__body">
                       <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
-                        <span className="list-row__name">{h.name}{h.nickname ? ` "${h.nicknfunction MyStatsPage({ profile }) {
+                        <span className="list-row__name">{h.name}{h.nickname ? ` "${h.nickname}"` : ""}</span>
+                        <span className="list-row__sub">{h.stats.totalShots} shots · {h.stats.makePct}% makes · {h.stats.runouts} runouts</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      {rawEvents === null && playCategory !== "tournaments" && (
+        <div style={{fontSize:10.5,color:"#6A6A6A",textAlign:"center"}}>
+          No advanced stats tracked yet — use "Track a Rack" during a live match, manual entry, or practice to start building this out.
+        </div>
+      )}
+    </>
+  );
+}
+
+function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
   const [playCategory, setPlayCategory] = useState("all");
   const [practiceGames, setPracticeGames] = useState(undefined);
@@ -1386,7 +1406,6 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     </>
   );
 }
-
 function PlayerLookupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
