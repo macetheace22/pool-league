@@ -1305,37 +1305,21 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
 
 function MyStatsPage({ profile }) {
   const activeTeamIds = getActiveTeamIds(profile);
-  if (activeTeamIds.length === 0) {
-    return (
-      <>
-        <PageHeader title="My Stats" />
-        <div className="tab-content">
-          <div className="empty-state">You're not linked to a team yet. Once you are, your stats will show here.</div>
-        </div>
-      </>
-    );
-  }
-  if (!profile?.player_num) {
-    return (
-      <>
-        <PageHeader title="My Stats" />
-        <div className="tab-content">
-          <div className="card">
-            <div className="card__title">Link Your Player Number</div>
-            <div style={{fontSize:12.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
-              Your stats are tracked by your IBA player number. Redeem a player-specific invite code from My Profile to link your roster entry and see your record here.
-            </div>
-            <Link to="/me" className="btn-primary" style={{textAlign:"center",textDecoration:"none",display:"block"}}>Go to My Profile</Link>
-          </div>
-        </div>
-      </>
-    );
-  }
   return (
     <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
-        <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={activeTeamIds[0]} />
+        {!profile?.player_num ? (
+          <div className="card">
+            <div className="card__title">Link Your Player Number</div>
+            <div style={{fontSize:12.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
+              League results and player statistics are associated with your IBA player number. You do not need to be assigned to a current team to view your player history.
+            </div>
+            <Link to="/me" className="btn-primary" style={{textAlign:"center",textDecoration:"none",display:"block"}}>Go to My Profile</Link>
+          </div>
+        ) : (
+          <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={activeTeamIds[0] ?? null} />
+        )}
       </div>
     </>
   );
