@@ -116,7 +116,7 @@ describe("IBA parsers", () => {
 
   it("keeps IBA Play/Win counters separate when one player appears on multiple teams", () => {
     const result = parseLeagueRoster([
-      "Team 15101 Team One",
+      "Team 15101 Alpha",
       "Twin City Billiards",
       "105 12345 4 2 Player One",
       "Team 15102 Team Two",
@@ -148,16 +148,16 @@ describe("IBA parsers", () => {
         "Division Playoffs - Roster and Handicap Report",
         "For Week: 17",
         "Ratings current as of: 11/15/25",
-        "Team 15101 Team One",
+        "Team 15101 Alpha",
         "Rate Num Elig Name",
         "105 12345 E Player One",
         "NR 23456 T Player Two",
-      ].join("\\n"));
+      ].join("\n"));
 
       expect(result.eligibilityWeek).toBe(17);
       expect(result.eligibilityAsOfDate).toBe("2025-11-15");
       expect(result.eligibilityParseError).toBeNull();
-      expect(result.teams["15101"]).toMatchObject({ name: "Team One" });
+      expect(result.teams["15101"]).toMatchObject({ name: "Alpha" });
       expect(result.eligibilityRows).toEqual([
         expect.objectContaining({ teamNum: "15101", num: "12345", name: "Player One", eligCode: "E" }),
         expect.objectContaining({ teamNum: "15101", num: "23456", name: "Player Two", eligCode: "T" }),
@@ -169,10 +169,10 @@ describe("IBA parsers", () => {
       const result = parsePlayoffEligibilityRoster([
         "Division Playoffs - Roster and Handicap Report",
         "Ratings current as of: 11/15/2025",
-        "Team 15101 Team One Team 15102 Team Two",
+        "Team 15101 Alpha Team 15102 Beta",
         "Rate Num Elig Name",
         "105 12345 E Player One 106 23456 A Player Two",
-      ].join("\\n"));
+      ].join("\n"));
 
       expect(result.eligibilityRows).toEqual([
         expect.objectContaining({ teamNum: "15101", num: "12345", eligCode: "E" }),
@@ -183,16 +183,16 @@ describe("IBA parsers", () => {
     it("does not guess an effective date when it is missing or conflicting", () => {
       const missing = parsePlayoffEligibilityRoster([
         "Division Playoffs - Roster and Handicap Report",
-        "Team 15101 Team One",
+        "Team 15101 Alpha",
         "105 12345 E Player One",
-      ].join("\\n"));
+      ].join("\n"));
       const conflicting = parsePlayoffEligibilityRoster([
         "Division Playoffs - Roster and Handicap Report",
         "Ratings current as of: 11/15/25",
         "Ratings current as of: 11/22/25",
-        "Team 15101 Team One",
+        "Team 15101 Alpha",
         "105 12345 E Player One",
-      ].join("\\n"));
+      ].join("\n"));
 
       expect(missing.eligibilityAsOfDate).toBeNull();
       expect(missing.eligibilityParseError).toMatch(/date could not be read/i);
@@ -205,9 +205,9 @@ describe("IBA parsers", () => {
       const result = parsePlayoffEligibilityRoster([
         "Division Playoffs - Roster and Handicap Report",
         "Ratings current as of: 02/30/2025",
-        "Team 15101 Team One",
+        "Team 15101 Alpha",
         "105 12345 E Player One",
-      ].join("\\n"));
+      ].join("\n"));
 
       expect(result.eligibilityAsOfDate).toBeNull();
       expect(result.eligibilityParseError).toMatch(/date could not be read/i);
