@@ -166,6 +166,11 @@ export default function Practice() {
     return wrap(<ConfigStep profile={profile} session={session} setSession={setSession}
       onNext={() => changePhase("play")} onBack={() => changePhase("scoring")} onCancel={cancelSession} />);
   }
+  if (phase === "skillsplay") {
+    return wrap(<SkillsDrillsStep profile={profile} session={session} setSession={setSession}
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: "Skills & Drills", data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }}
+      onBack={() => changePhase("gametype")} onDiscard={discardSession} />);
+  }
   if (phase === "play") {
     return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
       onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={() => changePhase("config")} onDiscard={discardSession} />);
