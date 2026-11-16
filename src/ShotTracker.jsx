@@ -179,7 +179,7 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
                 </>
               )}
 
-              {(category === "shot" || category === "break") && (
+              {(category === "shot" || category === "safety" || category === "break") && (
                 <div className="shot-tracker__flag-row">
                   <button type="button" className={`toggle ${isScratch ? "toggle--active" : ""}`} aria-pressed={isScratch} onClick={() => setIsScratch(v => !v)}>Scratch</button>
                   <button type="button" className={`toggle ${isFoul ? "toggle--active" : ""}`} aria-pressed={isFoul} onClick={() => setIsFoul(v => !v)}>Foul</button>
