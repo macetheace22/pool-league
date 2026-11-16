@@ -1178,7 +1178,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       setMatchHistory([]);
       return () => { cancelled = true; };
     }
-    setMatchHistory(undefined);
+    // Keep the previous history visible while the new scope is loading; do not blank the render tree during a source toggle.
     db.listPlayerMatchHistory(playerNum, activeDivisionIds)
       .then(rows => { if (!cancelled) setMatchHistory(rows ?? []); })
       .catch(() => { if (!cancelled) setMatchHistory([]); });
@@ -1189,7 +1189,6 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   useEffect(() => {
     let cancelled = false;
     if (teamHistory === undefined) return () => { cancelled = true; };
-    setSeasonRecord(undefined);
     if (!includeLeague) {
       setSeasonRecord(null);
       return () => { cancelled = true; };
@@ -1251,7 +1250,18 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     (matchesPlayType(e, "practice") && includePractice)
   );
   const filteredEvents = sourceEvents.filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && (playCategory === "all" ? matchesPlayType(e, playTypeFilter) : true));
-  const shotStats = rawEvents ? db.computeShotStats(filteredEvents) : null;
+  // Shot-event rows can contain legacy/mixed data. A malformed row must not be able to
+  // tear down the entire My Stats page when a source filter changes the event set.
+  let shotStats = null;
+  let shotStatsError = "";
+  if (rawEvents) {
+    try {
+      shotStats = db.computeShotStats(Array.isArray(filteredEvents) ? filteredEvents : []);
+    } catch (error) {
+      console.error("My Stats shot-stat aggregation failed", error);
+      shotStatsError = error?.message || "Unable to calculate tracked-shot statistics.";
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1433,8 +1443,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
                 for (const set of match.playerSets ?? []) {
                   const opponent = set.playerHome?.num === playerNum ? set.playerAway : set.playerHome;
                   if (!opponent?.num) continue;
-                  const name = opponent.name ?? opponent.num;
-                  const key = name.trim().toLocaleLowerCase();
+                  const name = String(opponent.name ?? opponent.num ?? "").trim() || String(opponent.num ?? "Unknown");
+                  const key = name.toLocaleLowerCase();
                   const row = groups[key] ??= { key, name, wins: 0, losses: 0, leagueSets: 0, practiceGames: 0 };
                   if (set.winnerSlot === match.playerSide) row.wins++;
                   else if (set.winnerSlot) row.losses++;
@@ -1444,8 +1454,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
             }
             if (includePractice) {
               for (const game of practiceGames ?? []) {
-                if (game.practice_type === "skills_drills" || !game.opponent_name?.trim()) continue;
-                const name = game.opponent_name.trim();
+                const name = String(game.opponent_name ?? "").trim();
+                if (game.practice_type === "skills_drills" || !name) continue;
                 const key = name.toLocaleLowerCase();
                 const row = groups[key] ??= { key, name, wins: 0, losses: 0, leagueSets: 0, practiceGames: 0 };
                 if (game.winner === "me") row.wins++;
@@ -1523,9 +1533,11 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
               <FilterChips options={GAME_TYPE_FILTERS} value={gameTypeFilter} onChange={setGameTypeFilter} />
             </div>
             
-            {filteredEvents.length === 0
-              ? <div className="dash-empty" style={{marginTop:8}}>No tracked shots match this filter.</div>
-              : <>
+            {shotStatsError
+              ? <div className="error-msg" style={{marginTop:8}}>Unable to calculate tracked-shot statistics for this selection. Saved data is unchanged.</div>
+              : filteredEvents.length === 0
+                ? <div className="dash-empty" style={{marginTop:8}}>No tracked shots match this filter.</div>
+                : <>
                   <ShotStatsBlock stats={shotStats} />
                   <div style={{display:"flex",gap:8,marginTop:10}} className="no-print">
                     <button className="btn-sm" onClick={() => window.print()}>Print / Save as PDF</button>
@@ -1552,6 +1564,14 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
   const [includedSources, setIncludedSources] = useState(["league", "practice", "tournaments"]);
+  const toggleSource = source => setIncludedSources(current =>
+    current.includes(source)
+      ? current.filter(item => item !== source)
+      : [...current, source]
+  );
+  const includeLeague = includedSources.includes("league");
+  const includePractice = includedSources.includes("practice");
+  const includeTournaments = includedSources.includes("tournaments");
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
   const [practiceGamesError, setPracticeGamesError] = useState("");
@@ -1589,10 +1609,7 @@ function MyStatsPage({ profile }) {
   const practiceLosses = completedPractice.filter(g => g.winner === "opponent").length;
   const practiceDecided = practiceWins + practiceLosses;
   const practiceWinPct = practiceDecided ? Math.round((practiceWins / practiceDecided) * 100) : null;
-  const includeLeague = includedSources.includes("league");
-  const includePractice = includedSources.includes("practice");
-  const includeTournaments = includedSources.includes("tournaments");
-  const toggleSource = source => setIncludedSources(current => current.includes(source) ? current.filter(s => s !== source) : [...s, source]);
+  
 
 
 
@@ -1604,26 +1621,36 @@ function MyStatsPage({ profile }) {
           <div className="card__title">Include in My Stats</div>
           <div style={{fontSize:11.5,color:"#8A8A8A",marginBottom:10}}>Choose which types of play are included throughout this page. The same selection drives your record, history, Track a Rack stats, and Match Head-to-Head.</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,alignItems:"stretch"}}>
-            {[
-              {key:"league",label:"League",description:"IBA league matches"},
-              {key:"practice",label:"Practice",description:"Practice games and drills"},
-              {key:"tournaments",label:"Tournaments",description:"Tournament results (when available)"},
-            ].map(source => {
-              const selected = includedSources.includes(source.key);
-              return (
-                <button
-                  key={source.key}
-                  type="button"
-                  className={selected ? "btn-primary" : "btn-secondary"}
-                  aria-pressed={selected}
-                  onClick={() => toggleSource(source.key)}
-                  style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
-                >
-                  <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>{source.label}</span>
-                  <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>{source.description}</span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              className={includeLeague ? "btn-primary" : "btn-secondary"}
+              aria-pressed={includeLeague}
+              onClick={() => toggleSource("league")}
+              style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
+            >
+              <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>League</span>
+              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>IBA league matches</span>
+            </button>
+            <button
+              type="button"
+              className={includePractice ? "btn-primary" : "btn-secondary"}
+              aria-pressed={includePractice}
+              onClick={() => toggleSource("practice")}
+              style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
+            >
+              <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>Practice</span>
+              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>Practice games and drills</span>
+            </button>
+            <button
+              type="button"
+              className={includeTournaments ? "btn-primary" : "btn-secondary"}
+              aria-pressed={includeTournaments}
+              onClick={() => toggleSource("tournaments")}
+              style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
+            >
+              <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>Tournaments</span>
+              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>Tournament results (when available)</span>
+            </button>
           </div>
           {includedSources.length === 0 && <div className="dash-empty" style={{marginTop:10}}>Select at least one type of play.</div>}
         </div>
@@ -1638,23 +1665,13 @@ function MyStatsPage({ profile }) {
           </div>
         )}
 
-        {includeTournaments && (includeLeague || includePractice) && (
-          <div className="card">
-            <div className="card__title">Tournament Statistics</div>
-            <div className="dash-empty">Tournament tracking is not available yet. League and practice statistics below are unaffected.</div>
-          </div>
-        )}
-
         {includedSources.length === 0 ? (
           <div className="card">
             <div className="card__title">No Play Types Selected</div>
             <div className="dash-empty">Select League, Practice, or Tournaments above to display your stats. Your filters and player information will remain available.</div>
           </div>
         ) : includeTournaments && !includeLeague && !includePractice ? (
-          <div className="card">
-            <div className="card__title">Tournament Statistics</div>
-            <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app.</div>
-          </div>
+          null
         ) : (
           <>
             {includeLeague && !profile?.player_num && (
@@ -1671,6 +1688,13 @@ function MyStatsPage({ profile }) {
               <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory="all" includedSources={includedSources} practiceGames={completedPractice} practiceGamesLoading={practiceGames === undefined} practiceGamesError={practiceGamesError} practiceProfile={profile} defaultCareer hideNameHeader />
             )}
           </>
+        )}
+
+        {includeTournaments && (
+          <div className="card">
+            <div className="card__title">Tournament Statistics</div>
+            <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app. Available league and practice statistics remain above.</div>
+          </div>
         )}
       </div>
     </>
