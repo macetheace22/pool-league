@@ -132,25 +132,25 @@ export default function Practice() {
   }
   if (phase === "opponent") {
     return wrap(<OpponentStep profile={profile} session={session} setSession={setSession}
-      onNext={() => changePhase("gametype")} onCancel={cancelSession} />);
+      onNext={() => changePhase("gametype")} onBack={() => changePhase("type")} onCancel={cancelSession} />);
   }
   if (phase === "gametype") {
     return wrap(<GameTypeStep session={session} setSession={setSession}
       onNext={() => changePhase("tablesize")}
-      onBack={() => changePhase(session.practiceType === "skills_drills" ? "type" : "opponent")} />);
+      onBack={() => changePhase(session.practiceType === "skills_drills" ? "type" : "opponent")} onCancel={cancelSession} />);
   }
   if (phase === "tablesize") {
     return wrap(<TableSizeStep session={session} setSession={setSession}
       onNext={() => changePhase(session.practiceType === "skills_drills" ? "skillsplay" : "scoring")}
-      onBack={() => changePhase("gametype")} />);
+      onBack={() => changePhase("gametype")} onCancel={cancelSession} />);
   }
   if (phase === "scoring") {
     return wrap(<ScoringMethodStep session={session} setSession={setSession}
-      onNext={() => changePhase("config")} onBack={() => changePhase("gametype")} />);
+      onNext={() => changePhase("config")} onBack={() => changePhase("tablesize")} onCancel={cancelSession} />);
   }
   if (phase === "config") {
     return wrap(<ConfigStep profile={profile} session={session} setSession={setSession}
-      onNext={() => changePhase("play")} onBack={() => changePhase("scoring")} />);
+      onNext={() => changePhase("play")} onBack={() => changePhase("scoring")} onCancel={cancelSession} />);
   }
   if (phase === "play") {
     return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
@@ -263,7 +263,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
 function PracticeTypeStep({ session, setSession, onNext, onCancel }) {
   return (
     <>
-      <PageHeader title="Practice" onBack={onCancel} />
+      <PageHeader title="Practice" hideBack />
       <div className="tab-content">
         <div className="card">
           <div className="card__title">Practice Type</div>
@@ -326,7 +326,7 @@ function LinkOpponentPanel({ opponentId, onDone, onCancel }) {
   );
 }
 
-function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
+function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [manualFirstName, setManualFirstName] = useState("");
@@ -360,7 +360,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 
   return (
     <>
-      <PageHeader title="Practice" onBack={onCancel} />
+      <PageHeader title="Practice" onBack={onBack} />
       <div className="tab-content">
         <div className="field">
           <div className="form-label" style={{display:"flex",alignItems:"center",gap:5}}><Search size={11}/> Search league players</div>
@@ -409,7 +409,7 @@ function OpponentStep({ profile, session, setSession, onNext, onCancel }) {
 }
 
 // ─── Step 2: game type ──────────────────────────────────────────────────────
-function GameTypeStep({ session, setSession, onNext, onBack }) {
+function GameTypeStep({ session, setSession, onNext, onBack, onCancel }) {
   const isSkills = session.practiceType === "skills_drills";
   return (
     <>
@@ -427,14 +427,14 @@ function GameTypeStep({ session, setSession, onNext, onBack }) {
             ))}
           </div>
         </div>
-        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
     </>
   );
 }
 
 // ─── Step 3: table size ───────────────────────────────────────────────────
-function TableSizeStep({ session, setSession, onNext, onBack }) {
+function TableSizeStep({ session, setSession, onNext, onBack, onCancel }) {
   const [value, setValue] = useState(session.tableSizeFeet ?? "");
   const [err, setErr] = useState("");
 
@@ -469,14 +469,14 @@ function TableSizeStep({ session, setSession, onNext, onBack }) {
           {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
           <button className="btn-primary" style={{marginTop:10}} onClick={next}>Continue</button>
         </div>
-        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
     </>
   );
 }
 
 // ─── Step 3: scoring method ────────────────────────────────────────────────
-function ScoringMethodStep({ session, setSession, onNext, onBack }) {
+function ScoringMethodStep({ session, setSession, onNext, onBack, onCancel }) {
   return (
     <>
       <PageHeader title="Practice" subtitle={`vs ${session.opponentName}`} onBack={onBack} />
@@ -499,14 +499,14 @@ function ScoringMethodStep({ session, setSession, onNext, onBack }) {
             ))}
           </div>
         </div>
-        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
     </>
   );
 }
 
 // ─── Step 4: config (target X, or ratings for Match) ───────────────────────
-function ConfigStep({ profile, session, setSession, onNext, onBack }) {
+function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) {
   const [x, setX] = useState(session.x ?? 5);
   const [myRating, setMyRating] = useState(session.myRating ?? "");
   const [oppRating, setOppRating] = useState(session.opponentRating ?? "");
@@ -577,7 +577,7 @@ function ConfigStep({ profile, session, setSession, onNext, onBack }) {
           {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
           <button className="btn-primary" style={{marginTop:10}} onClick={next}>Start Playing</button>
         </div>
-        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
     </>
   );
