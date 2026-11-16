@@ -1710,11 +1710,11 @@ function MyStatsPage({ profile }) {
             <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app. Available league and practice statistics remain above.</div>
           </div>
         )}
-        </div>
-      </MyStatsRenderBoundary>
+      </div>
       </>
     </MyStatsRenderBoundary>
-  );}
+  );
+}
 function PlayerLookupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
