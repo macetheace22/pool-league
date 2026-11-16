@@ -1642,7 +1642,7 @@ function MyStatsPage({ profile }) {
   const includeLeague = includedSources.includes("league");
   const includePractice = includedSources.includes("practice");
   const includeTournaments = includedSources.includes("tournaments");
-  const toggleSource = source => setIncludedSources(current => current.includes(source) ? current.filter(s => s !== source) : [...s, source]);
+  const toggleSource = source => setIncludedSources(current => current.includes(source) ? current.filter(s => s !== source) : [...current, source]);
 
 
 
