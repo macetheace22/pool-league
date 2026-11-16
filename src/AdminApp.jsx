@@ -1076,7 +1076,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [playoffElig, setPlayoffElig] = useState(undefined); // undefined = loading/n-a, null = nothing imported for this scope
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
-  const [headToHead, setHeadToHead] = useState([]);
+  const [headToHead, setHeadToHead] = useState([]);\n  const [matchHistory, setMatchHistory] = useState(undefined);\n  const [selectedHistoryMatch, setSelectedHistoryMatch] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1165,6 +1165,17 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
   useEffect(() => {
     if (teamHistory === undefined) return;
+    if (playCategory === "practice" || playCategory === "tournaments") {
+      setMatchHistory([]);
+      return;
+    }
+    setMatchHistory(undefined);
+    db.listPlayerMatchHistory(playerNum, activeDivisionIds).then(rows => setMatchHistory(rows ?? [])).catch(() => setMatchHistory([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerNum, teamHistory, effectiveScopeMode, selectedSeasonId, playCategory]);
+
+  useEffect(() => {
+    if (teamHistory === undefined) return;
     setSeasonRecord(undefined);
     if (playCategory === "practice") { setSeasonRecord(null); return; }
     db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord).catch(() => setSeasonRecord(null));
@@ -1227,7 +1238,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || (playCategory !== "practice" && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
+  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || matchHistory === undefined || (playCategory !== "practice" && playCategory !== "tournaments" && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
 
   return (
     <>
@@ -1299,6 +1310,31 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         </div>
       )}
 
+      {playCategory !== "practice" && playCategory !== "tournaments" && (
+        <div className="card">
+          <div className="card__title">Match History</div>
+          <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Select a completed match to view the saved scoresheet.</div>
+          {matchHistory.length === 0 ? <div className="dash-empty">No individual match results are recorded for this scope.</div> : (
+            <div className="list" style={{marginTop:6}}>
+              {matchHistory.map(m => (
+                <button key={m.id} type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} onClick={() => setSelectedHistoryMatch(m)}>
+                  <div className="list-row__body">
+                    <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
+                      <span className="list-row__name">vs {m.opponentTeamName}</span>
+                      <span className="list-row__sub">{m.week_num ? "Week " + m.week_num + " · " : ""}{m.week_date || new Date(m.confirmed_at || m.created_at).toLocaleDateString()} · {m.playerSetsWon}–{m.playerSetsLost} sets</span>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+                      {(m.team_home_total != null || m.team_away_total != null) && <span className="player-rating-badge">{m.team_home_total ?? 0}–{m.team_away_total ?? 0}</span>}
+                      <ChevronRight size={14} color="#6A6A6A" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {selectedHistoryMatch && <div className="card" style={{padding:0}}><Scoresheet match={selectedHistoryMatch} onClose={() => setSelectedHistoryMatch(null)} closeLabel="Back to My Stats" /></div>}
       {playCategory !== "practice" && teamHistory.length > 0 && (
         <div className="card">
           <div className="card__title">Team History</div>
@@ -1404,7 +1440,7 @@ function MyStatsPage({ profile }) {
   const [playCategory, setPlayCategory] = useState("all");
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
-  const [practiceGamesError, setPracticeGamesError] = useState("");
+  const [practiceGamesError, setPracticeGamesError] = useState("");\n  const [selectedHistoryPractice, setSelectedHistoryPractice] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
