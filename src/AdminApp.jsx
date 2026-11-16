@@ -3601,7 +3601,7 @@ function SeedPlayoffEligibilityImport({ divisionId, onImported, existingCount })
       return;
     }
     setParseErr(""); setParsed(result);
-    if (result.eligibilityAsOfDate) setAsOfDate(result.eligibilityAsOfDate);
+    setAsOfDate(result.eligibilityAsOfDate || "");
   };
   const handleImport = async () => {
     if (!parsed?.eligibilityRows?.length || !asOfDate) {
