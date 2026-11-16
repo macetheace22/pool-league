@@ -8,6 +8,7 @@ import { dashboardCss } from "./Dashboard";
 import * as db from "./db";
 import { useActiveSession } from "./ActiveSessionContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
+import Scoresheet from "./Scoresheet";
 
 const PRACTICE_TYPES = [
   { key: "skills_drills", label: "Practice Skills & Drills", desc: "Work on your own game with Track a Rack and focused practice drills — no opponent or match result." },
@@ -189,6 +190,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const [filterOpponent, setFilterOpponent] = useState(null);
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [linkingKey, setLinkingKey] = useState(null);
+  const [selectedGameId, setSelectedGameId] = useState(null);
 
   const opponentKey = (g) => g.opponent_player_num ? `p:${g.opponent_player_num}` : `o:${g.opponent_id}`;
   const byOpponent = {};
@@ -253,25 +255,34 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
 
         <div className="card" id="practice-sessions" ref={sessionsRef} style={{ scrollMarginTop: 16 }}>
           <div className="card__title">{filterOpponent ? "Games vs This Opponent" : "My Practice Sessions"}</div>
+          <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Select any session to view its saved game results and Track a Rack history.</div>
           {history === undefined && <Loader />}
           {history && visibleGames.length === 0 && <div className="dash-empty">No practice games yet.</div>}
           {history && visibleGames.map(g => (
-            <div key={g.id} className="match-row">
-              <div className="match-row__opponent">
-                {g.practice_type === "skills_drills" ? "Skills & Drills" : `vs ${g.opponent_name}`}
-                {g.practice_type !== "skills_drills" && <span style={{color: g.winner === "me" ? "#5FCF9E" : "#F87171", fontWeight:700, marginLeft:6}}>
-                  {g.winner === "me" ? "Won" : g.winner === "opponent" ? "Lost" : "—"}
-                </span>}
-              </div>
-              <div className="match-row__meta">
-                {gameTypeLabel(g.game_type)}
-                {g.scoring_method ? ` · ${scoringMethodLabel(g.scoring_method)}` : ""}
-                {g.practice_type !== "skills_drills" ? ` · ${g.my_score}–${g.opponent_score}` : ""}
-                {` · ${new Date(g.completed_at || g.played_at).toLocaleDateString()}`}
-              </div>
+            <div key={g.id}>
+              <button type="button" className="match-row practice-history-button"
+                aria-expanded={selectedGameId === g.id}
+                onClick={() => setSelectedGameId(current => current === g.id ? null : g.id)}>
+                <span style={{flex:1,minWidth:0,textAlign:"left"}}>
+                  <span className="match-row__opponent" style={{display:"block"}}>
+                    {g.practice_type === "skills_drills" ? "Skills & Drills" : `vs ${g.opponent_name}`}
+                    {g.practice_type !== "skills_drills" && <span style={{color: g.winner === "me" ? "#5FCF9E" : "#F87171", fontWeight:700, marginLeft:6}}>
+                      {g.winner === "me" ? "Won" : g.winner === "opponent" ? "Lost" : "—"}
+                    </span>}
+                  </span>
+                  <span className="match-row__meta" style={{display:"block"}}>
+                    {gameTypeLabel(g.game_type)}
+                    {g.scoring_method ? ` · ${scoringMethodLabel(g.scoring_method)}` : ""}
+                    {g.practice_type !== "skills_drills" ? ` · ${g.my_score}–${g.opponent_score}` : ""}
+                    {` · ${new Date(g.completed_at || g.played_at).toLocaleDateString()}`}
+                  </span>
+                </span>
+                <ChevronRight size={16} style={{transform:selectedGameId === g.id ? "rotate(90deg)" : "none",flexShrink:0}} color="#6A6A6A" />
+              </button>
+              {selectedGameId === g.id && <Scoresheet key={g.id} practiceGame={g} profile={profile} onClose={() => setSelectedGameId(null)} />}
             </div>
           ))}
-          {filterOpponent && <button className="btn-secondary" style={{marginTop:8}} onClick={() => setFilterOpponent(null)}>Show All</button>}
+          {filterOpponent && <button className="btn-secondary" style={{marginTop:8}} onClick={() => { setFilterOpponent(null); setSelectedGameId(null); }}>Show All</button>}
         </div>
       </div>
     </>
@@ -923,6 +934,29 @@ function DoneStep({ profile, session, onSaved }) {
 }
 
 export const practiceCss = `
+.practice-history-button{width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 0;text-align:left;}
+.practice-scoresheet{margin:8px 0 12px;padding:12px;background:#141414;border:1px solid #333;border-radius:10px;display:flex;flex-direction:column;gap:12px;}
+.practice-scoresheet__header{background:#0B3D2E;border-radius:8px;padding:12px;}
+.practice-scoresheet__eyebrow,.practice-scoresheet__section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#9FC4B4;}
+.practice-scoresheet__players{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0;}
+.practice-scoresheet__players div{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;}
+.practice-scoresheet__players div:last-child{text-align:right;}
+.practice-scoresheet__players strong{font-size:11px;overflow-wrap:anywhere;color:#fff;}
+.practice-scoresheet__players b{font-family:'JetBrains Mono',monospace;font-size:25px;color:#fff;}
+.practice-scoresheet__players>span{font-size:10px;color:#9FC4B4;}
+.practice-scoresheet__meta{font-size:10px;color:#B7D2C6;}
+.practice-scoresheet__section{display:flex;flex-direction:column;gap:7px;}
+.practice-scoresheet__section-title{color:#9A9A9A;}
+.practice-scoresheet__empty{font-size:11px;color:#777;padding:10px;background:#1C1C1C;border-radius:7px;}
+.practice-scoresheet__table-wrap{overflow-x:auto;border:1px solid #333;border-radius:7px;}
+.practice-scoresheet__table{width:100%;border-collapse:collapse;font-size:10.5px;white-space:nowrap;}
+.practice-scoresheet__table th{background:#252525;color:#B7D2C6;text-align:left;font-size:9px;text-transform:uppercase;padding:8px 6px;}
+.practice-scoresheet__table td{padding:8px 6px;border-top:1px solid #303030;color:#E0E0E0;}
+.practice-scoresheet__events{display:flex;flex-direction:column;gap:5px;}
+.practice-scoresheet__event{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;padding:8px;background:#1C1C1C;border-radius:6px;font-size:10.5px;color:#E0E0E0;}
+.practice-scoresheet__event>span:nth-child(2){color:#9FC4B4;text-align:right;}
+.practice-scoresheet__event time{grid-column:1/-1;font-size:9px;color:#777;}
+
 .chip{background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:20px;padding:8px 14px;color:#E0E0E0;font-size:12px;font-weight:600;cursor:pointer;}
 .play-tally{display:flex;align-items:center;gap:10px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:16px;padding:20px 10px;}
 .play-tally__side{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;}

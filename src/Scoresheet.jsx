@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import * as db from "./db";
 import { ChevronLeft, ChevronRight, FileText, Table as TableIcon, X } from "lucide-react";
 
 const TEAM_RATING_LIMIT = 325; // only used in open/advanced
@@ -446,7 +447,13 @@ function TeamColumn({ teamName, rollups, team, isMasters, format, ratingTotal, b
   );
 }
 
-export default function Scoresheet({ match, onClose }) {
+export default function Scoresheet({ match, practiceGame = null, profile = null, onClose }) {
+  return practiceGame
+    ? <PracticeScoresheetView game={practiceGame} profile={profile} onClose={onClose} />
+    : <LeagueScoresheet match={match} onClose={onClose} />;
+}
+
+function LeagueScoresheet({ match, onClose }) {
   const [view, setView] = useState("front");
   const [setIndex, setSetIndex] = useState(0);
   const [showInnings, setShowInnings] = useState(false);
@@ -515,6 +522,113 @@ export default function Scoresheet({ match, onClose }) {
       ) : (
         <BackSheet match={match} sets={sets} />
       )}
+    </div>
+  );
+}
+
+function practiceGameTypeLabel(key) {
+  return ({ "8ball": "8-Ball", "9ball": "9-Ball", "10ball": "10-Ball", ultimate: "Ultimate Pool" })[key] ?? key ?? "Practice";
+}
+function practiceScoringMethodLabel(key) {
+  return ({ race_to_points: "Race to Points", race_to_games: "Race to Games", best_of_games: "Best of X Games" })[key] ?? "Practice";
+}
+
+function PracticeScoresheetView({ game, profile, onClose }) {
+  const [results, setResults] = useState(undefined);
+  const [events, setEvents] = useState(undefined);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      db.listPracticeGameResults(game.id),
+      db.listShotEvents("practice_game", game.id),
+    ]).then(([gameResults, shotEvents]) => {
+      if (cancelled) return;
+      setResults(gameResults ?? []);
+      setEvents(shotEvents ?? []);
+    }).catch(e => {
+      if (!cancelled) setError(e?.message || "Unable to load this practice scoresheet.");
+    });
+    return () => { cancelled = true; };
+  }, [game.id]);
+
+  const playerLabel = (num) => {
+    if (!num) return "Unlinked player";
+    if (String(num) === String(profile?.player_num)) return "You";
+    if (String(num) === String(game.opponent_player_num)) return game.opponent_name || `Player #${num}`;
+    return `Player #${num}`;
+  };
+  const describeEvent = (event) => {
+    const label = event.category === "shot"
+      ? (event.outcome === "make" ? "Shot made" : "Shot missed")
+      : event.category === "safety"
+        ? (event.outcome === "successful" ? "Successful safety" : "Unsuccessful safety")
+        : event.category === "break"
+          ? (event.is_eight_ball_break ? `8-ball break · ${event.balls_made_on_break ?? 0} made` : "Break")
+          : "Runout";
+    return [label, event.is_scratch && "Scratch", event.is_foul && "Foul", event.is_miscue && "Miscue",
+      ...(event.tags ?? []).map(tag => tag.replace("cut_", "").replaceAll("_", " "))].filter(Boolean).join(" · ");
+  };
+
+  return (
+    <div className="scoresheet-app">
+      <style>{css}</style>
+      <button className="scoresheet-close" onClick={onClose}><X size={14}/> Back to History</button>
+      <section className="practice-scoresheet" aria-label="Practice scoresheet">
+      <div className="practice-scoresheet__header">
+        <div className="practice-scoresheet__eyebrow">Practice scoresheet · Read only</div>
+        <div className="practice-scoresheet__players">
+          <div><strong>You</strong><b>{game.my_score ?? 0}</b></div>
+          <span>vs</span>
+          <div><strong>{game.opponent_name || "Practice"}</strong><b>{game.opponent_score ?? 0}</b></div>
+        </div>
+        <div className="practice-scoresheet__meta">
+          {practiceGameTypeLabel(game.game_type)} · {game.practice_type === "skills_drills" ? "Skills & Drills" : practiceScoringMethodLabel(game.scoring_method)}
+          {game.table_size_feet ? ` · ${game.table_size_feet}-ft table` : ""}
+        </div>
+      </div>
+
+      {error && <div className="error-msg">{error}</div>}
+      {(results === undefined || events === undefined) && !error && <div className="empty-state-ss">Loading practice detail…</div>}
+      {results && (
+        <div className="practice-scoresheet__section">
+          <div className="practice-scoresheet__section-title">Game-by-game results</div>
+          {results.length === 0 ? <div className="practice-scoresheet__empty">No individual game results were saved.</div> : (
+            <div className="practice-scoresheet__table-wrap">
+              <table className="practice-scoresheet__table">
+                <thead><tr><th>Game</th><th>You</th><th>{game.opponent_name || "Opponent"}</th><th>Winner</th></tr></thead>
+                <tbody>{results.map(result => (
+                  <tr key={result.id}>
+                    <td>{result.game_number}</td>
+                    <td>{result.my_points ?? (result.winner === "me" ? "Win" : "—")}</td>
+                    <td>{result.opponent_points ?? (result.winner === "opponent" ? "Win" : "—")}</td>
+                    <td>{result.winner === "me" ? "You" : game.opponent_name || "Opponent"}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {events && (
+        <div className="practice-scoresheet__section">
+          <div className="practice-scoresheet__section-title">Track a Rack details</div>
+          {events.length === 0 ? <div className="practice-scoresheet__empty">No shot-level details were recorded for this session.</div> : (
+            <div className="practice-scoresheet__events">
+              {events.map(event => (
+                <div className="practice-scoresheet__event" key={event.id}>
+                  <span>{describeEvent(event)}</span>
+                  <span>{playerLabel(event.player_num)}</span>
+                  <time dateTime={event.created_at}>{new Date(event.created_at).toLocaleString()}</time>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      </section>
     </div>
   );
 }
