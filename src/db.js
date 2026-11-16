@@ -2602,6 +2602,21 @@ export function filterShotEvents(events, { gameType, playType } = {}) {
   );
 }
 
+// Pure grouping logic, separated from the small lookup needed to resolve
+// manually-entered practice opponents by their saved session display name.
+export function groupHeadToHeadEvents(events, practiceNames = {}) {
+  const byOpp = {};
+  for (const e of events) {
+    const manualName = !e.opponent_player_num && e.context_type === "practice_game"
+      ? practiceNames[e.context_id] : null;
+    const normalizedName = manualName?.trim().toLocaleLowerCase();
+    const key = e.opponent_player_num || (normalizedName ? `manual:${normalizedName}` : "unknown");
+    const group = byOpp[key] ??= { events: [], manualName: manualName?.trim() ?? null };
+    group.events.push(e);
+  }
+  return Object.entries(byOpp).map(([key, group]) => ({ key, ...group }));
+}
+
 // Group league and practice shot events by opponent. Practice opponents
 // without an IBA player number are resolved from their saved practice session.
 export async function computeHeadToHead(events) {
@@ -2614,23 +2629,15 @@ export async function computeHeadToHead(events) {
     practiceNames = Object.fromEntries((data ?? []).map(row => [row.id, row.opponent_name]).filter(([, name]) => !!name));
   }
 
-  const byOpp = {};
-  for (const e of events) {
-    const manualName = !e.opponent_player_num && e.context_type === "practice_game"
-      ? practiceNames[e.context_id] : null;
-    const normalizedName = manualName?.trim().toLocaleLowerCase();
-    const key = e.opponent_player_num || (normalizedName ? `manual:${normalizedName}` : "unknown");
-    const group = byOpp[key] ??= { events: [], manualName: manualName?.trim() ?? null };
-    group.events.push(e);
-  }
-  const playerNums = Object.keys(byOpp).filter(k => !k.startsWith("manual:") && k !== "unknown");
+  const groups = groupHeadToHeadEvents(events, practiceNames);
+  const playerNums = groups.map(group => group.key).filter(k => !k.startsWith("manual:") && k !== "unknown");
   const names = await getPlayerNameMap(playerNums);
-  return Object.entries(byOpp)
-    .map(([key, group]) => ({
-      opponentNum: playerNums.includes(key) ? key : null,
-      opponentKey: key,
-      name: key.startsWith("manual:") ? group.manualName : key === "unknown" ? "Unknown / Manual Opponent" : (names[key]?.name ?? key),
-      nickname: names[key]?.nickname ?? "",
+  return groups
+    .map(group => ({
+      opponentNum: playerNums.includes(group.key) ? group.key : null,
+      opponentKey: group.key,
+      name: group.key.startsWith("manual:") ? group.manualName : group.key === "unknown" ? "Unknown / Manual Opponent" : (names[group.key]?.name ?? group.key),
+      nickname: names[group.key]?.nickname ?? "",
       stats: computeShotStats(group.events),
     }))
     .sort((a, b) => b.stats.totalShots - a.stats.totalShots);
