@@ -873,7 +873,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
         <div className="play-tally">
           <div className="play-tally__side">
             <div className="play-tally__name">You</div>
-            <button type="button" className="play-tally__score play-tally__score-button" aria-label="View practice scoresheet" onClick={() => setShowScoresheet(true)}>{myScore}</button>
+            <button type="button" className="play-tally__score play-tally__score-button" aria-label="View practice scoresheet" disabled={recordStatus !== "ready"} onClick={() => setShowScoresheet(true)}>{myScore}</button>
             <div className="play-tally__target">of {myTargetDisplay}</div>
             {!isEightBall && <button className="btn-primary" style={{marginTop:8,padding:"8px 10px",fontSize:11}} disabled={savingResult || !!winner || recordStatus !== "ready"} onClick={() => recordRackWin("me")}>Record Rack Win</button>}
           </div>
