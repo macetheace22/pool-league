@@ -567,7 +567,6 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     return (
       <>
         <PageHeader title="My Profile" />
-        <MyStatsRenderBoundary>
         <div className="tab-content"><AccountSettings profile={profile} onProfileRefresh={onProfileRefresh} /></div>
       </>
     );
@@ -1636,7 +1635,8 @@ function MyStatsPage({ profile }) {
 
 
   return (
-    <>
+    <MyStatsRenderBoundary>
+      <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
         <div className="card">
@@ -1712,9 +1712,9 @@ function MyStatsPage({ profile }) {
         )}
         </div>
       </MyStatsRenderBoundary>
-    </>
-  );
-}
+      </>
+    </MyStatsRenderBoundary>
+  );}
 function PlayerLookupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
