@@ -113,6 +113,20 @@ export default function Practice() {
     if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
   }, [location.search]);
   const cancelSession = () => { clearActiveSession(); setSessionState(null); setPhase("landing"); };
+  const discardSession = async () => {
+    if (!session?.gameId || !profile?.id) return;
+    const confirmed = window.confirm("Discard this practice session? All saved game results and Track a Rack shot details for this unfinished session will be permanently deleted.");
+    if (!confirmed) return;
+    try {
+      await db.discardPracticeGame(session.gameId);
+      clearActiveSession();
+      setSessionState(null);
+      setPhase("landing");
+      refreshHistory();
+    } catch (error) {
+      window.alert(error?.message || "The practice session could not be discarded. Please try again.");
+    }
+  };
 
   const wrap = (children) => (
     <div className="app">
@@ -154,7 +168,7 @@ export default function Practice() {
   }
   if (phase === "play") {
     return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
-      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={() => changePhase("config")} />);
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={() => changePhase("config")} onDiscard={discardSession} />);
   }
   if (phase === "done") {
     return wrap(<DoneStep profile={profile} session={session}
@@ -600,7 +614,7 @@ function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) 
 }
 
 // ─── Skills & Drills play ─────────────────────────────────────────────────
-function SkillsDrillsStep({ profile, session, setSession, onDone, onBack }) {
+function SkillsDrillsStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
   const [recordStatus, setRecordStatus] = useState("checking");
   const [recordError, setRecordError] = useState("");
   const [recordAttempt, setRecordAttempt] = useState(0);
@@ -638,6 +652,7 @@ function SkillsDrillsStep({ profile, session, setSession, onDone, onBack }) {
           {profile?.player_num ? <ShotTracker contextType="practice_game" contextId={session.gameId} player={{ num: profile.player_num, name: profile.username || "You" }} opponentNum={null} gameType={session.gameType} /> :
             <div className="dash-empty">Your league player profile is not linked, so shot tracking is unavailable for your account.</div>}
           <button className="btn-primary" style={{marginTop:12}} onClick={finish}>Finish Practice</button>
+          <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard}>Discard Practice</button>
         </div>}
         <button className="btn-secondary" onClick={onBack}>← Back to Game Type</button>
       </div>
@@ -646,7 +661,7 @@ function SkillsDrillsStep({ profile, session, setSession, onDone, onBack }) {
 }
 
 // ─── Step 5: play (running tally) ───────────────────────────────────────────
-function PlayStep({ profile, session, setSession, onDone, onBack }) {
+function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
   const [recordStatus, setRecordStatus] = useState("checking");
   const [recordError, setRecordError] = useState("");
   const [recordAttempt, setRecordAttempt] = useState(0);
@@ -858,6 +873,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack }) {
         )}
 
         <button className="btn-secondary" onClick={onBack}>← Back to Setup</button>
+        <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard}>Discard Practice</button>
       </div>
     </>
   );
