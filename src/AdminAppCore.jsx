@@ -1122,6 +1122,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 }
 
 function MyStatsPage({ profile }) {
+  const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
   const [playCategory, setPlayCategory] = useState("all");
   const [practiceGames, setPracticeGames] = useState(undefined);
 
