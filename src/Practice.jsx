@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { Search, Check, ChevronRight, Trophy } from "lucide-react";
+import { Search, Check, ChevronRight, Trophy, Plus } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
 import { css, Loader } from "./AdminApp";
