@@ -292,7 +292,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                 </span>
                 <ChevronRight size={16} style={{transform:selectedGameId === g.id ? "rotate(90deg)" : "none",flexShrink:0}} color="#6A6A6A" />
               </button>
-              {selectedGameId === g.id && <Scoresheet key={g.id} practiceGame={g} profile={profile} onClose={() => setSelectedGameId(null)} />}
+              {selectedGameId === g.id && <Scoresheet key={g.id} practiceGame={g} profile={profile} closeLabel="Close" onClose={() => setSelectedGameId(null)} />}
             </div>
           ))}
           {filterOpponent && <button className="btn-secondary" style={{marginTop:8}} onClick={() => { setFilterOpponent(null); setSelectedGameId(null); }}>Show All</button>}
