@@ -1,4 +1,4 @@
-import { Component, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Users, ChevronDown, ChevronUp, Plus, Trash2,
   Check, AlertCircle, Edit2, X, Settings, LogOut,
@@ -1561,49 +1561,17 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   );
 }
 
-class MyStatsRenderBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { error: null, componentStack: "" };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { error };
-  }
-
-  componentDidCatch(error, info) {
-    const componentStack = info?.componentStack ?? "";
-    console.error("My Stats render failed", error, componentStack);
-    this.setState({ componentStack });
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="card" role="alert">
-          <div className="card__title">Unable to display these statistics</div>
-          <div className="error-msg" style={{marginTop:8}}>
-            This selection caused a display error. Your saved match and practice data has not been changed.
-          </div>
-          <details style={{marginTop:8,color:"#9A9A9A",fontSize:11}}>
-            <summary>Technical details</summary>
-            <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{this.state.error.message}{this.state.componentStack ? "\n" + this.state.componentStack : ""}</pre>
-          </details>
-          <button type="button" className="btn-secondary" style={{marginTop:10}} onClick={() => this.setState({error:null})}>
-            Try again
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
-  const [includeLeague, setIncludeLeague] = useState(true);
-  const [includePractice, setIncludePractice] = useState(true);
-  const [includeTournaments, setIncludeTournaments] = useState(true);
+  const [includedSources, setIncludedSources] = useState(["league", "practice", "tournaments"]);
+  const toggleSource = source => setIncludedSources(current =>
+    current.includes(source)
+      ? current.filter(item => item !== source)
+      : [...current, source]
+  );
+  const includeLeague = includedSources.includes("league");
+  const includePractice = includedSources.includes("practice");
+  const includeTournaments = includedSources.includes("tournaments");
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
   const [practiceGamesError, setPracticeGamesError] = useState("");
@@ -1641,19 +1609,15 @@ function MyStatsPage({ profile }) {
   const practiceLosses = completedPractice.filter(g => g.winner === "opponent").length;
   const practiceDecided = practiceWins + practiceLosses;
   const practiceWinPct = practiceDecided ? Math.round((practiceWins / practiceDecided) * 100) : null;
-  const includedSources = [];
-  if (includeLeague) includedSources.push("league");
-  if (includePractice) includedSources.push("practice");
-  if (includeTournaments) includedSources.push("tournaments");
+  
 
 
 
   return (
-    <MyStatsRenderBoundary>
-      <>
+    <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
-        <div className="card" data-my-stats-build="20261116-source-toggle-v2">
+        <div className="card">
           <div className="card__title">Include in My Stats</div>
           <div style={{fontSize:11.5,color:"#8A8A8A",marginBottom:10}}>Choose which types of play are included throughout this page. The same selection drives your record, history, Track a Rack stats, and Match Head-to-Head.</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,alignItems:"stretch"}}>
@@ -1661,7 +1625,7 @@ function MyStatsPage({ profile }) {
               type="button"
               className={includeLeague ? "btn-primary" : "btn-secondary"}
               aria-pressed={includeLeague}
-              onClick={() => setIncludeLeague(!includeLeague)}
+              onClick={() => toggleSource("league")}
               style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
             >
               <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>League</span>
@@ -1671,7 +1635,7 @@ function MyStatsPage({ profile }) {
               type="button"
               className={includePractice ? "btn-primary" : "btn-secondary"}
               aria-pressed={includePractice}
-              onClick={() => setIncludePractice(!includePractice)}
+              onClick={() => toggleSource("practice")}
               style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
             >
               <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>Practice</span>
@@ -1681,7 +1645,7 @@ function MyStatsPage({ profile }) {
               type="button"
               className={includeTournaments ? "btn-primary" : "btn-secondary"}
               aria-pressed={includeTournaments}
-              onClick={() => setIncludeTournaments(!includeTournaments)}
+              onClick={() => toggleSource("tournaments")}
               style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
             >
               <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>Tournaments</span>
@@ -1721,9 +1685,7 @@ function MyStatsPage({ profile }) {
             )}
 
             {profile?.player_num && includedSources.length > 0 && (
-              <MyStatsRenderBoundary>
-                <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory="all" includedSources={includedSources} practiceGames={completedPractice} practiceGamesLoading={practiceGames === undefined} practiceGamesError={practiceGamesError} practiceProfile={profile} defaultCareer hideNameHeader />
-              </MyStatsRenderBoundary>
+              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory="all" includedSources={includedSources} practiceGames={completedPractice} practiceGamesLoading={practiceGames === undefined} practiceGamesError={practiceGamesError} practiceProfile={profile} defaultCareer hideNameHeader />
             )}
           </>
         )}
@@ -1735,8 +1697,7 @@ function MyStatsPage({ profile }) {
           </div>
         )}
       </div>
-      </>
-    </MyStatsRenderBoundary>
+    </>
   );
 }
 function PlayerLookupPage() {
