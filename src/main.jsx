@@ -97,6 +97,57 @@ function DirtySaveButtonBehavior() {
 }
 
 
+function MyStatsBrowserErrorCapture() {
+  const [failure, setFailure] = React.useState(null);
+  const [breadcrumbs, setBreadcrumbs] = React.useState([]);
+
+  React.useEffect(() => {
+    const addBreadcrumb = (event) => {
+      setBreadcrumbs(current => [...current.slice(-7), event.detail]);
+    };
+    const onError = (event) => {
+      const error = event.error;
+      setFailure({
+        type: "Browser runtime error",
+        message: event.message || error?.message || "Unknown browser error",
+        source: event.filename ? `${event.filename}:${event.lineno || 0}:${event.colno || 0}` : "",
+        stack: error?.stack || "",
+      });
+    };
+    const onRejection = (event) => {
+      const reason = event.reason;
+      setFailure({
+        type: "Unhandled promise rejection",
+        message: reason?.message || String(reason ?? "Unknown rejection"),
+        source: "",
+        stack: reason?.stack || "",
+      });
+    };
+    window.addEventListener("my-stats-filter-debug", addBreadcrumb);
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("my-stats-filter-debug", addBreadcrumb);
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
+  if (!failure) return null;
+  return (
+    <div role="alert" style={{position:"fixed",inset:"12px",zIndex:2147483647,overflow:"auto",background:"#160D0D",color:"#FFF",border:"2px solid #E05252",borderRadius:12,padding:16,fontFamily:"sans-serif",boxShadow:"0 8px 40px #000"}}>
+      <h2 style={{fontSize:18,margin:"0 0 10px"}}>My Stats browser error captured</h2>
+      <div style={{fontSize:13,fontWeight:700,color:"#FF9B9B"}}>{failure.type}</div>
+      <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",fontSize:12,lineHeight:1.45}}>{failure.message}{failure.source ? "\\n" + failure.source : ""}{failure.stack ? "\\n\\n" + failure.stack : ""}</pre>
+      {breadcrumbs.length > 0 && <>
+        <div style={{fontWeight:700,fontSize:12,marginTop:12}}>Filter actions immediately before the error</div>
+        <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere",fontSize:11}}>{breadcrumbs.map(item => JSON.stringify(item)).join("\\n")}</pre>
+      </>}
+      <button type="button" onClick={() => setFailure(null)} style={{padding:"10px 14px",borderRadius:8,border:"1px solid #888",background:"#333",color:"#FFF"}}>Dismiss diagnostic</button>
+    </div>
+  );
+}
+
 class MyStatsRouteErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -167,7 +218,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/mvp-standings" element={<AdminApp page="mvp" />} />
             <Route path="/match-lookup" element={<AdminApp page="matchlkp" />} />
             <Route path="/leaderboard" element={<AdminApp page="leaderboard" />} />
-            <Route path="/my-stats" element={<MyStatsRouteErrorBoundary><AdminApp page="stats" /></MyStatsRouteErrorBoundary>} />
+            <Route path="/my-stats" element={<><MyStatsBrowserErrorCapture /><MyStatsRouteErrorBoundary><AdminApp page="stats" /></MyStatsRouteErrorBoundary></>} />
             <Route path="/league-news" element={<LeagueNewsManager />} />
             <Route path="/access" element={<AdminApp page="access" />} />
             <Route path="/me" element={<AdminApp page="me" />} />
