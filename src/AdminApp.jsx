@@ -2396,6 +2396,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const [standingsAdj, setStandingsAdj] = useState([]);
   const [mvpAdj, setMvpAdj] = useState([]);
   const [rule55AuditData, setRule55AuditData] = useState(null);
+  const mvpTieBreakData = rule55AuditData;
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [selectedMatch, setSelectedMatch] = useState(null);
