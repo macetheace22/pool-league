@@ -1601,7 +1601,9 @@ class MyStatsRenderBoundary extends Component {
 
 function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
-  const [includedSources, setIncludedSources] = useState(["league", "practice", "tournaments"]);
+  const [includeLeague, setIncludeLeague] = useState(true);
+  const [includePractice, setIncludePractice] = useState(true);
+  const [includeTournaments, setIncludeTournaments] = useState(true);
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
   const [practiceGamesError, setPracticeGamesError] = useState("");
@@ -1639,17 +1641,10 @@ function MyStatsPage({ profile }) {
   const practiceLosses = completedPractice.filter(g => g.winner === "opponent").length;
   const practiceDecided = practiceWins + practiceLosses;
   const practiceWinPct = practiceDecided ? Math.round((practiceWins / practiceDecided) * 100) : null;
-  const includeLeague = includedSources.includes("league");
-  const includePractice = includedSources.includes("practice");
-  const includeTournaments = includedSources.includes("tournaments");
-  const toggleSource = source => {
-    setIncludedSources(current => {
-      const next = current.includes(source)
-        ? current.filter(item => item !== source)
-        : [...current, source];
-      return next;
-    });
-  };
+  const includedSources = [];
+  if (includeLeague) includedSources.push("league");
+  if (includePractice) includedSources.push("practice");
+  if (includeTournaments) includedSources.push("tournaments");
 
 
 
@@ -1658,30 +1653,40 @@ function MyStatsPage({ profile }) {
       <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
-        <div className="card">
+        <div className="card" data-my-stats-build="20261116-source-toggle-v2">
           <div className="card__title">Include in My Stats</div>
           <div style={{fontSize:11.5,color:"#8A8A8A",marginBottom:10}}>Choose which types of play are included throughout this page. The same selection drives your record, history, Track a Rack stats, and Match Head-to-Head.</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,alignItems:"stretch"}}>
-            {[
-              {key:"league",label:"League",description:"IBA league matches"},
-              {key:"practice",label:"Practice",description:"Practice games and drills"},
-              {key:"tournaments",label:"Tournaments",description:"Tournament results (when available)"},
-            ].map(source => {
-              const selected = includedSources.includes(source.key);
-              return (
-                <button
-                  key={source.key}
-                  type="button"
-                  className={selected ? "btn-primary" : "btn-secondary"}
-                  aria-pressed={selected}
-                  onClick={() => toggleSource(source.key)}
-                  style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
-                >
-                  <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>{source.label}</span>
-                  <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>{source.description}</span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              className={includeLeague ? "btn-primary" : "btn-secondary"}
+              aria-pressed={includeLeague}
+              onClick={() => setIncludeLeague(!includeLeague)}
+              style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
+            >
+              <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>League</span>
+              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>IBA league matches</span>
+            </button>
+            <button
+              type="button"
+              className={includePractice ? "btn-primary" : "btn-secondary"}
+              aria-pressed={includePractice}
+              onClick={() => setIncludePractice(!includePractice)}
+              style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
+            >
+              <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>Practice</span>
+              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>Practice games and drills</span>
+            </button>
+            <button
+              type="button"
+              className={includeTournaments ? "btn-primary" : "btn-secondary"}
+              aria-pressed={includeTournaments}
+              onClick={() => setIncludeTournaments(!includeTournaments)}
+              style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
+            >
+              <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>Tournaments</span>
+              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>Tournament results (when available)</span>
+            </button>
           </div>
           {includedSources.length === 0 && <div className="dash-empty" style={{marginTop:10}}>Select at least one type of play.</div>}
         </div>
