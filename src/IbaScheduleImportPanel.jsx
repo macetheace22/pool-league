@@ -176,11 +176,12 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         data = await postSchedule({ action: "fetch", format: division.format, day: division.day, division: division.value || division.label });
         setPreviews(p => ({ ...p, [key]: data }));
       }
+      setRowErrors(p => { const next = { ...p }; delete next[key]; return next; });
       const savedSnapshot = await db.getIbaScheduleComparisonSnapshot(season.id, extractDivisionNum(division));
       const report = compareIbaSchedules({
         saved: { teams: savedSnapshot.teams, weeks: savedSnapshot.weeks },
         official: data,
-        errors: rowErrors[key] ? [{ error: rowErrors[key] }] : [],
+        errors: [],
       });
       setComparisonResults(p => ({ ...p, [key]: report }));
       setExpanded(key);
