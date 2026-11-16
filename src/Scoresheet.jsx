@@ -449,7 +449,7 @@ function TeamColumn({ teamName, rollups, team, isMasters, format, ratingTotal, b
 
 export default function Scoresheet({ match, practiceGame = null, profile = null, onClose, closeLabel = "Back to History" }) {
   return practiceGame
-    ? <PracticeScoresheetView game={practiceGame} profile={profile} onClose={onClose} />
+    ? <PracticeScoresheetView game={practiceGame} profile={profile} onClose={onClose} closeLabel={closeLabel} />
     : <LeagueScoresheet match={match} onClose={onClose} closeLabel={closeLabel} />;
 }
 
@@ -481,7 +481,7 @@ function LeagueScoresheet({ match, onClose, closeLabel }) {
   return (
     <div className="scoresheet-app">
       <style>{css}</style>
-      <button className="scoresheet-close" onClick={onClose}><X size={14}/> Back to History</button>
+      <button className="scoresheet-close" onClick={onClose}><X size={14}/> {closeLabel}</button>
       {makeupBanner}
       <div className="app__header">
         <div className="app__header-meta">{match.venue || "—"} · {match.week_num ? `Week ${match.week_num}` : match.week_date || ""} · {isMasters ? "IBA Masters Format" : match.format === "open" ? "IBA Open Format" : "IBA Advanced Format"}</div>
@@ -533,7 +533,7 @@ function practiceScoringMethodLabel(key) {
   return ({ race_to_points: "Race to Points", race_to_games: "Race to Games", best_of_games: "Best of X Games" })[key] ?? "Practice";
 }
 
-function PracticeScoresheetView({ game, profile, onClose }) {
+function PracticeScoresheetView({ game, profile, onClose, closeLabel }) {
   const [results, setResults] = useState(undefined);
   const [events, setEvents] = useState(undefined);
   const [error, setError] = useState("");
