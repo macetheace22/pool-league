@@ -1432,8 +1432,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
                 for (const set of match.playerSets ?? []) {
                   const opponent = set.playerHome?.num === playerNum ? set.playerAway : set.playerHome;
                   if (!opponent?.num) continue;
-                  const name = opponent.name ?? opponent.num;
-                  const key = name.trim().toLocaleLowerCase();
+                  const name = String(opponent.name ?? opponent.num ?? "").trim() || String(opponent.num ?? "Unknown");
+                  const key = name.toLocaleLowerCase();
                   const row = groups[key] ??= { key, name, wins: 0, losses: 0, leagueSets: 0, practiceGames: 0 };
                   if (set.winnerSlot === match.playerSide) row.wins++;
                   else if (set.winnerSlot) row.losses++;
@@ -1443,8 +1443,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
             }
             if (includePractice) {
               for (const game of practiceGames ?? []) {
-                if (game.practice_type === "skills_drills" || !game.opponent_name?.trim()) continue;
-                const name = game.opponent_name.trim();
+                const name = String(game.opponent_name ?? "").trim();
+                if (game.practice_type === "skills_drills" || !name) continue;
                 const key = name.toLocaleLowerCase();
                 const row = groups[key] ??= { key, name, wins: 0, losses: 0, leagueSets: 0, practiceGames: 0 };
                 if (game.winner === "me") row.wins++;
