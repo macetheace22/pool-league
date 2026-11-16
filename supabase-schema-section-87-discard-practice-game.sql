@@ -6,7 +6,7 @@ create or replace function public.discard_practice_game(p_practice_game_id uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_created_by uuid;
