@@ -14,7 +14,7 @@ export function toDisplaySets(match) {
   return (match.state?.sets ?? [])
     .map(s => {
       const status = s.forfeited ? "forfeited"
-        : s.complete ? "played"
+        : s.complete || (match.is_live && (s.racks ?? []).length > 0) ? "played"
         : match.is_makeup_pending ? "makeup-pending"
         : "unplayed";
       if (status === "unplayed" || status === "makeup-pending") {
@@ -447,13 +447,13 @@ function TeamColumn({ teamName, rollups, team, isMasters, format, ratingTotal, b
   );
 }
 
-export default function Scoresheet({ match, practiceGame = null, profile = null, onClose }) {
+export default function Scoresheet({ match, practiceGame = null, profile = null, onClose, closeLabel = "Back to History" }) {
   return practiceGame
     ? <PracticeScoresheetView game={practiceGame} profile={profile} onClose={onClose} />
-    : <LeagueScoresheet match={match} onClose={onClose} />;
+    : <LeagueScoresheet match={match} onClose={onClose} closeLabel={closeLabel} />;
 }
 
-function LeagueScoresheet({ match, onClose }) {
+function LeagueScoresheet({ match, onClose, closeLabel }) {
   const [view, setView] = useState("front");
   const [setIndex, setSetIndex] = useState(0);
   const [showInnings, setShowInnings] = useState(false);
@@ -472,7 +472,7 @@ function LeagueScoresheet({ match, onClose }) {
     return (
       <div className="scoresheet-app">
         <style>{css}</style>
-        <button className="scoresheet-close" onClick={onClose}><X size={14}/> Back to History</button>
+        <button className="scoresheet-close" onClick={onClose}><X size={14}/> {closeLabel}</button>
         <div className="empty-state-ss">No rack-by-rack detail was recorded for this match.</div>
       </div>
     );

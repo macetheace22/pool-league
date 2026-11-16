@@ -7,6 +7,7 @@ import * as db from "./db";
 import { isTimeoutEligibleFormat, timeoutAllowance, timeoutCount } from "./timeoutRules";
 import { useAuth } from "./AuthContext";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
+import Scoresheet from "./Scoresheet";
 import { mergeLiveMatchState } from "./liveMatchSync";
 import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
@@ -1065,6 +1066,17 @@ function ForfeitTableForm({ match, setIdx, used, defaultForfeitingSide, lockForf
 // ─── Live Screen (scoring) ────────────────────────────────────────────────────
 function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
   const completedCount = match.sets.filter((s) => s.complete).length;
+  const [showScoresheet, setShowScoresheet] = useState(false);
+  const scoresheetMatch = {
+    venue: match.venue,
+    week_num: match.weekNum ?? null,
+    week_date: match.weekDate ?? null,
+    format: match.format,
+    team_home_name: match.teamHome?.name ?? "Home",
+    team_away_name: match.teamAway?.name ?? "Away",
+    is_live: true,
+    state: { ...match, sets: match.sets },
+  };
   return (
     <div className="screen">
       <SetTabBar sets={match.sets} activeSet={activeSet} onSelect={setActiveSet} />
@@ -1074,6 +1086,7 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
         match={match}
         contextType="live_match"
         contextId={pairingId}
+        onShowScoresheet={() => setShowScoresheet(true)}
         onUpdateSet={(updatedSet) => {
           const newSets = match.sets.map((s, i) => (i === activeSet ? updatedSet : s));
           const allDone = newSets.every((s) => s.complete);
@@ -1081,6 +1094,15 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
         }}
       />
       {completedCount > 0 && <div className="completed-banner">{completedCount} of 5 sets complete</div>}
+      {showScoresheet && (
+        <div role="dialog" aria-modal="true" aria-label="Read-only match scoresheet"
+          onClick={(event) => { if (event.target === event.currentTarget) setShowScoresheet(false); }}
+          style={{position:"fixed",inset:0,zIndex:1000,overflowY:"auto",background:"rgba(0,0,0,.88)",padding:"12px",boxSizing:"border-box"}}>
+          <div style={{maxWidth:760,margin:"0 auto",minHeight:"100%"}}>
+            <Scoresheet match={scoresheetMatch} closeLabel="Back to Live Scoring" onClose={() => setShowScoresheet(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1097,7 +1119,7 @@ function SetTabBar({ sets, activeSet, onSelect }) {
   );
 }
 
-export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
+export function SetEntry({ set, match, onUpdateSet, onShowScoresheet, contextType, contextId }) {
   const TIMEOUTS_ENABLED = isTimeoutEligibleFormat(match.format);
   const [homeVal, setHomeVal] = useState("");
   const [awayVal, setAwayVal] = useState("");
@@ -1170,8 +1192,8 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
   return (
     <div className="set-entry">
       <div className="set-entry__players">
-        <PlayerBar name={set.playerHome.name} rating={ratingH} target={targetH} run={runHome} pct={pctH} side="home" winner={winner === "home"} />
-        <PlayerBar name={set.playerAway.name} rating={ratingA} target={targetA} run={runAway} pct={pctA} side="away" winner={winner === "away"} />
+        <PlayerBar name={set.playerHome.name} rating={ratingH} target={targetH} run={runHome} pct={pctH} side="home" winner={winner === "home"} onShowScoresheet={onShowScoresheet} />
+        <PlayerBar name={set.playerAway.name} rating={ratingA} target={targetA} run={runAway} pct={pctA} side="away" winner={winner === "away"} onShowScoresheet={onShowScoresheet} />
       </div>
       {set.complete && (
         <div className={`set-winner-badge set-winner-badge--${set.winnerSlot}`}>
@@ -1287,13 +1309,17 @@ function SafetyStepper({ label, value, onChange, color }) {
   );
 }
 
-function PlayerBar({ name, rating, target, run, pct, side, winner }) {
+function PlayerBar({ name, rating, target, run, pct, side, winner, onShowScoresheet }) {
   const unrated = isUnrated(rating);
   return (
     <div className={`player-bar player-bar--${side} ${winner ? "player-bar--winner" : ""}`}>
       <div className="player-bar__info">
         <span className="player-bar__name">{name}{unrated && <span className="player-bar__nr">NR</span>}</span>
-        <span className="player-bar__score">{run}<span className="player-bar__rating">/{target}</span></span>
+        <button type="button" className="player-bar__score" onClick={onShowScoresheet}
+          aria-label={`View read-only match scoresheet for ${name}`}
+          style={{border:0,padding:0,background:"none",color:"inherit",font:"inherit",cursor:"pointer",textAlign:"inherit"}}>
+          {run}<span className="player-bar__rating">/{target}</span>
+        </button>
       </div>
       <div className="player-bar__track">
         <div className={`player-bar__fill player-bar__fill--${side} ${pct >= 100 ? "player-bar__fill--done" : ""}`} style={{ width: `${pct}%` }} />
