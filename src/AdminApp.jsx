@@ -1056,7 +1056,7 @@ function seasonLabelFor(row) {
 // concept at all, so they're included under Career but excluded whenever a
 // specific season is selected -- called out inline rather than silently
 // dropped.
-function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "all", defaultCareer = false }) {
+function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "all", defaultCareer = false, hideNameHeader = false }) {
   const navigate = useNavigate();
   const [nameInfo, setNameInfo] = useState(null);
   const [currentRating, setCurrentRating] = useState(null);
@@ -1231,12 +1231,12 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
   return (
     <>
-      <div className="card">
+      {!hideNameHeader && <div className="card">
         <div style={{fontSize:16,fontWeight:700,color:"#E0E0E0"}}>
           {nameInfo?.name ?? playerNum}{nameInfo?.nickname ? <span style={{color:"#6A6A6A",fontWeight:500}}> "{nameInfo.nickname}"</span> : ""}
         </div>
         {currentRating != null && <div style={{fontSize:11,color:"#9A9A9A",marginTop:2}}>Current Rating: {currentRating}</div>}
-      </div>
+      </div>}
 
       {showScope && <div className="card">
         <div className="card__title">Scope</div>
@@ -1402,8 +1402,26 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
   const [playCategory, setPlayCategory] = useState("all");
+  const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
   const [practiceGamesError, setPracticeGamesError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!profile?.player_num) { setPlayerHeading(null); return () => { cancelled = true; }; }
+    setPlayerHeading({ name: profile.player_num, nickname: "", rating: null });
+    Promise.all([
+      db.getPlayerNameMap([profile.player_num]),
+      db.getPlayerRating(profile.player_num),
+    ]).then(([nameMap, rating]) => {
+      if (cancelled) return;
+      const info = nameMap[profile.player_num] ?? { name: profile.player_num, nickname: "" };
+      setPlayerHeading({ ...info, rating });
+    }).catch(() => {
+      if (!cancelled) setPlayerHeading({ name: profile.player_num, nickname: "", rating: null });
+    });
+    return () => { cancelled = true; };
+  }, [profile?.player_num]);
 
   useEffect(() => {
     if (!profile?.id) { setPracticeGames([]); setPracticeGamesError(""); return; }
@@ -1453,6 +1471,16 @@ function MyStatsPage({ profile }) {
           </div>
         </div>
 
+        {profile?.player_num && (
+          <div className="card">
+            <div style={{fontSize:16,fontWeight:700,color:"#E0E0E0"}}>
+              {playerHeading?.name ?? profile.player_num}
+              {playerHeading?.nickname ? <span style={{color:"#6A6A6A",fontWeight:500}}> "{playerHeading.nickname}"</span> : ""}
+            </div>
+            {playerHeading?.rating != null && <div style={{fontSize:11,color:"#9A9A9A",marginTop:2}}>Current Rating: {playerHeading.rating}</div>}
+          </div>
+        )}
+
         {playCategory === "tournaments" ? (
           <div className="card">
             <div className="card__title">Tournament Statistics</div>
@@ -1499,7 +1527,7 @@ function MyStatsPage({ profile }) {
             )}
 
             {profile?.player_num && (showLeague || showPractice) && (
-              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory={playCategory} defaultCareer />
+              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory={playCategory} defaultCareer hideNameHeader />
             )}
           </>
         )}
