@@ -1289,7 +1289,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
           <button className={`seg-btn ${scopeMode==="season"?"seg-btn--active":""}`} onClick={()=>setScopeMode("season")}>By Season</button>
           <button className={`seg-btn ${scopeMode==="career"?"seg-btn--active":""}`} onClick={()=>setScopeMode("career")}>Career (All-Time)</button>
         </div>
-        {playCategory !== "practice" && scopeMode === "season" && (
+        {includeLeague && scopeMode === "season" && (
           years.length === 0 ? <div className="dash-empty">No season history on file.</div> : (
             <div style={{display:"flex",gap:8}}>
               <select className="input input--select" style={{flex:1}} value={selectedYear ?? ""} onChange={e => {
@@ -1423,13 +1423,13 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       )}
 
       {rawEvents === undefined && <Loader />}
-      {rawEventsError && playCategory !== "tournaments" && (
+      {rawEventsError && !includeTournaments && (
         <div className="card">
           <div className="card__title">Advanced Stats</div>
           <div className="error-msg">Unable to load tracked shots: {rawEventsError}</div>
         </div>
       )}
-      {rawEvents && playCategory !== "tournaments" && (
+      {rawEvents && !includeTournaments && (
         <>
           <div className="card">
             <div className="card__title">Track a Rack — Individual Stats</div>
@@ -1437,7 +1437,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
               <FilterChips options={PLAY_TYPE_FILTERS} value={playTypeFilter} onChange={setPlayTypeFilter} />
               <FilterChips options={GAME_TYPE_FILTERS} value={gameTypeFilter} onChange={setGameTypeFilter} />
             </div>
-            {scopeMode === "season" && <div style={{fontSize:10,color:"#6A6A6A",marginBottom:6}}>Practice games aren't tied to a season, so they're excluded while a specific season is selected — switch to Career to include them.</div>}
+            
             {filteredEvents.length === 0
               ? <div className="dash-empty" style={{marginTop:8}}>No tracked shots match this filter.</div>
               : <>
@@ -1451,16 +1451,13 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
       </>
       )}
-      {rawEvents === null && !rawEventsError && playCategory !== "tournaments" && (
+      {rawEvents === null && !rawEventsError && !includeTournaments && (
         <>
           <div className="card">
             <div className="card__title">Advanced Stats (Track a Rack)</div>
             <div className="dash-empty">No Track a Rack shots have been recorded yet for this play type.</div>
           </div>
-          <div className="card">
-            <div className="card__title">Head-to-Head</div>
-            <div className="dash-empty">No Track a Rack shots have been recorded yet for this play type.</div>
-          </div>
+
         </>
       )}
     </>
