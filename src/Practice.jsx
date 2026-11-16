@@ -857,10 +857,10 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
             <div className="card__title">Record This Game's Score</div>
             <div style={{display:"flex",gap:10,alignItems:"flex-end",marginTop:6}}>
               <div className="field" style={{flex:1}}><div className="form-label">You</div>
-                <input className="input" type="number" value={myPts} onChange={e=>setSession(s=>({...s,myPts:e.target.value}))} placeholder="0" /></div>
+                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={myPts} onChange={e=>setSession(s=>({...s,myPts:e.target.value}))} placeholder="0" /></div>
               <div style={{fontSize:13,color:"#6A6A6A",paddingBottom:12}}>–</div>
               <div className="field" style={{flex:1}}><div className="form-label">{session.opponentName}</div>
-                <input className="input" type="number" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="0" /></div>
+                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="0" /></div>
             </div>
             {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
             <button className="btn-primary" style={{marginTop:10}} onClick={recordGame} disabled={savingResult || recordStatus !== "ready"}>{savingResult ? "Saving…" : "Submit Game Score"}</button>
