@@ -50,13 +50,13 @@ describe("computeShotStats", () => {
     const events = [
       { category: "safety", outcome: "successful", tags: [], is_scratch: false, is_foul: false, is_miscue: false },
       { category: "safety", outcome: "unsuccessful", tags: [], is_scratch: false, is_foul: false, is_miscue: false },
-      { category: "break", outcome: "make", tags: [], is_scratch: true, is_foul: false, is_miscue: false },
+      { category: "break", outcome: "make", tags: [], is_scratch: true, is_foul: false, is_miscue: false, is_eight_ball_break: true, balls_made_on_break: 3 },
       { category: "runout" },
       { category: "runout" },
     ];
     const stats = computeShotStats(events);
     expect(stats.safeties).toEqual({ attempts: 2, successful: 1, pct: 50 });
-    expect(stats.breaks).toEqual({ attempts: 1, made: 1, scratches: 1 });
+    expect(stats.breaks).toEqual({ attempts: 1, made: 1, scratches: 1, eightBall: { attempts: 1, madeOnBreak: 3 } });
     expect(stats.runouts).toBe(2);
     expect(stats.totalShots).toBe(0); // none of the above are category "shot"
   });
@@ -79,3 +79,15 @@ describe("computeShotStats", () => {
     expect(stats.byDistance.short.attempts).toBe(0);
   });
 });
+
+
+  it("tracks 8-ball breaks and balls made on the break separately", () => {
+    const events = [
+      { category: "break", outcome: "make", tags: [], is_scratch: false, is_foul: false, is_miscue: false, is_eight_ball_break: true, balls_made_on_break: 2 },
+      { category: "break", outcome: "miss", tags: [], is_scratch: false, is_foul: false, is_miscue: false, is_eight_ball_break: true, balls_made_on_break: 0 },
+      { category: "break", outcome: "make", tags: [], is_scratch: false, is_foul: false, is_miscue: false, is_eight_ball_break: false, balls_made_on_break: null },
+    ];
+    const stats = computeShotStats(events);
+    expect(stats.breaks.attempts).toBe(3);
+    expect(stats.breaks.eightBall).toEqual({ attempts: 2, madeOnBreak: 2 });
+  });
