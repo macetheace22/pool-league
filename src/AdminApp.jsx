@@ -1076,7 +1076,9 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [playoffElig, setPlayoffElig] = useState(undefined); // undefined = loading/n-a, null = nothing imported for this scope
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
-  const [headToHead, setHeadToHead] = useState([]);\n  const [matchHistory, setMatchHistory] = useState(undefined);\n  const [selectedHistoryMatch, setSelectedHistoryMatch] = useState(null);
+  const [headToHead, setHeadToHead] = useState([]);
+  const [matchHistory, setMatchHistory] = useState(undefined);
+  const [selectedHistoryMatch, setSelectedHistoryMatch] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1440,7 +1442,8 @@ function MyStatsPage({ profile }) {
   const [playCategory, setPlayCategory] = useState("all");
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
-  const [practiceGamesError, setPracticeGamesError] = useState("");\n  const [selectedHistoryPractice, setSelectedHistoryPractice] = useState(null);
+  const [practiceGamesError, setPracticeGamesError] = useState("");
+  const [selectedHistoryPractice, setSelectedHistoryPractice] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
