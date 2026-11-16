@@ -1205,15 +1205,15 @@ export function SetEntry({ set, match, onUpdateSet, contextType, contextId }) {
           <div className="rack-entry-form__row">
             <div className="rack-entry-form__field">
               <label className="rack-entry-form__label rack-entry-form__label--home">{set.playerHome.name.split(" ")[0]}</label>
-              <input className="rack-entry-form__input" type="number" min={0} value={homeVal} onChange={(e) => setHomeVal(e.target.value)} placeholder="0" />
+              <input className="rack-entry-form__input" type="number" inputMode="numeric" pattern="[0-9]*" min={0} value={homeVal} onChange={(e) => setHomeVal(e.target.value)} placeholder="0" />
             </div>
             <div className="rack-entry-form__field">
               <label className="rack-entry-form__label rack-entry-form__label--away">{set.playerAway.name.split(" ")[0]}</label>
-              <input className="rack-entry-form__input" type="number" min={0} value={awayVal} onChange={(e) => setAwayVal(e.target.value)} placeholder="0" />
+              <input className="rack-entry-form__input" type="number" inputMode="numeric" pattern="[0-9]*" min={0} value={awayVal} onChange={(e) => setAwayVal(e.target.value)} placeholder="0" />
             </div>
             <div className="rack-entry-form__field rack-entry-form__field--inn">
               <label className="rack-entry-form__label">Inn.</label>
-              <input className="rack-entry-form__input" type="number" min={0} value={inningsVal} onChange={(e) => setInningsVal(e.target.value)} placeholder="0" />
+              <input className="rack-entry-form__input" type="number" inputMode="numeric" pattern="[0-9]*" min={0} value={inningsVal} onChange={(e) => setInningsVal(e.target.value)} placeholder="0" />
             </div>
           </div>
           <div className="safety-row">
