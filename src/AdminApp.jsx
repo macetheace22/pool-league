@@ -1250,7 +1250,18 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     (matchesPlayType(e, "practice") && includePractice)
   );
   const filteredEvents = sourceEvents.filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && (playCategory === "all" ? matchesPlayType(e, playTypeFilter) : true));
-  const shotStats = rawEvents ? db.computeShotStats(filteredEvents) : null;
+  // Shot-event rows can contain legacy/mixed data. A malformed row must not be able to
+  // tear down the entire My Stats page when a source filter changes the event set.
+  let shotStats = null;
+  let shotStatsError = "";
+  if (rawEvents) {
+    try {
+      shotStats = db.computeShotStats(Array.isArray(filteredEvents) ? filteredEvents : []);
+    } catch (error) {
+      console.error("My Stats shot-stat aggregation failed", error);
+      shotStatsError = error?.message || "Unable to calculate tracked-shot statistics.";
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1522,9 +1533,11 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
               <FilterChips options={GAME_TYPE_FILTERS} value={gameTypeFilter} onChange={setGameTypeFilter} />
             </div>
             
-            {filteredEvents.length === 0
-              ? <div className="dash-empty" style={{marginTop:8}}>No tracked shots match this filter.</div>
-              : <>
+            {shotStatsError
+              ? <div className="error-msg" style={{marginTop:8}}>Unable to calculate tracked-shot statistics for this selection. Saved data is unchanged.</div>
+              : filteredEvents.length === 0
+                ? <div className="dash-empty" style={{marginTop:8}}>No tracked shots match this filter.</div>
+                : <>
                   <ShotStatsBlock stats={shotStats} />
                   <div style={{display:"flex",gap:8,marginTop:10}} className="no-print">
                     <button className="btn-sm" onClick={() => window.print()}>Print / Save as PDF</button>
