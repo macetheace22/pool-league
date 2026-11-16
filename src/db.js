@@ -2502,10 +2502,11 @@ export async function savePracticeGame(row) {
   return error ? null : data;
 }
 export async function listMyPracticeGames(profileId) {
-  const { data } = await supabase.from("practice_games").select("*")
+  const { data, error } = await supabase.from("practice_games").select("*")
     .eq("created_by", profileId)
     .or("winner.not.is.null,completed_at.not.is.null")
     .order("played_at", { ascending: false });
+  if (error) throw error;
   return data ?? [];
 }
 
@@ -2535,7 +2536,8 @@ export async function deleteShotEvent(id) {
 // (and any future team/tournament breakdown) aggregates over.
 export async function listMyShotEvents(playerNum) {
   if (!playerNum) return [];
-  const { data } = await supabase.from("shot_events").select("*").eq("player_num", playerNum).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("shot_events").select("*").eq("player_num", playerNum).order("created_at", { ascending: false });
+  if (error) throw error;
   return data ?? [];
 }
 
@@ -2605,18 +2607,40 @@ export function filterShotEvents(events, { gameType, playType } = {}) {
 // practice game against a manually-typed, no-account opponent) land in an
 // explicit "Unknown / Manual Opponent" bucket rather than being dropped.
 export async function computeHeadToHead(events) {
+  // Practice opponents entered manually do not have an IBA player number.
+  // Resolve their saved name from the practice session so they appear as
+  // identifiable opponents rather than being merged into "Unknown".
+  const practiceIds = [...new Set(events
+    .filter(e => e.context_type === "practice_game" && !e.opponent_player_num)
+    .map(e => e.context_id).filter(Boolean))];
+  let practiceNames = {};
+  if (practiceIds.length) {
+    const { data, error } = await supabase.from("practice_games")
+      .select("id, opponent_name").in("id", practiceIds);
+    if (error) throw error;
+    practiceNames = Object.fromEntries((data ?? [])
+      .filter(row => row.opponent_name?.trim())
+      .map(row => [row.id, row.opponent_name.trim()]));
+  }
+
   const byOpp = {};
   for (const e of events) {
-    const key = e.opponent_player_num || "unknown";
-    (byOpp[key] ??= []).push(e);
+    const manualName = !e.opponent_player_num && e.context_type === "practice_game"
+      ? practiceNames[e.context_id] : null;
+    const normalizedName = manualName?.toLocaleLowerCase();
+    const key = e.opponent_player_num || (normalizedName ? `manual:${normalizedName}` : "unknown");
+    const group = byOpp[key] ??= { events: [], manualName: manualName ?? null };
+    group.events.push(e);
   }
-  const names = await getPlayerNameMap(Object.keys(byOpp).filter(k => k !== "unknown"));
+  const playerNums = Object.keys(byOpp).filter(key => !key.startsWith("manual:") && key !== "unknown");
+  const names = await getPlayerNameMap(playerNums);
   return Object.entries(byOpp)
-    .map(([key, evs]) => ({
-      opponentNum: key === "unknown" ? null : key,
-      name: key === "unknown" ? "Unknown / Manual Opponent" : (names[key]?.name ?? key),
-      nickname: key === "unknown" ? "" : (names[key]?.nickname ?? ""),
-      stats: computeShotStats(evs),
+    .map(([key, group]) => ({
+      opponentNum: playerNums.includes(key) ? key : null,
+      opponentKey: key,
+      name: key.startsWith("manual:") ? group.manualName : key === "unknown" ? "Unknown / Manual Opponent" : (names[key]?.name ?? key),
+      nickname: names[key]?.nickname ?? "",
+      stats: computeShotStats(group.events),
     }))
     .sort((a, b) => b.stats.totalShots - a.stats.totalShots);
 }
