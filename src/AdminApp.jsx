@@ -221,6 +221,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const captainTeamId = captainTeamIds.includes(selectedCaptainTeamId) ? selectedCaptainTeamId : (captainTeamIds[0] ?? null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const requestedSeasonId = searchParams.get("season");
 
   useEffect(() => {
     let cancelled = false;
@@ -232,7 +233,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   const [seasons, setSeasons] = useState([]);
   const [divisionTeamCounts, setDivisionTeamCounts] = useState({});
-  const [divisionTeamCountsLoaded, setDivisionTeamCountsLoaded] = useState(false);
+  const [divisionTeamCountsLoadedFor, setDivisionTeamCountsLoadedFor] = useState(null);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
   const [initialLoadError, setInitialLoadError] = useState("");
   const skipNextDivisionLoadRef = useRef(false);
@@ -261,27 +262,28 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [myTeamSubTab, setMyTeamSubTab]   = useState("roster");
 
   const activeSeasons = seasons.filter(s => s.is_active);
-  const seasonIdsNeedingTeams = new Set(divisionTeamCountsLoaded ? activeSeasons.filter(season => {
+  const divisionIdsKey = seasons.flatMap(season => (season.divisions ?? []).map(division => division.id)).join("|");
+  const seasonIdsNeedingTeams = new Set(divisionTeamCountsLoadedFor === divisionIdsKey ? activeSeasons.filter(season => {
     const divisions = season.divisions ?? [];
     return divisions.length > 0 && divisions.reduce((total, division) => total + (divisionTeamCounts[division.id] ?? 0), 0) === 0;
   }).map(season => season.id) : []);
   useEffect(() => {
     let cancelled = false;
     const divisionIds = seasons.flatMap(season => (season.divisions ?? []).map(division => division.id));
-    setDivisionTeamCountsLoaded(false);
+    const requestKey = divisionIds.join("|");
     if (!divisionIds.length) {
       setDivisionTeamCounts({});
-      setDivisionTeamCountsLoaded(true);
+      setDivisionTeamCountsLoadedFor(requestKey);
       return () => { cancelled = true; };
     }
     db.countTeamsByDivisions(divisionIds).then(counts => {
       if (cancelled) return;
       setDivisionTeamCounts(counts ?? {});
-      setDivisionTeamCountsLoaded(true);
+      setDivisionTeamCountsLoadedFor(requestKey);
     }).catch(() => {
       if (cancelled) return;
       setDivisionTeamCounts({});
-      setDivisionTeamCountsLoaded(false);
+      setDivisionTeamCountsLoadedFor(null);
     });
     return () => { cancelled = true; };
   }, [seasons]);
@@ -1964,7 +1966,6 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSetPlayoffsDate, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule, seasonIdsNeedingTeams = new Set(), onImportTeams }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const requestedSeasonId = searchParams.get("season");
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
    const [error, setError]   = useState("");
