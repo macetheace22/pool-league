@@ -738,6 +738,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
   const myPts = session.myPts ?? "";
   const oppPts = session.oppPts ?? "";
   const [err, setErr] = useState("");
+  const [showScoresheet, setShowScoresheet] = useState(false);
 
   const isEightBall = session.gameType === "8ball";
   const myPlayer = profile?.player_num ? { num: profile.player_num, name: profile.username || "You" } : null;
@@ -753,6 +754,24 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
 
   const [savingResult, setSavingResult] = useState(false);
   const savingResultRef = useRef(false);
+
+  if (showScoresheet) {
+    return <Scoresheet
+      practiceGame={{
+        id: session.gameId,
+        practice_type: session.practiceType ?? "opponent",
+        scoring_method: session.scoringMethod,
+        game_type: session.gameType,
+        opponent_player_num: session.opponentPlayerNum ?? null,
+        opponent_name: session.opponentName,
+        my_score: myScore,
+        opponent_score: oppScore,
+        played_at: new Date().toISOString(),
+      }}
+      profile={profile}
+      onClose={() => setShowScoresheet(false)}
+    />;
+  }
 
   const saveGameResult = async ({ myPoints = null, oppPoints = null, gameWinner }) => {
     if (savingResultRef.current) return;
@@ -854,14 +873,14 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
         <div className="play-tally">
           <div className="play-tally__side">
             <div className="play-tally__name">You</div>
-            <div className="play-tally__score">{myScore}</div>
+            <button type="button" className="play-tally__score play-tally__score-button" aria-label="View practice scoresheet" onClick={() => setShowScoresheet(true)}>{myScore}</button>
             <div className="play-tally__target">of {myTargetDisplay}</div>
             {!isEightBall && <button className="btn-primary" style={{marginTop:8,padding:"8px 10px",fontSize:11}} disabled={savingResult || !!winner || recordStatus !== "ready"} onClick={() => recordRackWin("me")}>Record Rack Win</button>}
           </div>
           <div className="play-tally__vs">vs</div>
           <div className="play-tally__side">
             <div className="play-tally__name">{session.opponentName}</div>
-            <div className="play-tally__score">{oppScore}</div>
+            <button type="button" className="play-tally__score play-tally__score-button" aria-label="View practice scoresheet" onClick={() => setShowScoresheet(true)}>{oppScore}</button>
             <div className="play-tally__target">of {oppTarget}</div>
             {!isEightBall && <button className="btn-primary" style={{marginTop:8,padding:"8px 10px",fontSize:11}} disabled={savingResult || !!winner || recordStatus !== "ready"} onClick={() => recordRackWin("opponent")}>Record Rack Win</button>}
           </div>
@@ -967,6 +986,6 @@ export const practiceCss = `
 .play-tally__vs{font-size:11px;color:#6A6A6A;font-weight:700;}
 .play-tally__name{font-size:12px;font-weight:700;color:#9FC4B4;text-align:center;}
 .play-tally__score{font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:700;color:#FFF;line-height:1;}
-.play-tally__target{font-size:10.5px;color:#6A6A6A;}
+.play-tally__score-button{border:0;background:transparent;padding:0;cursor:pointer;line-height:1;}.play-tally__score-button:focus-visible{outline:2px solid #5FCF9E;outline-offset:5px;border-radius:4px;}.play-tally__target{font-size:10.5px;color:#6A6A6A;}
 .play-tally__btns{display:flex;gap:8px;margin-top:4px;}
 `;
