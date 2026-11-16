@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { Component, useState, useEffect, useRef } from "react";
 import {
   Users, ChevronDown, ChevronUp, Plus, Trash2,
   Check, AlertCircle, Edit2, X, Settings, LogOut,
@@ -1549,7 +1549,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   );
 }
 
-class MyStatsRenderBoundary extends React.Component {
+class MyStatsRenderBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = { error: null };
