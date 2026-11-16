@@ -289,6 +289,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   }, [seasons]);
   const refreshSeasons = async () => {
     const list = await db.listSeasons();
+    setDivisionTeamCountsLoadedFor(null);
     setSeasons(list);
     return list;
   };
