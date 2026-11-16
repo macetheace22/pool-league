@@ -1638,6 +1638,13 @@ function MyStatsPage({ profile }) {
           </div>
         )}
 
+        {includeTournaments && (includeLeague || includePractice) && (
+          <div className="card">
+            <div className="card__title">Tournament Statistics</div>
+            <div className="dash-empty">Tournament tracking is not available yet. League and practice statistics below are unaffected.</div>
+          </div>
+        )}
+
         {includedSources.length === 0 ? (
           <div className="card">
             <div className="card__title">No Play Types Selected</div>
