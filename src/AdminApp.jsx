@@ -1397,11 +1397,12 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
                 for (const set of match.playerSets ?? []) {
                   const opponent = set.playerHome?.num === playerNum ? set.playerAway : set.playerHome;
                   if (!opponent?.num) continue;
-                  const key = "league:" + opponent.num;
-                  const row = groups[key] ??= { key, name: opponent.name ?? opponent.num, wins: 0, losses: 0, matches: 0 };
+                  const name = opponent.name ?? opponent.num;
+                  const key = name.trim().toLocaleLowerCase();
+                  const row = groups[key] ??= { key, name, wins: 0, losses: 0, leagueSets: 0, practiceGames: 0 };
                   if (set.winnerSlot === match.playerSide) row.wins++;
                   else if (set.winnerSlot) row.losses++;
-                  row.matches++;
+                  row.leagueSets++;
                 }
               }
             }
@@ -1409,14 +1410,14 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
               for (const game of practiceGames ?? []) {
                 if (game.practice_type === "skills_drills" || !game.opponent_name?.trim()) continue;
                 const name = game.opponent_name.trim();
-                const key = "practice:" + name.toLocaleLowerCase();
-                const row = groups[key] ??= { key, name, wins: 0, losses: 0, matches: 0 };
+                const key = name.toLocaleLowerCase();
+                const row = groups[key] ??= { key, name, wins: 0, losses: 0, leagueSets: 0, practiceGames: 0 };
                 if (game.winner === "me") row.wins++;
                 else if (game.winner === "opponent") row.losses++;
-                row.matches++;
+                row.practiceGames++;
               }
             }
-            const rows = Object.values(groups).sort((a,b) => (b.matches - a.matches) || a.name.localeCompare(b.name));
+            const rows = Object.values(groups).sort((a,b) => ((b.leagueSets + b.practiceGames) - (a.leagueSets + a.practiceGames)) || a.name.localeCompare(b.name));
             if (rows.length === 0) return <div className="dash-empty">No completed head-to-head results are available for the selected play.</div>;
             return <div className="list" style={{marginTop:6}}>
               {rows.map(row => (
@@ -1424,7 +1425,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
                   <div className="list-row__body">
                     <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
                       <span className="list-row__name">{row.name}</span>
-                      <span className="list-row__sub">{row.matches} {row.matches === 1 ? "match" : "matches"} · {row.wins} wins · {row.losses} losses · {row.wins + row.losses ? Math.round((row.wins / (row.wins + row.losses)) * 100) : 0}%</span>
+                      <span className="list-row__sub">{row.leagueSets ? `${row.leagueSets} league ${row.leagueSets === 1 ? "set" : "sets"}` : ""}{row.leagueSets && row.practiceGames ? " · " : ""}{row.practiceGames ? `${row.practiceGames} practice ${row.practiceGames === 1 ? "game" : "games"}` : ""} · {row.wins} wins · {row.losses} losses · {row.wins + row.losses ? Math.round((row.wins / (row.wins + row.losses)) * 100) : 0}%</span>
                     </div>
                     <span style={{fontSize:11,fontWeight:800}}>{row.wins}–{row.losses}</span>
                   </div>
