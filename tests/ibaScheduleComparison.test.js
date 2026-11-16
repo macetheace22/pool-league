@@ -33,7 +33,14 @@ describe("read-only IBA schedule comparison", () => {
 
   it("reports team additions, removals, and team detail changes", () => {
     const result = compareIbaSchedules({
-      saved: { teams, weeks: [week("9/9/2026", [{ home: 1, away: 2 }])] },
+      saved: {
+        teams: [
+          { id: "team-a", teamNum: "15101", name: "Alpha", venue: "Club" },
+          { id: "team-b", teamNum: "15102", name: "Beta", venue: "Club" },
+          { id: "team-c", teamNum: "15103", name: "Gamma", venue: "Club" },
+        ],
+        weeks: [week("9/9/2026", [{ home: 1, away: 2 }])],
+      },
       official: {
         hasSchedule: true,
         teams: [
@@ -82,7 +89,10 @@ describe("read-only IBA schedule comparison", () => {
 
   it("reports added and removed weeks", () => {
     const result = compareIbaSchedules({
-      saved: saved([week("9/9/2026", [{ home: 1, away: 2 }], 1)]),
+      saved: saved([
+        week("9/9/2026", [{ home: 1, away: 2 }], 1),
+        week("9/16/2026", [{ home: 1, away: 2 }], 2),
+      ]),
       official: official([
         week("9/16/2026", [{ home: 1, away: 2 }], 2),
         week("9/23/2026", [{ home: 2, away: 3 }], 3),
