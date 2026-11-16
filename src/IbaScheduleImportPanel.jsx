@@ -176,10 +176,9 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
         data = await postSchedule({ action: "fetch", format: division.format, day: division.day, division: division.value || division.label });
         setPreviews(p => ({ ...p, [key]: data }));
       }
-      const teams = await db.listTeams(division.id || extractDivisionNum(division));
-      const savedWeeks = await db.listSchedule(division.id || extractDivisionNum(division), teams);
+      const savedSnapshot = await db.getIbaScheduleComparisonSnapshot(season.id, extractDivisionNum(division));
       const report = compareIbaSchedules({
-        saved: { teams, weeks: savedWeeks },
+        saved: { teams: savedSnapshot.teams, weeks: savedSnapshot.weeks },
         official: data,
         errors: rowErrors[key] ? [{ error: rowErrors[key] }] : [],
       });
