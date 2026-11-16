@@ -408,10 +408,13 @@ describe("Practice data persistence", () => {
     expect(sql).toContain("set target_config = '{}'::jsonb");
   });
 
-  it("requires a positive practice table size", () => {
+  it("uses the supported 7/8/9-foot practice table-size options", () => {
     const practice = read("src/Practice.jsx");
-    expect(practice).toContain("Number.isFinite(n) || n <= 0");
-    expect(practice).toContain("step=\"0.1\"");
+    expect(practice).toContain('<option value="7">7 feet</option>');
+    expect(practice).toContain('<option value="8">8 feet</option>');
+    expect(practice).toContain('<option value="9">9 feet</option>');
+    expect(practice).toContain("Select the table size");
+    expect(practice).not.toContain('step="0.1"');
   });
 });
 
