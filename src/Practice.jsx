@@ -514,10 +514,26 @@ function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) 
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    if (session.format !== "match") return;
+    if (session.format !== "match") { setLoadingMyRating(false); return; }
+    // A rating entered in an earlier setup pass is authoritative for this
+    // session. Only fetch the league default when no session value exists.
+    if (session.myRating != null && session.myRating !== "") {
+      setMyRating(session.myRating);
+      setLoadingMyRating(false);
+      return;
+    }
     if (!profile?.player_num) { setLoadingMyRating(false); return; }
-    db.getPlayerRating(profile.player_num).then(r => { setMyRating(r ?? ""); setLoadingMyRating(false); });
-  }, [session.format, profile?.player_num]);
+    let cancelled = false;
+    db.getPlayerRating(profile.player_num).then(r => {
+      if (cancelled) return;
+      const rating = r ?? "";
+      setMyRating(rating);
+      if (rating !== "") setSession(current => current?.myRating != null && current.myRating !== ""
+        ? current : { ...current, myRating: rating });
+      setLoadingMyRating(false);
+    });
+    return () => { cancelled = true; };
+  }, [session.format, session.myRating, profile?.player_num, setSession]);
 
   const isRaceToPoints = session.scoringMethod === "race_to_points";
   const isRaceToGames = session.scoringMethod === "race_to_games";
