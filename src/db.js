@@ -2602,23 +2602,36 @@ export function filterShotEvents(events, { gameType, playType } = {}) {
   );
 }
 
-// One player's own events, grouped by opponent -- the head-to-head
-// breakdown in My Stats. Events with no resolvable opponent (e.g. a
-// practice game against a manually-typed, no-account opponent) land in an
-// explicit "Unknown / Manual Opponent" bucket rather than being dropped.
+// Group league and practice shot events by opponent. Practice opponents
+// without an IBA player number are resolved from their saved practice session.
 export async function computeHeadToHead(events) {
+  const practiceIds = [...new Set(events
+    .filter(e => e.context_type === "practice_game" && !e.opponent_player_num)
+    .map(e => e.context_id).filter(Boolean))];
+  let practiceNames = {};
+  if (practiceIds.length) {
+    const { data } = await supabase.from("practice_games").select("id, opponent_name").in("id", practiceIds);
+    practiceNames = Object.fromEntries((data ?? []).map(row => [row.id, row.opponent_name]).filter(([, name]) => !!name));
+  }
+
   const byOpp = {};
   for (const e of events) {
-    const key = e.opponent_player_num || "unknown";
-    (byOpp[key] ??= []).push(e);
+    const manualName = !e.opponent_player_num && e.context_type === "practice_game"
+      ? practiceNames[e.context_id] : null;
+    const normalizedName = manualName?.trim().toLocaleLowerCase();
+    const key = e.opponent_player_num || (normalizedName ? `manual:${normalizedName}` : "unknown");
+    const group = byOpp[key] ??= { events: [], manualName: manualName?.trim() ?? null };
+    group.events.push(e);
   }
-  const names = await getPlayerNameMap(Object.keys(byOpp).filter(k => k !== "unknown"));
+  const playerNums = Object.keys(byOpp).filter(k => !k.startsWith("manual:") && k !== "unknown");
+  const names = await getPlayerNameMap(playerNums);
   return Object.entries(byOpp)
-    .map(([key, evs]) => ({
-      opponentNum: key === "unknown" ? null : key,
-      name: key === "unknown" ? "Unknown / Manual Opponent" : (names[key]?.name ?? key),
-      nickname: key === "unknown" ? "" : (names[key]?.nickname ?? ""),
-      stats: computeShotStats(evs),
+    .map(([key, group]) => ({
+      opponentNum: playerNums.includes(key) ? key : null,
+      opponentKey: key,
+      name: key.startsWith("manual:") ? group.manualName : key === "unknown" ? "Unknown / Manual Opponent" : (names[key]?.name ?? key),
+      nickname: names[key]?.nickname ?? "",
+      stats: computeShotStats(group.events),
     }))
     .sort((a, b) => b.stats.totalShots - a.stats.totalShots);
 }
