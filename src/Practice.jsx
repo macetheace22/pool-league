@@ -469,7 +469,7 @@ function TableSizeStep({ session, setSession, onNext, onBack, onCancel }) {
           {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
           <button className="btn-primary" style={{marginTop:10}} onClick={next}>Continue</button>
         </div>
-        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
     </>
   );
@@ -499,7 +499,7 @@ function ScoringMethodStep({ session, setSession, onNext, onBack, onCancel }) {
             ))}
           </div>
         </div>
-        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
     </>
   );
@@ -577,7 +577,7 @@ function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) 
           {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
           <button className="btn-primary" style={{marginTop:10}} onClick={next}>Start Playing</button>
         </div>
-        <button className="btn-secondary" onClick={onBack}>← Back</button>
+        <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
     </>
   );
