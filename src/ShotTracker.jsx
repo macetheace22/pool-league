@@ -31,6 +31,8 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
   const [isScratch, setIsScratch] = useState(false);
   const [isFoul, setIsFoul] = useState(false);
   const [isMiscue, setIsMiscue] = useState(false);
+  const [isEightBallBreak, setIsEightBallBreak] = useState(false);
+  const [ballsMadeOnBreak, setBallsMadeOnBreak] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
   const resetForm = () => {
     setCategory("shot"); setOutcome(null); setDistance(null); setCut(null);
     setTechniques(new Set()); setIsScratch(false); setIsFoul(false); setIsMiscue(false);
+    setIsEightBallBreak(false); setBallsMadeOnBreak("");
   };
   const toggleTechnique = (key) => setTechniques(prev => {
     const next = new Set(prev);
@@ -64,6 +67,7 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
 
   const logEvent = async () => {
     if (category !== "runout" && !outcome) return;
+    if (category === "break" && isEightBallBreak && ballsMadeOnBreak === "") return;
     setSaving(true);
     const tags = category === "shot" ? [distance, cut, ...techniques].filter(Boolean) : [];
     const row = {
@@ -71,7 +75,10 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
       player_num: player.num, team_id: teamId, recorded_by: profile?.id ?? null,
       opponent_player_num: opponentNum, game_type: gameType, division_id: divisionId,
       category, outcome: category === "runout" ? null : outcome,
-      is_scratch: isScratch, is_foul: isFoul, is_miscue: isMiscue, tags,
+      is_scratch: isScratch, is_foul: isFoul, is_miscue: isMiscue,
+      is_eight_ball_break: category === "break" ? isEightBallBreak : false,
+      balls_made_on_break: category === "break" && isEightBallBreak ? Number(ballsMadeOnBreak) : null,
+      tags,
     };
     const saved = await db.logShotEvent(row);
     setSaving(false);
@@ -134,6 +141,24 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
                 </div>
               )}
 
+              {category === "break" && (
+                <>
+                  <div className="shot-tracker__tag-row">
+                    <button className={`chip ${!isEightBallBreak ? "chip--active" : ""}`} onClick={() => { setIsEightBallBreak(false); setBallsMadeOnBreak(""); }}>Standard Break</button>
+                    <button className={`chip ${isEightBallBreak ? "chip--active" : ""}`} onClick={() => setIsEightBallBreak(true)}>8-Ball Break</button>
+                  </div>
+                  {isEightBallBreak && (
+                    <div className="field">
+                      <div className="form-label">Balls made on break</div>
+                      <select className="input shot-tracker__select" value={ballsMadeOnBreak} onChange={e => setBallsMadeOnBreak(e.target.value)}>
+                        <option value="">Select number</option>
+                        {Array.from({ length: 9 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
               {category === "shot" && (
                 <>
                   <div className="shot-tracker__tag-row">
@@ -162,7 +187,7 @@ export default function ShotTracker({ contextType, contextId, setNum = null, pla
                 </div>
               )}
 
-              <button className="btn-sm btn-sm--accent" onClick={logEvent} disabled={saving || (category !== "runout" && !outcome)}>
+              <button className="btn-sm btn-sm--accent" onClick={logEvent} disabled={saving || (category !== "runout" && !outcome) || (category === "break" && isEightBallBreak && ballsMadeOnBreak === "")}>
                 <Plus size={12} /> {saving ? "Logging…" : `Log ${category === "runout" ? "Runout" : "Event"}`}
               </button>
 
@@ -197,5 +222,7 @@ export const shotTrackerCss = `
 .shot-tracker__flag-row label{display:flex;align-items:center;gap:5px;cursor:pointer;}
 .shot-tracker__log{display:flex;flex-direction:column;gap:4px;max-height:140px;overflow-y:auto;border-top:1px solid #2A2A2A;padding-top:6px;}
 .shot-tracker__log-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10.5px;color:#8A8A8A;padding:2px 0;}
+.chip{font-size:12px;font-weight:700;min-height:34px;}
+.shot-tracker__select{appearance:auto;}
 .chip--active{background:#0F2D1F;border-color:#1F6B4A;color:#5FCF9E;}
 `;
