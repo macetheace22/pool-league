@@ -455,12 +455,16 @@ function TableSizeStep({ session, setSession, onNext, onBack }) {
         <div className="card">
           <div className="card__title">Table Size</div>
           <div style={{fontSize:11.5,color:"#9A9A9A",marginBottom:8}}>
-            Enter the table size in feet used for this practice session.
+            Select the table size in feet used for this practice session.
           </div>
           <div className="field">
             <div className="form-label">Size (feet)</div>
-            <input className="input" type="number" min="1" step="0.1" value={value}
-              onChange={e => { setValue(e.target.value); setErr(""); }} placeholder="7, 8, or 9" />
+            <select className="input" value={value} onChange={e => { setValue(e.target.value); setErr(""); }}>
+              <option value="">Select table size</option>
+              <option value="7">7 feet</option>
+              <option value="8">8 feet</option>
+              <option value="9">9 feet</option>
+            </select>
           </div>
           {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
           <button className="btn-primary" style={{marginTop:10}} onClick={next}>Continue</button>
