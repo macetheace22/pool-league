@@ -889,6 +889,20 @@ export function sortScheduleWeeks(weeks) {
   });
 }
 
+export async function getIbaScheduleComparisonSnapshot(seasonId, divisionNum) {
+  const { data: division, error } = await supabase
+    .from("divisions")
+    .select("id, num")
+    .eq("season_id", seasonId)
+    .eq("num", String(divisionNum))
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!division) throw new Error("This IBA division has not been imported into the selected season yet.");
+  const teams = await listTeams(division.id);
+  const weeks = await listSchedule(division.id, teams);
+  return { divisionId: division.id, teams, weeks };
+}
+
 export async function listSchedule(divisionId, teams) {
   const { data: weeks } = await supabase
     .from("schedule_weeks")
