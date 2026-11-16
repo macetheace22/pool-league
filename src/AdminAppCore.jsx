@@ -853,7 +853,7 @@ function seasonLabelFor(row) {
 // concept at all, so they're included under Career but excluded whenever a
 // specific season is selected -- called out inline rather than silently
 // dropped.
-function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "all" }) {
+function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "all", defaultCareer = false }) {
   const navigate = useNavigate();
   const [nameInfo, setNameInfo] = useState(null);
   const [currentRating, setCurrentRating] = useState(null);
@@ -861,7 +861,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [ratingHistory, setRatingHistory] = useState([]);
   const [rawEvents, setRawEvents] = useState(undefined); // undefined = loading, null = none tracked
 
-  const [scopeMode, setScopeMode] = useState("career"); // Career is the useful default for a player-level stats view
+  const [scopeMode, setScopeMode] = useState(defaultCareer ? "career" : "season");
   const [selectedYear, setSelectedYear] = useState(null);
   const [selectedSeasonId, setSelectedSeasonId] = useState(null);
 
@@ -882,7 +882,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       setTeamHistory(history);
       const current = history.find(t => t.teamId === currentTeamId) ?? history[0];
       if (current) { setSelectedYear(current.seasonYear); setSelectedSeasonId(current.seasonId); }
-      setScopeMode("career");
+      setScopeMode(defaultCareer ? "career" : current ? "season" : "career");
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum]);
@@ -1214,7 +1214,7 @@ function MyStatsPage({ profile }) {
             )}
 
             {profile?.player_num && (showLeague || showPractice) && (
-              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory={playCategory} />
+              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory={playCategory} defaultCareer />
             )}
           </>
         )}
