@@ -783,10 +783,11 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
 
   const recordGame = () => {
     setErr("");
-    const my = Number(myPts), opp = Number(oppPts);
-    if (myPts === "" || oppPts === "" || !Number.isInteger(my) || !Number.isInteger(opp) || my < 0 || opp < 0) {
-      setErr("Enter nonnegative whole-number scores for both players."); return;
+    const myText = myPts.trim(), oppText = oppPts.trim();
+    if (!/^\d+$/.test(myText) || !/^\d+$/.test(oppText)) {
+      setErr("Enter a nonnegative whole-number score for both players."); return;
     }
+    const my = Number(myText), opp = Number(oppText);
     if (my === opp) { setErr("Scores can't be tied — one side has to win the game."); return; }
     void saveGameResult({ myPoints: my, oppPoints: opp, gameWinner: my > opp ? "me" : "opponent" });
   };
@@ -868,10 +869,10 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
             <div className="card__title">Record This Game's Score</div>
             <div style={{display:"flex",gap:10,alignItems:"flex-end",marginTop:6}}>
               <div className="field" style={{flex:1}}><div className="form-label">You</div>
-                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={myPts} onChange={e=>setSession(s=>({...s,myPts:e.target.value}))} placeholder="0" /></div>
+                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={myPts} onChange={e=>setSession(s=>({...s,myPts:e.target.value}))} placeholder="Enter score" /></div>
               <div style={{fontSize:13,color:"#6A6A6A",paddingBottom:12}}>–</div>
               <div className="field" style={{flex:1}}><div className="form-label">{session.opponentName}</div>
-                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="0" /></div>
+                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="Enter score" /></div>
             </div>
             {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
             <button className="btn-primary" style={{marginTop:10}} onClick={recordGame} disabled={savingResult || recordStatus !== "ready"}>{savingResult ? "Saving…" : "Submit Game Score"}</button>
