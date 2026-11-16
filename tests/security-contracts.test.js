@@ -493,6 +493,7 @@ describe("practice session rating retention and discard", () => {
     expect(sql).toContain("delete from public.practice_games");
     expect(sql).toContain("grant execute on function public.discard_practice_game(uuid) to authenticated");
     expect(db).toContain('supabase.rpc("discard_practice_game"');
+    expect(practice).toContain('if (phase === "skillsplay")');
     expect(practice).toContain("Discard Practice");
     expect(practice).toContain("window.confirm");
   });
