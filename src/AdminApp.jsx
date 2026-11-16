@@ -1697,7 +1697,7 @@ function MyStatsPage({ profile }) {
             )}
 
             {profile?.player_num && includedSources.length > 0 && (
-              <MyStatsRenderBoundary key={includedSources.slice().sort().join("|")}>
+              <MyStatsRenderBoundary>
                 <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory="all" includedSources={includedSources} practiceGames={completedPractice} practiceGamesLoading={practiceGames === undefined} practiceGamesError={practiceGamesError} practiceProfile={profile} defaultCareer hideNameHeader />
               </MyStatsRenderBoundary>
             )}
