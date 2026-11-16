@@ -1115,7 +1115,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
             ) : (
               <div className="list" style={{marginTop:6}}>
                 {headToHead.map(h => (
-                  <div key={h.opponentNum ?? "unknown"} className="list-row">
+                  <div key={h.opponentKey ?? h.opponentNum ?? "unknown"} className="list-row">
                     <div className="list-row__body">
                       <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
                         <span className="list-row__name">{h.name}{h.nickname ? ` "${h.nickname}"` : ""}</span>
