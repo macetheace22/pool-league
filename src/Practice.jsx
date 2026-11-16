@@ -82,7 +82,7 @@ export default function Practice() {
       const gameType = session.gameType ? gameTypeLabel(session.gameType) : "Practice setup";
       const score = session.gameType ? `${session.myScore ?? 0}–${session.opponentScore ?? 0}` : "";
       setActiveSession((current) => current?.type === "practice"
-        ? { ...current, title: session.opponentName ? `vs ${session.opponentName}` : "Practice session", subtitle: [gameType, score].filter(Boolean).join(" · "), data: { phase, session: practiceSessionSnapshot(session) } }
+        ? { ...current, title: session.opponentName ? `vs ${session.opponentName}` : "Practice session", subtitle: [gameType, score].filter(Boolean).join(" · "), data: { phase, startedByUser: true, session: practiceSessionSnapshot(session) } }
         : current);
     }
   }, [phase, session]);
@@ -119,7 +119,7 @@ export default function Practice() {
       type: "practice", ownerId: profile?.id, route: "/practice",
       title: session?.opponentName ? `vs ${session.opponentName}` : "Practice session",
       subtitle: session?.gameType ? gameTypeLabel(session.gameType) : "Practice in progress",
-      data: { phase: nextPhase, session: practiceSessionSnapshot(session) },
+      data: { phase: nextPhase, startedByUser: true, session: practiceSessionSnapshot(session) },
     });
   };
   const cancelSession = () => { clearActiveSession(); setSessionState(null); setPhase("landing"); };
@@ -182,7 +182,7 @@ export default function Practice() {
   }
   if (phase === "skillsplay") {
     return wrap(<SkillsDrillsStep profile={profile} session={session} setSession={setSession}
-      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: "Skills & Drills", data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }}
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: "Skills & Drills", data: { phase: "done", startedByUser: true, session: practiceSessionSnapshot(finalSession) } }); }}
       onBack={() => changePhase("gametype")} onDiscard={discardSession} />);
   }
   if (phase === "play") {
@@ -510,7 +510,7 @@ function TableSizeStep({ session, setSession, onNext, onBack, onCancel }) {
             </select>
           </div>
           {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
-          <button className="btn-primary" style={{marginTop:10}} onClick={next}>Continue</button>
+          <button className="btn-primary" style={{marginTop:10}} onClick={next}>{session.practiceType === "skills_drills" ? "Start Playing" : "Continue"}</button>
         </div>
         <div style={{display:"flex",gap:8}}><button className="btn-secondary" style={{flex:1}} onClick={onBack}>← Back</button><button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Cancel</button></div>
       </div>
