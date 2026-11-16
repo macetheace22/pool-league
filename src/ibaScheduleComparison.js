@@ -95,6 +95,30 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
   const officialWeeks = new Map(official.weeks.map(week => [weekKey(week), week]));
   const changes = [];
 
+  const savedTeamByNum = new Map(savedTeams.map(team => [teamNumber(team), team]).filter(([num]) => num));
+  const officialTeamByNum = new Map(officialTeams.map(team => [teamNumber(team), team]).filter(([num]) => num));
+  for (const [num, team] of officialTeamByNum) {
+    const old = savedTeamByNum.get(num);
+    if (!old) {
+      changes.push({ type: "team_added", teamNum: num, name: team.name ?? "" });
+    } else if (
+      String(old.name ?? "") !== String(team.name ?? "") ||
+      String(old.venue ?? old.location ?? "") !== String(team.venue ?? team.location ?? "")
+    ) {
+      changes.push({
+        type: "team_details_changed",
+        teamNum: num,
+        fromName: old.name ?? "",
+        toName: team.name ?? "",
+        fromVenue: old.venue ?? old.location ?? "",
+        toVenue: team.venue ?? team.location ?? "",
+      });
+    }
+  }
+  for (const [num, team] of savedTeamByNum) {
+    if (!officialTeamByNum.has(num)) changes.push({ type: "team_removed", teamNum: num, name: team.name ?? "" });
+  }
+
   for (const [key, officialWeek] of officialWeeks) {
     const savedWeek = savedWeeks.get(key);
     if (!savedWeek) {
@@ -162,8 +186,9 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
     status: changes.length ? "changes_found" : "no_changes",
     changes,
     summary: {
-      added: count("week_added") + count("matchup_added") + count("tba_added"),
-      removed: count("week_removed") + count("matchup_removed"),
+      added: count("week_added") + count("matchup_added") + count("tba_added") + count("team_added"),
+      removed: count("week_removed") + count("matchup_removed") + count("team_removed"),
+      teamDetailsChanged: count("team_details_changed"),
       changed: count("matchup_changed"),
       dateChanges: count("date_changed"),
       tbaResolutions: count("tba_resolved"),
