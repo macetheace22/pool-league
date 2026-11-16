@@ -1077,6 +1077,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
   const [headToHead, setHeadToHead] = useState([]);
+  const [matchHistory, setMatchHistory] = useState(undefined);
+  const [selectedHistoryMatch, setSelectedHistoryMatch] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1165,6 +1167,17 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
   useEffect(() => {
     if (teamHistory === undefined) return;
+    if (playCategory === "practice" || playCategory === "tournaments") {
+      setMatchHistory([]);
+      return;
+    }
+    setMatchHistory(undefined);
+    db.listPlayerMatchHistory(playerNum, activeDivisionIds).then(rows => setMatchHistory(rows ?? [])).catch(() => setMatchHistory([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerNum, teamHistory, effectiveScopeMode, selectedSeasonId, playCategory]);
+
+  useEffect(() => {
+    if (teamHistory === undefined) return;
     setSeasonRecord(undefined);
     if (playCategory === "practice") { setSeasonRecord(null); return; }
     db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord).catch(() => setSeasonRecord(null));
@@ -1227,7 +1240,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || (playCategory !== "practice" && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
+  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || matchHistory === undefined || (playCategory !== "practice" && playCategory !== "tournaments" && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
 
   return (
     <>
@@ -1299,6 +1312,31 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         </div>
       )}
 
+      {playCategory !== "practice" && playCategory !== "tournaments" && (
+        <div className="card">
+          <div className="card__title">Match History</div>
+          <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Select a completed match to view the saved scoresheet.</div>
+          {matchHistory.length === 0 ? <div className="dash-empty">No individual match results are recorded for this scope.</div> : (
+            <div className="list" style={{marginTop:6}}>
+              {matchHistory.map(m => (
+                <button key={m.id} type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} onClick={() => setSelectedHistoryMatch(m)}>
+                  <div className="list-row__body">
+                    <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
+                      <span className="list-row__name">vs {m.opponentTeamName}</span>
+                      <span className="list-row__sub">{m.week_num ? "Week " + m.week_num + " · " : ""}{m.week_date || new Date(m.confirmed_at || m.created_at).toLocaleDateString()} · {m.playerSetsWon}–{m.playerSetsLost} sets</span>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+                      {(m.team_home_total != null || m.team_away_total != null) && <span className="player-rating-badge">{m.team_home_total ?? 0}–{m.team_away_total ?? 0}</span>}
+                      <ChevronRight size={14} color="#6A6A6A" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {selectedHistoryMatch && <div className="card" style={{padding:0}}><Scoresheet match={selectedHistoryMatch} onClose={() => setSelectedHistoryMatch(null)} closeLabel="Back to My Stats" /></div>}
       {playCategory !== "practice" && teamHistory.length > 0 && (
         <div className="card">
           <div className="card__title">Team History</div>
@@ -1405,6 +1443,7 @@ function MyStatsPage({ profile }) {
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
   const [practiceGamesError, setPracticeGamesError] = useState("");
+  const [selectedHistoryPractice, setSelectedHistoryPractice] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1488,6 +1527,27 @@ function MyStatsPage({ profile }) {
           </div>
         ) : (
           <>
+            {showPractice && (
+              <div className="card">
+                <div className="card__title">Practice History</div>
+                <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>Select a completed practice session to view its saved scoresheet.</div>
+                {completedPractice.length === 0 ? <div className="dash-empty">No completed practice sessions recorded yet.</div> : (
+                  <div className="list" style={{marginTop:6}}>
+                    {completedPractice.map(g => (
+                      <div key={g.id} style={{marginBottom:6}}>
+                        <button type="button" className="match-row practice-history-button" aria-expanded={selectedHistoryPractice?.id === g.id} onClick={() => setSelectedHistoryPractice(current => current?.id === g.id ? null : g)}>
+                          <span style={{flex:1,minWidth:0,textAlign:"left"}}>
+                            <span className="match-row__opponent" style={{display:"block"}}>{g.practice_type === "skills_drills" ? "Skills & Drills" : "vs " + g.opponent_name} {g.practice_type !== "skills_drills" && <span style={{color:g.winner === "me" ? "#5FCF9E" : "#F87171",fontWeight:700,marginLeft:6}}>{g.winner === "me" ? "Won" : g.winner === "opponent" ? "Lost" : "—"}</span>}</span>
+                            <span className="match-row__meta" style={{display:"block"}}>{({ "8ball":"8-Ball","9ball":"9-Ball","10ball":"10-Ball",ultimate:"Ultimate Pool" })[g.game_type] ?? g.game_type ?? "Practice"}{g.scoring_method ? " · " + ({race_to_points:"Race to Points",race_to_games:"Race to Games",best_of_games:"Best of X Games"})[g.scoring_method] : ""}{g.practice_type !== "skills_drills" ? " · " + g.my_score + "–" + g.opponent_score : ""}{" · " + new Date(g.completed_at || g.played_at).toLocaleDateString()}</span>
+                          </span><ChevronRight size={16} color="#6A6A6A" />
+                        </button>
+                        {selectedHistoryPractice?.id === g.id && <Scoresheet practiceGame={g} profile={profile} onClose={() => setSelectedHistoryPractice(null)} closeLabel="Back to My Stats" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {showPractice && (
               <div className="card">
                 <div className="card__title">Practice Record</div>
