@@ -466,10 +466,12 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                             <div key={index} style={{ marginTop: 3, color: "#BDBDBD" }}>
                               Week {change.week ?? "—"}: {change.type.replaceAll("_", " ")}
                               {change.homeTeamNum ? ` · Team ${change.homeTeamNum}` : ""}
+                              {change.teamNum ? ` · Team ${change.teamNum}` : ""}
                               {change.awayTeamNum ? ` vs ${change.awayTeamNum}` : ""}
                               {change.fromAwayTeamNum != null || change.toAwayTeamNum != null ? ` · ${change.fromAwayTeamNum ?? "TBA"} → ${change.toAwayTeamNum ?? "TBA"}` : ""}
                               {change.from || change.to ? ` · ${change.from ?? "—"} → ${change.to ?? "—"}` : ""}
                               {change.fromName != null || change.toName != null ? ` · ${change.fromName ?? "—"} → ${change.toName ?? "—"}` : ""}
+                              {change.fromVenue != null || change.toVenue != null ? ` · ${change.fromVenue ?? "—"} → ${change.toVenue ?? "—"}` : ""}
                             </div>
                           ))}
                           <div style={{ marginTop: 5, color: "#A3A3A3" }}>Read-only comparison. No schedule data was changed. Previously discarded TBA pairings cannot be reconstructed from the saved schedule.</div>
