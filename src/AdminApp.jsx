@@ -991,7 +991,7 @@ function seasonLabelFor(row) {
 // concept at all, so they're included under Career but excluded whenever a
 // specific season is selected -- called out inline rather than silently
 // dropped.
-function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
+function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "all", defaultCareer = false }) {
   const navigate = useNavigate();
   const [nameInfo, setNameInfo] = useState(null);
   const [currentRating, setCurrentRating] = useState(null);
@@ -1001,7 +1001,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const [coreProfileLoading, setCoreProfileLoading] = useState(true);
   const [loadedPlayerNum, setLoadedPlayerNum] = useState(null);
 
-  const [scopeMode, setScopeMode] = useState("season"); // "career" | "season"
+  const [scopeMode, setScopeMode] = useState(defaultCareer ? "career" : "season"); // "career" | "season"
   const [selectedYear, setSelectedYear] = useState(null);
   const [selectedSeasonId, setSelectedSeasonId] = useState(null);
 
@@ -1087,9 +1087,10 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   useEffect(() => {
     if (teamHistory === undefined) return;
     setSeasonRecord(undefined);
+    if (playCategory === "practice") { setSeasonRecord(null); return; }
     db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord).catch(() => setSeasonRecord(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerNum, scopeMode, selectedSeasonId, teamHistory]);
+  }, [playerNum, scopeMode, selectedSeasonId, teamHistory, playCategory]);
 
   // MVP rank and playoff eligibility are both scoped to a single division's
   // real standings/report -- meaningless across a career spanning multiple
@@ -1120,7 +1121,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
   const scopedEvents = rawEvents
     ? (scopeMode === "career" ? rawEvents : rawEvents.filter(e => activeDivisionIds.includes(e.division_id)))
     : [];
-  const filteredEvents = scopedEvents.filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && matchesPlayType(e, playTypeFilter));
+  const sourceEvents = scopedEvents.filter(e => playCategory === "all" || (playCategory === "league" ? matchesPlayType(e, "league") : playCategory === "practice" ? matchesPlayType(e, "practice") : false));
+  const filteredEvents = sourceEvents.filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && (playCategory === "all" ? matchesPlayType(e, playTypeFilter) : true));
   const shotStats = rawEvents ? db.computeShotStats(filteredEvents) : null;
 
   useEffect(() => {
@@ -1146,7 +1148,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || seasonRecord === undefined || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
+  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || (playCategory !== "practice" && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
 
   return (
     <>
@@ -1163,7 +1165,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
           <button className={`seg-btn ${scopeMode==="season"?"seg-btn--active":""}`} onClick={()=>setScopeMode("season")}>By Season</button>
           <button className={`seg-btn ${scopeMode==="career"?"seg-btn--active":""}`} onClick={()=>setScopeMode("career")}>Career (All-Time)</button>
         </div>
-        {scopeMode === "season" && (
+        {playCategory !== "practice" && scopeMode === "season" && (
           years.length === 0 ? <div className="dash-empty">No season history on file.</div> : (
             <div style={{display:"flex",gap:8}}>
               <select className="input input--select" style={{flex:1}} value={selectedYear ?? ""} onChange={e => {
@@ -1180,8 +1182,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
         )}
       </div>
 
-      {seasonRecord === undefined && <Loader />}
-      {seasonRecord && (
+      {playCategory !== "practice" && seasonRecord === undefined && <Loader />}
+      {playCategory !== "practice" && seasonRecord && (
         <div className="card">
           <div className="card__title">{scopeMode === "career" ? "Career Record" : "Season Record"}</div>
           {seasonRecord.sets === 0
@@ -1218,7 +1220,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
         </div>
       )}
 
-      {teamHistory.length > 0 && (
+      {playCategory !== "practice" && teamHistory.length > 0 && (
         <div className="card">
           <div className="card__title">Team History</div>
           <div className="list" style={{marginTop:6}}>
@@ -1238,7 +1240,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
         </div>
       )}
 
-      {ratingHistory.length > 0 && (
+      {playCategory !== "practice" && ratingHistory.length > 0 && (
         <div className="card">
           <div className="card__title">Rating History</div>
           <div className="list" style={{marginTop:6}}>
@@ -1255,7 +1257,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
       )}
 
       {rawEvents === undefined && <Loader />}
-      {rawEvents && (
+      {rawEvents && playCategory !== "tournaments" && (
         <>
           <div className="card">
             <div className="card__title">Advanced Stats (Track a Rack)</div>
@@ -1283,39 +1285,114 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null }) {
                   <div key={h.opponentNum ?? "unknown"} className="list-row">
                     <div className="list-row__body">
                       <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
-                        <span className="list-row__name">{h.name}{h.nickname ? ` "${h.nickname}"` : ""}</span>
-                        <span className="list-row__sub">{h.stats.totalShots} shots · {h.stats.makePct}% makes · {h.stats.runouts} runouts</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-      {rawEvents === null && (
-        <div style={{fontSize:10.5,color:"#6A6A6A",textAlign:"center"}}>
-          No advanced stats tracked yet — use "Track a Rack" during a live match, manual entry, or practice to start building this out.
-        </div>
-      )}
-    </>
-  );
-}
+                        <span className="list-row__name">{h.name}{h.nickname ? ` "${h.nicknfunction MyStatsPage({ profile }) {
+  const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
+  const [playCategory, setPlayCategory] = useState("all");
+  const [practiceGames, setPracticeGames] = useState(undefined);
 
-function MyStatsPage({ profile }) {
-  const activeTeamIds = getActiveTeamIds(profile);
+  useEffect(() => {
+    if (!profile?.id) { setPracticeGames([]); return; }
+    setPracticeGames(undefined);
+    db.listMyPracticeGames(profile.id).then(setPracticeGames).catch(() => setPracticeGames([]));
+  }, [profile?.id]);
+
+  const completedPractice = practiceGames ?? [];
+  const practiceWins = completedPractice.filter(g => g.winner === "me").length;
+  const practiceLosses = completedPractice.filter(g => g.winner === "opponent").length;
+  const practiceDecided = practiceWins + practiceLosses;
+  const practiceWinPct = practiceDecided ? Math.round((practiceWins / practiceDecided) * 100) : null;
+  const showPractice = playCategory === "all" || playCategory === "practice";
+  const showLeague = playCategory === "all" || playCategory === "league";
+
+  const categories = [
+    { key: "all", label: "All Play", description: "Combined player performance" },
+    { key: "practice", label: "Practice", description: "Practice sessions and shot tracking" },
+    { key: "league", label: "League", description: "IBA league match performance" },
+    { key: "tournaments", label: "Tournaments", description: "Tournament results and performance" },
+  ];
+
   return (
     <>
       <PageHeader title="My Stats" />
       <div className="tab-content">
-        {!profile?.player_num ? (
+        <div className="card">
+          <div className="card__title">Choose Statistics</div>
+          <div style={{fontSize:11.5,color:"#8A8A8A",marginBottom:10}}>
+            Select the type of play you want to review. All Play combines the available practice and league information.
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>
+            {categories.map(category => (
+              <button key={category.key} type="button"
+                className={playCategory === category.key ? "btn-primary" : "btn-secondary"}
+                aria-pressed={playCategory === category.key}
+                onClick={() => setPlayCategory(category.key)}
+                style={{minHeight:58,textAlign:"left",padding:"10px 12px",whiteSpace:"normal"}}>
+                <span style={{display:"block",fontWeight:800,fontSize:12}}>{category.label}</span>
+                <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3}}>{category.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {playCategory === "tournaments" ? (
           <div className="card">
-            <div className="card__title">Link Your Player Number</div>
-            <div style={{fontSize:12.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
-              League results and player statistics are associated with your IBA player number. You do not need to be assigned to a current team to view your player history.
-            </div>
-            <Link to="/me" className="btn-primary" style={{textAlign:"center",textDecoration:"none",display:"block"}}>Go to My Profile</Link>
+            <div className="card__title">Tournament Statistics</div>
+            <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app.</div>
+          </div>
+        ) : (
+          <>
+            {showPractice && (
+              <div className="card">
+                <div className="card__title">Practice Record</div>
+                {practiceGames === undefined ? <Loader /> : completedPractice.length === 0 ? (
+                  <div className="dash-empty">No completed practice sessions recorded yet.</div>
+                ) : (
+                  <>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8,marginTop:6}}>
+                      {[
+                        {label:"Sessions",value:completedPractice.length},
+                        {label:"Wins",value:practiceWins},
+                        {label:"Losses",value:practiceLosses},
+                        {label:"Win %",value:practiceWinPct == null ? "—" : `${practiceWinPct}%`},
+                      ].map(item => (
+                        <div key={item.label} style={{textAlign:"center",background:"#141414",border:"1px solid #2A2A2A",borderRadius:10,padding:"10px 4px"}}>
+                          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:17,fontWeight:700,color:"#5FCF9E"}}>{item.value}</div>
+                          <div style={{fontSize:9,color:"#8A8A8A",marginTop:3,textTransform:"uppercase"}}>{item.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{fontSize:10.5,color:"#777",marginTop:8}}>Skills and drills sessions are included in session totals but do not count as wins or losses.</div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {showLeague && !profile?.player_num && (
+              <div className="card">
+                <div className="card__title">Link Your Player Number</div>
+                <div style={{fontSize:12.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
+                  League results and player statistics are associated with your IBA player number. You do not need to be assigned to a current team to view your player history.
+                </div>
+                <Link to="/me" className="btn-primary" style={{textAlign:"center",textDecoration:"none",display:"block"}}>Go to My Profile</Link>
+              </div>
+            )}
+
+            {profile?.player_num && (showLeague || showPractice) && (
+              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory={playCategory} defaultCareer />
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── Player Lookup (leaguewide, every role) ────────────────────────────────
+// Search any player, see their full profile (PlayerStatsProfile, shared
+// with My Stats), and optionally compare it against a second player's --
+// the same component stacked twice with a "vs" divider, so a comparison
+// gets everything a solo lookup gets (season/career scope, team history,
+// rating history, advanced stats, head-to-head), not a stripped-down view.ck"}}>Go to My Profile</Link>
           </div>
         ) : (
           <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={activeTeamIds[0] ?? null} />
