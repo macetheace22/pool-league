@@ -1472,13 +1472,13 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       )}
 
       {rawEvents === undefined && <Loader />}
-      {rawEventsError && !includeTournaments && (
+      {rawEventsError && (
         <div className="card">
           <div className="card__title">Advanced Stats</div>
           <div className="error-msg">Unable to load tracked shots: {rawEventsError}</div>
         </div>
       )}
-      {rawEvents && !includeTournaments && (
+      {rawEvents && (
         <>
           <div className="card">
             <div className="card__title">Track a Rack — Individual Stats</div>
@@ -1500,10 +1500,10 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
       </>
       )}
-      {rawEvents === null && !rawEventsError && !includeTournaments && (
+      {rawEvents === null && !rawEventsError && (
         <>
           <div className="card">
-            <div className="card__title">Advanced Stats (Track a Rack)</div>
+            <div className="card__title">Track a Rack — Individual Stats</div>
             <div className="dash-empty">No Track a Rack shots have been recorded yet for this play type.</div>
           </div>
 
