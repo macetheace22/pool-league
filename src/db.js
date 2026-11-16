@@ -2555,7 +2555,15 @@ export function computeShotStats(events) {
     byCut: { left: tagStat("cut_left"), right: tagStat("cut_right") },
     byTechnique: { jump: tagStat("jump"), kick: tagStat("kick"), bank: tagStat("bank") },
     safeties: { attempts: safeties.length, successful: safeMade, pct: safeties.length ? Math.round((safeMade / safeties.length) * 100) : 0 },
-    breaks: { attempts: breaks.length, made: breaks.filter(e => e.outcome === "make").length, scratches: breaks.filter(e => e.is_scratch).length },
+    breaks: {
+      attempts: breaks.length,
+      made: breaks.filter(e => e.outcome === "make").length,
+      scratches: breaks.filter(e => e.is_scratch).length,
+      eightBall: {
+        attempts: breaks.filter(e => e.is_eight_ball_break).length,
+        madeOnBreak: breaks.filter(e => e.is_eight_ball_break).reduce((sum, e) => sum + (Number(e.balls_made_on_break) || 0), 0),
+      },
+    },
     runouts: runouts.length,
   };
 }

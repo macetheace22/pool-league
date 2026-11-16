@@ -277,6 +277,14 @@ describe("Section 4.5 player division transfers", () => {
 });
 
 describe("Section 8.1 roster history preservation", () => {
+  it("includes durable 8-ball break tracking schema and explicit Data API grants", () => {
+    const sql = read("supabase-schema-section-86-8ball-break-tracking.sql");
+    expect(sql).toContain("is_eight_ball_break boolean not null default false");
+    expect(sql).toContain("balls_made_on_break integer");
+    expect(sql).toContain("balls_made_on_break >= 0 and balls_made_on_break <= 8");
+    expect(sql).toContain("grant select, insert, update, delete on table public.shot_events to authenticated");
+  });
+
   it("preserves former roster membership and reads player team history from its ledger", () => {
     const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
     const db = read("src/db.js");
@@ -400,10 +408,13 @@ describe("Practice data persistence", () => {
     expect(sql).toContain("set target_config = '{}'::jsonb");
   });
 
-  it("requires a positive practice table size", () => {
+  it("uses the supported 7/8/9-foot practice table-size options", () => {
     const practice = read("src/Practice.jsx");
-    expect(practice).toContain("Number.isFinite(n) || n <= 0");
-    expect(practice).toContain("step=\"0.1\"");
+    expect(practice).toContain('<option value="7">7 feet</option>');
+    expect(practice).toContain('<option value="8">8 feet</option>');
+    expect(practice).toContain('<option value="9">9 feet</option>');
+    expect(practice).toContain("Select the table size");
+    expect(practice).not.toContain('step="0.1"');
   });
 });
 
