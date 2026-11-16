@@ -2604,9 +2604,13 @@ export function filterShotEvents(events, { gameType, playType } = {}) {
 
 // Pure grouping logic, separated from the small lookup needed to resolve
 // manually-entered practice opponents by their saved session display name.
-export function groupHeadToHeadEvents(events, practiceNames = {}) {
+export function groupHeadToHeadEvents(events, practiceNames = {}, soloPracticeIds = []) {
+  const soloIds = new Set(soloPracticeIds);
   const byOpp = {};
   for (const e of events) {
+    // Skills & drills have no opponent, so they belong in overall practice
+    // shot stats but not in a head-to-head opponent breakdown.
+    if (e.context_type === "practice_game" && soloIds.has(e.context_id)) continue;
     const manualName = !e.opponent_player_num && e.context_type === "practice_game"
       ? practiceNames[e.context_id] : null;
     const normalizedName = manualName?.trim().toLocaleLowerCase();
@@ -2624,12 +2628,14 @@ export async function computeHeadToHead(events) {
     .filter(e => e.context_type === "practice_game" && !e.opponent_player_num)
     .map(e => e.context_id).filter(Boolean))];
   let practiceNames = {};
+  let soloPracticeIds = [];
   if (practiceIds.length) {
-    const { data } = await supabase.from("practice_games").select("id, opponent_name").in("id", practiceIds);
+    const { data } = await supabase.from("practice_games").select("id, opponent_name, practice_type").in("id", practiceIds);
     practiceNames = Object.fromEntries((data ?? []).map(row => [row.id, row.opponent_name]).filter(([, name]) => !!name));
+    soloPracticeIds = (data ?? []).filter(row => row.practice_type === "skills_drills").map(row => row.id);
   }
 
-  const groups = groupHeadToHeadEvents(events, practiceNames);
+  const groups = groupHeadToHeadEvents(events, practiceNames, soloPracticeIds);
   const playerNums = groups.map(group => group.key).filter(k => !k.startsWith("manual:") && k !== "unknown");
   const names = await getPlayerNameMap(playerNums);
   return groups
