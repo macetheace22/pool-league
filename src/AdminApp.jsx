@@ -1552,7 +1552,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 class MyStatsRenderBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, componentStack: "" };
   }
 
   static getDerivedStateFromError(error) {
@@ -1560,7 +1560,9 @@ class MyStatsRenderBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("My Stats render failed", error, info?.componentStack);
+    const componentStack = info?.componentStack ?? "";
+    console.error("My Stats render failed", error, componentStack);
+    this.setState({ componentStack });
   }
 
   render() {
@@ -1573,7 +1575,7 @@ class MyStatsRenderBoundary extends Component {
           </div>
           <details style={{marginTop:8,color:"#9A9A9A",fontSize:11}}>
             <summary>Technical details</summary>
-            <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{this.state.error.message}</pre>
+            <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{this.state.error.message}{this.state.componentStack ? "\n" + this.state.componentStack : ""}</pre>
           </details>
           <button type="button" className="btn-secondary" style={{marginTop:10}} onClick={() => this.setState({error:null})}>
             Try again
