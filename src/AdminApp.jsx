@@ -1549,6 +1549,42 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   );
 }
 
+class MyStatsRenderBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("My Stats render failed", error, info?.componentStack);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="card" role="alert">
+          <div className="card__title">Unable to display these statistics</div>
+          <div className="error-msg" style={{marginTop:8}}>
+            This selection caused a display error. Your saved match and practice data has not been changed.
+          </div>
+          <details style={{marginTop:8,color:"#9A9A9A",fontSize:11}}>
+            <summary>Technical details</summary>
+            <pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{this.state.error.message}</pre>
+          </details>
+          <button type="button" className="btn-secondary" style={{marginTop:10}} onClick={() => this.setState({error:null})}>
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
   const [includedSources, setIncludedSources] = useState(["league", "practice", "tournaments"]);
@@ -1638,23 +1674,13 @@ function MyStatsPage({ profile }) {
           </div>
         )}
 
-        {includeTournaments && (includeLeague || includePractice) && (
-          <div className="card">
-            <div className="card__title">Tournament Statistics</div>
-            <div className="dash-empty">Tournament tracking is not available yet. League and practice statistics below are unaffected.</div>
-          </div>
-        )}
-
         {includedSources.length === 0 ? (
           <div className="card">
             <div className="card__title">No Play Types Selected</div>
             <div className="dash-empty">Select League, Practice, or Tournaments above to display your stats. Your filters and player information will remain available.</div>
           </div>
         ) : includeTournaments && !includeLeague && !includePractice ? (
-          <div className="card">
-            <div className="card__title">Tournament Statistics</div>
-            <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app.</div>
-          </div>
+          null
         ) : (
           <>
             {includeLeague && !profile?.player_num && (
@@ -1668,9 +1694,18 @@ function MyStatsPage({ profile }) {
             )}
 
             {profile?.player_num && includedSources.length > 0 && (
-              <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory="all" includedSources={includedSources} practiceGames={completedPractice} practiceGamesLoading={practiceGames === undefined} practiceGamesError={practiceGamesError} practiceProfile={profile} defaultCareer hideNameHeader />
+              <MyStatsRenderBoundary key={includedSources.slice().sort().join("|")}>
+                <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={primaryTeamId} playCategory="all" includedSources={includedSources} practiceGames={completedPractice} practiceGamesLoading={practiceGames === undefined} practiceGamesError={practiceGamesError} practiceProfile={profile} defaultCareer hideNameHeader />
+              </MyStatsRenderBoundary>
             )}
           </>
+        )}
+
+        {includeTournaments && (
+          <div className="card">
+            <div className="card__title">Tournament Statistics</div>
+            <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app. Available league and practice statistics remain above.</div>
+          </div>
         )}
       </div>
     </>
