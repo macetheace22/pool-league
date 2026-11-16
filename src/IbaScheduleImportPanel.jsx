@@ -460,7 +460,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                       {comparisonResults[key].reason && <div>{comparisonResults[key].reason}</div>}
                       {comparisonResults[key].status !== "incomplete" && (
                         <>
-                          <div>{comparisonResults[key].summary.added} added · {comparisonResults[key].summary.removed} removed · {comparisonResults[key].summary.changed} matchup changes · {comparisonResults[key].summary.dateChanges} date changes · {comparisonResults[key].summary.tbaResolutions} TBA resolutions</div>
+                          <div>{comparisonResults[key].summary.added} added · {comparisonResults[key].summary.removed} removed · {comparisonResults[key].summary.changed} matchup changes · {comparisonResults[key].summary.dateChanges} date changes · {comparisonResults[key].summary.tbaResolutions} TBA resolutions · {comparisonResults[key].summary.teamDetailsChanged || 0} team detail changes</div>
                           {comparisonResults[key].changes.map((change, index) => (
                             <div key={index} style={{ marginTop: 3, color: "#BDBDBD" }}>
                               Week {change.week ?? "—"}: {change.type.replaceAll("_", " ")}
@@ -468,6 +468,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                               {change.awayTeamNum ? ` vs ${change.awayTeamNum}` : ""}
                               {change.fromAwayTeamNum != null || change.toAwayTeamNum != null ? ` · ${change.fromAwayTeamNum ?? "TBA"} → ${change.toAwayTeamNum ?? "TBA"}` : ""}
                               {change.from || change.to ? ` · ${change.from ?? "—"} → ${change.to ?? "—"}` : ""}
+                              {change.fromName != null || change.toName != null ? ` · ${change.fromName ?? "—"} → ${change.toName ?? "—"}` : ""}
                             </div>
                           ))}
                           <div style={{ marginTop: 5, color: "#A3A3A3" }}>Read-only comparison. No schedule data was changed. Previously discarded TBA pairings cannot be reconstructed from the saved schedule.</div>
