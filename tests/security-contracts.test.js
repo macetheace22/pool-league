@@ -473,3 +473,27 @@ describe("Practice active-session finalization", () => {
     expect(practice).toContain("savingResultRef.current = false;");
   });
 });
+
+
+describe("practice session rating retention and discard", () => {
+  it("preserves the saved player rating when returning to practice setup", () => {
+    const practice = read("src/Practice.jsx");
+    expect(practice).toContain('session.myRating != null && session.myRating !== ""');
+    expect(practice).toContain("setSession(current => current?.myRating != null && current.myRating !== \"\"");
+  });
+
+  it("discards only the authenticated owner's practice game and its dependent shot and result rows", () => {
+    const sql = read("supabase-schema-section-87-discard-practice-game.sql");
+    const db = read("src/db.js");
+    const practice = read("src/Practice.jsx");
+    expect(sql).toContain("if v_created_by is distinct from auth.uid()");
+    expect(sql).toContain("delete from public.shot_events");
+    expect(sql).toContain("context_type = 'practice_game'");
+    expect(sql).toContain("delete from public.practice_game_results");
+    expect(sql).toContain("delete from public.practice_games");
+    expect(sql).toContain("grant execute on function public.discard_practice_game(uuid) to authenticated");
+    expect(db).toContain('supabase.rpc("discard_practice_game"');
+    expect(practice).toContain("Discard Practice");
+    expect(practice).toContain("window.confirm");
+  });
+});
