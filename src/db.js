@@ -2502,10 +2502,11 @@ export async function savePracticeGame(row) {
   return error ? null : data;
 }
 export async function listMyPracticeGames(profileId) {
-  const { data } = await supabase.from("practice_games").select("*")
+  const { data, error } = await supabase.from("practice_games").select("*")
     .eq("created_by", profileId)
     .or("winner.not.is.null,completed_at.not.is.null")
     .order("played_at", { ascending: false });
+  if (error) throw error;
   return data ?? [];
 }
 
@@ -2535,7 +2536,8 @@ export async function deleteShotEvent(id) {
 // (and any future team/tournament breakdown) aggregates over.
 export async function listMyShotEvents(playerNum) {
   if (!playerNum) return [];
-  const { data } = await supabase.from("shot_events").select("*").eq("player_num", playerNum).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("shot_events").select("*").eq("player_num", playerNum).order("created_at", { ascending: false });
+  if (error) throw error;
   return data ?? [];
 }
 
