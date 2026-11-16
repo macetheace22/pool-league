@@ -975,7 +975,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         {currentRating != null && <div style={{fontSize:11,color:"#9A9A9A",marginTop:2}}>Current Rating: {currentRating}</div>}
       </div>
 
-      <div className="card">
+      {playCategory !== "practice" && <div className="card">
         <div className="card__title">Scope</div>
         <div className="seg-control" style={{marginBottom:8}}>
           <button className={`seg-btn ${scopeMode==="season"?"seg-btn--active":""}`} onClick={()=>setScopeMode("season")}>By Season</button>
@@ -996,7 +996,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
             </div>
           )
         )}
-      </div>
+      </div>}
 
       {playCategory !== "practice" && seasonRecord === undefined && <Loader />}
       {playCategory !== "practice" && seasonRecord && (
