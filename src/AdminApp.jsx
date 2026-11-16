@@ -1063,6 +1063,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [teamHistory, setTeamHistory] = useState(undefined); // undefined = loading
   const [ratingHistory, setRatingHistory] = useState([]);
   const [rawEvents, setRawEvents] = useState(undefined); // undefined = loading, null = none tracked
+  const [rawEventsError, setRawEventsError] = useState("");
   const [coreProfileLoading, setCoreProfileLoading] = useState(true);
   const [loadedPlayerNum, setLoadedPlayerNum] = useState(null);
 
@@ -1089,6 +1090,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     setCoreProfileLoading(true);
     setTeamHistory(undefined);
     setRawEvents(undefined);
+    setRawEventsError("");
     setSeasonRecord(undefined);
     setMvpRankRow(undefined);
     setPlayoffElig(undefined);
@@ -1098,14 +1100,20 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       db.getPlayerNameMap([playerNum]),
       db.getPlayerRating(playerNum),
       db.listRosterHistory(playerNum),
-      db.listMyShotEvents(playerNum),
+      db.listMyShotEvents(playerNum).catch(error => ({ __shotEventError: error })),
       db.listPlayerTeamHistory(playerNum),
     ]).then(([nameMap, rating, ratings, events, history]) => {
       if (cancelled) return;
       setNameInfo(nameMap[playerNum] ?? { name: playerNum, nickname: "" });
       setCurrentRating(rating);
       setRatingHistory(ratings ?? []);
-      setRawEvents(events?.length ? events : null);
+      if (events?.__shotEventError) {
+        setRawEvents(null);
+        setRawEventsError(events.__shotEventError?.message || "Unable to load tracked shots.");
+      } else {
+        setRawEvents(events?.length ? events : null);
+        setRawEventsError("");
+      }
       setTeamHistory(history ?? []);
       const current = (history ?? []).find(t => t.teamId === currentTeamId) ?? (history ?? [])[0];
       if (current) {
@@ -1121,6 +1129,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       setCurrentRating(null);
       setRatingHistory([]);
       setRawEvents(null);
+      setRawEventsError("Unable to load player statistics. Please try again.");
       setTeamHistory([]);
       setScopeMode("career");
     }).finally(() => {
@@ -1196,7 +1205,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     setHeadToHead(undefined);
     db.computeHeadToHead(filteredEvents).then(setHeadToHead).catch(() => setHeadToHead([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawEvents, gameTypeFilter, playTypeFilter, scopeMode, selectedSeasonId]);
+  }, [rawEvents, gameTypeFilter, playTypeFilter, scopeMode, selectedSeasonId, playCategory]);
 
   const winPct = seasonRecord && seasonRecord.sets > 0 ? Math.round((seasonRecord.wins / seasonRecord.sets) * 100) : null;
   const statBoxes = seasonRecord ? [
@@ -1214,6 +1223,9 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   };
 
   if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || (playCategory !== "practice" && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
+  // My Stats All Play is career-wide; season scope belongs on League.
+  // Player Lookup retains its full season/career selector.
+  const showScope = playCategory === "league" || !defaultCareer;
 
   return (
     <>
@@ -1224,7 +1236,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         {currentRating != null && <div style={{fontSize:11,color:"#9A9A9A",marginTop:2}}>Current Rating: {currentRating}</div>}
       </div>
 
-      <div className="card">
+      {showScope && <div className="card">
         <div className="card__title">Scope</div>
         <div className="seg-control" style={{marginBottom:8}}>
           <button className={`seg-btn ${scopeMode==="season"?"seg-btn--active":""}`} onClick={()=>setScopeMode("season")}>By Season</button>
@@ -1245,7 +1257,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
             </div>
           )
         )}
-      </div>
+      </div>}
 
       {playCategory !== "practice" && seasonRecord === undefined && <Loader />}
       {playCategory !== "practice" && seasonRecord && (
@@ -1322,32 +1334,44 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       )}
 
       {rawEvents === undefined && <Loader />}
-      {rawEvents && playCategory !== "tournaments" && (
+      {playCategory !== "tournaments" && (
         <>
           <div className="card">
             <div className="card__title">Advanced Stats (Track a Rack)</div>
-            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:4}}>
-              <FilterChips options={PLAY_TYPE_FILTERS} value={playTypeFilter} onChange={setPlayTypeFilter} />
-              <FilterChips options={GAME_TYPE_FILTERS} value={gameTypeFilter} onChange={setGameTypeFilter} />
-            </div>
-            {scopeMode === "season" && <div style={{fontSize:10,color:"#6A6A6A",marginBottom:6}}>Practice games aren't tied to a season, so they're excluded while a specific season is selected — switch to Career to include them.</div>}
-            {filteredEvents.length === 0
-              ? <div className="dash-empty" style={{marginTop:8}}>No tracked shots match this filter.</div>
-              : <>
-                  <ShotStatsBlock stats={shotStats} />
-                  <div style={{display:"flex",gap:8,marginTop:10}} className="no-print">
-                    <button className="btn-sm" onClick={() => window.print()}>Print / Save as PDF</button>
-                    <button className="btn-sm" onClick={exportAll}>Export CSV</button>
-                  </div>
-                </>}
+            {rawEventsError ? (
+              <div className="error-msg">Unable to load advanced stats: {rawEventsError}</div>
+            ) : (
+              <>
+                {playCategory === "all" && <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:4}}>
+                  <FilterChips options={PLAY_TYPE_FILTERS} value={playTypeFilter} onChange={setPlayTypeFilter} />
+                </div>}
+                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:4}}>
+                  <FilterChips options={GAME_TYPE_FILTERS} value={gameTypeFilter} onChange={setGameTypeFilter} />
+                </div>
+                {showScope && scopeMode === "season" && <div style={{fontSize:10,color:"#6A6A6A",marginBottom:6}}>Practice games aren't tied to a season, so they're excluded while a specific season is selected — switch to Career to include them.</div>}
+                {!rawEvents?.length || filteredEvents.length === 0
+                  ? <div className="dash-empty" style={{marginTop:8}}>{rawEvents?.length ? "No tracked shots match this filter." : "No Track a Rack shots have been recorded yet."}</div>
+                  : <>
+                      <ShotStatsBlock stats={shotStats} />
+                      <div style={{display:"flex",gap:8,marginTop:10}} className="no-print">
+                        <button className="btn-sm" onClick={() => window.print()}>Print / Save as PDF</button>
+                        <button className="btn-sm" onClick={exportAll}>Export CSV</button>
+                      </div>
+                    </>}
+              </>
+            )}
           </div>
 
-          {headToHead.length > 0 && (
-            <div className="card">
-              <div className="card__title">Head-to-Head</div>
+          <div className="card">
+            <div className="card__title">Head-to-Head</div>
+            {rawEventsError ? (
+              <div className="error-msg">Unable to load head-to-head stats: {rawEventsError}</div>
+            ) : headToHead.length === 0 ? (
+              <div className="dash-empty">No opponent shot data is available for this play type yet. Practice and league Track a Rack events are included when available.</div>
+            ) : (
               <div className="list" style={{marginTop:6}}>
                 {headToHead.map(h => (
-                  <div key={h.opponentNum ?? "unknown"} className="list-row">
+                  <div key={h.opponentKey ?? h.opponentNum ?? "unknown"} className="list-row">
                     <div className="list-row__body">
                       <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
                         <span className="list-row__name">{h.name}{h.nickname ? ` "${h.nickname}"` : ""}</span>
@@ -1357,14 +1381,9 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
-      )}
-      {rawEvents === null && playCategory !== "tournaments" && (
-        <div style={{fontSize:10.5,color:"#6A6A6A",textAlign:"center"}}>
-          No advanced stats tracked yet — use "Track a Rack" during a live match, manual entry, or practice to start building this out.
-        </div>
       )}
     </>
   );
@@ -1374,11 +1393,16 @@ function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
   const [playCategory, setPlayCategory] = useState("all");
   const [practiceGames, setPracticeGames] = useState(undefined);
+  const [practiceGamesError, setPracticeGamesError] = useState("");
 
   useEffect(() => {
     if (!profile?.id) { setPracticeGames([]); return; }
     setPracticeGames(undefined);
-    db.listMyPracticeGames(profile.id).then(setPracticeGames).catch(() => setPracticeGames([]));
+    setPracticeGamesError("");
+    db.listMyPracticeGames(profile.id).then(setPracticeGames).catch(error => {
+      setPracticeGames([]);
+      setPracticeGamesError(error?.message || "Unable to load your practice sessions.");
+    });
   }, [profile?.id]);
 
   const completedPractice = practiceGames ?? [];
@@ -1429,7 +1453,9 @@ function MyStatsPage({ profile }) {
             {showPractice && (
               <div className="card">
                 <div className="card__title">Practice Record</div>
-                {practiceGames === undefined ? <Loader /> : completedPractice.length === 0 ? (
+                {practiceGames === undefined ? <Loader /> : practiceGamesError ? (
+                  <div className="error-msg">Unable to load practice stats: {practiceGamesError}</div>
+                ) : completedPractice.length === 0 ? (
                   <div className="dash-empty">No completed practice sessions recorded yet.</div>
                 ) : (
                   <>
