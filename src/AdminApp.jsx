@@ -15,7 +15,7 @@ import Scoresheet from "./Scoresheet";
 import { useAuth } from "./AuthContext";
 import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from "./Shell";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { parseStandingsImport, parseMvpImport, parseLeagueRoster, extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision } from "./ibaParsers";
+import { parseStandingsImport, parseMvpImport, parseLeagueRoster, parsePlayoffEligibilityRoster, extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision } from "./ibaParsers";
 import { makeupDeadlineFromPlayoffsStart } from "./forfeitRules";
 import IbaAutoSyncPanel from "./IbaAutoSyncPanel";
 import IbaScheduleImportPanel, { clearIbaSchedulePanelState } from "./IbaScheduleImportPanel";
@@ -231,6 +231,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   }, [profile.id, captainTeamIds.join("|")]);
 
   const [seasons, setSeasons] = useState([]);
+  const [divisionTeamCounts, setDivisionTeamCounts] = useState({});
   const [seasonsLoading, setSeasonsLoading] = useState(true);
   const [initialLoadError, setInitialLoadError] = useState("");
   const skipNextDivisionLoadRef = useRef(false);
@@ -259,6 +260,18 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [myTeamSubTab, setMyTeamSubTab]   = useState("roster");
 
   const activeSeasons = seasons.filter(s => s.is_active);
+  const seasonIdsNeedingTeams = new Set(activeSeasons.filter(season => {
+    const divisions = season.divisions ?? [];
+    return divisions.length > 0 && divisions.reduce((total, division) => total + (divisionTeamCounts[division.id] ?? 0), 0) === 0;
+  }).map(season => season.id));
+  useEffect(() => {
+    let cancelled = false;
+    const divisionIds = seasons.flatMap(season => (season.divisions ?? []).map(division => division.id));
+    if (!divisionIds.length) { setDivisionTeamCounts({}); return () => { cancelled = true; }; }
+    db.countTeamsByDivisions(divisionIds).then(counts => { if (!cancelled) setDivisionTeamCounts(counts ?? {}); })
+      .catch(() => { if (!cancelled) setDivisionTeamCounts({}); });
+    return () => { cancelled = true; };
+  }, [seasons]);
   const refreshSeasons = async () => {
     const list = await db.listSeasons();
     setSeasons(list);
@@ -546,7 +559,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             onSetPlayoffsDate={handleSetPlayoffsDate}
             onSeasonCreated={(_, makeActive)=>setSeasonsSubTab(makeActive ? "active" : "inactive")}
             onSeasonTabChange={setSeasonsSubTab}
-            onImportIbaSchedule={refreshSeasons} />
+            onImportIbaSchedule={refreshSeasons} seasonIdsNeedingTeams={seasonIdsNeedingTeams}
+            onImportTeams={seasonId => navigate(`/manual-season-import?season=${encodeURIComponent(seasonId)}`)} />
         </div>
       </>
     );
@@ -570,7 +584,8 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             onSetPlayoffsDate={handleSetPlayoffsDate}
             onSeasonCreated={(_, makeActive)=>setSeasonsSubTab(makeActive ? "active" : "inactive")}
             onSeasonTabChange={setSeasonsSubTab}
-            onImportIbaSchedule={refreshSeasons} />
+            onImportIbaSchedule={refreshSeasons} seasonIdsNeedingTeams={seasonIdsNeedingTeams}
+            onImportTeams={seasonId => navigate(`/manual-season-import?season=${encodeURIComponent(seasonId)}`)} />
         </div>
       </>
     );
@@ -593,7 +608,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
               viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} readOnly={!isViewingActive} />
           )}
           {page === "playoff-eligibility" && viewingDiv && (
-            <PlayoffEligibilityStatus rows={playoffEligibilityRows} teams={viewTeams} rosters={viewRosters} />
+            <>
+              <SeedPlayoffEligibilityImport divisionId={viewingDiv.id} onImported={refreshCurrentDivision} existingCount={playoffEligibilityRows.length} />
+              <PlayoffEligibilityStatus rows={playoffEligibilityRows} teams={viewTeams} rosters={viewRosters} />
+            </>
           )}
           {page === "playoff-eligibility" && !viewingDiv && (
             <div className="empty-state">Select a season and division to view imported playoff eligibility.</div>
@@ -1914,7 +1932,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 }
 
 // ─── Seasons Tab ──────────────────────────────────────────────────────────────
-function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSetPlayoffsDate, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule }) {
+function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSetPlayoffsDate, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule, seasonIdsNeedingTeams = new Set(), onImportTeams }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [type, setType]     = useState("Summer");
@@ -2158,6 +2176,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                 const isAct        = s.is_active;
                 const isExpanded   = expandedSeason === s.id;
                 const divs         = s.divisions ?? [];
+                const needsTeams   = seasonIdsNeedingTeams.has(s.id);
                 return (
                   <div key={s.id} className={`season-card ${isAct?"season-card--active":""}`}>
                     <div className="season-card__header" onClick={()=>{setExpandedSeason(isExpanded?null:s.id);if(!isExpanded){setNewDivisionFormat(divs[0]?.format || s.format || "");setNewDivisionDay(divs[0]?.day || s.day || "");}}}>
@@ -2166,7 +2185,7 @@ function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleA
                         <div className="season-card__meta">{divs.length} division{divs.length!==1?"s":""}{isAct?" · ● Active":""}</div>
                       </div>
                       <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        
+                        {needsTeams && <button className="btn-sm btn-sm--accent" onClick={event => { event.stopPropagation(); onImportTeams?.(s.id); }}>Import Teams <ChevronRight size={11}/></button>}
                         <button className={`btn-sm ${isAct?"btn-sm--warn":"btn-sm--accent"}`}
                           onClick={async e=>{e.stopPropagation();await onToggleActive(s);onSeasonTabChange(!isAct ? "active" : "inactive");if(!isAct)setExpandedSeason(s.id);}}>
                           {isAct?"Deactivate":"Set Active"}
@@ -3562,6 +3581,72 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
       }
       preview={parsed.length>0 && <PreviewList rows={parsed.map(r=>({id:r.playerNum, name:r.playerName, sub:`${r.wins}W–${r.losses}L · ${r.pointsScored} pts scored · ${r.mvpRankingPoints} ranking pts`}))}/>}
       onImport={parsed.length?handleImport:null} importLabel={`Import ${parsed.length} players for this week`} saved={saved}/>
+  );
+}
+
+
+function SeedPlayoffEligibilityImport({ divisionId, onImported, existingCount }) {
+  const [open, setOpen] = useState(false);
+  const [raw, setRaw] = useState("");
+  const [parsed, setParsed] = useState(null);
+  const [parseErr, setParseErr] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [unmatchedCount, setUnmatchedCount] = useState(0);
+  const [asOfDate, setAsOfDate] = useState("");
+
+  const handleParse = () => {
+    const result = parsePlayoffEligibilityRoster(raw);
+    if (!result?.eligibilityRows?.length) {
+      setParseErr(result?.eligibilityParseError || "No eligibility rows found. Paste the IBA Division Playoffs - Roster and Handicap Report.");
+      return;
+    }
+    setParseErr(""); setParsed(result);
+    setAsOfDate(result.eligibilityAsOfDate || "");
+  };
+  const handleImport = async () => {
+    if (!parsed?.eligibilityRows?.length || !asOfDate) {
+      setParseErr("Confirm the report's Ratings current as of date before importing.");
+      return;
+    }
+    const weekLabel = parsed.eligibilityWeek != null ? `Week ${parsed.eligibilityWeek}` : "Playoffs";
+    const result = await db.importPlayoffEligibilityForWeek(divisionId,
+      parsed.eligibilityRows.map(row => ({ num: row.num, name: row.name, teamNum: row.teamNum, eligCode: row.eligCode })),
+      { weekKey: asOfDate, label: `${weekLabel} · Eligibility as of ${asOfDate}` }
+    );
+    if (!result?.ok) { setParseErr("The eligibility snapshot could not be saved. Please try again."); return; }
+    setOpen(false); setRaw(""); setParsed(null); setParseErr(""); setSaved(true);
+    setUnmatchedCount(result.unmatchedCount ?? 0);
+    window.setTimeout(() => setSaved(false), 1800);
+    await onImported?.();
+  };
+
+  if (!open) return (
+    <div className="card" style={{marginBottom:12}}>
+      <div className="card__title">Official Playoff Eligibility Import</div>
+      <button className="btn-sm" onClick={() => setOpen(true)}><Plus size={12}/> {existingCount ? `Update eligibility report (${existingCount} records)` : "Import Playoff Eligibility"}</button>
+      {saved && <div style={{fontSize:11,color:"#5FCF9E",marginTop:8}}>Eligibility snapshot saved.</div>}
+      {unmatchedCount > 0 && <div style={{fontSize:10.5,color:"#F59E0B",marginTop:6}}>{unmatchedCount} player numbers did not match a known player and remain unverified.</div>}
+    </div>
+  );
+
+  return (
+    <div className="card" style={{marginBottom:12}}>
+      <div className="card__title">Official Playoff Eligibility Import</div>
+      <PasteImporter label="Import Playoff Eligibility" hint="Paste the IBA Division Playoffs - Roster and Handicap Report. This updates eligibility only; it does not change team rosters or ratings."
+        raw={raw} setRaw={value => { setRaw(value); setParsed(null); setParseErr(""); }}
+        onParse={handleParse} parseErr={parseErr}
+        onClear={() => { setRaw(""); setParsed(null); setParseErr(""); }}
+        preHint={<div className="field" style={{marginBottom:8}}>
+          <Label>Eligibility as of</Label>
+          <input className="input" type="date" value={asOfDate} onChange={event => setAsOfDate(event.target.value)} />
+          <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>The date is read from the report when available; confirm or correct it before saving.</div>
+        </div>}
+        preview={parsed && <><div style={{fontSize:11,fontWeight:700,color:"#5FCF9E",marginBottom:6}}>{parsed.eligibilityWeek != null ? `Week ${parsed.eligibilityWeek}` : "Playoffs"} · {parsed.eligibilityRows.length} players</div>
+          <PreviewList rows={parsed.eligibilityRows.map(row => ({id:row.eligCode,name:row.name,sub:`Team ${row.teamNum} · ${row.teamName}`}))}/></>}
+        onImport={parsed?.eligibilityRows?.length && asOfDate ? handleImport : null}
+        importLabel={parsed ? `Import ${parsed.eligibilityRows.length} eligibility records` : ""} saved={saved}/>
+      <button className="btn-ghost" style={{marginTop:8}} onClick={() => { setOpen(false); setRaw(""); setParsed(null); setParseErr(""); }}>Cancel</button>
+    </div>
   );
 }
 
