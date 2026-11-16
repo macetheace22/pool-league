@@ -788,6 +788,9 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
       setErr("Enter a nonnegative whole-number score for both players."); return;
     }
     const my = Number(myText), opp = Number(oppText);
+    if (!Number.isInteger(my) || !Number.isInteger(opp) || my < 0 || opp < 0) {
+      setErr("Enter nonnegative whole-number scores for both players."); return;
+    }
     if (my === opp) { setErr("Scores can't be tied — one side has to win the game."); return; }
     void saveGameResult({ myPoints: my, oppPoints: opp, gameWinner: my > opp ? "me" : "opponent" });
   };
