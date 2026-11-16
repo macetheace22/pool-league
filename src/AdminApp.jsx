@@ -1178,7 +1178,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       setMatchHistory([]);
       return () => { cancelled = true; };
     }
-    // Keep the previous history visible while the new scope is loading; do not blank the render tree during a source toggle.\n    db.listPlayerMatchHistory(playerNum, activeDivisionIds)
+    // Keep the previous history visible while the new scope is loading; do not blank the render tree during a source toggle.
+    db.listPlayerMatchHistory(playerNum, activeDivisionIds)
       .then(rows => { if (!cancelled) setMatchHistory(rows ?? []); })
       .catch(() => { if (!cancelled) setMatchHistory([]); });
     return () => { cancelled = true; };
