@@ -232,6 +232,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
   const [seasons, setSeasons] = useState([]);
   const [divisionTeamCounts, setDivisionTeamCounts] = useState({});
+  const [divisionTeamCountsLoaded, setDivisionTeamCountsLoaded] = useState(false);
   const [seasonsLoading, setSeasonsLoading] = useState(true);
   const [initialLoadError, setInitialLoadError] = useState("");
   const skipNextDivisionLoadRef = useRef(false);
@@ -260,16 +261,28 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const [myTeamSubTab, setMyTeamSubTab]   = useState("roster");
 
   const activeSeasons = seasons.filter(s => s.is_active);
-  const seasonIdsNeedingTeams = new Set(activeSeasons.filter(season => {
+  const seasonIdsNeedingTeams = new Set(divisionTeamCountsLoaded ? activeSeasons.filter(season => {
     const divisions = season.divisions ?? [];
     return divisions.length > 0 && divisions.reduce((total, division) => total + (divisionTeamCounts[division.id] ?? 0), 0) === 0;
-  }).map(season => season.id));
+  }).map(season => season.id) : []);
   useEffect(() => {
     let cancelled = false;
     const divisionIds = seasons.flatMap(season => (season.divisions ?? []).map(division => division.id));
-    if (!divisionIds.length) { setDivisionTeamCounts({}); return () => { cancelled = true; }; }
-    db.countTeamsByDivisions(divisionIds).then(counts => { if (!cancelled) setDivisionTeamCounts(counts ?? {}); })
-      .catch(() => { if (!cancelled) setDivisionTeamCounts({}); });
+    setDivisionTeamCountsLoaded(false);
+    if (!divisionIds.length) {
+      setDivisionTeamCounts({});
+      setDivisionTeamCountsLoaded(true);
+      return () => { cancelled = true; };
+    }
+    db.countTeamsByDivisions(divisionIds).then(counts => {
+      if (cancelled) return;
+      setDivisionTeamCounts(counts ?? {});
+      setDivisionTeamCountsLoaded(true);
+    }).catch(() => {
+      if (cancelled) return;
+      setDivisionTeamCounts({});
+      setDivisionTeamCountsLoaded(false);
+    });
     return () => { cancelled = true; };
   }, [seasons]);
   const refreshSeasons = async () => {
@@ -319,8 +332,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
         ]);
         if (cancelled) return;
 
-        const requestedId = searchParams.get("season");
-        const requested = requestedId ? list.find(s => s.id === requestedId) : null;
+        const requested = requestedSeasonId ? list.find(s => s.id === requestedSeasonId) : null;
         const target = requested ?? list.find(s => s.is_active);
         const targetDivision = target?.divisions?.[0] ?? null;
 
@@ -354,6 +366,23 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
       clearIbaSchedulePanelState();
     };
   }, []);
+
+  // Keep the manual-import season selection in sync when the URL changes
+  // without relying on this route component being remounted.
+  useEffect(() => {
+    if (page !== "manual-import" || !requestedSeasonId || !seasons.length) return;
+    const target = seasons.find(season => season.id === requestedSeasonId);
+    if (!target || target.id === viewingSeason?.id) return;
+    let cancelled = false;
+    const targetDivision = target.divisions?.[0] ?? null;
+    (async () => {
+      await loadDivisionData(targetDivision);
+      if (cancelled) return;
+      setViewingSeason(target);
+      setViewingDiv(targetDivision);
+    })();
+    return () => { cancelled = true; };
+  }, [page, requestedSeasonId, seasons, viewingSeason?.id]);
 
   useEffect(() => {
     if (skipNextDivisionLoadRef.current) {
@@ -1935,6 +1964,7 @@ function SeasonDivBanner({ seasons, activeSeasons, viewingSeason, viewingDiv, on
 function SeasonsTab({ seasons, subTab, onCreateSeason, onDeleteSeason, onToggleActive, onAddDivision, onRemoveDivision, onUpdateDivision, onSetPlayoffsDate, onSeasonCreated, onSeasonTabChange, onImportIbaSchedule, seasonIdsNeedingTeams = new Set(), onImportTeams }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const requestedSeasonId = searchParams.get("season");
   const [type, setType]     = useState("Summer");
   const [year, setYear]     = useState(CURRENT_YEAR);
    const [error, setError]   = useState("");
