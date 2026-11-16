@@ -1172,21 +1172,32 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     : (seasonOptionsForYear(selectedYear).find(s => s.seasonId === selectedSeasonId)?.divisionIds ?? []);
 
   useEffect(() => {
-    if (teamHistory === undefined) return;
+    let cancelled = false;
+    if (teamHistory === undefined) return () => { cancelled = true; };
     if (!includeLeague) {
       setMatchHistory([]);
-      return;
+      return () => { cancelled = true; };
     }
     setMatchHistory(undefined);
-    db.listPlayerMatchHistory(playerNum, activeDivisionIds).then(rows => setMatchHistory(rows ?? [])).catch(() => setMatchHistory([]));
+    db.listPlayerMatchHistory(playerNum, activeDivisionIds)
+      .then(rows => { if (!cancelled) setMatchHistory(rows ?? []); })
+      .catch(() => { if (!cancelled) setMatchHistory([]); });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, teamHistory, effectiveScopeMode, selectedSeasonId, includeLeague]);
 
   useEffect(() => {
-    if (teamHistory === undefined) return;
+    let cancelled = false;
+    if (teamHistory === undefined) return () => { cancelled = true; };
     setSeasonRecord(undefined);
-    if (!includeLeague) { setSeasonRecord(null); return; }
-    db.getStatsForDivisions(playerNum, activeDivisionIds).then(setSeasonRecord).catch(() => setSeasonRecord(null));
+    if (!includeLeague) {
+      setSeasonRecord(null);
+      return () => { cancelled = true; };
+    }
+    db.getStatsForDivisions(playerNum, activeDivisionIds)
+      .then(row => { if (!cancelled) setSeasonRecord(row); })
+      .catch(() => { if (!cancelled) setSeasonRecord(null); });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, scopeMode, selectedSeasonId, teamHistory, includeLeague]);
 
@@ -1198,18 +1209,32 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const singleScopedDivisionId = effectiveScopeMode === "season" && activeDivisionIds.length === 1 ? activeDivisionIds[0] : null;
 
   useEffect(() => {
-    if (teamHistory === undefined) return;
-    if (!singleScopedDivisionId) { setMvpRankRow(null); return; }
+    let cancelled = false;
+    if (teamHistory === undefined) return () => { cancelled = true; };
+    if (!singleScopedDivisionId) {
+      setMvpRankRow(null);
+      return () => { cancelled = true; };
+    }
     setMvpRankRow(undefined);
-    db.getPlayerMvpRankRow(playerNum, singleScopedDivisionId).then(row => setMvpRankRow(row ?? null)).catch(() => setMvpRankRow(null));
+    db.getPlayerMvpRankRow(playerNum, singleScopedDivisionId)
+      .then(row => { if (!cancelled) setMvpRankRow(row ?? null); })
+      .catch(() => { if (!cancelled) setMvpRankRow(null); });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, singleScopedDivisionId, teamHistory]);
 
   useEffect(() => {
-    if (teamHistory === undefined) return;
-    if (!singleScopedDivisionId) { setPlayoffElig(null); return; }
+    let cancelled = false;
+    if (teamHistory === undefined) return () => { cancelled = true; };
+    if (!singleScopedDivisionId) {
+      setPlayoffElig(null);
+      return () => { cancelled = true; };
+    }
     setPlayoffElig(undefined);
-    db.getPlayerPlayoffEligibility(playerNum, singleScopedDivisionId).then(row => setPlayoffElig(row ?? null)).catch(() => setPlayoffElig(null));
+    db.getPlayerPlayoffEligibility(playerNum, singleScopedDivisionId)
+      .then(row => { if (!cancelled) setPlayoffElig(row ?? null); })
+      .catch(() => { if (!cancelled) setPlayoffElig(null); });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerNum, singleScopedDivisionId, teamHistory]);
 
@@ -1229,10 +1254,18 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const shotStats = rawEvents ? db.computeShotStats(filteredEvents) : null;
 
   useEffect(() => {
-    if (rawEvents === undefined) return;
-    if (!rawEvents) { setHeadToHead([]); return; }
-    setHeadToHead(undefined);
-    db.computeHeadToHead(filteredEvents).then(setHeadToHead).catch(() => setHeadToHead([]));
+    let cancelled = false;
+    if (rawEvents === undefined) return () => { cancelled = true; };
+    if (!rawEvents) {
+      setHeadToHead([]);
+      return () => { cancelled = true; };
+    }
+    // Keep the last completed result visible while this filter's calculation
+    // runs. A stale request must never replace the result for newer filters.
+    db.computeHeadToHead(filteredEvents)
+      .then(rows => { if (!cancelled) setHeadToHead(rows ?? []); })
+      .catch(() => { if (!cancelled) setHeadToHead([]); });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawEvents, gameTypeFilter, playTypeFilter, effectiveScopeMode, selectedSeasonId, playCategory, includeLeague, includePractice]);
 
@@ -1268,11 +1301,14 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   ] : [];
 
   const exportAll = () => {
-    const nameMap = { [playerNum]: nameInfo ?? { name: playerNum }, ...Object.fromEntries(headToHead.filter(h => h.opponentNum).map(h => [h.opponentNum, { name: h.name }])) };
+    const safeHeadToHead = Array.isArray(headToHead) ? headToHead : [];
+    const nameMap = { [playerNum]: nameInfo ?? { name: playerNum }, ...Object.fromEntries(safeHeadToHead.filter(h => h.opponentNum).map(h => [h.opponentNum, { name: h.name }])) };
     db.downloadCSV(`${nameInfo?.name ?? playerNum}-advanced-stats.csv`, db.shotEventsToCSV(filteredEvents, nameMap));
   };
 
-  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined || (includeLeague && matchHistory === undefined) || (includeLeague && seasonRecord === undefined) || mvpRankRow === undefined || playoffElig === undefined || headToHead === undefined) return <Loader />;
+  // Filter-dependent requests must not unmount the entire stats profile.
+  // Only the core player data is allowed to block the page.
+  if (loadedPlayerNum !== playerNum || coreProfileLoading || teamHistory === undefined || rawEvents === undefined) return <Loader />;
 
   return (
     <>
@@ -1515,7 +1551,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
 function MyStatsPage({ profile }) {
   const primaryTeamId = getActiveTeamIds(profile)[0] ?? null;
-  const [includedSources, setIncludedSources] = useState(["league", "practice"]);
+  const [includedSources, setIncludedSources] = useState(["league", "practice", "tournaments"]);
   const [playerHeading, setPlayerHeading] = useState(null);
   const [practiceGames, setPracticeGames] = useState(undefined);
   const [practiceGamesError, setPracticeGamesError] = useState("");
@@ -1556,9 +1592,7 @@ function MyStatsPage({ profile }) {
   const includeLeague = includedSources.includes("league");
   const includePractice = includedSources.includes("practice");
   const includeTournaments = includedSources.includes("tournaments");
-  const allSourcesSelected = ["league", "practice", "tournaments"].every(source => includedSources.includes(source));
   const toggleSource = source => setIncludedSources(current => current.includes(source) ? current.filter(s => s !== source) : [...s, source]);
-  const toggleAllSources = () => setIncludedSources(allSourcesSelected ? [] : ["league", "practice", "tournaments"]);
 
 
 
@@ -1569,21 +1603,27 @@ function MyStatsPage({ profile }) {
         <div className="card">
           <div className="card__title">Include in My Stats</div>
           <div style={{fontSize:11.5,color:"#8A8A8A",marginBottom:10}}>Choose which types of play are included throughout this page. The same selection drives your record, history, Track a Rack stats, and Match Head-to-Head.</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>
-            <button type="button" className={allSourcesSelected ? "btn-primary" : "btn-secondary"} aria-pressed={allSourcesSelected} onClick={toggleAllSources} style={{minHeight:48,textAlign:"left",padding:"10px 12px"}}>
-              <span style={{display:"block",fontWeight:800,fontSize:12}}>All Play</span>
-              <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3}}>Include every available source</span>
-            </button>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,alignItems:"stretch"}}>
             {[
               {key:"league",label:"League",description:"IBA league matches"},
               {key:"practice",label:"Practice",description:"Practice games and drills"},
               {key:"tournaments",label:"Tournaments",description:"Tournament results (when available)"},
-            ].map(source => (
-              <button key={source.key} type="button" className={includedSources.includes(source.key) ? "btn-primary" : "btn-secondary"} aria-pressed={includedSources.includes(source.key)} onClick={() => toggleSource(source.key)} style={{minHeight:48,textAlign:"left",padding:"10px 12px"}}>
-                <span style={{display:"block",fontWeight:800,fontSize:12}}>{source.label}</span>
-                <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3}}>{source.description}</span>
-              </button>
-            ))}
+            ].map(source => {
+              const selected = includedSources.includes(source.key);
+              return (
+                <button
+                  key={source.key}
+                  type="button"
+                  className={selected ? "btn-primary" : "btn-secondary"}
+                  aria-pressed={selected}
+                  onClick={() => toggleSource(source.key)}
+                  style={{minHeight:58,height:58,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"flex-start",textAlign:"left",padding:"8px 12px",overflow:"hidden"}}
+                >
+                  <span style={{display:"block",fontWeight:800,fontSize:12,lineHeight:"16px"}}>{source.label}</span>
+                  <span style={{display:"block",fontSize:10,opacity:.78,fontWeight:500,marginTop:3,lineHeight:"12px",whiteSpace:"nowrap"}}>{source.description}</span>
+                </button>
+              );
+            })}
           </div>
           {includedSources.length === 0 && <div className="dash-empty" style={{marginTop:10}}>Select at least one type of play.</div>}
         </div>
