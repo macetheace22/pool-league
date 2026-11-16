@@ -769,6 +769,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
         played_at: new Date().toISOString(),
       }}
       profile={profile}
+      closeLabel="Back to Practice"
       onClose={() => setShowScoresheet(false)}
     />;
   }
