@@ -1387,27 +1387,6 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   );
 }
 
-// ─── Player Lookup (leaguewide, every role) ────────────────────────────────
-// Search any player, see their full profile (PlayerStatsProfile, shared
-// with My Stats), and optionally compare it against a second player's --
-// the same component stacked twice with a "vs" divider, so a comparison
-// gets everything a solo lookup gets (season/career scope, team history,
-// rating history, advanced stats, head-to-head), not a stripped-down view.ck"}}>Go to My Profile</Link>
-          </div>
-        ) : (
-          <PlayerStatsProfile playerNum={profile.player_num} currentTeamId={activeTeamIds[0] ?? null} />
-        )}
-      </div>
-    </>
-  );
-}
-
-// ─── Player Lookup (leaguewide, every role) ────────────────────────────────
-// Search any player, see their full profile (PlayerStatsProfile, shared
-// with My Stats), and optionally compare it against a second player's --
-// the same component stacked twice with a "vs" divider, so a comparison
-// gets everything a solo lookup gets (season/career scope, team history,
-// rating history, advanced stats, head-to-head), not a stripped-down view.
 function PlayerLookupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
