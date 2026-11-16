@@ -7,6 +7,7 @@ import { css, Loader } from "./AdminApp";
 import { dashboardCss } from "./Dashboard";
 import * as db from "./db";
 import { useActiveSession } from "./ActiveSessionContext";
+import { isResumablePracticeSession } from "./activeSessionUtils";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import Scoresheet from "./Scoresheet";
 
@@ -65,7 +66,7 @@ export default function Practice() {
   const { profile } = useAuth();
   const location = useLocation();
   const { activeSession, setActiveSession, clearActiveSession } = useActiveSession();
-  const restoredPractice = activeSession?.type === "practice" && activeSession.data?.phase !== "done" ? activeSession.data : null;
+  const restoredPractice = isResumablePracticeSession(activeSession) ? activeSession.data : null;
   useEffect(() => {
     if (activeSession?.type === "practice" && activeSession.data?.phase === "done") clearActiveSession();
   }, [activeSession?.type, activeSession?.data?.phase, clearActiveSession]);
@@ -108,11 +109,19 @@ export default function Practice() {
     };
     setSessionState(initial);
     setPhase("type");
-    setActiveSession({ type: "practice", ownerId: profile?.id, route: "/practice", title: "Choose a practice type", subtitle: "Practice setup", data: { phase: "type", session: initial } });
+
   };
   useEffect(() => {
     if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
   }, [location.search]);
+  const activatePracticeSession = (nextPhase) => {
+    setActiveSession({
+      type: "practice", ownerId: profile?.id, route: "/practice",
+      title: session?.opponentName ? `vs ${session.opponentName}` : "Practice session",
+      subtitle: session?.gameType ? gameTypeLabel(session.gameType) : "Practice in progress",
+      data: { phase: nextPhase, session: practiceSessionSnapshot(session) },
+    });
+  };
   const cancelSession = () => { clearActiveSession(); setSessionState(null); setPhase("landing"); };
   const discardSession = async () => {
     if (!session?.gameId || !profile?.id) return;
@@ -156,7 +165,11 @@ export default function Practice() {
   }
   if (phase === "tablesize") {
     return wrap(<TableSizeStep session={session} setSession={setSession}
-      onNext={() => changePhase(session.practiceType === "skills_drills" ? "skillsplay" : "scoring")}
+      onNext={() => {
+        const nextPhase = session.practiceType === "skills_drills" ? "skillsplay" : "scoring";
+        if (nextPhase === "skillsplay") activatePracticeSession(nextPhase);
+        changePhase(nextPhase);
+      }}
       onBack={() => changePhase("gametype")} onCancel={cancelSession} />);
   }
   if (phase === "scoring") {
@@ -165,7 +178,7 @@ export default function Practice() {
   }
   if (phase === "config") {
     return wrap(<ConfigStep profile={profile} session={session} setSession={setSession}
-      onNext={() => changePhase("play")} onBack={() => changePhase("scoring")} onCancel={cancelSession} />);
+      onNext={() => { activatePracticeSession("play"); changePhase("play"); }} onBack={() => changePhase("scoring")} onCancel={cancelSession} />);
   }
   if (phase === "skillsplay") {
     return wrap(<SkillsDrillsStep profile={profile} session={session} setSession={setSession}

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Play, X } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import * as db from "./db";
+import { isResumablePracticeSession } from "./activeSessionUtils";
 
 const STORAGE_KEY = "iba-active-session-v1";
 const ActiveSessionContext = createContext(null);
@@ -41,6 +42,12 @@ export function ActiveSessionProvider({ children }) {
   useEffect(() => {
     if (activeSession && profileId && activeSession.ownerId !== profileId) clearActiveSession();
   }, [activeSession?.ownerId, profileId, clearActiveSession]);
+
+  // Older versions persisted setup wizard steps as active sessions. Only actual
+  // play (or the result-saving screen) should survive navigation/reload.
+  useEffect(() => {
+    if (activeSession?.type === "practice" && !isResumablePracticeSession(activeSession)) clearActiveSession();
+  }, [activeSession?.type, activeSession?.data?.phase, clearActiveSession]);
 
   const value = useMemo(() => ({ activeSession, setActiveSession, clearActiveSession }), [activeSession, setActiveSession, clearActiveSession]);
   const isViewingSession = activeSession?.route?.split("?")[0] === location.pathname;
