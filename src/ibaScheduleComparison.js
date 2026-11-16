@@ -15,7 +15,7 @@ function teamIndexMap(teams = []) {
 
 function resolveTeam(value, teams, byId) {
   if (value == null || value === "") return null;
-  if (typeof value === "number" || /^\\d+$/.test(String(value))) {
+  if (typeof value === "number" || /^\d+$/.test(String(value))) {
     const index = Number(value);
     if (Number.isInteger(index) && index >= 1 && index <= teams.length) {
       return teamNumber(teams[index - 1]) || null;
@@ -28,10 +28,10 @@ function normalizeDate(value) {
   if (!value) return "";
   const text = String(value).trim();
   let year, month, day;
-  let match = text.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (match) [, year, month, day] = match;
   else {
-    match = text.match(/^(\\d{1,2})[/-](\\d{1,2})[/-](\\d{2,4})$/);
+    match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
     if (!match) return text;
     [, month, day, year] = match;
   }
