@@ -547,7 +547,7 @@ function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) 
       setLoadingMyRating(false);
     });
     return () => { cancelled = true; };
-  }, [session.format, session.myRating, profile?.player_num, setSession]);
+  }, [session.format, session.myRating, profile?.player_num]);
 
   const isRaceToPoints = session.scoringMethod === "race_to_points";
   const isRaceToGames = session.scoringMethod === "race_to_games";
