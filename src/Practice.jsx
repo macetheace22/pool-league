@@ -652,7 +652,7 @@ function SkillsDrillsStep({ profile, session, setSession, onDone, onBack, onDisc
           {profile?.player_num ? <ShotTracker contextType="practice_game" contextId={session.gameId} player={{ num: profile.player_num, name: profile.username || "You" }} opponentNum={null} gameType={session.gameType} /> :
             <div className="dash-empty">Your league player profile is not linked, so shot tracking is unavailable for your account.</div>}
           <button className="btn-primary" style={{marginTop:12}} onClick={finish}>Finish Practice</button>
-          <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard}>Discard Practice</button>
+          <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard} disabled={recordStatus !== "ready"}>Discard Practice</button>
         </div>}
         <button className="btn-secondary" onClick={onBack}>← Back to Game Type</button>
       </div>
@@ -873,7 +873,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
         )}
 
         <button className="btn-secondary" onClick={onBack}>← Back to Setup</button>
-        <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard}>Discard Practice</button>
+        <button className="btn-secondary" style={{marginTop:8,color:"#F87171",borderColor:"#7F3030"}} onClick={onDiscard} disabled={savingResult || recordStatus !== "ready"}>Discard Practice</button>
       </div>
     </>
   );
