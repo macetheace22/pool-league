@@ -251,12 +251,12 @@ function parseTeams(html = "") {
 
 function parsePairings(text = "") {
   const pairings = [];
-  const regex = /(\d+)\s*(?:vs\.?|versus)\s*(\d+|TBD)/gi;
+  const regex = /(\d+|TBD)\s*(?:vs\.?|versus)\s*(\d+|TBD)/gi;
   let match;
 
   while ((match = regex.exec(text))) {
     pairings.push({
-      home: Number(match[1]),
+      home: /^tbd$/i.test(match[1]) ? null : Number(match[1]),
       away: /^tbd$/i.test(match[2]) ? null : Number(match[2]),
     });
   }
@@ -296,6 +296,7 @@ function attachTbdCodes(weeks, teams, division) {
       ...week,
       pairings: (week.pairings || []).map(pairing => ({
         ...pairing,
+        ...(pairing.home == null && fallbackCode ? { homeTbdCode: fallbackCode } : {}),
         ...(pairing.away == null && fallbackCode ? { awayTbdCode: fallbackCode } : {}),
       })),
     })),
