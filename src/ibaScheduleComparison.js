@@ -119,15 +119,15 @@ export function validateIbaScheduleSnapshot(schedule) {
           continue;
         }
         const raw = String(entry.value);
-        if (/^\d+$/.test(raw)) {
+        if (teamNumbers.has(raw)) resolved.push(raw);
+        else if (/^\d+$/.test(raw)) {
           const position = Number(raw);
           if (position < 1 || position > schedule.teams.length) {
             errors.push(`Week ${label} matchup ${pairIndex + 1} references missing team position ${raw}.`);
             continue;
           }
           resolved.push(teamNumber(schedule.teams[position - 1]));
-        } else if (teamNumbers.has(raw)) resolved.push(raw);
-        else errors.push(`Week ${label} matchup ${pairIndex + 1} references unknown team ${raw}.`);
+        } else errors.push(`Week ${label} matchup ${pairIndex + 1} references unknown team ${raw}.`);
       }
       if (resolved.length === 2 && resolved[0] === resolved[1]) {
         errors.push(`Week ${label} matchup ${pairIndex + 1} pairs a team against itself.`);
