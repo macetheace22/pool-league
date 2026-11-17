@@ -20,21 +20,16 @@ describe("IBA schedule snapshot confirmation primitives", () => {
   });
 
   it("ignores matchup row ordering while retaining home/away orientation", () => {
-    const reordered = {
+    const pairings = [{ home: 1, away: 2 }, { home: 2, away: null, awayTbdCode: "15103" }];
+    const ordered = {
       ...base,
-      weeks: [{
-        ...base.weeks[0],
-        pairings: [{ home: 2, away: 1 }, { home: 1, away: 2 }],
-      }, base.weeks[1]],
+      weeks: [{ ...base.weeks[0], pairings }, base.weeks[1]],
     };
     const reversed = {
       ...base,
-      weeks: [{
-        ...base.weeks[0],
-        pairings: [...base.weeks[0].pairings].reverse(),
-      }, base.weeks[1]],
+      weeks: [{ ...base.weeks[0], pairings: [...pairings].reverse() }, base.weeks[1]],
     };
-    expect(serializeIbaScheduleSnapshot(reordered)).not.toBe(serializeIbaScheduleSnapshot(reversed));
+    expect(serializeIbaScheduleSnapshot(ordered)).toBe(serializeIbaScheduleSnapshot(reversed));
     expect(fingerprintIbaScheduleSnapshot(base)).resolves.toMatch(/^[a-f0-9]{64}$/);
   });
 
