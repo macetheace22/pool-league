@@ -264,6 +264,35 @@ function parsePairings(text = "") {
   return pairings;
 }
 
+function isTbdTeam(team) {
+  return /^(?:TBD|TBA|TO BE ANNOUNCED)$/i.test(String(team?.name ?? "").trim());
+}
+
+function deriveTbdTeamNum(division, teams = []) {
+  const divisionCode = String(division || "").split("!")[0].replace(/\D/g, "");
+  if (!divisionCode) return null;
+  const used = new Set(teams.map(team => String(team?.teamNum ?? "").trim().toUpperCase()).filter(Boolean));
+  for (let suffix = 1; suffix <= 99; suffix += 1) {
+    const candidate = divisionCode + String(suffix).padStart(2, "0");
+    if (!used.has(candidate)) return candidate;
+  }
+  return divisionCode + "TBD";
+}
+
+function attachTbdCodes(weeks, teams, division) {
+  const suppliedTbdCodes = teams.filter(isTbdTeam)
+    .map(team => String(team.teamNum || "").trim())
+    .filter(Boolean);
+  const fallbackCode = suppliedTbdCodes[0] || deriveTbdTeamNum(division, teams);
+  return weeks.map(week => ({
+    ...week,
+    pairings: (week.pairings || []).map(pairing => ({
+      ...pairing,
+      ...(pairing.away == null ? { awayTbdCode: fallbackCode } : {}),
+    })),
+  }));
+}
+
 function parseScheduleRows(html = "") {
   const tables = extractTables(html);
   const weeks = [];
@@ -328,7 +357,7 @@ function parseWeeksFallback(html = "") {
   return weeks;
 }
 
-function parseScheduleHtml(html = "") {
+function parseScheduleHtml(html = "", division = "") {
   const clean = stripScripts(html);
   const teams = parseTeams(clean);
   let weeks = parseScheduleRows(clean);
@@ -343,10 +372,12 @@ function parseScheduleHtml(html = "") {
     return true;
   });
 
+  const weeksWithTbd = attachTbdCodes(weeks, teams, division);
+
   return {
     teams,
-    weeks,
-    hasSchedule: teams.length > 0 && weeks.length > 0,
+    weeks: weeksWithTbd,
+    hasSchedule: teams.length > 0 && weeksWithTbd.length > 0,
   };
 }
 
@@ -702,7 +733,7 @@ async function getDivisionSchedule(division) {
     }
   }
 
-  const parsed = parseScheduleHtml(scheduleHtml);
+  const parsed = parseScheduleHtml(scheduleHtml, division);
   return {
     division,
     url: result.url,
