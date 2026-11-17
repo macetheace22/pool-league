@@ -943,6 +943,7 @@ export async function listSchedule(divisionId, teams) {
       away: idxOf(p.away_team_id),
       homeTeamId: p.home_team_id,
       awayTeamId: p.away_team_id,
+      homeTbdCode: p.home_tbd_code ?? null,
       awayTbdCode: p.away_tbd_code ?? null,
     })),
   }));
