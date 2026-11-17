@@ -628,7 +628,15 @@ export function SeasonManagementHub() {
               </Link>
             </div>
             <div className="season-hub-section">
-              <div className="season-hub-section__title">2. Update weekly league data</div>
+              <div className="season-hub-section__title">2. Review IBA schedule changes</div>
+              <Link to="/iba-schedule-review" className="season-hub-card">
+                <div className="season-hub-card__icon"><AlertCircle size={19} /></div>
+                <div className="season-hub-card__body"><div className="season-hub-card__title">IBA Schedule Review</div><div className="season-hub-card__desc">Review changes detected during the IBA Week 1–5 monitoring window. Approval does not change the league schedule yet.</div></div>
+                <ChevronRight size={17} className="season-hub-card__arrow" />
+              </Link>
+            </div>
+            <div className="season-hub-section">
+              <div className="season-hub-section__title">3. Update weekly league data</div>
               <Link to="/weekly-data" className="season-hub-card">
                 <div className="season-hub-card__icon"><Upload size={19} /></div>
                 <div className="season-hub-card__body">
