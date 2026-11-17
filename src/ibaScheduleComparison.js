@@ -54,8 +54,8 @@ function normalizePairings(week, teams, byId) {
     const homeValue = pairing?.homeTeamId ?? pairing?.home_team_id ?? pairing?.home;
     const awayValue = pairing?.awayTeamId ?? pairing?.away_team_id ?? pairing?.away;
     return {
-      home: resolveTeam(homeValue, teams, byId),
-      away: resolveTeam(awayValue, teams, byId),
+      home: pairing?.homeTbdCode ?? resolveTeam(homeValue, teams, byId),
+      away: pairing?.awayTbdCode ?? resolveTeam(awayValue, teams, byId),
     };
   }).filter(pairing => pairing.home);
 }
@@ -194,7 +194,7 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
       tbaResolutions: count("tba_resolved"),
     },
     limitations: [
-      "Previously imported TBA pairings are not retained by the current schedule database schema, so historical TBA resolutions cannot be inferred when the saved pairing is absent.",
+      "TBD participants are preserved separately from real team rows; a TBD-to-real-team change is reported when the saved pairing retains the TBD code.",
     ],
   };
 }
