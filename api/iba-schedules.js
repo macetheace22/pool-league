@@ -338,15 +338,6 @@ function parseScheduleRows(html = "", snapshotErrors = []) {
     }
   }
 
-  const seenWeekNumbers = new Set();
-  for (const week of weeks) {
-    if (week.week == null) continue;
-    if (seenWeekNumbers.has(week.week)) {
-      snapshotErrors.push(`Duplicate IBA schedule week number: ${week.week}.`);
-    }
-    seenWeekNumbers.add(week.week);
-  }
-
   return weeks;
 }
 
@@ -385,6 +376,15 @@ function parseScheduleHtml(html = "", division = "") {
   const teams = parseTeams(clean, snapshotErrors);
   let weeks = parseScheduleRows(clean, snapshotErrors);
   if (!weeks.length) weeks = parseWeeksFallback(clean);
+
+  // Check after either parser path so fallback-parsed schedules receive the
+  // same duplicate-week protection as table-parsed schedules.
+  const seenWeekNumbers = new Set();
+  for (const week of weeks) {
+    if (week.week == null) continue;
+    if (seenWeekNumbers.has(week.week)) snapshotErrors.push(`Duplicate IBA schedule week number: ${week.week}.`);
+    seenWeekNumbers.add(week.week);
+  }
 
   // Keep the established de-duplication behavior, but record evidence of
   // repeated rows so an unattended comparison cannot treat a damaged response
