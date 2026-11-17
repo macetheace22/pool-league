@@ -280,17 +280,23 @@ function deriveTbdTeamNum(division, teams = []) {
 }
 
 function attachTbdCodes(weeks, teams, division) {
-  const suppliedTbdCodes = teams.filter(isTbdTeam)
-    .map(team => String(team.teamNum || "").trim())
-    .filter(Boolean);
-  const fallbackCode = suppliedTbdCodes[0] || deriveTbdTeamNum(division, teams);
-  return weeks.map(week => ({
-    ...week,
-    pairings: (week.pairings || []).map(pairing => ({
-      ...pairing,
-      ...(pairing.away == null ? { awayTbdCode: fallbackCode } : {}),
+  const existingTbd = teams.find(isTbdTeam);
+  const fallbackCode = String(existingTbd?.teamNum || "").trim() || deriveTbdTeamNum(division, teams);
+  const hasTbdPairing = weeks.some(week => (week.pairings || []).some(pairing => pairing.away == null));
+  const normalizedTeams = hasTbdPairing && !existingTbd && fallbackCode
+    ? [...teams, { teamNum: fallbackCode, name: "TBD", venue: "", isBye: false, isTbd: true }]
+    : teams.map(team => ({ ...team, isTbd: isTbdTeam(team) }));
+
+  return {
+    teams: normalizedTeams,
+    weeks: weeks.map(week => ({
+      ...week,
+      pairings: (week.pairings || []).map(pairing => ({
+        ...pairing,
+        ...(pairing.away == null ? { awayTbdCode: fallbackCode } : {}),
+      })),
     })),
-  }));
+  };
 }
 
 function parseScheduleRows(html = "") {
@@ -372,11 +378,11 @@ function parseScheduleHtml(html = "", division = "") {
     return true;
   });
 
-  const weeksWithTbd = attachTbdCodes(weeks, teams, division);
+  const normalized = attachTbdCodes(weeks, teams, division);
 
   return {
-    teams,
-    weeks: weeksWithTbd,
+    teams: normalized.teams,
+    weeks: normalized.weeks,
     hasSchedule: teams.length > 0 && weeksWithTbd.length > 0,
   };
 }
