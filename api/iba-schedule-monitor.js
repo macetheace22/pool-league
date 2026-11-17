@@ -115,7 +115,7 @@ export default async function handler(req, res) {
         incomplete++;
         await saveCheck(client, {
           season_id: division.season_id, division_id: division.id, monitor_date: monitorDate,
-          status: "incomplete", snapshot_fingerprint: null, snapshot: null,
+          status: "incomplete", review_status: "not_required", snapshot_fingerprint: null, snapshot: null,
           changes: [], summary: emptyMonitorSummary(), error: window.reason, checked_at: new Date().toISOString(),
         });
         continue;
@@ -125,7 +125,7 @@ export default async function handler(req, res) {
         incomplete++;
         await saveCheck(client, {
           season_id: division.season_id, division_id: division.id, monitor_date: monitorDate,
-          status: "incomplete", snapshot_fingerprint: null, snapshot: null,
+          status: "incomplete", review_status: "not_required", snapshot_fingerprint: null, snapshot: null,
           changes: [], summary: emptyMonitorSummary(),
           error: discovery?.error || "IBA division discovery was unavailable.", checked_at: new Date().toISOString(),
         });
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
         incomplete++;
         await saveCheck(client, {
           season_id: division.season_id, division_id: division.id, monitor_date: monitorDate,
-          status: "incomplete", snapshot_fingerprint: null, snapshot: null,
+          status: "incomplete", review_status: "not_required", snapshot_fingerprint: null, snapshot: null,
           changes: [], summary: emptyMonitorSummary(),
           error: `IBA did not return division ${division.num} for ${division.format} · ${division.day}.`,
           checked_at: new Date().toISOString(),
@@ -154,7 +154,7 @@ export default async function handler(req, res) {
         if (comparison.status === "incomplete") {
           await saveCheck(client, {
             season_id: item.division.season_id, division_id: item.division.id, monitor_date: monitorDate,
-            status: "incomplete", snapshot_fingerprint: null, snapshot: null,
+            status: "incomplete", review_status: "not_required", snapshot_fingerprint: null, snapshot: null,
             changes: [], summary: emptyMonitorSummary(), error: comparison.reason,
             checked_at: new Date().toISOString(),
           });
@@ -163,7 +163,7 @@ export default async function handler(req, res) {
         const fingerprint = await fingerprintIbaScheduleSnapshot(official);
         await saveCheck(client, {
           season_id: item.division.season_id, division_id: item.division.id, monitor_date: monitorDate,
-          status: comparison.status, snapshot_fingerprint: fingerprint,
+          status: comparison.status, review_status: comparison.status === "changes_found" ? "pending" : "not_required", snapshot_fingerprint: fingerprint,
           snapshot: { teams: official.teams, weeks: official.weeks },
           changes: comparison.changes, summary: comparison.summary, error: null,
           checked_at: new Date().toISOString(),
@@ -172,7 +172,7 @@ export default async function handler(req, res) {
       } catch (error) {
         await saveCheck(client, {
           season_id: item.division.season_id, division_id: item.division.id, monitor_date: monitorDate,
-          status: "incomplete", snapshot_fingerprint: null, snapshot: null,
+          status: "incomplete", review_status: "not_required", snapshot_fingerprint: null, snapshot: null,
           changes: [], summary: emptyMonitorSummary(),
           error: error?.message || "IBA schedule monitoring failed.", checked_at: new Date().toISOString(),
         });
