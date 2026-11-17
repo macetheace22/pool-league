@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createIbaScheduleRetrievalId, serializeIbaScheduleSnapshot } from "../src/ibaScheduleConfirmation";
+import { createIbaScheduleRetrievalId, fingerprintIbaScheduleSnapshot, serializeIbaScheduleSnapshot } from "../src/ibaScheduleConfirmation";
 
 describe("IBA schedule snapshot confirmation primitives", () => {
   const base = {
@@ -17,6 +17,25 @@ describe("IBA schedule snapshot confirmation primitives", () => {
     expect(serializeIbaScheduleSnapshot(base)).toBe(
       serializeIbaScheduleSnapshot({ ...base, weeks: [...base.weeks].reverse() }),
     );
+  });
+
+  it("ignores matchup row ordering while retaining home/away orientation", () => {
+    const reordered = {
+      ...base,
+      weeks: [{
+        ...base.weeks[0],
+        pairings: [{ home: 2, away: 1 }, { home: 1, away: 2 }],
+      }, base.weeks[1]],
+    };
+    const reversed = {
+      ...base,
+      weeks: [{
+        ...base.weeks[0],
+        pairings: [...base.weeks[0].pairings].reverse(),
+      }, base.weeks[1]],
+    };
+    expect(serializeIbaScheduleSnapshot(reordered)).not.toBe(serializeIbaScheduleSnapshot(reversed));
+    expect(fingerprintIbaScheduleSnapshot(base)).resolves.toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("preserves team order because IBA matchup values are positional", () => {
