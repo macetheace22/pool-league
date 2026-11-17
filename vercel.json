@@ -4,5 +4,16 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "crons": [
+    {
+      "path": "/api/iba-schedule-monitor",
+      "schedule": "0 12 * * *"
+    }
+  ],
+  "functions": {
+    "api/iba-schedule-monitor.js": {
+      "maxDuration": 60
+    }
+  }
 }

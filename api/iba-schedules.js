@@ -899,4 +899,4 @@ export default async function handler(req, res) {
   }
 }
 
-export { parseDivisionOptions, parsePairings, parseScheduleHtml };
+export { parseDivisionOptions, parsePairings, parseScheduleHtml, getDivisions, getDivisionSchedule };
