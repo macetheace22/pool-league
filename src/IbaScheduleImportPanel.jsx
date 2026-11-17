@@ -171,9 +171,10 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     const key = divisionKey(division);
     setLoading(true);
     setError("");
-    const retrievalId = createIbaScheduleRetrievalId();
+    let retrievalId = null;
     let savedSnapshot = null;
     try {
+      retrievalId = createIbaScheduleRetrievalId();
       // Always perform a new network retrieval. Reusing a cached preview would
       // falsely count the same response twice as independent confirmation.
       savedSnapshot = await db.getIbaScheduleComparisonSnapshot(season.id, extractDivisionNum(division));
@@ -215,7 +216,7 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
       }
       setExpanded(key);
     } catch (e) {
-      if (savedSnapshot?.divisionId) {
+      if (savedSnapshot?.divisionId && retrievalId) {
         const recorded = await db.recordIbaScheduleSnapshotCheck({
           divisionId: savedSnapshot.divisionId,
           retrievalId,
