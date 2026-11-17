@@ -251,17 +251,56 @@ function parseTeams(html = "") {
 
 function parsePairings(text = "") {
   const pairings = [];
-  const regex = /(\d+)\s*(?:vs\.?|versus)\s*(\d+|TBD)/gi;
+  const regex = /(\d+|TBD)\s*(?:vs\.?|versus)\s*(\d+|TBD)/gi;
   let match;
 
   while ((match = regex.exec(text))) {
     pairings.push({
-      home: Number(match[1]),
+      home: /^tbd$/i.test(match[1]) ? null : Number(match[1]),
       away: /^tbd$/i.test(match[2]) ? null : Number(match[2]),
     });
   }
 
   return pairings;
+}
+
+function isTbdTeam(team) {
+  return /^(?:TBD|TBA|TO BE ANNOUNCED)$/i.test(String(team?.name ?? "").trim());
+}
+
+function deriveTbdTeamNum(division, teams = []) {
+  const divisionCode = String(division || "").split("!")[0].replace(/\D/g, "");
+  if (!divisionCode) return null;
+  const prefix = divisionCode.toUpperCase();
+  const suffixes = teams
+    .map(team => String(team?.teamNum ?? "").trim().toUpperCase())
+    .map(teamNum => teamNum.startsWith(prefix) ? teamNum.slice(prefix.length) : "")
+    .filter(suffix => /^\d{1,2}$/.test(suffix))
+    .map(Number);
+  const nextSuffix = Math.max(0, ...suffixes) + 1;
+  if (nextSuffix <= 99) return prefix + String(nextSuffix).padStart(2, "0");
+  return prefix + "TBD";
+}
+
+function attachTbdCodes(weeks, teams, division) {
+  const existingTbd = teams.find(isTbdTeam);
+  const fallbackCode = String(existingTbd?.teamNum || "").trim() || deriveTbdTeamNum(division, teams);
+  const hasTbdPairing = weeks.some(week => (week.pairings || []).some(pairing => pairing.away == null));
+  const normalizedTeams = hasTbdPairing && !existingTbd && fallbackCode
+    ? [...teams, { teamNum: fallbackCode, name: "TBD", venue: "", isBye: false, isTbd: true }]
+    : teams.map(team => ({ ...team, isTbd: isTbdTeam(team) }));
+
+  return {
+    teams: normalizedTeams,
+    weeks: weeks.map(week => ({
+      ...week,
+      pairings: (week.pairings || []).map(pairing => ({
+        ...pairing,
+        ...(pairing.home == null && fallbackCode ? { homeTbdCode: fallbackCode } : {}),
+        ...(pairing.away == null && fallbackCode ? { awayTbdCode: fallbackCode } : {}),
+      })),
+    })),
+  };
 }
 
 function parseScheduleRows(html = "") {
@@ -328,7 +367,7 @@ function parseWeeksFallback(html = "") {
   return weeks;
 }
 
-function parseScheduleHtml(html = "") {
+function parseScheduleHtml(html = "", division = "") {
   const clean = stripScripts(html);
   const teams = parseTeams(clean);
   let weeks = parseScheduleRows(clean);
@@ -343,10 +382,12 @@ function parseScheduleHtml(html = "") {
     return true;
   });
 
+  const normalized = attachTbdCodes(weeks, teams, division);
+
   return {
-    teams,
-    weeks,
-    hasSchedule: teams.length > 0 && weeks.length > 0,
+    teams: normalized.teams,
+    weeks: normalized.weeks,
+    hasSchedule: normalized.teams.length > 0 && normalized.weeks.length > 0,
   };
 }
 
@@ -702,7 +743,7 @@ async function getDivisionSchedule(division) {
     }
   }
 
-  const parsed = parseScheduleHtml(scheduleHtml);
+  const parsed = parseScheduleHtml(scheduleHtml, division);
   return {
     division,
     url: result.url,

@@ -53,9 +53,13 @@ function normalizePairings(week, teams, byId) {
   return pairings.map(pairing => {
     const homeValue = pairing?.homeTeamId ?? pairing?.home_team_id ?? pairing?.home;
     const awayValue = pairing?.awayTeamId ?? pairing?.away_team_id ?? pairing?.away;
+    const homeTbdCode = pairing?.homeTbdCode ?? null;
+    const awayTbdCode = pairing?.awayTbdCode ?? null;
     return {
-      home: resolveTeam(homeValue, teams, byId),
-      away: resolveTeam(awayValue, teams, byId),
+      home: homeTbdCode ?? resolveTeam(homeValue, teams, byId),
+      away: awayTbdCode ?? resolveTeam(awayValue, teams, byId),
+      homeTbd: homeTbdCode != null && String(homeTbdCode).trim() !== "",
+      awayTbd: awayTbdCode != null && String(awayTbdCode).trim() !== "",
     };
   }).filter(pairing => pairing.home);
 }
@@ -95,8 +99,9 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
   const officialWeeks = new Map(official.weeks.map(week => [weekKey(week), week]));
   const changes = [];
 
-  const savedTeamByNum = new Map(savedTeams.map(team => [teamNumber(team), team]).filter(([num]) => num));
-  const officialTeamByNum = new Map(officialTeams.map(team => [teamNumber(team), team]).filter(([num]) => num));
+  const realTeams = team => (team ?? []).filter(item => !item?.isTbd && !/^(?:TBD|TBA|TO BE ANNOUNCED)$/i.test(String(item?.name ?? "").trim()));
+  const savedTeamByNum = new Map(realTeams(savedTeams).map(team => [teamNumber(team), team]).filter(([num]) => num));
+  const officialTeamByNum = new Map(realTeams(officialTeams).map(team => [teamNumber(team), team]).filter(([num]) => num));
   for (const [num, team] of officialTeamByNum) {
     const old = savedTeamByNum.get(num);
     if (!old) {
@@ -152,7 +157,7 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
           awayTeamNum: matchup.away,
         });
       } else if (old.away !== matchup.away) {
-        const resolvedTba = old.away == null && matchup.away != null;
+        const resolvedTba = (old.away == null || old.awayTbd) && matchup.away != null && !matchup.awayTbd;
         changes.push({
           type: resolvedTba ? "tba_resolved" : "matchup_changed",
           week: officialWeek.week ?? officialWeek.week_num ?? null,
@@ -194,7 +199,7 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
       tbaResolutions: count("tba_resolved"),
     },
     limitations: [
-      "Previously imported TBA pairings are not retained by the current schedule database schema, so historical TBA resolutions cannot be inferred when the saved pairing is absent.",
+      "TBD participants are preserved separately from real team rows; a TBD-to-real-team change is reported when the saved pairing retains the TBD code.",
     ],
   };
 }
