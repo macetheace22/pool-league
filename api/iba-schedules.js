@@ -271,12 +271,15 @@ function isTbdTeam(team) {
 function deriveTbdTeamNum(division, teams = []) {
   const divisionCode = String(division || "").split("!")[0].replace(/\D/g, "");
   if (!divisionCode) return null;
-  const used = new Set(teams.map(team => String(team?.teamNum ?? "").trim().toUpperCase()).filter(Boolean));
-  for (let suffix = 1; suffix <= 99; suffix += 1) {
-    const candidate = divisionCode + String(suffix).padStart(2, "0");
-    if (!used.has(candidate)) return candidate;
-  }
-  return divisionCode + "TBD";
+  const prefix = divisionCode.toUpperCase();
+  const suffixes = teams
+    .map(team => String(team?.teamNum ?? "").trim().toUpperCase())
+    .map(teamNum => teamNum.startsWith(prefix) ? teamNum.slice(prefix.length) : "")
+    .filter(suffix => /^\d{1,2}$/.test(suffix))
+    .map(Number);
+  const nextSuffix = Math.max(0, ...suffixes) + 1;
+  if (nextSuffix <= 99) return prefix + String(nextSuffix).padStart(2, "0");
+  return prefix + "TBD";
 }
 
 function attachTbdCodes(weeks, teams, division) {
