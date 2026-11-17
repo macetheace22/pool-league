@@ -122,4 +122,24 @@ describe("IBA schedule API parsers", () => {
     expect(parsed.weeks[0].pairings[0].awayTbdCode).toBe("15310");
   });
 
+  it("reports duplicate team rows and repeated week numbers as snapshot warnings", () => {
+    const html = `
+      <table>
+        <tr><th>Team #</th><th>Name</th><th>Location</th></tr>
+        <tr><td>75101</td><td>Rebels</td><td>Pullman Club</td></tr>
+        <tr><td>75101</td><td>Rebels Duplicate</td><td>Pullman Club</td></tr>
+        <tr><td>75102</td><td>Legion</td><td>Pullman Club</td></tr>
+      </table>
+      <table>
+        <tr><th>Week</th><th>Date</th><th>Pairings</th></tr>
+        <tr><td>1</td><td>9/9/2026</td><td>1 vs 2</td></tr>
+        <tr><td>1</td><td>9/16/2026</td><td>2 vs 1</td></tr>
+      </table>`;
+    const parsed = parseScheduleHtml(html, "751!1234567");
+    expect(parsed.snapshotErrors).toEqual(expect.arrayContaining([
+      expect.stringMatching(/duplicate team row/i),
+      expect.stringMatching(/duplicate iba schedule week number/i),
+    ]));
+  });
+
 });

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { compareIbaSchedules } from "../src/ibaScheduleComparison";
+import { compareIbaSchedules, validateIbaScheduleSnapshot } from "../src/ibaScheduleComparison";
 
 const teams = [
-  { id: "team-a", team_num: "15101" },
-  { id: "team-b", team_num: "15102" },
-  { id: "team-c", team_num: "15103" },
-  { id: "team-d", team_num: "15104" },
+  { id: "team-a", team_num: "15101", name: "Alpha" },
+  { id: "team-b", team_num: "15102", name: "Bravo" },
+  { id: "team-c", team_num: "15103", name: "Charlie" },
+  { id: "team-d", team_num: "15104", name: "Delta" },
 ];
 const week = (date, pairings, number = 1) => ({ week: number, date, pairings });
 const saved = weeks => ({ teams, weeks });
@@ -63,14 +63,14 @@ describe("read-only IBA schedule comparison", () => {
   it("reports added and removed matchups", () => {
     const result = compareIbaSchedules({
       saved: saved([week("9/9/2026", [{ home: 1, away: 2 }])]),
-      official: official([week("9/9/2026", [{ home: 1, away: 3 }, { home: 2, away: 3 }])]),
+      official: official([week("9/9/2026", [{ home: 1, away: 3 }, { home: 2, away: 4 }])]),
     });
     expect(result.changes).toContainEqual({
       type: "matchup_changed", week: 1, homeTeamNum: "15101",
       fromAwayTeamNum: "15102", toAwayTeamNum: "15103",
     });
     expect(result.changes).toContainEqual({
-      type: "matchup_added", week: 1, homeTeamNum: "15102", awayTeamNum: "15103",
+      type: "matchup_added", week: 1, homeTeamNum: "15102", awayTeamNum: "15104",
     });
     expect(result.summary.changed).toBe(1);
     expect(result.summary.added).toBe(1);
@@ -140,6 +140,14 @@ describe("read-only IBA schedule comparison", () => {
     });
     expect(result.status).toBe("no_changes");
     expect(result.changes).toEqual([]);
+  });
+
+  it("rejects impossible calendar dates and accepts IBA parser duplicate warnings", () => {
+    const invalidDate = official([week("2/30/2026", [{ home: 1, away: 2 }])]);
+    expect(validateIbaScheduleSnapshot(invalidDate).join(" ")).toMatch(/unrecognized date/i);
+    const duplicateRows = official([week("9/9/2026", [{ home: 1, away: 2 }])]);
+    duplicateRows.snapshotErrors = ["Duplicate team row in IBA response: 15101."];
+    expect(validateIbaScheduleSnapshot(duplicateRows).join(" ")).toMatch(/duplicate team row/i);
   });
 
 });
