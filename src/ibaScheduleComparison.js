@@ -53,9 +53,13 @@ function normalizePairings(week, teams, byId) {
   return pairings.map(pairing => {
     const homeValue = pairing?.homeTeamId ?? pairing?.home_team_id ?? pairing?.home;
     const awayValue = pairing?.awayTeamId ?? pairing?.away_team_id ?? pairing?.away;
+    const homeTbdCode = pairing?.homeTbdCode ?? null;
+    const awayTbdCode = pairing?.awayTbdCode ?? null;
     return {
-      home: pairing?.homeTbdCode ?? resolveTeam(homeValue, teams, byId),
-      away: pairing?.awayTbdCode ?? resolveTeam(awayValue, teams, byId),
+      home: homeTbdCode ?? resolveTeam(homeValue, teams, byId),
+      away: awayTbdCode ?? resolveTeam(awayValue, teams, byId),
+      homeTbd: homeTbdCode != null && String(homeTbdCode).trim() !== "",
+      awayTbd: awayTbdCode != null && String(awayTbdCode).trim() !== "",
     };
   }).filter(pairing => pairing.home);
 }
@@ -153,7 +157,7 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
           awayTeamNum: matchup.away,
         });
       } else if (old.away !== matchup.away) {
-        const resolvedTba = old.away == null && matchup.away != null;
+        const resolvedTba = old.awayTbd && matchup.away != null && !matchup.awayTbd;
         changes.push({
           type: resolvedTba ? "tba_resolved" : "matchup_changed",
           week: officialWeek.week ?? officialWeek.week_num ?? null,
