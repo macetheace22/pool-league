@@ -106,6 +106,7 @@ export function validateIbaScheduleSnapshot(schedule) {
     const date = String(week?.date ?? "").trim();
     const special = String(week?.special ?? "").trim();
     const pairings = week?.pairings;
+    if ((number == null || number === "") && Array.isArray(pairings) && pairings.length) errors.push(`Week ${label} has matchups but no week number.`);
     if (number != null && number !== "" && (!Number.isInteger(Number(number)) || Number(number) < 1)) {
       errors.push(`Week ${label} has an invalid week number.`);
     }
