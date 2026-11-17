@@ -42,6 +42,7 @@ describe("IBA schedule API parsers", () => {
       { home: 3, away: 4 },
       { home: 5, away: null },
     ]);
+    expect(parsePairings("TBD vs 2")).toEqual([{ home: null, away: 2 }]);
   });
 
   it("parses IBA team and schedule tables with nested pairing markup", () => {
