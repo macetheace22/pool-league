@@ -96,6 +96,10 @@ begin
     raise exception 'INVALID_SNAPSHOT_MUST_NOT_HAVE_FINGERPRINT';
   end if;
 
+  -- Serialize concurrent checks for the same division, including the first
+  -- check when no state row exists yet.
+  perform pg_advisory_xact_lock(hashtextextended(p_division_id::text, 0));
+
   insert into public.iba_schedule_snapshot_check_history
     (division_id, retrieval_id, snapshot_fingerprint, is_valid, retrieved_by, retrieved_at)
   values
