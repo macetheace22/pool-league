@@ -296,7 +296,7 @@ function attachTbdCodes(weeks, teams, division) {
       ...week,
       pairings: (week.pairings || []).map(pairing => ({
         ...pairing,
-        ...(pairing.away == null ? { awayTbdCode: fallbackCode } : {}),
+        ...(pairing.away == null && fallbackCode ? { awayTbdCode: fallbackCode } : {}),
       })),
     })),
   };
