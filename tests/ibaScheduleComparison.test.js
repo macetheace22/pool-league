@@ -142,4 +142,12 @@ describe("read-only IBA schedule comparison", () => {
     expect(result.changes).toEqual([]);
   });
 
+  it("rejects impossible calendar dates and accepts IBA parser duplicate warnings", () => {
+    const invalidDate = official([week("2/30/2026", [{ home: 1, away: 2 }])]);
+    expect(validateIbaScheduleSnapshot(invalidDate).join(" ")).toMatch(/unrecognized date/i);
+    const duplicateRows = official([week("9/9/2026", [{ home: 1, away: 2 }])]);
+    duplicateRows.snapshotErrors = ["Duplicate team row in IBA response: 15101."];
+    expect(validateIbaScheduleSnapshot(duplicateRows).join(" ")).toMatch(/duplicate team row/i);
+  });
+
 });
