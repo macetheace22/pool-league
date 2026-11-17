@@ -3,10 +3,10 @@ const CHICAGO_TIME_ZONE = "America/Chicago";
 function parseScheduleDate(value) {
   const text = String(value ?? "").trim();
   let year, month, day;
-  let match = text.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (match) [, year, month, day] = match;
   else {
-    match = text.match(/^(\\d{1,2})[/-](\\d{1,2})[/-](\\d{2,4})$/);
+    match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
     if (!match) return null;
     [, month, day, year] = match;
   }
