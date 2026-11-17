@@ -63,14 +63,14 @@ describe("read-only IBA schedule comparison", () => {
   it("reports added and removed matchups", () => {
     const result = compareIbaSchedules({
       saved: saved([week("9/9/2026", [{ home: 1, away: 2 }])]),
-      official: official([week("9/9/2026", [{ home: 1, away: 3 }, { home: 2, away: 3 }])]),
+      official: official([week("9/9/2026", [{ home: 1, away: 3 }, { home: 2, away: 4 }])]),
     });
     expect(result.changes).toContainEqual({
       type: "matchup_changed", week: 1, homeTeamNum: "15101",
       fromAwayTeamNum: "15102", toAwayTeamNum: "15103",
     });
     expect(result.changes).toContainEqual({
-      type: "matchup_added", week: 1, homeTeamNum: "15102", awayTeamNum: "15103",
+      type: "matchup_added", week: 1, homeTeamNum: "15102", awayTeamNum: "15104",
     });
     expect(result.summary.changed).toBe(1);
     expect(result.summary.added).toBe(1);
