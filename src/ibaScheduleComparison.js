@@ -95,8 +95,9 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
   const officialWeeks = new Map(official.weeks.map(week => [weekKey(week), week]));
   const changes = [];
 
-  const savedTeamByNum = new Map(savedTeams.map(team => [teamNumber(team), team]).filter(([num]) => num));
-  const officialTeamByNum = new Map(officialTeams.map(team => [teamNumber(team), team]).filter(([num]) => num));
+  const realTeams = team => (team ?? []).filter(item => !item?.isTbd && !/^(?:TBD|TBA|TO BE ANNOUNCED)$/i.test(String(item?.name ?? "").trim()));
+  const savedTeamByNum = new Map(realTeams(savedTeams).map(team => [teamNumber(team), team]).filter(([num]) => num));
+  const officialTeamByNum = new Map(realTeams(officialTeams).map(team => [teamNumber(team), team]).filter(([num]) => num));
   for (const [num, team] of officialTeamByNum) {
     const old = savedTeamByNum.get(num);
     if (!old) {
