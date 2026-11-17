@@ -766,8 +766,9 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
         name: String(team.name ?? "").trim(),
         venue: String(team.venue ?? "").trim(),
         isBye: !!team.isBye,
+        isTbd: !!team.isTbd,
       }))
-      .filter(team => /^(?=.*\d)[A-Z0-9]{3,8}$/i.test(team.teamNum) && team.name);
+      .filter(team => !team.isTbd && /^(?=.*\d)[A-Z0-9]{3,8}$/i.test(team.teamNum) && team.name);
 
     if (!normalizedTeams.length) {
       return { ok: false, error: `${divisionName}: no valid teams were parsed.` };
@@ -801,16 +802,32 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
     const orderedTeams = [...savedTeams].sort((a, b) => String(a.teamNum).localeCompare(String(b.teamNum), undefined, { numeric: true }));
     const positionToTeam = new Map(orderedTeams.map((team, index) => [index + 1, team]));
 
+    const importedTeamByPosition = new Map(
+      importedTeams
+        .map((team, index) => [index + 1, {
+          teamNum: String(team.teamNum ?? "").trim(),
+          isTbd: !!team.isTbd,
+        }])
+    );
     const normalizedWeeks = importedWeeks.map(week => ({
       week: week.week == null ? null : Number(week.week),
       date: String(week.date ?? "").trim(),
       special: week.special ? String(week.special).trim() : null,
       pairings: (week.pairings ?? [])
-        .map(pairing => ({
-          home: Number(pairing.home),
-          away: pairing.away == null ? null : Number(pairing.away),
-        }))
-        .filter(pairing => Number.isInteger(pairing.home) && pairing.home > 0),
+        .map(pairing => {
+          const homeParticipant = importedTeamByPosition.get(Number(pairing.home));
+          const awayParticipant = pairing.away == null
+            ? null
+            : importedTeamByPosition.get(Number(pairing.away));
+          return {
+            home: Number(pairing.home),
+            away: pairing.away == null ? null : Number(pairing.away),
+            homeTeamNum: homeParticipant?.teamNum || null,
+            awayTeamNum: awayParticipant?.teamNum || null,
+            awayTbdCode: pairing.awayTbdCode || (awayParticipant?.isTbd ? awayParticipant.teamNum : null),
+          };
+        })
+        .filter(pairing => Number.isInteger(pairing.home) && pairing.home > 0 && pairing.homeTeamNum),
     }));
 
     // Replace only after teams and weeks have both parsed successfully. This
@@ -925,6 +942,7 @@ export async function listSchedule(divisionId, teams) {
       away: idxOf(p.away_team_id),
       homeTeamId: p.home_team_id,
       awayTeamId: p.away_team_id,
+      awayTbdCode: p.away_tbd_code ?? null,
     })),
   }));
 }
@@ -959,15 +977,20 @@ export async function replaceSchedule(divisionId, parsedWeeks, teams) {
       throw new Error("Could not create an IBA schedule week.");
     }
 
+    const teamByNum = new Map(teams.map(team => [String(team.teamNum), team]));
     const pairingRows = (w.pairings ?? [])
-      .map(p => ({
-        week_id: weekRow.id,
-        home_team_id: teams[p.home - 1]?.id,
-        away_team_id: p.away == null ? null : teams[p.away - 1]?.id,
-      }))
-      // TBD pairings cannot become a real schedule_pairings row because the
-      // schema requires real team UUIDs. The week/special row is still kept.
-      .filter(p => p.home_team_id && p.away_team_id);
+      .map(p => {
+        const homeTeam = teamByNum.get(String(p.homeTeamNum ?? ""));
+        const awayTeam = teamByNum.get(String(p.awayTeamNum ?? ""));
+        return {
+          week_id: weekRow.id,
+          home_team_id: homeTeam?.id ?? null,
+          away_team_id: awayTeam?.id ?? null,
+          home_tbd_code: p.homeTbdCode ?? null,
+          away_tbd_code: p.awayTbdCode ?? null,
+        };
+      })
+      .filter(p => (p.home_team_id || p.home_tbd_code) && (p.away_team_id || p.away_tbd_code));
 
     if (pairingRows.length) {
       const { error: pairingError } = await supabase
