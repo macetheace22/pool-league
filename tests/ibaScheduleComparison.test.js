@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { compareIbaSchedules, validateIbaScheduleSnapshot } from "../src/ibaScheduleComparison";
 
 const teams = [
-  { id: "team-a", team_num: "15101" },
-  { id: "team-b", team_num: "15102" },
-  { id: "team-c", team_num: "15103" },
-  { id: "team-d", team_num: "15104" },
+  { id: "team-a", team_num: "15101", name: "Alpha" },
+  { id: "team-b", team_num: "15102", name: "Bravo" },
+  { id: "team-c", team_num: "15103", name: "Charlie" },
+  { id: "team-d", team_num: "15104", name: "Delta" },
 ];
 const week = (date, pairings, number = 1) => ({ week: number, date, pairings });
 const saved = weeks => ({ teams, weeks });
