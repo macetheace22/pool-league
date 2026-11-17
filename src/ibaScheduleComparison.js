@@ -42,6 +42,22 @@ function normalizeDate(value) {
   return String(year) + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
 }
 
+function isValidScheduleDate(value) {
+  const text = String(value ?? "").trim();
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  let year, month, day;
+  if (match) [, year, month, day] = match;
+  else {
+    match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+    if (!match) return false;
+    [, month, day, year] = match;
+  }
+  year = Number(year); month = Number(month); day = Number(day);
+  if (year < 100) year += 2000;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 function weekKey(week) {
   const number = week?.week ?? week?.week_num ?? week?.weekNumber;
   if (number != null && number !== "") return "week:" + number;
@@ -72,6 +88,7 @@ export function validateIbaScheduleSnapshot(schedule) {
   if (!schedule || typeof schedule !== "object") return ["Schedule response is not an object."];
   if (!Array.isArray(schedule.teams) || schedule.teams.length === 0) return ["Schedule response has no team list."];
   if (!Array.isArray(schedule.weeks) || schedule.weeks.length === 0) return ["Schedule response has no weeks."];
+  if (Array.isArray(schedule.snapshotErrors) && schedule.snapshotErrors.length) errors.push(...schedule.snapshotErrors);
 
   const teamNumbers = new Set();
   for (const [index, team] of schedule.teams.entries()) {
@@ -93,7 +110,7 @@ export function validateIbaScheduleSnapshot(schedule) {
       errors.push(`Week ${label} has an invalid week number.`);
     }
     if (!date) errors.push(`Week ${label} has no date.`);
-    else if (!normalizeDate(date) || normalizeDate(date) === date && !/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(date) && !/^\d{4}-\d{1,2}-\d{1,2}$/.test(date)) {
+    else if (!isValidScheduleDate(date)) {
       errors.push(`Week ${label} has an unrecognized date: ${date}.`);
     }
     if (!Array.isArray(pairings)) {
