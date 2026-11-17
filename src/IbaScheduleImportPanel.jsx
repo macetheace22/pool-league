@@ -8,7 +8,8 @@ export function clearIbaSchedulePanelState() {
 import { useNavigate } from "react-router-dom";
 import { Check, Calendar, RefreshCw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import * as db from "./db";
-import { compareIbaSchedules } from "./ibaScheduleComparison";
+import { compareIbaSchedules, validateIbaScheduleSnapshot } from "./ibaScheduleComparison";
+import { createIbaScheduleRetrievalId, fingerprintIbaScheduleSnapshot } from "./ibaScheduleConfirmation";
 
 async function postSchedule(body) {
   const r = await fetch("/api/iba-schedules", {
@@ -170,22 +171,59 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
     const key = divisionKey(division);
     setLoading(true);
     setError("");
+    let retrievalId = null;
+    let savedSnapshot = null;
     try {
-      let data = previews[key];
-      if (!data) {
-        data = await postSchedule({ action: "fetch", format: division.format, day: division.day, division: division.value || division.label });
-        setPreviews(p => ({ ...p, [key]: data }));
-      }
+      retrievalId = createIbaScheduleRetrievalId();
+      // Always perform a new network retrieval. Reusing a cached preview would
+      // falsely count the same response twice as independent confirmation.
+      savedSnapshot = await db.getIbaScheduleComparisonSnapshot(season.id, extractDivisionNum(division));
+      const data = await postSchedule({ action: "fetch", format: division.format, day: division.day, division: division.value || division.label });
+      setPreviews(p => ({ ...p, [key]: data }));
       setRowErrors(p => { const next = { ...p }; delete next[key]; return next; });
-      const savedSnapshot = await db.getIbaScheduleComparisonSnapshot(season.id, extractDivisionNum(division));
+
+      const validationErrors = validateIbaScheduleSnapshot(data);
       const report = compareIbaSchedules({
         saved: { teams: savedSnapshot.teams, weeks: savedSnapshot.weeks },
         official: data,
-        errors: [],
+        errors: validationErrors,
       });
-      setComparisonResults(p => ({ ...p, [key]: report }));
+      if (report.status === "incomplete") {
+        const recorded = await db.recordIbaScheduleSnapshotCheck({
+          divisionId: savedSnapshot.divisionId,
+          retrievalId,
+          isValid: false,
+        });
+        if (!recorded.ok) throw new Error("Could not persist the failed retrieval check: " + recorded.error);
+        setComparisonResults(p => ({ ...p, [key]: { ...report, confirmation: recorded, status: "incomplete" } }));
+      } else {
+        const fingerprint = await fingerprintIbaScheduleSnapshot(data);
+        const recorded = await db.recordIbaScheduleSnapshotCheck({
+          divisionId: savedSnapshot.divisionId,
+          retrievalId,
+          fingerprint,
+          isValid: true,
+        });
+        if (!recorded.ok) throw new Error("Could not persist the schedule confirmation check: " + recorded.error);
+        if (recorded.duplicateRetrieval) throw new Error("This retrieval was already counted; retrieve the schedule again.");
+        const confirmed = recorded.confirmed;
+        setComparisonResults(p => ({ ...p, [key]: {
+          ...report,
+          status: confirmed ? report.status : "awaiting_confirmation",
+          confirmation: recorded,
+          reason: confirmed ? report.reason : "One valid snapshot is recorded. Retrieve the schedule again; a second independent, valid retrieval must match before changes are ready for manager review.",
+        }}));
+      }
       setExpanded(key);
     } catch (e) {
+      if (savedSnapshot?.divisionId && retrievalId) {
+        const recorded = await db.recordIbaScheduleSnapshotCheck({
+          divisionId: savedSnapshot.divisionId,
+          retrievalId,
+          isValid: false,
+        });
+        if (!recorded.ok) setError("Retrieval failed, and its failure could not be recorded: " + recorded.error);
+      }
       setComparisonResults(p => ({ ...p, [key]: {
         status: "incomplete",
         reason: e?.message || "Unable to compare the saved and official schedules.",
@@ -456,10 +494,11 @@ export default function IbaScheduleImportPanel({ season, onImported, compact = f
                   {comparisonResults[key] && (
                     <div role="status" style={{ padding: "8px 9px", background: "#101010", border: "1px solid #333", borderRadius: 7, fontSize: 11, lineHeight: 1.5 }}>
                       <strong style={{ color: comparisonResults[key].status === "incomplete" ? "#F59E0B" : "#E0E0E0" }}>
-                        {comparisonResults[key].status === "incomplete" ? "Comparison incomplete" : comparisonResults[key].status === "no_changes" ? "No schedule changes found" : "Schedule changes found — review only"}
+                        {comparisonResults[key].status === "incomplete" ? "Comparison incomplete" : comparisonResults[key].status === "awaiting_confirmation" ? "Awaiting independent confirmation" : comparisonResults[key].status === "no_changes" ? "No schedule changes found" : "Schedule changes confirmed — review only"}
                       </strong>
                       {comparisonResults[key].reason && <div>{comparisonResults[key].reason}</div>}
-                      {comparisonResults[key].status !== "incomplete" && (
+                      {comparisonResults[key].confirmation && <div>{comparisonResults[key].confirmation.consecutiveValidMatches} consecutive matching valid retrieval(s) · {comparisonResults[key].confirmation.confirmed ? "confirmed" : "not yet confirmed"}</div>}
+                      {comparisonResults[key].status !== "incomplete" && comparisonResults[key].status !== "awaiting_confirmation" && (
                         <>
                           <div>{comparisonResults[key].summary.added} added · {comparisonResults[key].summary.removed} removed · {comparisonResults[key].summary.changed} matchup changes · {comparisonResults[key].summary.dateChanges} date changes · {comparisonResults[key].summary.tbaResolutions} TBA resolutions · {comparisonResults[key].summary.teamDetailsChanged || 0} team detail changes</div>
                           {comparisonResults[key].changes.map((change, index) => (
