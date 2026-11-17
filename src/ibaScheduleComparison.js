@@ -64,11 +64,90 @@ function normalizePairings(week, teams, byId) {
   }).filter(pairing => pairing.home);
 }
 
+// Validate structural consistency before any schedule is compared. This intentionally
+// does not require a fixed number of weeks or matchups: IBA special weeks and TBD
+// participants are legitimate schedule content.
+export function validateIbaScheduleSnapshot(schedule) {
+  const errors = [];
+  if (!schedule || typeof schedule !== "object") return ["Schedule response is not an object."];
+  if (!Array.isArray(schedule.teams) || schedule.teams.length === 0) return ["Schedule response has no team list."];
+  if (!Array.isArray(schedule.weeks) || schedule.weeks.length === 0) return ["Schedule response has no weeks."];
+
+  const teamNumbers = new Set();
+  for (const [index, team] of schedule.teams.entries()) {
+    const number = teamNumber(team);
+    if (!number) errors.push(`Team row ${index + 1} has no team number.`);
+    else if (teamNumbers.has(number)) errors.push(`Duplicate team number: ${number}.`);
+    else teamNumbers.add(number);
+    if (!String(team?.name ?? "").trim()) errors.push(`Team ${number || index + 1} has no name.`);
+  }
+
+  const weekKeys = new Set();
+  for (const [index, week] of schedule.weeks.entries()) {
+    const label = week?.week ?? week?.week_num ?? week?.weekNumber ?? index + 1;
+    const number = week?.week ?? week?.week_num ?? week?.weekNumber;
+    const date = String(week?.date ?? "").trim();
+    const special = String(week?.special ?? "").trim();
+    const pairings = week?.pairings;
+    if (number != null && number !== "" && (!Number.isInteger(Number(number)) || Number(number) < 1)) {
+      errors.push(`Week ${label} has an invalid week number.`);
+    }
+    if (!date) errors.push(`Week ${label} has no date.`);
+    else if (!normalizeDate(date) || normalizeDate(date) === date && !/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(date) && !/^\d{4}-\d{1,2}-\d{1,2}$/.test(date)) {
+      errors.push(`Week ${label} has an unrecognized date: ${date}.`);
+    }
+    if (!Array.isArray(pairings)) {
+      errors.push(`Week ${label} has no valid matchup list.`);
+      continue;
+    }
+    if (pairings.length === 0 && !special) errors.push(`Week ${label} has neither matchups nor a special-week description.`);
+    const key = weekKey(week);
+    if (weekKeys.has(key)) errors.push(`Duplicate schedule week: ${key}.`);
+    weekKeys.add(key);
+
+    const usedTeams = new Set();
+    for (const [pairIndex, pairing] of pairings.entries()) {
+      const sides = [
+        { side: "home", value: pairing?.homeTeamId ?? pairing?.home_team_id ?? pairing?.home, tbd: pairing?.homeTbdCode },
+        { side: "away", value: pairing?.awayTeamId ?? pairing?.away_team_id ?? pairing?.away, tbd: pairing?.awayTbdCode },
+      ];
+      const resolved = [];
+      for (const entry of sides) {
+        if (entry.value == null || entry.value === "") {
+          if (entry.tbd != null && String(entry.tbd).trim()) continue;
+          // A null side is the parser's explicit representation of IBA's TBD slot.
+          continue;
+        }
+        const raw = String(entry.value);
+        if (/^\d+$/.test(raw)) {
+          const position = Number(raw);
+          if (position < 1 || position > schedule.teams.length) {
+            errors.push(`Week ${label} matchup ${pairIndex + 1} references missing team position ${raw}.`);
+            continue;
+          }
+          resolved.push(teamNumber(schedule.teams[position - 1]));
+        } else if (teamNumbers.has(raw)) resolved.push(raw);
+        else errors.push(`Week ${label} matchup ${pairIndex + 1} references unknown team ${raw}.`);
+      }
+      if (resolved.length === 2 && resolved[0] === resolved[1]) {
+        errors.push(`Week ${label} matchup ${pairIndex + 1} pairs a team against itself.`);
+      }
+      for (const team of resolved) {
+        if (usedTeams.has(team)) errors.push(`Team ${team} appears in more than one matchup in week ${label}.`);
+        usedTeams.add(team);
+      }
+    }
+  }
+  return [...new Set(errors)];
+}
+
 function incompleteReason(schedule, errors) {
   if (Array.isArray(errors) && errors.length) return "IBA retrieval reported one or more errors.";
   if (!schedule || schedule.hasSchedule === false) return "IBA did not confirm that a schedule is available.";
   if (!Array.isArray(schedule.teams) || schedule.teams.length === 0) return "The schedule response did not contain a team list.";
   if (!Array.isArray(schedule.weeks) || schedule.weeks.length === 0) return "The schedule response did not contain schedule weeks.";
+  const validationErrors = validateIbaScheduleSnapshot(schedule);
+  if (validationErrors.length) return "IBA schedule failed consistency validation: " + validationErrors.join(" ");
   if (!schedule.weeks.some(week => Array.isArray(week.pairings) && week.pairings.length)) return "The schedule response contained no usable matchups.";
   return null;
 }
