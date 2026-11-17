@@ -157,7 +157,7 @@ export function compareIbaSchedules({ saved, official, errors = [] } = {}) {
           awayTeamNum: matchup.away,
         });
       } else if (old.away !== matchup.away) {
-        const resolvedTba = old.awayTbd && matchup.away != null && !matchup.awayTbd;
+        const resolvedTba = (old.away == null || old.awayTbd) && matchup.away != null && !matchup.awayTbd;
         changes.push({
           type: resolvedTba ? "tba_resolved" : "matchup_changed",
           week: officialWeek.week ?? officialWeek.week_num ?? null,
