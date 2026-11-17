@@ -22,7 +22,7 @@ export function serializeIbaScheduleSnapshot(snapshot) {
         away: pairing?.awayTeamNum ?? pairing?.away_team_num ?? pairing?.awayTeamId ?? pairing?.away_team_id ?? pairing?.away ?? null,
         homeTbdCode: pairing?.homeTbdCode ?? pairing?.home_tbd_code ?? null,
         awayTbdCode: pairing?.awayTbdCode ?? pairing?.away_tbd_code ?? null,
-      })),
+      })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
     }))
     .sort((a, b) => {
       const aw = Number(a.week), bw = Number(b.week);
@@ -30,6 +30,15 @@ export function serializeIbaScheduleSnapshot(snapshot) {
       return a.date.localeCompare(b.date) || a.special.localeCompare(b.special);
     });
   return JSON.stringify({ teams, weeks });
+}
+
+export async function fingerprintIbaScheduleSnapshot(snapshot) {
+  const serialized = serializeIbaScheduleSnapshot(snapshot);
+  if (!globalThis.crypto?.subtle || typeof TextEncoder === "undefined") {
+    throw new Error("Secure schedule fingerprinting is unavailable in this browser.");
+  }
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(serialized));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 // A fresh UUID must be generated for every actual fetch attempt. The database
