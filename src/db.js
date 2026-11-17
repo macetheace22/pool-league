@@ -824,10 +824,11 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
             away: pairing.away == null ? null : Number(pairing.away),
             homeTeamNum: homeParticipant?.teamNum || null,
             awayTeamNum: awayParticipant?.teamNum || null,
+            homeTbdCode: pairing.homeTbdCode || (pairing.home == null ? importedTeams.find(team => team.isTbd)?.teamNum ?? null : null),
             awayTbdCode: pairing.awayTbdCode || (awayParticipant?.isTbd ? awayParticipant.teamNum : null),
           };
         })
-        .filter(pairing => Number.isInteger(pairing.home) && pairing.home > 0 && pairing.homeTeamNum),
+        .filter(pairing => (pairing.home == null || (Number.isInteger(pairing.home) && pairing.home > 0)) && (pairing.homeTeamNum || pairing.homeTbdCode) && (pairing.awayTeamNum || pairing.awayTbdCode)),
     }));
 
     // Replace only after teams and weeks have both parsed successfully. This
