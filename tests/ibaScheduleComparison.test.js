@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareIbaSchedules } from "../src/ibaScheduleComparison";
+import { compareIbaSchedules, validateIbaScheduleSnapshot } from "../src/ibaScheduleComparison";
 
 const teams = [
   { id: "team-a", team_num: "15101" },
