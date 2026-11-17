@@ -198,7 +198,7 @@ function parseTableRows(tableHtml = "") {
   return rows;
 }
 
-function parseTeams(html = "") {
+function parseTeams(html = "", snapshotErrors = []) {
   const tables = extractTables(html);
   const teams = [];
 
@@ -215,7 +215,10 @@ function parseTeams(html = "") {
       const venue = norm(row[2] || "");
 
       if (!/^(?=.*\d)[A-Z0-9]{3,8}$/i.test(teamNum) || !name || /^name$/i.test(name)) continue;
-      if (teams.some(team => team.teamNum === teamNum)) continue;
+      if (teams.some(team => team.teamNum === teamNum)) {
+        snapshotErrors.push(`Duplicate team row in IBA response: ${teamNum}.`);
+        continue;
+      }
 
       teams.push({
         teamNum,
@@ -303,7 +306,7 @@ function attachTbdCodes(weeks, teams, division) {
   };
 }
 
-function parseScheduleRows(html = "") {
+function parseScheduleRows(html = "", snapshotErrors = []) {
   const tables = extractTables(html);
   const weeks = [];
 
@@ -333,6 +336,15 @@ function parseScheduleRows(html = "") {
         });
       }
     }
+  }
+
+  const seenWeekNumbers = new Set();
+  for (const week of weeks) {
+    if (week.week == null) continue;
+    if (seenWeekNumbers.has(week.week)) {
+      snapshotErrors.push(`Duplicate IBA schedule week number: ${week.week}.`);
+    }
+    seenWeekNumbers.add(week.week);
   }
 
   return weeks;
@@ -369,15 +381,21 @@ function parseWeeksFallback(html = "") {
 
 function parseScheduleHtml(html = "", division = "") {
   const clean = stripScripts(html);
-  const teams = parseTeams(clean);
-  let weeks = parseScheduleRows(clean);
+  const snapshotErrors = [];
+  const teams = parseTeams(clean, snapshotErrors);
+  let weeks = parseScheduleRows(clean, snapshotErrors);
   if (!weeks.length) weeks = parseWeeksFallback(clean);
 
-  // Remove accidental duplicate week rows while preserving order.
+  // Keep the established de-duplication behavior, but record evidence of
+  // repeated rows so an unattended comparison cannot treat a damaged response
+  // as an authoritative schedule.
   const seen = new Set();
   weeks = weeks.filter(week => {
     const key = `${week.week ?? ""}|${week.date}|${week.special ?? ""}|${JSON.stringify(week.pairings)}`;
-    if (seen.has(key)) return false;
+    if (seen.has(key)) {
+      snapshotErrors.push(`Duplicate IBA schedule row detected for week ${week.week ?? "?"} on ${week.date || "an unknown date"}.`);
+      return false;
+    }
     seen.add(key);
     return true;
   });
@@ -388,6 +406,7 @@ function parseScheduleHtml(html = "", division = "") {
     teams: normalized.teams,
     weeks: normalized.weeks,
     hasSchedule: normalized.teams.length > 0 && normalized.weeks.length > 0,
+    snapshotErrors: [...new Set(snapshotErrors)],
   };
 }
 
@@ -852,6 +871,7 @@ export default async function handler(req, res) {
         teams: data.teams,
         weeks: data.weeks,
         hasSchedule: data.hasSchedule,
+        snapshotErrors: data.snapshotErrors,
         htmlBytes: data.htmlBytes,
       });
     }
