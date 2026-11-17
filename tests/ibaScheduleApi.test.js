@@ -77,4 +77,48 @@ describe("IBA schedule API parsers", () => {
     ]));
     expect(parsed.hasSchedule).toBe(true);
   });
+  it("preserves a supplied TBD team code and marks it as a temporary participant", () => {
+    const html = `
+      <table>
+        <tr><th>Team #</th><th>Name</th><th>Location</th></tr>
+        <tr><td>15301</td><td>Alpha</td><td>Club</td></tr>
+        <tr><td>15302</td><td>Beta</td><td>Club</td></tr>
+        <tr><td>15310</td><td>TBD</td><td></td></tr>
+      </table>
+      <table>
+        <tr><th>Week</th><th>Date</th><th>Pairings</th></tr>
+        <tr><td>1</td><td>9/9/2026</td><td>1 vs TBD  2 vs 1</td></tr>
+      </table>`;
+
+    const parsed = parseScheduleHtml(html, "153!1234567");
+
+    expect(parsed.teams).toContainEqual(expect.objectContaining({
+      teamNum: "15310", name: "TBD", isTbd: true,
+    }));
+    expect(parsed.weeks[0].pairings[0]).toEqual({
+      home: 1, away: null, awayTbdCode: "15310",
+    });
+  });
+
+  it("derives a TBD team code after the highest real team number when IBA supplies only TBD", () => {
+    const html = `
+      <table>
+        <tr><th>Team #</th><th>Name</th><th>Location</th></tr>
+        <tr><td>15301</td><td>Alpha</td><td>Club</td></tr>
+        <tr><td>15302</td><td>Beta</td><td>Club</td></tr>
+        <tr><td>15309</td><td>Nine</td><td>Club</td></tr>
+      </table>
+      <table>
+        <tr><th>Week</th><th>Date</th><th>Pairings</th></tr>
+        <tr><td>1</td><td>9/9/2026</td><td>1 vs TBD</td></tr>
+      </table>`;
+
+    const parsed = parseScheduleHtml(html, "153!1234567");
+
+    expect(parsed.teams).toContainEqual(expect.objectContaining({
+      teamNum: "15310", name: "TBD", isTbd: true,
+    }));
+    expect(parsed.weeks[0].pairings[0].awayTbdCode).toBe("15310");
+  });
+
 });
