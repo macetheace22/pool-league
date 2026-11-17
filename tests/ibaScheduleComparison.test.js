@@ -5,6 +5,7 @@ const teams = [
   { id: "team-a", team_num: "15101" },
   { id: "team-b", team_num: "15102" },
   { id: "team-c", team_num: "15103" },
+  { id: "team-d", team_num: "15104" },
 ];
 const week = (date, pairings, number = 1) => ({ week: number, date, pairings });
 const saved = weeks => ({ teams, weeks });
