@@ -386,7 +386,7 @@ function parseScheduleHtml(html = "", division = "") {
   return {
     teams: normalized.teams,
     weeks: normalized.weeks,
-    hasSchedule: teams.length > 0 && weeksWithTbd.length > 0,
+    hasSchedule: normalized.teams.length > 0 && normalized.weeks.length > 0,
   };
 }
 
