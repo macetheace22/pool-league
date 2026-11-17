@@ -498,3 +498,13 @@ describe("practice session rating retention and discard", () => {
     expect(practice).toContain("window.confirm");
   });
 });
+
+
+describe("IBA schedule TBD participant readback", () => {
+  it("preserves both home-side and away-side TBD codes when loading saved schedules", () => {
+    const db = read("src/db.js");
+    const listSchedule = db.slice(db.indexOf("export async function listSchedule"), db.indexOf("// parsedWeeks:", db.indexOf("export async function listSchedule")));
+    expect(listSchedule).toContain("homeTbdCode: p.home_tbd_code ?? null");
+    expect(listSchedule).toContain("awayTbdCode: p.away_tbd_code ?? null");
+  });
+});
