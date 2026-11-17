@@ -907,6 +907,35 @@ export function sortScheduleWeeks(weeks) {
   });
 }
 
+
+export async function recordIbaScheduleSnapshotCheck({ divisionId, retrievalId, fingerprint = null, isValid }) {
+  const { data, error } = await supabase.rpc("record_iba_schedule_snapshot_check", {
+    p_division_id: divisionId,
+    p_retrieval_id: retrievalId,
+    p_snapshot_fingerprint: isValid ? fingerprint : null,
+    p_is_valid: Boolean(isValid),
+  });
+  if (error) return { ok: false, error: error.message };
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    ok: true,
+    consecutiveValidMatches: Number(row?.consecutive_valid_matches ?? 0),
+    confirmed: Boolean(row?.confirmed),
+    duplicateRetrieval: Boolean(row?.duplicate_retrieval),
+    lastCheckedAt: row?.last_checked_at ?? null,
+  };
+}
+
+export async function getIbaScheduleSnapshotConfirmation(divisionId) {
+  const { data, error } = await supabase
+    .from("iba_schedule_snapshot_confirmation_state")
+    .select("consecutive_valid_matches, snapshot_fingerprint, last_checked_at, confirmed_at")
+    .eq("division_id", divisionId)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: data ?? null };
+}
+
 export async function getIbaScheduleComparisonSnapshot(seasonId, divisionNum) {
   const { data: division, error } = await supabase
     .from("divisions")
