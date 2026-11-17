@@ -120,4 +120,25 @@ describe("read-only IBA schedule comparison", () => {
     expect(result.status).toBe("incomplete");
     expect(result.changes).toEqual([]);
   });
+  it("recognizes a preserved TBD code resolving to a real team", () => {
+    const result = compareIbaSchedules({
+      saved: saved([week("9/9/2026", [{ home: 1, away: null, awayTbdCode: "15110" }])]),
+      official: official([week("9/9/2026", [{ home: 1, away: 4 }])]),
+    });
+    expect(result.changes).toContainEqual({
+      type: "tba_resolved", week: 1, homeTeamNum: "15101",
+      fromAwayTeamNum: "15110", toAwayTeamNum: "15104",
+    });
+    expect(result.summary.tbaResolutions).toBe(1);
+  });
+
+  it("recognizes a TBD code remaining unresolved without reporting a change", () => {
+    const result = compareIbaSchedules({
+      saved: saved([week("9/9/2026", [{ home: 1, away: null, awayTbdCode: "15110" }])]),
+      official: official([week("9/9/2026", [{ home: 1, away: null, awayTbdCode: "15110" }])]),
+    });
+    expect(result.status).toBe("no_changes");
+    expect(result.changes).toEqual([]);
+  });
+
 });
