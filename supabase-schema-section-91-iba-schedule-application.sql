@@ -1,9 +1,8 @@
 -- Section 91: controlled application of manager-approved IBA schedule changes
 --
--- An approved monitor snapshot is applied in one Postgres transaction.
--- The pre-application schedule and resulting schedule are retained in an
--- immutable application-history row. Existing app-owned team rows are never
--- deleted solely because IBA no longer lists them.
+-- Applies one approved IBA snapshot transactionally, preserves the complete
+-- before/after schedule state, and marks the originating monitor check as
+-- applied so it cannot be applied twice.
 
 alter table public.iba_schedule_monitor_checks
   drop constraint if exists iba_schedule_monitor_checks_review_status_check;
@@ -22,7 +21,7 @@ create table if not exists public.iba_schedule_change_applications (
   monitor_check_id uuid not null references public.iba_schedule_monitor_checks(id) on delete restrict,
   season_id uuid not null references public.seasons(id) on delete restrict,
   division_id uuid not null references public.divisions(id) on delete restrict,
-  applied_by uuid not null,
+  applied_by uuid not null references public.profiles(id) on delete restrict,
   applied_at timestamptz not null default now(),
   before_snapshot jsonb not null,
   after_snapshot jsonb not null,
@@ -59,15 +58,16 @@ as $$
 declare
   check_row public.iba_schedule_monitor_checks%rowtype;
   division_row public.divisions%rowtype;
-  before_snapshot jsonb;
-  after_snapshot jsonb;
+  latest_check public.iba_schedule_monitor_checks%rowtype;
+  before_state jsonb;
+  resulting_state jsonb;
   application_row public.iba_schedule_change_applications%rowtype;
   applied_user uuid := (select auth.uid());
   team_item jsonb;
   week_item jsonb;
   pairing_item jsonb;
-  team_row public.teams%rowtype;
   week_row public.schedule_weeks%rowtype;
+  application_exists boolean;
 begin
   if applied_user is null then
     raise exception 'Authentication is required.';
@@ -99,6 +99,20 @@ begin
     raise exception 'Only an approved IBA schedule change can be applied.';
   end if;
 
+  -- Do not allow an older approved snapshot to overwrite a newer monitor
+  -- result that has already been recorded for this division.
+  select *
+    into latest_check
+    from public.iba_schedule_monitor_checks
+   where division_id = check_row.division_id
+   order by monitor_date desc, checked_at desc
+   limit 1;
+
+  if latest_check.id <> check_row.id
+     and coalesce(latest_check.snapshot_fingerprint, '') <> coalesce(check_row.snapshot_fingerprint, '') then
+    raise exception 'A newer IBA schedule check exists for this division. Review the newer change before applying this approval.';
+  end if;
+
   select *
     into division_row
     from public.divisions
@@ -114,6 +128,17 @@ begin
      or jsonb_typeof(check_row.snapshot->'teams') <> 'array'
      or jsonb_typeof(check_row.snapshot->'weeks') <> 'array' then
     raise exception 'The approved IBA snapshot is incomplete.';
+  end if;
+
+  select exists (
+    select 1
+      from public.iba_schedule_change_applications
+     where monitor_check_id = check_row.id
+  )
+  into application_exists;
+
+  if application_exists then
+    raise exception 'This approved IBA schedule change has already been applied.';
   end if;
 
   select jsonb_build_object(
@@ -162,7 +187,7 @@ begin
       where sw.division_id = division_row.id
     ), '[]'::jsonb)
   )
-  into before_snapshot;
+  into before_state;
 
   insert into public.iba_schedule_change_applications (
     monitor_check_id,
@@ -179,7 +204,7 @@ begin
     check_row.season_id,
     check_row.division_id,
     applied_user,
-    before_snapshot,
+    before_state,
     check_row.snapshot,
     coalesce(check_row.changes, '[]'::jsonb),
     coalesce(check_row.summary, '{}'::jsonb)
@@ -187,12 +212,13 @@ begin
   returning * into application_row;
 
   -- Update/add IBA teams while preserving existing UUIDs, captains, rosters,
-  -- and other app-owned team data. A team absent from the new IBA snapshot is
-  -- intentionally not deleted; its future schedule entries are removed below.
+  -- and other app-owned team data. Teams absent from the new IBA snapshot are
+  -- retained because other app data can still reference their UUIDs.
   for team_item in
-    select value from jsonb_array_elements(check_row.snapshot->'teams')
-    where coalesce((value->>'teamNum'), '') <> ''
-      and coalesce((value->>'isTbd')::boolean, false) = false
+    select value
+      from jsonb_array_elements(check_row.snapshot->'teams')
+     where coalesce(value->>'teamNum', '') <> ''
+       and coalesce((value->>'isTbd')::boolean, false) = false
   loop
     insert into public.teams (
       division_id, team_num, name, venue, is_bye
@@ -211,13 +237,16 @@ begin
       is_bye = excluded.is_bye;
   end loop;
 
+  -- The live schedule is replaced only after approval, inside this transaction.
+  -- The application history row above makes the prior schedule recoverable.
   delete from public.schedule_weeks
    where division_id = division_row.id;
 
   for week_item in
     select value
-    from jsonb_array_elements(check_row.snapshot->'weeks')
-    order by coalesce((value->>'week')::integer, 2147483647), value->>'date'
+      from jsonb_array_elements(check_row.snapshot->'weeks')
+     order by coalesce(nullif(value->>'week', '')::integer, 2147483647),
+              value->>'date'
   loop
     insert into public.schedule_weeks (
       division_id,
@@ -230,13 +259,7 @@ begin
     values (
       division_row.id,
       nullif(week_item->>'week', '')::integer,
-      case
-        when (week_item->>'date') ~ '^\d{1,2}/\d{1,2}/\d{4}$'
-          then to_date(week_item->>'date', 'MM/DD/YYYY')
-        when (week_item->>'date') ~ '^\d{4}-\d{1,2}-\d{1,2}$'
-          then to_date(week_item->>'date', 'YYYY-MM-DD')
-        else null
-      end,
+      trim(week_item->>'date'),
       nullif(trim(week_item->>'special'), ''),
       coalesce((week_item->>'isPlayoff')::boolean, false),
       case
@@ -248,23 +271,9 @@ begin
     returning * into week_row;
 
     for pairing_item in
-      select value from jsonb_array_elements(coalesce(week_item->'pairings', '[]'::jsonb))
+      select value
+        from jsonb_array_elements(coalesce(week_item->'pairings', '[]'::jsonb))
     loop
-      select *
-        into team_row
-        from public.teams
-       where division_id = division_row.id
-         and team_num = trim(pairing_item->>'homeTeamNum')
-       limit 1;
-
-      if pairing_item->>'homeTeamNum' is null or pairing_item->>'homeTeamNum' = '' then
-        team_row.id := null;
-      end if;
-
-      if pairing_item->>'awayTeamNum' is null or pairing_item->>'awayTeamNum' = '' then
-        pairing_item := jsonb_set(pairing_item, '{awayTeamNum}', 'null'::jsonb);
-      end if;
-
       insert into public.schedule_pairings (
         week_id,
         home_team_id,
@@ -285,13 +294,14 @@ begin
       where ht.division_id = division_row.id
         and ht.team_num = trim(pairing_item->>'homeTeamNum')
         and (
-          ht.id is not null
-          or nullif(trim(pairing_item->>'homeTbdCode'), '') is not null
-        )
-        and (
           at.id is not null
           or nullif(trim(pairing_item->>'awayTbdCode'), '') is not null
         );
+
+      if not found and nullif(trim(pairing_item->>'homeTbdCode'), '') is null then
+        raise exception 'IBA schedule application could not resolve home team % for week %.',
+          pairing_item->>'homeTeamNum', week_item->>'week';
+      end if;
     end loop;
   end loop;
 
@@ -309,11 +319,6 @@ begin
       )
       from public.teams t
       where t.division_id = division_row.id
-        and exists (
-          select 1
-          from jsonb_array_elements(check_row.snapshot->'teams') src
-          where src->>'teamNum' = t.team_num
-        )
     ), '[]'::jsonb),
     'weeks',
     coalesce((
@@ -346,10 +351,10 @@ begin
       where sw.division_id = division_row.id
     ), '[]'::jsonb)
   )
-  into after_snapshot;
+  into resulting_state;
 
   update public.iba_schedule_change_applications
-     set after_snapshot = after_snapshot,
+     set after_snapshot = resulting_state,
          applied_at = now()
    where id = application_row.id;
 
@@ -379,7 +384,3 @@ grant execute on function public.apply_iba_schedule_change(uuid) to authenticate
 -- select count(*) from pg_policies where schemaname='public'
 --   and tablename='iba_schedule_change_applications'
 --   and policyname='Managers can read IBA schedule applications';
--- select conname, pg_get_constraintdef(oid)
--- from pg_constraint
--- where conrelid = 'public.iba_schedule_monitor_checks'::regclass
---   and conname = 'iba_schedule_monitor_checks_review_status_check';
