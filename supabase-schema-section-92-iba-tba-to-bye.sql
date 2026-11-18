@@ -114,7 +114,7 @@ begin
     raise exception 'Week 5 is not available for this division.';
   end if;
 
-  if current_date <= (
+  if (now() at time zone 'America/Chicago')::date <= (
     select to_date(trim(w.date), 'YYYY-MM-DD')
       from public.schedule_weeks w
      where w.division_id = division_row.id
