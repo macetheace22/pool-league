@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, X, AlertCircle, RefreshCw } from "lucide-react";
+import { Check, X, AlertCircle, RefreshCw, Upload } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import { PageHeader, AccessDenied, shellCss } from "./Shell";
 import { useAuth } from "./AuthContext";
@@ -34,8 +34,8 @@ export default function IbaScheduleReview() {
     setLoading(true); setError("");
     const { data, error: e } = await supabase
       .from("iba_schedule_monitor_checks")
-      .select("id,monitor_date,changes,summary,checked_at,review_status,seasons(type,year),divisions(num,name,format,day)")
-      .eq("review_status", "pending")
+      .select("id,monitor_date,changes,summary,checked_at,review_status,review_note,seasons(type,year),divisions(num,name,format,day)")
+      .in("review_status", ["pending", "approved"])
       .eq("status", "changes_found")
       .order("checked_at", { ascending: false });
     if (e) setError(e.message);
@@ -66,6 +66,23 @@ export default function IbaScheduleReview() {
     setBusyId(null);
   };
 
+  const apply = async (row) => {
+    const confirmed = window.confirm(
+      `Apply the approved IBA schedule change for ${divisionLabel(row)}? This will replace that division's live schedule with the approved IBA snapshot. The current schedule is preserved in application history.`
+    );
+    if (!confirmed) return;
+    setBusyId(row.id); setError("");
+    const { data, error: e } = await supabase.rpc("apply_iba_schedule_change", { p_check_id: row.id });
+    if (e) {
+      setError(e.message);
+    } else if (!data?.ok) {
+      setError(data?.error || "The approved schedule change was not applied.");
+    } else {
+      await load();
+    }
+    setBusyId(null);
+  };
+
   if (!profile) return null;
   if (profile.role !== "manager") return (
     <div className="app"><style>{shellCss}</style><PageHeader title="IBA Schedule Review" />
@@ -73,17 +90,20 @@ export default function IbaScheduleReview() {
     </div>
   );
 
+  const pendingCount = rows.filter(row => row.review_status === "pending").length;
+  const approvedCount = rows.filter(row => row.review_status === "approved").length;
+
   return (
     <div className="app"><style>{shellCss}</style>
-      <PageHeader title="IBA Schedule Review" subtitle="Manager review of changes detected from IBA" />
+      <PageHeader title="IBA Schedule Review" subtitle="Manager review and controlled application of changes detected from IBA" />
       <div className="tab-content">
         {error && <div className="card" style={{borderColor:"#8B2E2E",color:"#F2B8B8"}}>{error}</div>}
         {loading ? <div className="empty-state">Loading schedule changes…</div> :
           rows.length === 0 ? (
             <div className="card">
-              <div className="card__title">No schedule changes awaiting review</div>
+              <div className="card__title">No schedule changes awaiting action</div>
               <div style={{color:"#AAA",fontSize:12,lineHeight:1.5}}>
-                The daily IBA monitor has not found any unreviewed changes. Current-season divisions
+                The daily IBA monitor has not found any pending or approved changes. Current-season divisions
                 beyond Week 5 are not monitored.
               </div>
               <button className="btn-secondary" style={{marginTop:10}} onClick={load}><RefreshCw size={14}/> Refresh</button>
@@ -92,30 +112,54 @@ export default function IbaScheduleReview() {
             <div className="card" style={{marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <AlertCircle size={17}/>
-                <div><div className="card__title" style={{marginBottom:2}}>{rows.length} change{rows.length===1?"":"s"} awaiting review</div>
-                <div style={{color:"#AAA",fontSize:12}}>Approval does not modify the league schedule yet.</div></div>
-              </div>
-            </div>
-            {rows.map(row => (
-              <div className="card" key={row.id} style={{marginBottom:12}}>
-                <div className="card__title">{seasonLabel(row)} · {divisionLabel(row)}</div>
-                <div style={{color:"#AAA",fontSize:11,marginTop:3}}>Monitor date {row.monitor_date} · Checked {new Date(row.checked_at).toLocaleString()}</div>
-                <div style={{marginTop:10,fontSize:13}}><strong>Detected:</strong> {summaryText(row.summary)}</div>
-                {(row.changes ?? []).map((change,i) => (
-                  <div key={i} style={{padding:"8px 0",borderTop:i ? "1px solid #333" : "none"}}>
-                    <div style={{fontWeight:600}}>{change.type ?? change.kind ?? "Schedule change"}</div>
-                    <div style={{color:"#AAA",fontSize:11,marginTop:2}}>
-                      {Object.entries(change).filter(([k]) => !["type","kind"].includes(k))
-                        .map(([k,v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ")}
-                    </div>
+                <div>
+                  <div className="card__title" style={{marginBottom:2}}>
+                    {pendingCount ? `${pendingCount} awaiting review` : "No changes awaiting review"}
+                    {approvedCount ? ` · ${approvedCount} approved and ready to apply` : ""}
                   </div>
-                ))}
-                <div style={{display:"flex",gap:8,marginTop:12}}>
-                  <button className="btn-primary" disabled={busyId===row.id} onClick={() => decide(row,"approved")}><Check size={14}/> Approve</button>
-                  <button className="btn-secondary" disabled={busyId===row.id} onClick={() => decide(row,"rejected")}><X size={14}/> Reject</button>
+                  <div style={{color:"#AAA",fontSize:12}}>
+                    Approval alone does not modify the league schedule. Application is a separate manager action.
+                  </div>
                 </div>
               </div>
-            ))}
+            </div>
+            {rows.map(row => {
+              const approved = row.review_status === "approved";
+              return (
+                <div className="card" key={row.id} style={{marginBottom:12}}>
+                  <div className="card__title">{seasonLabel(row)} · {divisionLabel(row)}</div>
+                  <div style={{color:"#AAA",fontSize:11,marginTop:3}}>
+                    Monitor date {row.monitor_date} · Checked {new Date(row.checked_at).toLocaleString()}
+                  </div>
+                  <div style={{marginTop:10,fontSize:13}}><strong>Detected:</strong> {summaryText(row.summary)}</div>
+                  {(row.changes ?? []).map((change,i) => (
+                    <div key={i} style={{padding:"8px 0",borderTop:i ? "1px solid #333" : "none"}}>
+                      <div style={{fontWeight:600}}>{change.type ?? change.kind ?? "Schedule change"}</div>
+                      <div style={{color:"#AAA",fontSize:11,marginTop:2}}>
+                        {Object.entries(change).filter(([k]) => !["type","kind"].includes(k))
+                          .map(([k,v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ")}
+                      </div>
+                    </div>
+                  ))}
+                  {approved ? (
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginTop:12,paddingTop:10,borderTop:"1px solid #333"}}>
+                      <div style={{color:"#8FD8B5",fontSize:12}}><Check size={14}/> Approved — ready to apply</div>
+                      <button className="btn-primary" disabled={busyId===row.id} onClick={() => apply(row)}>
+                        <Upload size={14}/> {busyId===row.id ? "Applying…" : "Apply to Schedule"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",gap:8,marginTop:12}}>
+                      <button className="btn-primary" disabled={busyId===row.id} onClick={() => decide(row,"approved")}><Check size={14}/> Approve</button>
+                      <button className="btn-secondary" disabled={busyId===row.id} onClick={() => decide(row,"rejected")}><X size={14}/> Reject</button>
+                    </div>
+                  )}
+                  {row.review_note && (
+                    <div style={{color:"#AAA",fontSize:11,marginTop:8}}>Review note: {row.review_note}</div>
+                  )}
+                </div>
+              );
+            })}
           </>
         }
       </div>
