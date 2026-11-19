@@ -52,6 +52,7 @@ export const LEAGUE_OFFICE_ITEMS = [
   { key: "season-workspace", label: "Season Setup & Management", path: "/season-management", roles: ["manager"], icon: Calendar },
   { key: "access", label: "Manage App Access", path: "/access", roles: ["manager"], icon: Key },
   { key: "league-news", label: "Manage League News", path: "/league-news", roles: ["manager"], icon: Newspaper },
+  { key: "makeup-deadlines", label: "Makeup Deadline Review", path: "/makeup-deadline-review", roles: ["manager"], icon: Scale },
   { key: "myteam", label: "Manage My Team", path: "/my-team", roles: ["captain"], icon: Users },
 ];
 
