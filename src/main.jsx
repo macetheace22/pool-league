@@ -10,6 +10,7 @@ import Practice from './Practice.jsx';
 import Schedules from './Schedules.jsx';
 import LeagueNewsManager from './LeagueNews.jsx';
 import IbaScheduleReview from './IbaScheduleReview.jsx';
+import MakeupDeadlineReview from './MakeupDeadlineReview.jsx';
 import { ActiveSessionProvider } from './ActiveSessionContext.jsx';
 
 // Reset the document scroll position whenever the active route changes.
@@ -124,6 +125,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/locations" element={<AdminApp page="locations" />} />
             <Route path="/weekly-data" element={<AdminApp page="weekly" />} />
             <Route path="/iba-schedule-review" element={<IbaScheduleReview />} />
+            <Route path="/makeup-deadline-review" element={<MakeupDeadlineReview />} />
             <Route path="/matches" element={<AdminApp page="matches" />} />
             <Route path="/team-info" element={<AdminApp page="teaminfo" />} />
             <Route path="/my-team" element={<AdminApp page="myteam" />} />
