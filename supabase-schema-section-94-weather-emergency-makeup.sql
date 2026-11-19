@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.league_weather_emergencies (
 
 ALTER TABLE public.league_weather_emergencies ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.league_weather_emergencies FROM anon, authenticated;
+REVOKE ALL ON public.league_weather_emergencies FROM anon, authenticated;
 
 CREATE POLICY league_weather_emergencies_manager_select
   ON public.league_weather_emergencies
