@@ -78,7 +78,7 @@ BEGIN
 
   v_cutoff := v_last_regular_date - 7;
 
-  IF (now() AT TIME ZONE 'America/Chicago')::date <= v_cutoff THEN
+  IF (now() AT TIME ZONE 'America/Chicago')::date < v_cutoff THEN
     RAISE EXCEPTION 'MAKEUP_DEADLINE_NOT_REACHED';
   END IF;
 
