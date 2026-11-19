@@ -10,49 +10,33 @@ import Practice from './Practice.jsx';
 import Schedules from './Schedules.jsx';
 import LeagueNewsManager from './LeagueNews.jsx';
 import IbaScheduleReview from './IbaScheduleReview.jsx';
+import MakeupDeadlineReview from './MakeupDeadlineReview.jsx';
 import { ActiveSessionProvider } from './ActiveSessionContext.jsx';
 
-// Reset the document scroll position whenever the active route changes.
-// This covers links, bottom-tab navigation, and browser Back/Forward without
-// resetting scroll for in-page state changes such as filters or saves.
 function ScrollToTop() {
   const { pathname } = useLocation();
-
   useEffect(() => {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, [pathname]);
-
   return null;
 }
 
-// Shared save-button feedback: once a field changes, the nearest Save/Update
-// action turns green until it is clicked. This keeps the behavior consistent
-// across existing forms without requiring every screen to implement its own state.
 function DirtySaveButtonBehavior() {
   useEffect(() => {
     const style = document.createElement('style');
     style.dataset.dirtySaveBehavior = 'true';
     style.textContent = `
-      button.save-button--dirty {
-        background: #126B46 !important;
-        border-color: #5FCF9E !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 0 0 1px rgba(95, 207, 158, 0.28) !important;
-      }
-      button.save-button--dirty:hover:not(:disabled) {
-        background: #188357 !important;
-      }
+      button.save-button--dirty { background: #126B46 !important; border-color: #5FCF9E !important; color: #FFFFFF !important; box-shadow: 0 0 0 1px rgba(95, 207, 158, 0.28) !important; }
+      button.save-button--dirty:hover:not(:disabled) { background: #188357 !important; }
     `;
     document.head.appendChild(style);
-
     const isSaveButton = (button) => {
       const label = (button.innerText || button.getAttribute('aria-label') || button.title || '').trim();
       return /^(save|update|apply changes|save changes|save and continue|update password|update profile|save game|save role|save username|save phone number|save player number|save division|save season)\b/i.test(label)
         || button.classList.contains('btn-icon--confirm');
     };
-
     const nearestSaveButton = (field) => {
       let node = field.parentElement;
       while (node && node !== document.body) {
@@ -72,7 +56,6 @@ function DirtySaveButtonBehavior() {
       }
       return null;
     };
-
     const onFieldChange = (event) => {
       const field = event.target;
       if (!(field instanceof HTMLElement) || !field.matches('input,select,textarea,[contenteditable="true"]')) return;
@@ -83,7 +66,6 @@ function DirtySaveButtonBehavior() {
       const button = event.target instanceof Element ? event.target.closest('button') : null;
       if (button && isSaveButton(button)) button.classList.remove('save-button--dirty');
     };
-
     document.addEventListener('input', onFieldChange, true);
     document.addEventListener('change', onFieldChange, true);
     document.addEventListener('click', onButtonClick, true);
@@ -96,7 +78,6 @@ function DirtySaveButtonBehavior() {
   }, []);
   return null;
 }
-
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -124,6 +105,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/locations" element={<AdminApp page="locations" />} />
             <Route path="/weekly-data" element={<AdminApp page="weekly" />} />
             <Route path="/iba-schedule-review" element={<IbaScheduleReview />} />
+            <Route path="/makeup-deadline-review" element={<MakeupDeadlineReview />} />
             <Route path="/matches" element={<AdminApp page="matches" />} />
             <Route path="/team-info" element={<AdminApp page="teaminfo" />} />
             <Route path="/my-team" element={<AdminApp page="myteam" />} />
