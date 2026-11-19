@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation, useNavigationType } from "react-router-
 import {
   Menu, X, ChevronLeft, LogOut, UserCircle, Calendar, Settings2, Upload,
   Trophy, Eye, Users, Search, ClipboardList, Key, Building2,
-  Home, Dumbbell, Award, TrendingUp, Wrench, BarChart3, Newspaper, Scale,
+  Home, Dumbbell, Award, TrendingUp, Wrench, BarChart3, Newspaper, Scale, CloudRain,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 
@@ -53,6 +53,7 @@ export const LEAGUE_OFFICE_ITEMS = [
   { key: "access", label: "Manage App Access", path: "/access", roles: ["manager"], icon: Key },
   { key: "league-news", label: "Manage League News", path: "/league-news", roles: ["manager"], icon: Newspaper },
   { key: "makeup-deadlines", label: "Makeup Deadline Review", path: "/makeup-deadline-review", roles: ["manager"], icon: Scale },
+  { key: "weather-emergency", label: "Weather Emergency", path: "/weather-emergency", roles: ["manager"], icon: CloudRain },
   { key: "myteam", label: "Manage My Team", path: "/my-team", roles: ["captain"], icon: Users },
 ];
 
