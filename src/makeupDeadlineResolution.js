@@ -118,8 +118,8 @@ export async function resolveMakeupDeadline({
     p_responsible_side: responsibleSide,
     p_note: note || null,
     p_state: nextState,
-    p_home_total: 5,
-    p_away_total: 5,
+    p_home_total: responsibleSide === "home" ? 0 : 5,
+    p_away_total: responsibleSide === "away" ? 0 : 5,
     p_home_points: homePoints,
     p_away_points: awayPoints,
   });
