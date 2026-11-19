@@ -6,10 +6,10 @@ export function parseLeagueDate(value) {
   if (!value) return null;
   const text = String(value).trim();
   let date = null;
-  if (/^\\d{1,2}\\/\\d{1,2}\\/\\d{4}$/.test(text)) {
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)) {
     const [m, d, y] = text.split("/").map(Number);
     date = new Date(y, m - 1, d);
-  } else if (/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) {
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
     const [y, m, d] = text.split("-").map(Number);
     date = new Date(y, m - 1, d);
   }
