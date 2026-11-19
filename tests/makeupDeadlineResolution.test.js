@@ -15,7 +15,8 @@ describe("Section 8.5 makeup deadline workflow contract", () => {
     expect(rules).toContain("team_responsible");
     expect(sql).toContain("current_role_name() <> 'manager'");
     expect(sql).toContain("MAKEUP_DEADLINE_NOT_REACHED");
-    expect(sql).toContain("neither side earns standings points");
+    expect(sql).toContain("v_home_points := 0");
+    expect(sql).toContain("v_away_points := 0");
     expect(sql).toContain("p_responsible_side");
     expect(sql).not.toContain("base_forfeit_points");
     expect(resolution).toContain("buildFullMatchForfeitSets");
