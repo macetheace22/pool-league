@@ -543,6 +543,27 @@ export async function setDivisionPlayoffsStartDate(divisionId, date) {
   return !error;
 }
 
+export async function declareWeatherEmergency(seasonId, scheduledDate, note = "") {
+  const { data, error } = await supabase.rpc("declare_weather_emergency", {
+    p_season_id: seasonId,
+    p_scheduled_date: scheduledDate,
+    p_note: note || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function listWeatherEmergencies(seasonId) {
+  if (!seasonId) return [];
+  const { data, error } = await supabase
+    .from("league_weather_emergencies")
+    .select("id, season_id, scheduled_date, note, declared_by, declared_at, profiles(username)")
+    .eq("season_id", seasonId)
+    .order("scheduled_date", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Divisions ──────────────────────────────────────────────────────────────
 export async function addDivision(seasonId, num, name, format, day) {
   if (!seasonId || !String(format || "").trim() || !String(day || "").trim()) return null;
