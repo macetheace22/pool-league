@@ -159,7 +159,7 @@ export default function MakeupDeadlineReview() {
                                 ...prev,
                                 [match.id]: {
                                   ...(prev[match.id] ?? { home: [], away: [] }),
-                                  [side]: (prev[match.id]?.[side] ?? []).map((p, i) => i === index ? player : p),
+                                  [side]: Array.from({ length: 5 }, (_, i) => i === index ? player : (prev[match.id]?.[side]?.[i] ?? null)),
                                 },
                               }));
                             }}>
