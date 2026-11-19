@@ -3,6 +3,8 @@ import { AlertCircle, CheckCircle2, Scale } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader } from "./Shell";
 import { supabase } from "./supabaseClient";
+import { listRosterForTeam } from "./db";
+import { resolveMakeupDeadline } from "./makeupDeadlineResolution";
 import { isMakeupWithinProhibitedWindow, makeupCutoffFromFinalRegularSeasonDate } from "./makeupDeadlineRules";
 
 function parseDate(value) {
@@ -36,6 +38,8 @@ export default function MakeupDeadlineReview() {
   const [busyId, setBusyId] = useState(null);
   const [notes, setNotes] = useState({});
   const [errors, setErrors] = useState({});
+  const [rosters, setRosters] = useState({});
+  const [selections, setSelections] = useState({});
   const canManage = profile?.role === "manager";
 
   async function load() {
@@ -47,6 +51,15 @@ export default function MakeupDeadlineReview() {
     if (error) { setErrors({ load: error.message }); setLoading(false); return; }
     const rows = data ?? [];
     setMatches(rows);
+    const rosterMap = {};
+    await Promise.all(rows.map(async row => {
+      const [home, away] = await Promise.all([
+        row.team_home_id ? listRosterForTeam(row.team_home_id) : Promise.resolve([]),
+        row.team_away_id ? listRosterForTeam(row.team_away_id) : Promise.resolve([]),
+      ]);
+      rosterMap[row.id] = { home, away };
+    }));
+    setRosters(rosterMap);
     const dates = {};
     const divisionIds = [...new Set(rows.map(r => r.division_id).filter(Boolean))];
     await Promise.all(divisionIds.map(async divisionId => {
@@ -62,13 +75,23 @@ export default function MakeupDeadlineReview() {
   async function resolve(match, outcome, responsibleSide = null) {
     setBusyId(match.id);
     setErrors(prev => ({ ...prev, [match.id]: null }));
-    const { data, error } = await supabase.rpc("resolve_makeup_deadline", {
-      p_match_id: match.id, p_outcome: outcome, p_responsible_side: responsibleSide, p_note: notes[match.id] ?? null,
-    });
-    if (error) { setErrors(prev => ({ ...prev, [match.id]: error.message })); setBusyId(null); return; }
-    if (!data?.ok) { setErrors(prev => ({ ...prev, [match.id]: "The deadline resolution was not applied." })); setBusyId(null); return; }
-    await load();
-    setBusyId(null);
+    try {
+      const selection = selections[match.id] ?? { home: [], away: [] };
+      const result = await resolveMakeupDeadline({
+        matchId: match.id,
+        outcome,
+        responsibleSide,
+        note: notes[match.id] ?? "",
+        forfeitingPlayers: responsibleSide ? selection[responsibleSide] ?? [] : [],
+        receivingPlayers: responsibleSide ? selection[responsibleSide === "home" ? "away" : "home"] ?? [] : [],
+      });
+      if (!result?.ok) throw new Error("The deadline resolution was not applied.");
+      await load();
+    } catch (error) {
+      setErrors(prev => ({ ...prev, [match.id]: error.message ?? "The deadline resolution was not applied." }));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const pending = useMemo(() => matches.map(match => {
@@ -117,6 +140,41 @@ export default function MakeupDeadlineReview() {
                 <div><strong>Last regular-season date:</strong> {match.finalDate ? formatDate(match.finalDate) : "Unavailable"}</div>
                 <div><strong>7-day cutoff:</strong> {match.cutoff ? formatDate(match.cutoff) : "Unavailable"}</div>
               </div>
+              {!outcome && match.deadlineReached && rosters[match.id] && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>If League Management determines a team caused the missed deadline, select the five players for the resulting full-match forfeit.</div>
+                  {["home", "away"].map(side => {
+                    const sideName = side === "home" ? match.team_home_name : match.team_away_name;
+                    const sideRoster = rosters[match.id]?.[side] ?? [];
+                    const selected = selections[match.id]?.[side] ?? [];
+                    return (
+                      <div key={side} style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 4 }}>{sideName} players</div>
+                        {[0,1,2,3,4].map(index => (
+                          <select key={index} className="input input--select" style={{ width: "100%", marginBottom: 5 }}
+                            value={selected[index]?.num ?? ""}
+                            onChange={ev => {
+                              const player = sideRoster.find(p => String(p.num) === ev.target.value) ?? null;
+                              setSelections(prev => ({
+                                ...prev,
+                                [match.id]: {
+                                  ...(prev[match.id] ?? { home: [], away: [] }),
+                                  [side]: (prev[match.id]?.[side] ?? []).map((p, i) => i === index ? player : p),
+                                },
+                              }));
+                            }}>
+                            <option value="">Select {sideName} player {index + 1}…</option>
+                            {sideRoster.map(player => (
+                              <option key={player.num} value={player.num}>{player.name}{player.nickname ? " \"" + player.nickname + "\"" : ""} ({player.rating ?? "NR"})</option>
+                            ))}
+                          </select>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontSize: 11.5, color: "#8A8A8A", marginBottom: 8 }}>Players who already appeared in completed sets cannot be selected.</div>
+                </div>
+              )}
               {outcome ? (
                 <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: "#102B20", border: "1px solid #276B4A" }}>
                   <strong>{outcome}</strong>
