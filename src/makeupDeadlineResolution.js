@@ -71,13 +71,20 @@ export async function resolveMakeupDeadline({
     listRosterForTeam(responsibleSide === "home" ? match.team_home_id : match.team_away_id),
     listRosterForTeam(responsibleSide === "home" ? match.team_away_id : match.team_home_id),
   ]);
-  const rosterByNum = new Map(
-    [...forfeitingRoster, ...receivingRoster].map(player => [String(player.num), player]),
-  );
+  const forfeitingRosterNums = new Set(forfeitingRoster.map(player => String(player.num)));
+  const receivingRosterNums = new Set(receivingRoster.map(player => String(player.num)));
   const played = playedPlayerNums(match);
 
-  for (const player of [...forfeitingPlayers, ...receivingPlayers]) {
-    if (!rosterByNum.has(String(player.num))) {
+  for (const player of forfeitingPlayers) {
+    if (!forfeitingRosterNums.has(String(player.num))) {
+      throw new Error(`PLAYER_NOT_ON_ROSTER:${player.num}`);
+    }
+    if (played.has(String(player.num))) {
+      throw new Error(`PLAYER_ALREADY_PLAYED:${player.num}`);
+    }
+  }
+  for (const player of receivingPlayers) {
+    if (!receivingRosterNums.has(String(player.num))) {
       throw new Error(`PLAYER_NOT_ON_ROSTER:${player.num}`);
     }
     if (played.has(String(player.num))) {
