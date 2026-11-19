@@ -70,7 +70,7 @@ BEGIN
   WHERE sw.division_id = v_match.division_id
     AND coalesce(sw.is_playoff, false) = false
     AND sw.date IS NOT NULL
-    AND sw.date ~ '^\\d{1,2}/\\d{1,2}/\\d{4}$';
+    AND sw.date ~ '^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$';
 
   IF v_last_regular_date IS NULL THEN
     RAISE EXCEPTION 'FINAL_REGULAR_SEASON_DATE_UNAVAILABLE';
