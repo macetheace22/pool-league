@@ -1,9 +1,8 @@
 -- Section 93 / Rule 8.5: manager-controlled makeup deadline outcomes.
--- Only the three agreed Rule 8.5 outcomes are represented here:
---   1) the seven-day cutoff is deterministic;
---   2) teams failed to agree -> neither side receives points;
---   3) League Management names the responsible team -> the other side gets a forfeit.
--- The database never infers responsibility.
+-- The seven-day cutoff is enforced server-side. The application supplies the
+-- already-computed match state/score for a manager-approved team-responsible
+-- full-match forfeit, using the same existing scoring functions used by live
+-- full-match forfeits. The database never infers responsibility or scoring.
 
 BEGIN;
 
@@ -17,7 +16,12 @@ CREATE OR REPLACE FUNCTION public.resolve_makeup_deadline(
   p_match_id uuid,
   p_outcome text,
   p_responsible_side text DEFAULT NULL,
-  p_note text DEFAULT NULL
+  p_note text DEFAULT NULL,
+  p_state jsonb DEFAULT NULL,
+  p_home_total integer DEFAULT NULL,
+  p_away_total integer DEFAULT NULL,
+  p_home_points integer DEFAULT NULL,
+  p_away_points integer DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -28,13 +32,12 @@ DECLARE
   v_match public.completed_matches%ROWTYPE;
   v_last_regular_date date;
   v_cutoff date;
-  v_home_points integer := 0;
-  v_away_points integer := 0;
-  v_home_total integer := 0;
-  v_away_total integer := 0;
   v_resolution jsonb;
   v_state jsonb;
-  v_base_forfeit_points integer;
+  v_home_total integer;
+  v_away_total integer;
+  v_home_points integer;
+  v_away_points integer;
 BEGIN
   IF auth.uid() IS NULL OR public.current_role_name() <> 'manager' THEN
     RAISE EXCEPTION 'MANAGER_ONLY';
@@ -56,6 +59,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'MATCH_NOT_FOUND';
   END IF;
+
   IF NOT v_match.is_makeup_pending THEN
     RAISE EXCEPTION 'MAKEUP_NOT_PENDING';
   END IF;
@@ -73,51 +77,39 @@ BEGIN
   END IF;
 
   v_cutoff := v_last_regular_date - 7;
+
   IF (now() AT TIME ZONE 'America/Chicago')::date <= v_cutoff THEN
     RAISE EXCEPTION 'MAKEUP_DEADLINE_NOT_REACHED';
   END IF;
 
-  v_state := coalesce(v_match.state, '{}'::jsonb);
-  v_state := jsonb_set(
-    v_state,
-    '{makeupDeadlineResolution}',
-    jsonb_build_object(
-      'outcome', p_outcome,
-      'responsibleSide', CASE WHEN p_outcome = 'team_responsible' THEN p_responsible_side ELSE NULL END,
-      'note', nullif(trim(coalesce(p_note, '')), ''),
-      'resolvedAt', now(),
-      'resolvedBy', auth.uid(),
-      'finalRegularSeasonDate', v_last_regular_date,
-      'cutoffDate', v_cutoff
-    ),
-    true
-  );
-
   IF p_outcome = 'no_agreement' THEN
-    -- The match remains useful history, but neither side earns standings points.
+    v_state := coalesce(v_match.state, '{}'::jsonb);
     v_home_total := coalesce(v_match.team_home_total, 0);
     v_away_total := coalesce(v_match.team_away_total, 0);
     v_home_points := 0;
     v_away_points := 0;
   ELSE
-    -- League Management has explicitly determined a responsible side. The
-    -- existing match-level forfeit convention is represented explicitly in
-    -- state; standings totals become 0-5 and only the receiving side receives
-    -- the standard five-set regular-season forfeit value. The app's existing
-    -- full-match-forfeit scoring path remains authoritative for detailed
-    -- player/MVP presentation when the match is reopened for correction.
-    v_home_total := CASE WHEN p_responsible_side = 'home' THEN 0 ELSE 5 END;
-    v_away_total := CASE WHEN p_responsible_side = 'away' THEN 0 ELSE 5 END;
+    IF p_state IS NULL
+       OR p_home_total IS NULL
+       OR p_away_total IS NULL
+       OR p_home_points IS NULL
+       OR p_away_points IS NULL THEN
+      RAISE EXCEPTION 'FORFEIT_RESULT_REQUIRED';
+    END IF;
 
-    v_base_forfeit_points := CASE lower(coalesce(v_match.format, 'masters'))
-      WHEN 'open' THEN 125
-      WHEN 'advanced' THEN 150
-      ELSE 100
-    END;
-    v_home_points := CASE WHEN p_responsible_side = 'home' THEN 0 ELSE v_base_forfeit_points * 5 END;
-    v_away_points := CASE WHEN p_responsible_side = 'away' THEN 0 ELSE v_base_forfeit_points * 5 END;
-    v_state := jsonb_set(v_state, '{fullMatchForfeit}',
-      jsonb_build_object('forfeitingSide', p_responsible_side, 'reason', 'section_8_5_makeup_deadline'), true);
+    IF p_state->'fullMatchForfeit'->>'forfeitingSide' <> p_responsible_side THEN
+      RAISE EXCEPTION 'FORFEIT_STATE_MISMATCH';
+    END IF;
+
+    IF jsonb_array_length(coalesce(p_state->'sets', '[]'::jsonb)) <> 5 THEN
+      RAISE EXCEPTION 'FULL_MATCH_FORFEIT_REQUIRES_FIVE_SETS';
+    END IF;
+
+    v_state := p_state;
+    v_home_total := p_home_total;
+    v_away_total := p_away_total;
+    v_home_points := p_home_points;
+    v_away_points := p_away_points;
   END IF;
 
   v_resolution := jsonb_build_object(
@@ -128,6 +120,13 @@ BEGIN
     'resolvedBy', auth.uid(),
     'finalRegularSeasonDate', v_last_regular_date,
     'cutoffDate', v_cutoff
+  );
+
+  v_state := jsonb_set(
+    v_state,
+    '{makeupDeadlineResolution}',
+    v_resolution,
+    true
   );
 
   UPDATE public.completed_matches
@@ -156,7 +155,9 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.resolve_makeup_deadline(uuid, text, text, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.resolve_makeup_deadline(uuid, text, text, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.resolve_makeup_deadline(uuid, text, text, text, jsonb, integer, integer, integer, integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_makeup_deadline(uuid, text, text, text, jsonb, integer, integer, integer, integer)
+  TO authenticated;
 
 COMMIT;
