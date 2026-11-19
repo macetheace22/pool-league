@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation, useNavigationType } from "react-router-
 import {
   Menu, X, ChevronLeft, LogOut, UserCircle, Calendar, Settings2, Upload,
   Trophy, Eye, Users, Search, ClipboardList, Key, Building2,
-  Home, Dumbbell, Award, TrendingUp, Wrench, BarChart3, Newspaper,
+  Home, Dumbbell, Award, TrendingUp, Wrench, BarChart3, Newspaper, Scale,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 
