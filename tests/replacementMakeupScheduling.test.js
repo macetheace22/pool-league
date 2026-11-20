@@ -56,6 +56,10 @@ describe("Section 8.8 replacement-team makeup scheduling", () => {
   it("tracks completion through the existing completed-match archive lifecycle", () => {
     expect(sql).toContain("sync_team_replacement_makeup_match_status");
     expect(sql).toContain("NEW.state->>'schedulePairingId'");
+    expect(sql).toContain("v_pairing_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
+  });
+});
+");
     expect(sql).toContain("NEW.is_makeup_pending THEN 'scheduled' ELSE 'completed'");
   });
 });
