@@ -161,7 +161,21 @@ export async function resumeMakeupMatch(matchRow) {
 // authoritative cumulative totals and positions used for league standings.
 export async function computeFinalStandings(divisionId) {
   const adjustments = await listStandingsAdjustments(divisionId);
-  return prepareOfficialPlayoffSeeds(adjustments);
+  const prepared = prepareOfficialPlayoffSeeds(adjustments);
+  if (prepared.error) return prepared;
+
+  // The current view intentionally excludes unmatched team rows. Check the
+  // raw import rows for this same report week so an unresolved team cannot
+  // silently disappear from the bracket seed list.
+  const weekKey = adjustments[0]?.week_key;
+  const { data: unmatchedRows, error } = await supabase.from("standings_adjustments")
+    .select("id").eq("division_id", divisionId).eq("week_key", weekKey)
+    .is("team_id", null).limit(1);
+  if (error) return { error: "Could not validate unmatched teams in the official IBA standings import." };
+  if (unmatchedRows?.length) {
+    return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
+  }
+  return prepared;
 }
 
 async function createPlayoffWeek(divisionId, label) {
@@ -2338,10 +2352,10 @@ export function computeOfficialStandings(adjustments = []) {
 // The current view selects the latest row per team, so a partial import can
 // otherwise leave teams on different report weeks. Fail closed on mixed weeks,
 // unmatched teams, or unusable/duplicate published positions.
-export function prepareOfficialPlayoffSeeds(adjustments = []) {
+export function prepareOfficialPlayoffSeeds(adjustments = [], hasUnmatchedRows = false) {
   const rows = adjustments ?? [];
   if (!rows.length) return { error: "Import the official IBA standings report before generating playoff brackets." };
-  if (rows.some(row => !row.team_id)) {
+  if (hasUnmatchedRows || rows.some(row => !row.team_id)) {
     return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
   }
   const weekKeys = new Set(rows.map(row => row.week_key).filter(Boolean));
