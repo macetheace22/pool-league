@@ -21,7 +21,9 @@ export default function ReplacementTeamResolution() {
   const [note, setNote] = useState("");
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");\n  const [recordedResolutionId, setRecordedResolutionId] = useState("");\n  const [applyingSchedule, setApplyingSchedule] = useState(false);
+  const [message, setMessage] = useState("");
+  const [recordedResolutionId, setRecordedResolutionId] = useState("");
+  const [applyingSchedule, setApplyingSchedule] = useState(false);
 
   useEffect(() => {
     if (profile?.role !== "manager") return;
