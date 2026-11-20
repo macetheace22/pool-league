@@ -168,11 +168,21 @@ export async function computeFinalStandings(divisionId) {
   // raw import rows for this same report week so an unresolved team cannot
   // silently disappear from the bracket seed list.
   const weekKey = adjustments[0]?.week_key;
-  const { data: unmatchedRows, error } = await supabase.from("standings_adjustments")
-    .select("id").eq("division_id", divisionId).eq("week_key", weekKey)
-    .is("team_id", null).limit(1);
-  if (error) return { error: "Could not validate unmatched teams in the official IBA standings import." };
-  if (unmatchedRows?.length) {
+  const [{ data: unmatchedRows, error: unmatchedError }, { data: divisionTeams, error: teamsError }] = await Promise.all([
+    supabase.from("standings_adjustments").select("team_num")
+      .eq("division_id", divisionId).eq("week_key", weekKey).is("team_id", null),
+    supabase.from("teams").select("team_num").eq("division_id", divisionId),
+  ]);
+  if (unmatchedError || teamsError) {
+    return { error: "Could not validate unmatched teams in the official IBA standings import." };
+  }
+  // Older unmatched rows can remain after a manager fixes the team-number
+  // mapping and re-imports the same week (NULL team_id does not conflict in
+  // the import upsert). Treat them as resolved when that team number now maps
+  // to a real team in this division.
+  const knownTeamNums = new Set((divisionTeams ?? []).map(team => String(team.team_num ?? "").trim()).filter(Boolean));
+  const unresolvedRows = (unmatchedRows ?? []).filter(row => !knownTeamNums.has(String(row.team_num ?? "").trim()));
+  if (unresolvedRows.length) {
     return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
   }
   return prepared;
