@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { computeStandings, computeOfficialStandings } from "../src/db.js";
+import { computeStandings, computeOfficialStandings, computeFinalStandingsFromOfficialRows } from "../src/db.js";
 
 describe("official standings source precedence", () => {
+  it("uses official IBA positions for playoff seeds and excludes unmatched import rows", () => {
+    const rows = computeFinalStandingsFromOfficialRows([
+      {team_id:"t1",team_name:"Team A",total_points:1200,position:2,week_key:"2026-W17"},
+      {team_id:"t2",team_name:"Team B",total_points:1400,position:1,week_key:"2026-W17"},
+      {team_id:null,team_name:"Unmatched Team",total_points:900,position:3,week_key:"2026-W17"},
+    ]);
+    expect(rows.map(row => row.teamId)).toEqual(["t2","t1"]);
+    expect(rows.map(row => row.rank)).toEqual([1,2]);
+    expect(rows.find(row => row.teamId === "t1")).toMatchObject({totalPoints:1200,source:"official_iba"});
+  });
   it("uses imported cumulative totals and official report positions without adding app matches", () => {
     const appMatches = [{ team_home_id:"t1", team_home_name:"A", team_away_id:"t2", team_away_name:"B", team_home_total:3, team_away_total:2, team_home_points:500, team_away_points:400, is_makeup_pending:false }];
     const official = computeOfficialStandings([{team_id:"t1",team_name:"A",total_points:1200,position:2},{team_id:"t2",team_name:"B",total_points:1400,position:1}]);
