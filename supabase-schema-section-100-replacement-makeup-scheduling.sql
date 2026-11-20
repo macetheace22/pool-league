@@ -107,7 +107,8 @@ BEGIN
     ON sw.division_id = p_division_id
    AND sw.week_num = cb.week
    AND to_date(sw.date,'MM/DD/YYYY') >= p_effective_date
-   AND coalesce(sw.is_playoff,false) = false;
+   AND coalesce(sw.is_playoff,false) = false
+   AND COALESCE(sw.special,'') NOT LIKE 'REPLACEMENT_MAKEUP:%';
 
   RETURN jsonb_build_object(
     'dropoutTeamId',v_dropout_team_id,'dropoutTeamName',v_dropout_name,
@@ -277,6 +278,10 @@ CREATE TABLE IF NOT EXISTS public.team_replacement_makeup_matches (
 
 CREATE INDEX IF NOT EXISTS idx_team_replacement_makeup_matches_resolution
   ON public.team_replacement_makeup_matches(replacement_resolution_id, scheduled_date);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_weeks_replacement_makeup_date_unique
+  ON public.schedule_weeks(division_id, date)
+  WHERE special LIKE 'REPLACEMENT_MAKEUP:%';
 
 ALTER TABLE public.team_replacement_makeup_matches ENABLE ROW LEVEL SECURITY;
 
@@ -528,7 +533,31 @@ DECLARE
   v_pairing_id text;
 BEGIN
   v_pairing_id := NEW.state->>'schedulePairingId';
-  IF v_pairing_id IS NULL OR v_pairing_id = '' THEN
+  IF v_pairing_id IS NULL
+     OR v_pairing_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
+
+  UPDATE public.team_replacement_makeup_matches
+  SET status = CASE WHEN NEW.is_makeup_pending THEN 'scheduled' ELSE 'completed' END
+  WHERE schedule_pairing_id = v_pairing_id::uuid
+    AND status <> 'voided';
+
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.sync_team_replacement_makeup_match_status()
+  FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS sync_team_replacement_makeup_match_status
+  ON public.completed_matches;
+CREATE TRIGGER sync_team_replacement_makeup_match_status
+  AFTER INSERT OR UPDATE OF state, is_makeup_pending
+  ON public.completed_matches
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_team_replacement_makeup_match_status();
+
+COMMIT;
+ THEN
     RETURN NEW;
   END IF;
 
