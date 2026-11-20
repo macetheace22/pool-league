@@ -59,6 +59,7 @@ describe("replacement team resolution", () => {
         source: "official_iba",
       },
     })).toBe("");
+  });
 
   it("enforces the three-makeup maximum", () => {
     expect(validateReplacementResolution({
