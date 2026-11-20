@@ -161,7 +161,7 @@ export async function resumeMakeupMatch(matchRow) {
 // authoritative cumulative totals and positions used for league standings.
 export async function computeFinalStandings(divisionId) {
   const adjustments = await listStandingsAdjustments(divisionId);
-  return computeFinalStandingsFromOfficialRows(adjustments);
+  return prepareOfficialPlayoffSeeds(adjustments);
 }
 
 async function createPlayoffWeek(divisionId, label) {
@@ -180,8 +180,10 @@ export async function generateChampionshipBracket(divisionId) {
   const existing = await listPlayoffBrackets(divisionId);
   if (existing.some(m => m.bracket_type === "championship")) return { error: "A championship bracket already exists for this division." };
 
-  const standings = await computeFinalStandings(divisionId);
-  if (standings.length < 4) return { error: "Need at least 4 teams with standings to seed a championship bracket." };
+  const seedResult = await computeFinalStandings(divisionId);
+  if (seedResult.error) return seedResult;
+  const standings = seedResult.standings;
+  if (standings.length < 4) return { error: "Need at least 4 teams with official IBA standings to seed a championship bracket." };
   const [s1, s2, s3, s4] = standings;
 
   const week = await createPlayoffWeek(divisionId, "Championship Semifinals");
@@ -229,9 +231,13 @@ export async function previewConsolationBrackets(divisionId) {
   const divisionIds = (sisterDivisions ?? []).map(d => d.id);
 
   const pools = await Promise.all(divisionIds.map(async (divId) => {
-    const standings = await computeFinalStandings(divId);
-    return { divisionId: divId, consolationTeams: standings.slice(4) }; // 5th place onward
+    const result = await computeFinalStandings(divId);
+    return result.error
+      ? { divisionId: divId, error: result.error }
+      : { divisionId: divId, consolationTeams: result.standings.slice(4) }; // 5th place onward
   }));
+  const invalidPool = pools.find(pool => pool.error);
+  if (invalidPool) return { error: invalidPool.error };
 
   let pool = pools.find(p => p.divisionId === divisionId)?.consolationTeams ?? [];
   const otherPools = pools.filter(p => p.divisionId !== divisionId && p.consolationTeams.length > 0);
@@ -2328,12 +2334,25 @@ export function computeOfficialStandings(adjustments = []) {
     reportLabel: adj.label ?? null, source: "official_iba",
   })).sort((a,b) => a.position == null ? (b.position == null ? 0 : 1) : b.position == null ? -1 : a.position-b.position);
 }
-// Keep playoff seeding on the same official-IBA source as the public
-// standings screen. Unmatched import rows have no real team id and cannot
-// anchor playoff schedule pairings, so exclude them rather than inventing a seed.
-export function computeFinalStandingsFromOfficialRows(adjustments = []) {
-  return computeOfficialStandings(adjustments)
-    .filter(row => typeof row.teamId === "string" && !row.teamId.startsWith("manual:"));
+// Validate the imported report before using it for bracket generation.
+// The current view selects the latest row per team, so a partial import can
+// otherwise leave teams on different report weeks. Fail closed on mixed weeks,
+// unmatched teams, or unusable/duplicate published positions.
+export function prepareOfficialPlayoffSeeds(adjustments = []) {
+  const rows = adjustments ?? [];
+  if (!rows.length) return { error: "Import the official IBA standings report before generating playoff brackets." };
+  if (rows.some(row => !row.team_id)) {
+    return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
+  }
+  const weekKeys = new Set(rows.map(row => row.week_key).filter(Boolean));
+  if (rows.some(row => !row.week_key) || weekKeys.size !== 1) {
+    return { error: "The imported standings contain mixed or missing report weeks. Re-import the complete division report before generating playoff brackets." };
+  }
+  const positions = rows.map(row => row.position);
+  if (positions.some(position => !Number.isInteger(position) || position < 1) || new Set(positions).size !== positions.length) {
+    return { error: "The official standings report has missing or duplicate positions. Correct the import before generating playoff brackets." };
+  }
+  return { standings: computeOfficialStandings(rows) };
 }
 
 export function computeOfficialMvp(adjustments = []) {
