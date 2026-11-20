@@ -20,7 +20,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
   v_dropout_team_id uuid;
   v_week_ids jsonb := '[]'::jsonb;
