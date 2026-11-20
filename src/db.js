@@ -854,7 +854,12 @@ export async function importIbaScheduleDivision(seasonId, payload = {}) {
 
     // Replace only after teams and weeks have both parsed successfully. This
     // makes a re-import deterministic and avoids duplicate schedule rows.
-    await replaceSchedule(division.id, normalizedWeeks, orderedTeams);
+    await replaceSchedule(division.id, normalizedWeeks, orderedTeams, {
+      seasonId,
+      source: weekTag?.source === "manual" ? "manual" : "automatic",
+      reportWeek: Number.isInteger(Number(weekTag?.reportWeek)) ? Number(weekTag.reportWeek) : null,
+      reportPrintedOnDate: weekTag?.reportPrintedOnDate ?? null,
+    });
 
     const savedSchedule = await listSchedule(division.id, orderedTeams);
     const schedulePairingCount = savedSchedule.reduce((sum, week) => sum + (week.pairings?.length ?? 0), 0);
@@ -1002,7 +1007,15 @@ export async function listSchedule(divisionId, teams) {
 // teams: the division's current team list, in the same order the schedule's
 // numbering assumes -- positions are resolved to real team ids here, once,
 // so nothing downstream needs to think about position again.
-export async function replaceSchedule(divisionId, parsedWeeks, teams) {
+export async function replaceSchedule(divisionId, parsedWeeks, teams, snapshotContext = {}) {
+  const context = {
+    seasonId: snapshotContext.seasonId ?? null,
+    importId: snapshotContext.importId ?? crypto.randomUUID(),
+    source: snapshotContext.source === "manual" ? "manual" : "automatic",
+    reportWeek: snapshotContext.reportWeek ?? null,
+    reportPrintedOnDate: snapshotContext.reportPrintedOnDate ?? null,
+  };
+  await snapshotCurrentIbaSchedule(divisionId, context);
   const { error: deleteError } = await supabase
     .from("schedule_weeks")
     .delete()
@@ -1051,6 +1064,65 @@ export async function replaceSchedule(divisionId, parsedWeeks, teams) {
       if (pairingError) throw new Error(pairingError.message);
     }
   }
+
+  await snapshotImportedIbaSchedule(divisionId, parsedWeeks, teams, context);
+}
+
+export function buildIbaScheduleSnapshotState(weeks, teams = []) {
+  const teamByNum = new Map((teams ?? []).map(team => [String(team.teamNum ?? team.team_num ?? ""), team]));
+  return {
+    version: 1,
+    weeks: (weeks ?? []).map(week => ({
+      week: week.week == null ? null : Number(week.week),
+      date: String(week.date ?? "").trim(),
+      special: week.special ? String(week.special).trim() : null,
+      isPlayoff: /playoff/i.test(week.special ?? "") || !!week.isPlayoff || !!week.is_playoff,
+      pairings: (week.pairings ?? []).map(pairing => {
+        const homeTeam = pairing.homeTeamId ? { id: pairing.homeTeamId } : teamByNum.get(String(pairing.homeTeamNum ?? pairning.homeTeam ?? ""));
+        const awayTeam = pairing.awayTeamId ? { id: pairing.awayTeamId } : teamByNum.get(String(pairing.awayTeamNum ?? pairing.awayTeam ?? ""));
+        return {
+          homeTeamId: homeTeam?.id ?? null,
+          awayTeamId: awayTeam?.id ?? null,
+          homeTbdCode: pairing.homeTbdCode ?? pairing.home_tbd_code ?? null,
+          awayTbdCode: pairing.awayTbdCode ?? pairing.away_tbd_code ?? null,
+        };
+      }),
+    })),
+  };
+}
+
+async function snapshotCurrentIbaSchedule(divisionId, context) {
+  const { data, error } = await supabase
+    .from("schedule_weeks")
+    .select("week_num, date, special, is_playoff, schedule_pairings(home_team_id, away_team_id, home_tbd_code, away_tbd_code)")
+    .eq("division_id", divisionId);
+  if (error) throw new Error(`Could not snapshot the existing IBA schedule: ${error.message}`);
+  if (!(data ?? []).length) return null;
+  const state = buildIbaScheduleSnapshotState((data ?? []).map(week => ({
+    week: week.week_num, date: week.date, special: week.special, isPlayoff: week.is_playoff,
+    pairings: (week.schedule_pairings ?? []).map(pairing => ({
+      homeTeamId: pairing.home_team_id, awayTeamId: pairing.away_team_id,
+      homeTbdCode: pairing.home_tbd_code, awayTbdCode: pairing.away_tbd_code,
+    })),
+  })));
+  const { error: insertError } = await supabase.from("iba_schedule_import_snapshots").insert({
+    season_id: context.seasonId, division_id: divisionId, import_id: context.importId,
+    phase: "before", source: context.source, report_week: context.reportWeek,
+    report_printed_on_date: context.reportPrintedOnDate, schedule_state: state,
+  });
+  if (insertError) throw new Error(`Could not save the pre-import IBA schedule snapshot: ${insertError.message}`);
+  return state;
+}
+
+async function snapshotImportedIbaSchedule(divisionId, parsedWeeks, teams, context) {
+  const state = buildIbaScheduleSnapshotState(parsedWeeks, teams);
+  const { error } = await supabase.from("iba_schedule_import_snapshots").insert({
+    season_id: context.seasonId, division_id: divisionId, import_id: context.importId,
+    phase: "after", source: context.source, report_week: context.reportWeek,
+    report_printed_on_date: context.reportPrintedOnDate, schedule_state: state,
+  });
+  if (error) throw new Error(`Could not save the post-import IBA schedule snapshot: ${error.message}`);
+  return state;
 }
 
 // Manual pairing edits -- lets a manager fix or add a single matchup (BYE
