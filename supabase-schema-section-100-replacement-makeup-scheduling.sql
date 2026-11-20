@@ -533,35 +533,13 @@ DECLARE
   v_pairing_id text;
 BEGIN
   v_pairing_id := NEW.state->>'schedulePairingId';
-  IF v_pairing_id IS NULL
-     OR v_pairing_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
-  SET status = CASE WHEN NEW.is_makeup_pending THEN 'scheduled' ELSE 'completed' END
-  WHERE schedule_pairing_id = v_pairing_id::uuid
-    AND status <> 'voided';
-
-  RETURN NEW;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.sync_team_replacement_makeup_match_status()
-  FROM PUBLIC, anon, authenticated;
-
-DROP TRIGGER IF EXISTS sync_team_replacement_makeup_match_status
-  ON public.completed_matches;
-CREATE TRIGGER sync_team_replacement_makeup_match_status
-  AFTER INSERT OR UPDATE OF state, is_makeup_pending
-  ON public.completed_matches
-  FOR EACH ROW
-  EXECUTE FUNCTION public.sync_team_replacement_makeup_match_status();
-
-COMMIT;
- THEN
+  IF v_pairing_id IS NULL OR v_pairing_id = '' THEN
     RETURN NEW;
   END IF;
 
   UPDATE public.team_replacement_makeup_matches
   SET status = CASE WHEN NEW.is_makeup_pending THEN 'scheduled' ELSE 'completed' END
-  WHERE schedule_pairing_id = v_pairing_id::uuid
+  WHERE schedule_pairing_id::text = v_pairing_id
     AND status <> 'voided';
 
   RETURN NEW;
