@@ -55,6 +55,7 @@ export const LEAGUE_OFFICE_ITEMS = [
   { key: "makeup-deadlines", label: "Makeup Deadline Review", path: "/makeup-deadline-review", roles: ["manager"], icon: Scale },
   { key: "weather-emergency", label: "Weather Emergency", path: "/weather-emergency", roles: ["manager"], icon: CloudRain },
   { key: "dropout-resolution", label: "Team Dropout Resolution", path: "/dropout-resolution", roles: ["manager"], icon: Wrench },
+  { key: "replacement-team-resolution", label: "Replacement Team Resolution", path: "/replacement-team-resolution", roles: ["manager"], icon: Wrench },
   { key: "myteam", label: "Manage My Team", path: "/my-team", roles: ["captain"], icon: Users },
 ];
 

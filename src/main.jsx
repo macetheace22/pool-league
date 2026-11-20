@@ -13,6 +13,7 @@ import IbaScheduleReview from './IbaScheduleReview.jsx';
 import MakeupDeadlineReview from './MakeupDeadlineReview.jsx';
 import WeatherEmergency from './WeatherEmergency.jsx';
 import DropoutResolutionReview from './DropoutResolutionReview.jsx';
+import ReplacementTeamResolution from './ReplacementTeamResolution.jsx';
 import { ActiveSessionProvider } from './ActiveSessionContext.jsx';
 
 // Reset the document scroll position whenever the active route changes.
@@ -130,6 +131,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/makeup-deadline-review" element={<MakeupDeadlineReview />} />
             <Route path="/weather-emergency" element={<WeatherEmergency />} />
             <Route path="/dropout-resolution" element={<DropoutResolutionReview />} />
+            <Route path="/replacement-team-resolution" element={<ReplacementTeamResolution />} />
             <Route path="/matches" element={<AdminApp page="matches" />} />
             <Route path="/team-info" element={<AdminApp page="teaminfo" />} />
             <Route path="/my-team" element={<AdminApp page="myteam" />} />
