@@ -475,15 +475,14 @@ function LeagueSetPracticeDetail({ set, showInnings }) {
         <>
           <div className="practice-scoresheet__table-wrap">
             <table className="practice-scoresheet__table league-set-detail__table">
-              <thead><tr><th>Rack</th><th>{set.playerA.name}</th><th>{set.playerB.name}</th>{showInnings && <th>Innings</th>}<th>Safeties</th><th>Timeouts</th></tr></thead>
+              <thead><tr><th>Rack</th><th>{set.playerA.name}</th><th>{set.playerB.name}</th>{showInnings && <th>Innings</th>}<th>Timeouts</th></tr></thead>
               <tbody>
                 {set.racks.map(rack => <tr key={rack.n}>
                   <td>{rack.n}</td><td>{rack.a}</td><td>{rack.b}</td>
                   {showInnings && <td>{rack.innings ?? 0}</td>}
-                  <td>{(rack.safetyA || 0) + (rack.safetyB || 0)}</td>
                   <td>{(rack.timeoutA || 0) + (rack.timeoutB || 0)}</td>
                 </tr>)}
-                <tr className="league-set-detail__total"><td>Total</td><td>{set.finalA}</td><td>{set.finalB}</td>{showInnings && <td>{totalInnings}</td>}<td>{totalSafeties}</td><td>{totalTimeouts}</td></tr>
+                <tr className="league-set-detail__total"><td>Total</td><td>{set.finalA}</td><td>{set.finalB}</td>{showInnings && <td>{totalInnings}</td>}<td>{totalTimeouts}</td></tr>
               </tbody>
             </table>
           </div>
