@@ -453,6 +453,49 @@ export default function Scoresheet({ match, practiceGame = null, profile = null,
     : <LeagueScoresheet match={match} onClose={onClose} closeLabel={closeLabel} />;
 }
 
+function LeagueSetPracticeDetail({ set, showInnings }) {
+  const totalInnings = set.totalInnings ?? set.racks.reduce((sum, rack) => sum + (rack.innings || 0), 0);
+  const totalSafeties = (set.safetiesA ?? 0) + (set.safetiesB ?? 0);
+  const totalTimeouts = set.racks.reduce((sum, rack) => sum + (rack.timeoutA || 0) + (rack.timeoutB || 0), 0);
+  const pending = set.status === "unplayed" || set.status === "makeup-pending";
+  return (
+    <div className="practice-scoresheet__section league-set-detail">
+      <div className="practice-scoresheet__section-title">Set {set.setNum} · {set.venue || "Venue not recorded"}</div>
+      <div className="league-set-detail__players"><span>{set.playerA.name}</span><span>vs</span><span>{set.playerB.name}</span></div>
+      {set.source && <div className={`data-source-tag ${set.source === "live" || set.source === "manual" ? "data-source-tag--verified" : "data-source-tag--illustrative"}`}>
+        {set.source === "live" ? "✓ Rack-by-rack data from Live Entry" : set.source === "manual" ? "✓ Rack-by-rack data (entered manually)" : "Imported record — summary only"}
+      </div>}
+      {pending ? (
+        <div className="practice-scoresheet__empty">{set.status === "makeup-pending" ? "Awaiting makeup — this set is not final." : "No result was recorded for this set."}</div>
+      ) : set.forfeited ? (
+        <div className="practice-scoresheet__empty league-set-detail__forfeit">
+          Forfeit recorded. {set.forfeitedBy === "home" ? set.playerA.name : set.playerB.name} forfeited; the opposing player received the forfeit.
+        </div>
+      ) : (
+        <>
+          <div className="practice-scoresheet__table-wrap">
+            <table className="practice-scoresheet__table league-set-detail__table">
+              <thead><tr><th>Rack</th><th>{set.playerA.name}</th><th>{set.playerB.name}</th>{showInnings && <th>Innings</th>}<th>Timeouts</th></tr></thead>
+              <tbody>
+                {set.racks.map(rack => <tr key={rack.n}>
+                  <td>{rack.n}</td><td>{rack.a}</td><td>{rack.b}</td>
+                  {showInnings && <td>{rack.innings ?? 0}</td>}
+                  <td>{(rack.timeoutA || 0) + (rack.timeoutB || 0)}</td>
+                </tr>)}
+                <tr className="league-set-detail__total"><td>Total</td><td>{set.finalA}</td><td>{set.finalB}</td>{showInnings && <td>{totalInnings}</td>}<td>{totalTimeouts}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="league-set-detail__summary">
+            <span>{set.racks.length} racks · {totalInnings} innings · {totalSafeties} safeties ({set.safetiesA ?? 0} / {set.safetiesB ?? 0})</span>
+            {set.winnerSide && <strong>{(set.winnerSide === "a" ? set.playerA : set.playerB).name} won {set.winnerSide === "a" ? set.finalA : set.finalB}–{set.winnerSide === "a" ? set.finalB : set.finalA}</strong>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function LeagueScoresheet({ match, onClose, closeLabel }) {
   const [view, setView] = useState("front");
   const [setIndex, setSetIndex] = useState(0);
@@ -504,41 +547,29 @@ function LeagueScoresheet({ match, onClose, closeLabel }) {
             {match.state?.teamAway?.teamNum ? `Team ${match.state.teamAway.teamNum}` : "Team number unavailable"}
           </div>
         </div>
-        <div className="practice-scoresheet__section">
+        <div className="practice-scoresheet__section league-match-details">
           <div className="practice-scoresheet__section-title">Match details</div>
           <div className="view-toggle">
-            <button className={`view-toggle__btn ${view === "front" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("front")}>
-              <TableIcon size={14} /> Game Detail
-            </button>
-            <button className={`view-toggle__btn ${view === "back" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("back")}>
-              <FileText size={14} /> Team Scoresheet
-            </button>
+            <button className={`view-toggle__btn ${view === "front" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("front")}><TableIcon size={14} /> Game Detail</button>
+            <button className={`view-toggle__btn ${view === "back" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("back")}><FileText size={14} /> Team Scoresheet</button>
           </div>
           {view === "front" ? (
             <>
               <div className="set-nav">
-                <button className="set-nav__btn" disabled={setIndex === 0} onClick={() => setSetIndex((i) => Math.max(0, i - 1))}>
-                  <ChevronLeft size={16} />
-                </button>
+                <button className="set-nav__btn" disabled={setIndex === 0} onClick={() => setSetIndex(i => Math.max(0, i - 1))}><ChevronLeft size={16} /></button>
                 <span className="set-nav__label">Set {setIndex + 1} of {sets.length}</span>
-                <button className="set-nav__btn" disabled={setIndex === sets.length - 1} onClick={() => setSetIndex((i) => Math.min(sets.length - 1, i + 1))}>
-                  <ChevronRight size={16} />
-                </button>
+                <button className="set-nav__btn" disabled={setIndex === sets.length - 1} onClick={() => setSetIndex(i => Math.min(sets.length - 1, i + 1))}><ChevronRight size={16} /></button>
               </div>
               <div className="scoresheet-detail-options">
-                <button
-                  type="button"
-                  className="scoresheet-detail-options__toggle"
-                  aria-pressed={showInnings}
-                  onClick={() => setShowInnings((shown) => !shown)}
-                >
-                  {showInnings ? "Hide innings" : "Show innings"}
-                </button>
+                <button type="button" className="scoresheet-detail-options__toggle" aria-pressed={showInnings} onClick={() => setShowInnings(shown => !shown)}>{showInnings ? "Hide innings" : "Show innings"}</button>
               </div>
-              <FrontSheetSet set={sets[setIndex]} showInnings={showInnings} />
+              <LeagueSetPracticeDetail set={sets[setIndex]} showInnings={showInnings} />
             </>
           ) : (
-            <BackSheet match={match} sets={sets} />
+            <div className="practice-scoresheet__section league-team-scoresheet">
+              <div className="practice-scoresheet__section-title">Team scoresheet and point totals</div>
+              <BackSheet match={match} sets={sets} />
+            </div>
           )}
         </div>
       </section>
@@ -672,6 +703,35 @@ const css = `
 .league-scoresheet__team-numbers span{color:#7FA593;}
 .league-scoresheet .view-toggle{margin-bottom:2px;}
 .league-scoresheet .set-sheet{width:100%;box-sizing:border-box;}
+.league-scoresheet .practice-scoresheet__section{background:#1C1C1C;border:1px solid #2E2E2E;border-radius:8px;padding:12px;}
+.league-scoresheet .practice-scoresheet__section-title{color:#9FC4B4;}
+.league-scoresheet .practice-scoresheet__table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #333;border-radius:8px;}
+.league-scoresheet .practice-scoresheet__table{width:100%;border-collapse:collapse;min-width:420px;color:#E5E7EB;font-size:11px;}
+.league-scoresheet .practice-scoresheet__table th{background:#0B3D2E;color:#D1E7DC;text-align:left;padding:9px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.league-scoresheet .practice-scoresheet__table td{padding:9px 8px;border-top:1px solid #333;text-align:left;white-space:nowrap;}
+.league-scoresheet .practice-scoresheet__table tbody tr:nth-child(even){background:#202020;}
+.league-set-detail__players{display:flex;justify-content:center;align-items:center;gap:8px;color:#E5E7EB;font-size:11px;font-weight:700;}
+.league-set-detail__players span:nth-child(2){color:#9FC4B4;font-weight:400;}
+.league-set-detail .data-source-tag{margin:0;text-align:left;background:#202020;color:#9FC4B4;}
+.league-set-detail .data-source-tag--verified{background:#16332A;color:#5FCF9E;}
+.league-set-detail .data-source-tag--illustrative{background:#252525;color:#B0B0B0;}
+.league-set-detail__total{font-weight:800;background:#16332A!important;color:#fff;}
+.league-set-detail__summary{display:flex;flex-direction:column;gap:6px;color:#9A9A9A;font-size:10px;}
+.league-set-detail__summary strong{color:#5FCF9E;font-size:11px;}
+.league-set-detail__forfeit{background:#2A1F00;border:1px solid #92400E;color:#FCD34D;}
+.league-team-scoresheet .back-sheet{gap:10px;}
+.league-team-scoresheet .team-col{background:#1C1C1C;border:1px solid #333;border-radius:8px;padding:10px;}
+.league-team-scoresheet .team-col__name{color:#9FC4B4;}
+.league-team-scoresheet .team-col--away .team-col__name{color:#8CB7E0;}
+.league-team-scoresheet .team-col__table-wrap{border-color:#333;}
+.league-team-scoresheet .team-col__table td{background:#202020;color:#E5E7EB;border-color:#333;}
+.league-team-scoresheet .team-col__rating-box{background:#202020;border-color:#333;}
+.league-team-scoresheet .team-col__rating-row{color:#B0B0B0;}
+.league-team-scoresheet .team-col__rating-row strong{color:#fff;}
+.league-team-scoresheet .back-sheet__final{background:#1C1C1C;border-color:#333;}
+.league-team-scoresheet .back-sheet__final-name,.league-team-scoresheet .back-sheet__final-score{color:#fff;}
+.league-team-scoresheet .back-sheet__final-divider{color:#9FC4B4;}
+
 .empty-state-ss { font-size: 12.5px; color: #5A5A5A; text-align: center; padding: 24px; background: #1C1C1C; border: 1.5px solid #2E2E2E; border-radius: 10px; }
 
 .app__header { background: #0B3D2E; background-image: radial-gradient(circle at 50% 0%, #0F4A37 0%, #0B3D2E 70%); border-radius: 14px; padding: 16px 18px; color: #FFFFFF; }
