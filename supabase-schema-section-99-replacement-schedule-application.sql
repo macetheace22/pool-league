@@ -70,6 +70,7 @@ DECLARE
   v_bye_team_id uuid;
   v_replacement_id uuid;
   v_opponent_id uuid;
+  v_replacement_already_scheduled boolean;
   v_changed_count integer := 0;
 BEGIN
   IF auth.uid() IS NULL OR public.current_role_name() <> 'manager' THEN
@@ -184,6 +185,44 @@ BEGIN
         )
       FOR UPDATE
     LOOP
+      IF v_pairing.home_team_id = v_resolution.dropout_team_id
+         AND v_pairing.away_team_id IS NOT NULL
+         AND v_pairing.away_team_id <> v_bye_team_id
+      THEN
+        SELECT EXISTS (
+          SELECT 1
+          FROM public.schedule_pairings existing_pairing
+          WHERE existing_pairing.week_id = v_week.id
+            AND existing_pairing.id <> v_pairing.id
+            AND (
+              existing_pairing.home_team_id = v_resolution.replacement_team_id
+              OR existing_pairing.away_team_id = v_resolution.replacement_team_id
+            )
+        ) INTO v_replacement_already_scheduled;
+
+        IF v_replacement_already_scheduled THEN
+          RAISE EXCEPTION 'REPLACEMENT_TEAM_ALREADY_SCHEDULED: week %', v_week.week_num;
+        END IF;
+      ELSIF v_pairing.away_team_id = v_resolution.dropout_team_id
+         AND v_pairing.home_team_id IS NOT NULL
+         AND v_pairing.home_team_id <> v_bye_team_id
+      THEN
+        SELECT EXISTS (
+          SELECT 1
+          FROM public.schedule_pairings existing_pairing
+          WHERE existing_pairing.week_id = v_week.id
+            AND existing_pairing.id <> v_pairing.id
+            AND (
+              existing_pairing.home_team_id = v_resolution.replacement_team_id
+              OR existing_pairing.away_team_id = v_resolution.replacement_team_id
+            )
+        ) INTO v_replacement_already_scheduled;
+
+        IF v_replacement_already_scheduled THEN
+          RAISE EXCEPTION 'REPLACEMENT_TEAM_ALREADY_SCHEDULED: week %', v_week.week_num;
+        END IF;
+      END IF;
+
       IF v_pairing.home_team_id = v_resolution.dropout_team_id
          AND v_pairing.away_team_id IS NOT NULL
          AND v_pairing.away_team_id <> v_bye_team_id THEN
