@@ -33,8 +33,8 @@ CREATE INDEX IF NOT EXISTS idx_team_dropout_resolutions_team
 
 ALTER TABLE public.team_dropout_resolutions ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.team_dropout_resolutions FROM anon, authenticated;
-GRANT SELECT, INSERT ON TABLE public.team_dropout_resolutions TO authenticated;
+REVOKE ALL ON public.team_dropout_resolutions FROM anon, authenticated;
+GRANT SELECT, INSERT ON public.team_dropout_resolutions TO authenticated;
 
 DROP POLICY IF EXISTS team_dropout_resolutions_manager_select
   ON public.team_dropout_resolutions;
