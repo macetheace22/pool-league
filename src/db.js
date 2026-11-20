@@ -1025,7 +1025,10 @@ export async function replaceSchedule(divisionId, parsedWeeks, teams, snapshotCo
     .eq("division_id", divisionId);
   if (existingWeeksError) throw new Error(existingWeeksError.message);
   const importedWeekIdsToDelete = (existingWeeks ?? [])
-    .filter(week => !String(week.special ?? "").startsWith("REPLACEMENT_MAKEUP:"))
+    .filter(week => {
+      const special = String(week.special ?? "");
+      return !special.startsWith("REPLACEMENT_MAKEUP:");
+    })
     .map(week => week.id);
   if (importedWeekIdsToDelete.length) {
     const { error: deleteError } = await supabase
