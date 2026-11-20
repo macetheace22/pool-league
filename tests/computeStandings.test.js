@@ -23,6 +23,9 @@ describe("official standings source precedence", () => {
       {team_id:null,team_name:"Unknown",position:1,week_key:"2026-W17"},
     ]).error).toMatch(/unmatched teams/i);
     expect(prepareOfficialPlayoffSeeds([
+      {team_id:"t1",team_name:"Team A",position:1,week_key:"2026-W17"},
+    ], true).error).toMatch(/unmatched teams/i);
+    expect(prepareOfficialPlayoffSeeds([
       {team_id:"t1",team_name:"Team A",position:null,week_key:"2026-W17"},
     ]).error).toMatch(/missing or duplicate positions/i);
   });
