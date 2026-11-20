@@ -1,0 +1,176 @@
+import { useEffect, useState } from "react";
+import { useAuth } from "./AuthContext";
+import { PageHeader, AccessDenied, shellCss } from "./Shell";
+import { supabase } from "./supabaseClient";
+import * as db from "./db";
+import { normalizeReplacementPreview, validateReplacementResolution } from "./replacementResolution";
+
+export default function ReplacementTeamResolution() {
+  const { profile } = useAuth();
+  const [seasons, setSeasons] = useState([]);
+  const [divisions, setDivisions] = useState([]);
+  const [dropoutResolutions, setDropoutResolutions] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [seasonId, setSeasonId] = useState("");
+  const [divisionId, setDivisionId] = useState("");
+  const [dropoutResolutionId, setDropoutResolutionId] = useState("");
+  const [replacementTeamId, setReplacementTeamId] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [inheritedStandings, setInheritedStandings] = useState(null);
+  const [note, setNote] = useState("");
+  const [history, setHistory] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (profile?.role !== "manager") return;
+    supabase.from("seasons")
+      .select("id,type,year,is_active")
+      .eq("is_active", true)
+      .order("year", { ascending: false })
+      .then(({ data }) => setSeasons(data ?? []));
+  }, [profile?.role]);
+
+  useEffect(() => {
+    setDivisions([]); setDropoutResolutions([]); setTeams([]);
+    setDivisionId(""); setDropoutResolutionId(""); setReplacementTeamId("");
+    setPreview(null); setInheritedStandings(null);
+    if (!seasonId) return;
+    supabase.from("divisions")
+      .select("id,num,name,format,day")
+      .eq("season_id", seasonId)
+      .order("num")
+      .then(({ data }) => setDivisions(data ?? []));
+  }, [seasonId]);
+
+  useEffect(() => {
+    setDropoutResolutions([]); setTeams([]); setDropoutResolutionId(""); setReplacementTeamId("");
+    setPreview(null); setInheritedStandings(null);
+    if (!divisionId) return;
+    Promise.all([
+      supabase.from("team_dropout_resolutions")
+        .select("id,dropout_team_id,effective_date,remedies,status")
+        .eq("division_id", divisionId)
+        .eq("status", "applied")
+        .order("resolved_at", { ascending: false }),
+      supabase.from("teams")
+        .select("id,team_num,name,is_bye")
+        .eq("division_id", divisionId)
+        .eq("is_bye", false)
+        .order("team_num"),
+    ]).then(([dropouts, teamRows]) => {
+      setDropoutResolutions(dropouts.data ?? []);
+      setTeams(teamRows.data ?? []);
+    });
+  }, [divisionId]);
+
+  async function loadHistory() {
+    if (!divisionId) return;
+    const { data } = await supabase.from("team_replacement_resolutions")
+      .select("*").eq("division_id", divisionId).order("resolved_at", { ascending: false });
+    setHistory(data ?? []);
+  }
+
+  useEffect(() => { loadHistory(); }, [divisionId]);
+
+  async function getPreview() {
+    setMessage(""); setPreview(null); setInheritedStandings(null);
+    if (!dropoutResolutionId || !replacementTeamId || !effectiveDate) {
+      setMessage("Select the dropout resolution, replacement team, and effective date first.");
+      return;
+    }
+    setBusy(true);
+    const [{ data, error }, standings] = await Promise.all([
+      supabase.rpc("preview_team_replacement_resolution", {
+        p_season_id: seasonId,
+        p_division_id: divisionId,
+        p_dropout_resolution_id: dropoutResolutionId,
+        p_replacement_team_id: replacementTeamId,
+        p_effective_date: effectiveDate,
+      }),
+      db.computeFinalStandings(divisionId),
+    ]);
+    setBusy(false);
+    if (error) { setMessage(error.message); return; }
+    const normalized = normalizeReplacementPreview(data);
+    const dropoutStandings = standings.find(row => row.teamId === normalized.dropoutTeamId);
+    const snapshot = dropoutStandings ? {
+      totalPoints: dropoutStandings.totalPoints ?? 0,
+      wins: dropoutStandings.wins ?? 0,
+      losses: dropoutStandings.losses ?? 0,
+      setsFor: dropoutStandings.setsFor ?? 0,
+      setsAgainst: dropoutStandings.setsAgainst ?? 0,
+      setsPlayed: dropoutStandings.setsPlayed ?? 0,
+      pointsPerSet: dropoutStandings.pointsPerSet ?? 0,
+      capturedAt: new Date().toISOString(),
+    } : {
+      totalPoints: 0, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0, setsPlayed: 0,
+      pointsPerSet: 0, capturedAt: new Date().toISOString(),
+    };
+    setPreview(normalized);
+    setInheritedStandings(snapshot);
+  }
+
+  async function recordResolution() {
+    const errorText = validateReplacementResolution({
+      dropoutResolutionId, seasonId, divisionId, replacementTeamId,
+      effectiveDate, preview, inheritedStandings,
+    });
+    if (errorText) { setMessage(errorText); return; }
+    if (!window.confirm("Record this replacement team resolution? Original dropout match history will remain unchanged.")) return;
+    setBusy(true); setMessage("");
+    const { data, error } = await supabase.rpc("record_team_replacement_resolution", {
+      p_dropout_resolution_id: dropoutResolutionId,
+      p_season_id: seasonId,
+      p_division_id: divisionId,
+      p_dropout_team_id: preview.dropoutTeamId,
+      p_replacement_team_id: replacementTeamId,
+      p_effective_date: effectiveDate,
+      p_inherited_standings: inheritedStandings,
+      p_eligible_makeup_week_ids: preview.eligibleMakeupWeekIds.slice(0, 3),
+      p_note: note,
+    });
+    setBusy(false);
+    if (error) { setMessage(error.message); return; }
+    setMessage(`Replacement resolution recorded: ${data?.replacementResolutionId ?? "saved"}.`);
+    setPreview(null); setInheritedStandings(null); setNote(""); setDropoutResolutionId(""); setReplacementTeamId("");
+    await loadHistory();
+  }
+
+  if (profile?.role !== "manager") return <AccessDenied />;
+
+  return (
+    <div style={shellCss}>
+      <PageHeader title="Replacement Team Resolution" subtitle="Rule 8.8 — record replacement-team points and makeup entitlement" />
+      <div className="admin-card">
+        <div className="form-grid">
+          <label>Season<select value={seasonId} onChange={e => setSeasonId(e.target.value)}><option value="">Select…</option>{seasons.map(s => <option key={s.id} value={s.id}>{s.type} · {s.year}</option>)}</select></label>
+          <label>Division<select value={divisionId} onChange={e => setDivisionId(e.target.value)} disabled={!seasonId}><option value="">Select…</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.num} · {d.name} · {d.format} · {d.day}</option>)}</select></label>
+          <label>Dropout resolution<select value={dropoutResolutionId} onChange={e => setDropoutResolutionId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{dropoutResolutions.map(r => <option key={r.id} value={r.id}>{r.dropout_team_id} · effective {r.effective_date}</option>)}</select></label>
+          <label>Replacement team<select value={replacementTeamId} onChange={e => setReplacementTeamId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{teams.filter(t => t.id !== dropoutResolutions.find(r => r.id === dropoutResolutionId)?.dropout_team_id).map(t => <option key={t.id} value={t.id}>{t.team_num} · {t.name}</option>)}</select></label>
+          <label>Effective replacement date<input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} /></label>
+        </div>
+        <button className="btn btn-primary" onClick={getPreview} disabled={busy}>Preview replacement impact</button>
+        {preview && <div className="admin-card" style={{ marginTop: 16 }}>
+          <strong>Replacement impact</strong>
+          <p>{preview.dropoutTeamName} → {preview.replacementTeamName}</p>
+          <p>Eligible post-dropout bye weeks: {preview.eligibleMakeupWeekCount} (maximum three).</p>
+          <p>Inherited points snapshot: {inheritedStandings?.totalPoints ?? 0} points; {inheritedStandings?.setsPlayed ?? 0} sets.</p>
+          <p>Original completed match history remains unchanged. This records the manager's replacement decision and entitlement; future makeup scheduling remains part of the existing makeup workflow.</p>
+        </div>}
+        <label style={{ display:"block", marginTop:16 }}>Management note<textarea rows="4" value={note} onChange={e => setNote(e.target.value)} /></label>
+        <button className="btn btn-success" onClick={recordResolution} disabled={busy || !preview}>Record replacement resolution</button>
+        {message && <p style={{ marginTop:12 }}>{message}</p>}
+      </div>
+      <div className="admin-card" style={{ marginTop:16 }}>
+        <h3>Replacement resolution history</h3>
+        {!history.length ? <p>No replacement resolutions recorded for this division.</p> : history.map(h => <div key={h.id} style={{ borderTop:"1px solid #444", padding:"12px 0" }}>
+          <strong>{h.replacement_team_id}</strong> — {h.effective_date} — {h.status}
+          <div>Inherited points: {h.inherited_standings?.totalPoints ?? 0}; makeup entitlement: {h.makeup_matches_used ?? 0}/{h.makeup_matches_allowed ?? 0} used</div>
+          {h.note && <div>{h.note}</div>}
+        </div>)}
+      </div>
+    </div>
+  );
+}
