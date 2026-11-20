@@ -537,6 +537,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Compare as text rather than casting untrusted archived JSON to uuid.
+  -- Historical/manual records may not always carry a UUID-shaped pairing id.
   UPDATE public.team_replacement_makeup_matches
   SET status = CASE WHEN NEW.is_makeup_pending THEN 'scheduled' ELSE 'completed' END
   WHERE schedule_pairing_id::text = v_pairing_id
