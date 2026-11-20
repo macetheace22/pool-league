@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { buildIbaScheduleSnapshotState } from "../src/db.js";
 
 describe("IBA schedule import history", () => {
