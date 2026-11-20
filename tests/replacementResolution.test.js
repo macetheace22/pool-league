@@ -44,6 +44,22 @@ describe("replacement team resolution", () => {
     })).toBe("Inherited standings must be recorded as a structured snapshot.");
   });
 
+  it("accepts a structured official IBA standings snapshot", () => {
+    expect(validateReplacementResolution({
+      dropoutResolutionId: "dr",
+      seasonId: "s",
+      divisionId: "d",
+      replacementTeamId: "r",
+      effectiveDate: "2026-11-19",
+      preview: { dropoutTeamId: "drop", eligibleMakeupWeekIds: [] },
+      inheritedStandings: {
+        totalPoints: 125,
+        position: 4,
+        weekKey: "week-17",
+        source: "official_iba",
+      },
+    })).toBe("");
+
   it("enforces the three-makeup maximum", () => {
     expect(validateReplacementResolution({
       dropoutResolutionId: "dr",
