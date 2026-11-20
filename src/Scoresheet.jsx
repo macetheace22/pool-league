@@ -487,7 +487,7 @@ function LeagueSetPracticeDetail({ set, showInnings }) {
             </table>
           </div>
           <div className="league-set-detail__summary">
-            <span>{set.racks.length} racks · {totalInnings} innings · {totalSafeties} safeties</span>
+            <span>{set.racks.length} racks · {totalInnings} innings · {totalSafeties} safeties ({set.safetiesA ?? 0} / {set.safetiesB ?? 0})</span>
             {set.winnerSide && <strong>{(set.winnerSide === "a" ? set.playerA : set.playerB).name} won {set.winnerSide === "a" ? set.finalA : set.finalB}–{set.winnerSide === "a" ? set.finalB : set.finalA}</strong>}
           </div>
         </>
