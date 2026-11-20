@@ -203,7 +203,7 @@ export default function ReplacementTeamResolution() {
             {applyingSchedule ? "Applying…" : "Apply replacement to future schedule"}
           </button>
         )}
-        {message && <p style={{ marginTop:12 }}>{message}</p>
+        {message && <p style={{ marginTop:12 }}>{message}</p>}
       </div>
       <div className="admin-card" style={{ marginTop:16 }}>
         <h3>Replacement resolution history</h3>
