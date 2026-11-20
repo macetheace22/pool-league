@@ -547,14 +547,16 @@ function LeagueScoresheet({ match, onClose, closeLabel }) {
             {match.state?.teamAway?.teamNum ? `Team ${match.state.teamAway.teamNum}` : "Team number unavailable"}
           </div>
         </div>
-        <div className="practice-scoresheet__section league-match-details">
+        <div className="practice-scoresheet__section league-match-controls">
           <div className="practice-scoresheet__section-title">Match details</div>
           <div className="view-toggle">
             <button className={`view-toggle__btn ${view === "front" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("front")}><TableIcon size={14} /> Game Detail</button>
             <button className={`view-toggle__btn ${view === "back" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("back")}><FileText size={14} /> Team Scoresheet</button>
           </div>
-          {view === "front" ? (
-            <>
+        </div>
+        {view === "front" ? (
+          <>
+            <div className="practice-scoresheet__section league-match-controls">
               <div className="set-nav">
                 <button className="set-nav__btn" disabled={setIndex === 0} onClick={() => setSetIndex(i => Math.max(0, i - 1))}><ChevronLeft size={16} /></button>
                 <span className="set-nav__label">Set {setIndex + 1} of {sets.length}</span>
@@ -563,15 +565,15 @@ function LeagueScoresheet({ match, onClose, closeLabel }) {
               <div className="scoresheet-detail-options">
                 <button type="button" className="scoresheet-detail-options__toggle" aria-pressed={showInnings} onClick={() => setShowInnings(shown => !shown)}>{showInnings ? "Hide innings" : "Show innings"}</button>
               </div>
-              <LeagueSetPracticeDetail set={sets[setIndex]} showInnings={showInnings} />
-            </>
-          ) : (
-            <div className="practice-scoresheet__section league-team-scoresheet">
-              <div className="practice-scoresheet__section-title">Team scoresheet and point totals</div>
-              <BackSheet match={match} sets={sets} />
             </div>
-          )}
-        </div>
+            <LeagueSetPracticeDetail set={sets[setIndex]} showInnings={showInnings} />
+          </>
+        ) : (
+          <div className="practice-scoresheet__section league-team-scoresheet">
+            <div className="practice-scoresheet__section-title">Team scoresheet and point totals</div>
+            <BackSheet match={match} sets={sets} />
+          </div>
+        )}
       </section>
     </div>
   );
@@ -703,13 +705,7 @@ const css = `
 .league-scoresheet__team-numbers span{color:#7FA593;}
 .league-scoresheet .view-toggle{margin-bottom:2px;}
 .league-scoresheet .set-sheet{width:100%;box-sizing:border-box;}
-.league-scoresheet .practice-scoresheet__section{background:#1C1C1C;border:1px solid #2E2E2E;border-radius:8px;padding:12px;}
-.league-scoresheet .practice-scoresheet__section-title{color:#9FC4B4;}
-.league-scoresheet .practice-scoresheet__table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #333;border-radius:8px;}
-.league-scoresheet .practice-scoresheet__table{width:100%;border-collapse:collapse;min-width:420px;color:#E5E7EB;font-size:11px;}
-.league-scoresheet .practice-scoresheet__table th{background:#0B3D2E;color:#D1E7DC;text-align:left;padding:9px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
-.league-scoresheet .practice-scoresheet__table td{padding:9px 8px;border-top:1px solid #333;text-align:left;white-space:nowrap;}
-.league-scoresheet .practice-scoresheet__table tbody tr:nth-child(even){background:#202020;}
+.league-scoresheet .practice-scoresheet__section{padding:0;}
 .league-set-detail__players{display:flex;justify-content:center;align-items:center;gap:8px;color:#E5E7EB;font-size:11px;font-weight:700;}
 .league-set-detail__players span:nth-child(2){color:#9FC4B4;font-weight:400;}
 .league-set-detail .data-source-tag{margin:0;text-align:left;background:#202020;color:#9FC4B4;}
