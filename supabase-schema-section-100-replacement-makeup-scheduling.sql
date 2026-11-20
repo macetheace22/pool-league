@@ -533,12 +533,15 @@ DECLARE
   v_pairing_id text;
 BEGIN
   v_pairing_id := NEW.state->>'schedulePairingId';
-  IF v_pairing_id IS NULL
-     OR v_pairing_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
+  IF v_pairing_id IS NULL OR v_pairing_id = '' THEN
+    RETURN NEW;
+  END IF;
 
+  -- Compare as text rather than casting untrusted archived JSON to uuid.
+  -- Historical/manual records may not always carry a UUID-shaped pairing id.
   UPDATE public.team_replacement_makeup_matches
   SET status = CASE WHEN NEW.is_makeup_pending THEN 'scheduled' ELSE 'completed' END
-  WHERE schedule_pairing_id = v_pairing_id::uuid
+  WHERE schedule_pairing_id::text = v_pairing_id
     AND status <> 'voided';
 
   RETURN NEW;
