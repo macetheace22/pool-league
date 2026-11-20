@@ -20,6 +20,9 @@ export default function ReplacementTeamResolution() {
   const [inheritedStandings, setInheritedStandings] = useState(null);
   const [note, setNote] = useState("");
   const [history, setHistory] = useState([]);
+  const [makeupMatches, setMakeupMatches] = useState([]);
+  const [makeupDates, setMakeupDates] = useState({});
+  const [schedulingMakeupId, setSchedulingMakeupId] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [recordedResolutionId, setRecordedResolutionId] = useState("");
@@ -68,10 +71,52 @@ export default function ReplacementTeamResolution() {
   }, [divisionId]);
 
   async function loadHistory() {
-    if (!divisionId) return;
-    const { data } = await supabase.from("team_replacement_resolutions")
-      .select("*").eq("division_id", divisionId).order("resolved_at", { ascending: false });
-    setHistory(data ?? []);
+    if (!divisionId) {
+      setHistory([]);
+      setMakeupMatches([]);
+      return;
+    }
+    const [{ data: resolutions, error: resolutionError }, { data: makeups, error: makeupError }] = await Promise.all([
+      supabase.from("team_replacement_resolutions")
+        .select("*").eq("division_id", divisionId).order("resolved_at", { ascending: false }),
+      supabase.from("team_replacement_makeup_matches")
+        .select("*, opponent:teams!team_replacement_makeup_matches_opponent_team_id_fkey(team_num,name)")
+        .in("replacement_resolution_id", (history ?? []).map(row => row.id)),
+    ]);
+    if (resolutionError) { setMessage(resolutionError.message); return; }
+    if (makeupError && !/empty|invalid input syntax/i.test(makeupError.message)) {
+      setMessage(makeupError.message);
+      return;
+    }
+    const rows = resolutions ?? [];
+    setHistory(rows);
+    if (rows.length) {
+      const { data: allMakeups, error } = await supabase.from("team_replacement_makeup_matches")
+        .select("*, opponent:teams!team_replacement_makeup_matches_opponent_team_id_fkey(team_num,name)")
+        .in("replacement_resolution_id", rows.map(row => row.id));
+      if (error) { setMessage(error.message); return; }
+      setMakeupMatches(allMakeups ?? []);
+    } else {
+      setMakeupMatches([]);
+    }
+  }
+
+  async function scheduleMakeup(resolution, slot) {
+    const key = resolution.id + ":" + slot.sourceByeWeekId;
+    const scheduledDate = makeupDates[key];
+    if (!scheduledDate) { setMessage("Choose a date for this replacement-team makeup."); return; }
+    if (!window.confirm(`Schedule the makeup against ${slot.opponentName} on ${scheduledDate}?`)) return;
+    setSchedulingMakeupId(key);
+    setMessage("");
+    const { data, error } = await supabase.rpc("schedule_team_replacement_makeup", {
+      p_replacement_resolution_id: resolution.id,
+      p_source_bye_week_id: slot.sourceByeWeekId,
+      p_scheduled_date: scheduledDate,
+    });
+    setSchedulingMakeupId("");
+    if (error) { setMessage(error.message); return; }
+    setMessage(data?.status === "already_scheduled" ? "That eligible makeup was already scheduled." : "Replacement-team makeup scheduled.");
+    await loadHistory();
   }
 
   useEffect(() => { loadHistory(); }, [divisionId]);
@@ -211,6 +256,24 @@ export default function ReplacementTeamResolution() {
           <strong>{h.replacement_team_id}</strong> — {h.effective_date} — {h.status}
           <div>Inherited points: {h.inherited_standings?.totalPoints ?? 0}; makeup entitlement: {h.makeup_matches_used ?? 0}/{h.makeup_matches_allowed ?? 0} used</div>
           {h.note && <div>{h.note}</div>}
+          {(h.eligible_makeup_weeks ?? []).map(slot => {
+            const key = h.id + ":" + slot.sourceByeWeekId;
+            const existing = makeupMatches.find(row => row.replacement_resolution_id === h.id && row.source_bye_week_id === slot.sourceByeWeekId && row.status !== "voided");
+            return <div key={key} style={{ marginTop:10, padding:10, border:"1px solid #555", borderRadius:8 }}>
+              <strong>Bye from Week {slot.sourceWeekNum ?? "—"} · {slot.sourceWeekDate ?? ""}</strong>
+              <div>Opponent: {slot.opponentName ?? "Unknown team"}</div>
+              {existing ? (
+                <div style={{ marginTop:6 }}>Scheduled {existing.scheduled_date} · {existing.status}</div>
+              ) : (
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"end", marginTop:8 }}>
+                  <label>Makeup date<input type="date" value={makeupDates[key] ?? ""} onChange={event => setMakeupDates(prev => ({ ...prev, [key]: event.target.value }))} /></label>
+                  <button className="btn btn-primary" disabled={!!schedulingMakeupId || (h.makeup_matches_used ?? 0) >= (h.makeup_matches_allowed ?? 0)} onClick={() => scheduleMakeup(h, slot)}>
+                    {schedulingMakeupId === key ? "Scheduling…" : "Schedule makeup"}
+                  </button>
+                </div>
+              )}
+            </div>;
+          })}
         </div>)}
       </div>
     </div>
