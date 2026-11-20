@@ -57,6 +57,7 @@ describe("Section 8.8 replacement-team makeup scheduling", () => {
     expect(sql).toContain("sync_team_replacement_makeup_match_status");
     expect(sql).toContain("NEW.state->>'schedulePairingId'");
     expect(sql).toContain("schedule_pairing_id::text = v_pairing_id");
+    expect(sql.trim().endsWith("COMMIT;")).toBe(true);
     expect(sql).toContain("NEW.is_makeup_pending THEN 'scheduled' ELSE 'completed'");
   });
 });
