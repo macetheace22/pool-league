@@ -20,7 +20,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $section98$
 DECLARE
   v_dropout_team_id uuid;
   v_week_ids jsonb := '[]'::jsonb;
@@ -118,7 +118,7 @@ BEGIN
       '[]'::jsonb)
   );
 END;
-$;
+$section98$;
 
 REVOKE ALL ON FUNCTION public.preview_team_replacement_resolution(uuid,uuid,uuid,uuid,date)
   FROM PUBLIC, anon, authenticated;
