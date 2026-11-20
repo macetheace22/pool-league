@@ -705,7 +705,17 @@ const css = `
 .league-scoresheet__team-numbers span{color:#7FA593;}
 .league-scoresheet .view-toggle{margin-bottom:2px;}
 .league-scoresheet .set-sheet{width:100%;box-sizing:border-box;}
-.league-scoresheet .practice-scoresheet__section{padding:0;}
+.league-scoresheet .practice-scoresheet__section{display:flex;flex-direction:column;gap:7px;min-width:0;padding:0;}
+.league-scoresheet .practice-scoresheet__section-title{color:#9A9A9A;}
+.league-scoresheet .practice-scoresheet__empty{font-size:11px;color:#777;padding:10px;background:#1C1C1C;border-radius:7px;}
+.league-scoresheet .practice-scoresheet__table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #333;border-radius:7px;}
+.league-scoresheet .practice-scoresheet__table{width:100%;border-collapse:collapse;font-size:10.5px;white-space:nowrap;color:#E0E0E0;}
+.league-scoresheet .practice-scoresheet__table th{background:#252525;color:#B7D2C6;text-align:left;font-size:9px;text-transform:uppercase;padding:8px 6px;white-space:nowrap;}
+.league-scoresheet .practice-scoresheet__table td{padding:8px 6px;border-top:1px solid #303030;color:#E0E0E0;white-space:nowrap;}
+.league-scoresheet .practice-scoresheet__events{display:flex;flex-direction:column;gap:5px;}
+.league-scoresheet .practice-scoresheet__event{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;padding:8px;background:#1C1C1C;border-radius:6px;font-size:10.5px;color:#E0E0E0;}
+.league-scoresheet .practice-scoresheet__event>span:nth-child(2){color:#9FC4B4;text-align:right;}
+.league-scoresheet .practice-scoresheet__event time{grid-column:1/-1;font-size:9px;color:#777;}
 .league-set-detail__players{display:flex;justify-content:center;align-items:center;gap:8px;color:#E5E7EB;font-size:11px;font-weight:700;}
 .league-set-detail__players span:nth-child(2){color:#9FC4B4;font-weight:400;}
 .league-set-detail .data-source-tag{margin:0;text-align:left;background:#202020;color:#9FC4B4;}
