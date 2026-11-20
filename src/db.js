@@ -1078,7 +1078,7 @@ export function buildIbaScheduleSnapshotState(weeks, teams = []) {
       special: week.special ? String(week.special).trim() : null,
       isPlayoff: /playoff/i.test(week.special ?? "") || !!week.isPlayoff || !!week.is_playoff,
       pairings: (week.pairings ?? []).map(pairing => {
-        const homeTeam = pairing.homeTeamId ? { id: pairing.homeTeamId } : teamByNum.get(String(pairing.homeTeamNum ?? pairning.homeTeam ?? ""));
+        const homeTeam = pairing.homeTeamId ? { id: pairing.homeTeamId } : teamByNum.get(String(pairing.homeTeamNum ?? pairing.homeTeam ?? ""));
         const awayTeam = pairing.awayTeamId ? { id: pairing.awayTeamId } : teamByNum.get(String(pairing.awayTeamNum ?? pairing.awayTeam ?? ""));
         return {
           homeTeamId: homeTeam?.id ?? null,
