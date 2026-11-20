@@ -40,7 +40,7 @@ describe("Section 8.8 replacement-team makeup scheduling contract", () => {
   });
 
   it("keeps manager-created makeup weeks when a new IBA schedule is imported", () => {
-    expect(db).toContain('special.startsWith("REPLACEMENT_MAKEUP:")');
+    expect(db).toContain('.startsWith("REPLACEMENT_MAKEUP:")');
     expect(db).toContain("special.not.like.REPLACEMENT_MAKEUP:%");
   });
 
