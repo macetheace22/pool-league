@@ -21,7 +21,7 @@ export default function ReplacementTeamResolution() {
   const [note, setNote] = useState("");
   const [history, setHistory] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState("");\n  const [recordedResolutionId, setRecordedResolutionId] = useState("");\n  const [applyingSchedule, setApplyingSchedule] = useState(false);
 
   useEffect(() => {
     if (profile?.role !== "manager") return;
@@ -172,7 +172,36 @@ export default function ReplacementTeamResolution() {
         </div>}
         <label style={{ display:"block", marginTop:16 }}>Management note<textarea rows="4" value={note} onChange={e => setNote(e.target.value)} /></label>
         <button className="btn btn-success" onClick={recordResolution} disabled={busy || !preview}>Record replacement resolution</button>
-        {message && <p style={{ marginTop:12 }}>{message}</p>}
+        {recordedResolutionId && (
+          <button
+            className="btn btn-primary"
+            style={{ marginLeft: 8 }}
+            disabled={applyingSchedule}
+            onClick={async () => {
+              if (!window.confirm("Apply this replacement team to future scheduled matchups? Existing completed matches and BYE weeks will remain unchanged.")) return;
+              setApplyingSchedule(true);
+              setMessage("");
+              const { data, error } = await supabase.rpc("apply_team_replacement_schedule", {
+                p_replacement_resolution_id: recordedResolutionId,
+              });
+              setApplyingSchedule(false);
+              if (error) {
+                setMessage(error.message);
+                return;
+              }
+              setMessage(
+                data?.status === "already_applied"
+                  ? "Replacement schedule was already applied."
+                  : `Replacement schedule applied: ${data?.changedMatchupCount ?? 0} future matchup(s) updated.`,
+              );
+              setRecordedResolutionId("");
+              await loadHistory();
+            }}
+          >
+            {applyingSchedule ? "Applying…" : "Apply replacement to future schedule"}
+          </button>
+        )}
+        {message && <p style={{ marginTop:12 }}>{message}</p>
       </div>
       <div className="admin-card" style={{ marginTop:16 }}>
         <h3>Replacement resolution history</h3>
