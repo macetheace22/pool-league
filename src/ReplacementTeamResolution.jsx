@@ -81,7 +81,7 @@ export default function ReplacementTeamResolution() {
       return;
     }
     setBusy(true);
-    const [{ data, error }, standings] = await Promise.all([
+    const [{ data, error }, officialRows] = await Promise.all([
       supabase.rpc("preview_team_replacement_resolution", {
         p_season_id: seasonId,
         p_division_id: divisionId,
@@ -89,12 +89,14 @@ export default function ReplacementTeamResolution() {
         p_replacement_team_id: replacementTeamId,
         p_effective_date: effectiveDate,
       }),
-      db.computeFinalStandings(divisionId),
+      db.listStandingsAdjustments(divisionId),
     ]);
     setBusy(false);
     if (error) { setMessage(error.message); return; }
+
     const normalized = normalizeReplacementPreview(data);
-    const dropoutStandings = standings.find(row => row.teamId === normalized.dropoutTeamId);
+    const officialStandings = db.computeOfficialStandings(officialRows);
+    const dropoutStandings = officialStandings.find(row => row.teamId === normalized.dropoutTeamId);
     const snapshot = dropoutStandings ? {
       totalPoints: dropoutStandings.totalPoints ?? 0,
       wins: dropoutStandings.wins ?? 0,
@@ -102,12 +104,21 @@ export default function ReplacementTeamResolution() {
       setsFor: dropoutStandings.setsFor ?? 0,
       setsAgainst: dropoutStandings.setsAgainst ?? 0,
       setsPlayed: dropoutStandings.setsPlayed ?? 0,
-      pointsPerSet: dropoutStandings.pointsPerSet ?? 0,
+      pointsPerSet: dropoutStandings.setsPlayed
+        ? Number(((dropoutStandings.totalPoints ?? 0) / dropoutStandings.setsPlayed).toFixed(2))
+        : 0,
+      position: dropoutStandings.position ?? null,
+      weekKey: dropoutStandings.weekKey ?? null,
+      reportLabel: dropoutStandings.reportLabel ?? null,
+      source: dropoutStandings.source ?? "official_iba",
       capturedAt: new Date().toISOString(),
-    } : {
-      totalPoints: 0, wins: 0, losses: 0, setsFor: 0, setsAgainst: 0, setsPlayed: 0,
-      pointsPerSet: 0, capturedAt: new Date().toISOString(),
-    };
+    } : null;
+
+    if (!snapshot) {
+      setMessage("No imported official IBA team-standings snapshot exists for the dropout team in this division. Import the applicable standings report before recording the replacement.");
+      return;
+    }
+
     setPreview(normalized);
     setInheritedStandings(snapshot);
   }
@@ -156,7 +167,7 @@ export default function ReplacementTeamResolution() {
           <strong>Replacement impact</strong>
           <p>{preview.dropoutTeamName} → {preview.replacementTeamName}</p>
           <p>Eligible post-dropout bye weeks: {preview.eligibleMakeupWeekCount} (maximum three).</p>
-          <p>Inherited points snapshot: {inheritedStandings?.totalPoints ?? 0} points; {inheritedStandings?.setsPlayed ?? 0} sets.</p>
+          <p>Inherited official IBA snapshot: {inheritedStandings?.totalPoints ?? 0} points; report {inheritedStandings?.reportLabel || inheritedStandings?.weekKey || "unknown week"}.</p>
           <p>Original completed match history remains unchanged. This records the manager's replacement decision and entitlement; future makeup scheduling remains part of the existing makeup workflow.</p>
         </div>}
         <label style={{ display:"block", marginTop:16 }}>Management note<textarea rows="4" value={note} onChange={e => setNote(e.target.value)} /></label>
