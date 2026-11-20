@@ -1108,7 +1108,8 @@ async function snapshotCurrentIbaSchedule(divisionId, context) {
   const { data, error } = await supabase
     .from("schedule_weeks")
     .select("week_num, date, special, is_playoff, schedule_pairings(home_team_id, away_team_id, home_tbd_code, away_tbd_code)")
-    .eq("division_id", divisionId);
+    .eq("division_id", divisionId)
+    .or("special.is.null,special.not.like.REPLACEMENT_MAKEUP:%");
   if (error) throw new Error(`Could not snapshot the existing IBA schedule: ${error.message}`);
   if (!(data ?? []).length) return null;
   const state = buildIbaScheduleSnapshotState((data ?? []).map(week => ({
