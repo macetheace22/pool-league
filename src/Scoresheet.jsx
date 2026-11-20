@@ -478,50 +478,70 @@ function LeagueScoresheet({ match, onClose, closeLabel }) {
     );
   }
 
+  const homeScore = match.team_home_total ?? "—";
+  const awayScore = match.team_away_total ?? "—";
+  const formatLabel = isMasters ? "IBA Masters Format" : match.format === "open" ? "IBA Open Format" : "IBA Advanced Format";
+
   return (
     <div className="scoresheet-app">
       <style>{css}</style>
       <button className="scoresheet-close" onClick={onClose}><X size={14}/> {closeLabel}</button>
       {makeupBanner}
-      <div className="app__header">
-        <div className="app__header-meta">{match.venue || "—"} · {match.week_num ? `Week ${match.week_num}` : match.week_date || ""} · {isMasters ? "IBA Masters Format" : match.format === "open" ? "IBA Open Format" : "IBA Advanced Format"}</div>
-        <div className="app__header-teams">{match.state?.teamHome?.teamNum ? `Team ${match.state.teamHome.teamNum}` : "Team number unavailable"} <span className="vs-sm">vs</span> {match.state?.teamAway?.teamNum ? `Team ${match.state.teamAway.teamNum}` : "Team number unavailable"}</div>
-        <div className="app__header-title">{match.team_home_name} <span className="vs-sm">vs</span> {match.team_away_name}</div>
-      </div>
-      <div className="view-toggle">
-        <button className={`view-toggle__btn ${view === "front" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("front")}>
-          <TableIcon size={14} /> Game Detail
-        </button>
-        <button className={`view-toggle__btn ${view === "back" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("back")}>
-          <FileText size={14} /> Team Scoresheet
-        </button>
-      </div>
-      {view === "front" ? (
-        <>
-          <div className="set-nav">
-            <button className="set-nav__btn" disabled={setIndex === 0} onClick={() => setSetIndex((i) => Math.max(0, i - 1))}>
-              <ChevronLeft size={16} />
+      <section className="practice-scoresheet league-scoresheet" aria-label="League match scoresheet">
+        <div className="practice-scoresheet__header">
+          <div className="practice-scoresheet__eyebrow">League scoresheet · Read only</div>
+          <div className="practice-scoresheet__players">
+            <div><strong>{match.team_home_name}</strong><b>{homeScore}</b></div>
+            <span>vs</span>
+            <div><strong>{match.team_away_name}</strong><b>{awayScore}</b></div>
+          </div>
+          <div className="practice-scoresheet__meta">
+            {match.venue || "—"} · {match.week_num ? `Week ${match.week_num}` : match.week_date || ""} · {formatLabel}
+          </div>
+          <div className="league-scoresheet__team-numbers">
+            {match.state?.teamHome?.teamNum ? `Team ${match.state.teamHome.teamNum}` : "Team number unavailable"}
+            <span>vs</span>
+            {match.state?.teamAway?.teamNum ? `Team ${match.state.teamAway.teamNum}` : "Team number unavailable"}
+          </div>
+        </div>
+        <div className="practice-scoresheet__section">
+          <div className="practice-scoresheet__section-title">Match details</div>
+          <div className="view-toggle">
+            <button className={`view-toggle__btn ${view === "front" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("front")}>
+              <TableIcon size={14} /> Game Detail
             </button>
-            <span className="set-nav__label">Set {setIndex + 1} of {sets.length}</span>
-            <button className="set-nav__btn" disabled={setIndex === sets.length - 1} onClick={() => setSetIndex((i) => Math.min(sets.length - 1, i + 1))}>
-              <ChevronRight size={16} />
+            <button className={`view-toggle__btn ${view === "back" ? "view-toggle__btn--active" : ""}`} onClick={() => setView("back")}>
+              <FileText size={14} /> Team Scoresheet
             </button>
           </div>
-          <div className="scoresheet-detail-options">
-            <button
-              type="button"
-              className="scoresheet-detail-options__toggle"
-              aria-pressed={showInnings}
-              onClick={() => setShowInnings((shown) => !shown)}
-            >
-              {showInnings ? "Hide innings" : "Show innings"}
-            </button>
-          </div>
-          <FrontSheetSet set={sets[setIndex]} showInnings={showInnings} />
-        </>
-      ) : (
-        <BackSheet match={match} sets={sets} />
-      )}
+          {view === "front" ? (
+            <>
+              <div className="set-nav">
+                <button className="set-nav__btn" disabled={setIndex === 0} onClick={() => setSetIndex((i) => Math.max(0, i - 1))}>
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="set-nav__label">Set {setIndex + 1} of {sets.length}</span>
+                <button className="set-nav__btn" disabled={setIndex === sets.length - 1} onClick={() => setSetIndex((i) => Math.min(sets.length - 1, i + 1))}>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <div className="scoresheet-detail-options">
+                <button
+                  type="button"
+                  className="scoresheet-detail-options__toggle"
+                  aria-pressed={showInnings}
+                  onClick={() => setShowInnings((shown) => !shown)}
+                >
+                  {showInnings ? "Hide innings" : "Show innings"}
+                </button>
+              </div>
+              <FrontSheetSet set={sets[setIndex]} showInnings={showInnings} />
+            </>
+          ) : (
+            <BackSheet match={match} sets={sets} />
+          )}
+        </div>
+      </section>
     </div>
   );
 }
@@ -636,6 +656,22 @@ function PracticeScoresheetView({ game, profile, onClose, closeLabel }) {
 const css = `
 .scoresheet-app { font-family: 'Archivo', sans-serif; background: #0E0E0E; padding: 14px; color: #FFFFFF; display: flex; flex-direction: column; gap: 12px; }
 .scoresheet-close { display: flex; align-items: center; gap: 6px; background: none; border: none; color: #5FCF9E; font-family: 'Archivo', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; padding: 0; align-self: flex-start; }
+.practice-scoresheet{display:flex;flex-direction:column;gap:12px;background:#141414;border:1px solid #2A2A2A;border-radius:10px;padding:12px;min-width:0;}
+.practice-scoresheet__header{background:#0B3D2E;border-radius:8px;padding:12px;}
+.practice-scoresheet__eyebrow,.practice-scoresheet__section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#9FC4B4;}
+.practice-scoresheet__players{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0;}
+.practice-scoresheet__players div{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;}
+.practice-scoresheet__players div:last-child{text-align:right;}
+.practice-scoresheet__players strong{font-size:11px;overflow-wrap:anywhere;color:#fff;}
+.practice-scoresheet__players b{font-family:'JetBrains Mono',monospace;font-size:25px;color:#fff;}
+.practice-scoresheet__players>span{font-size:10px;color:#9FC4B4;}
+.practice-scoresheet__meta{font-size:10px;color:#9FC4B4;line-height:1.5;}
+.practice-scoresheet__section{display:flex;flex-direction:column;gap:10px;min-width:0;}
+.practice-scoresheet__section-title{color:#9A9A9A;}
+.league-scoresheet__team-numbers{display:flex;gap:8px;align-items:center;justify-content:center;color:#C4D8CE;font-size:10px;margin-top:8px;}
+.league-scoresheet__team-numbers span{color:#7FA593;}
+.league-scoresheet .view-toggle{margin-bottom:2px;}
+.league-scoresheet .set-sheet{width:100%;box-sizing:border-box;}
 .empty-state-ss { font-size: 12.5px; color: #5A5A5A; text-align: center; padding: 24px; background: #1C1C1C; border: 1.5px solid #2E2E2E; border-radius: 10px; }
 
 .app__header { background: #0B3D2E; background-image: radial-gradient(circle at 50% 0%, #0F4A37 0%, #0B3D2E 70%); border-radius: 14px; padding: 16px 18px; color: #FFFFFF; }
