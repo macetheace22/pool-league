@@ -156,12 +156,12 @@ export async function resumeMakeupMatch(matchRow) {
 }
 
 // ─── Playoffs ───────────────────────────────────────────────────────────────
-// Final standings, seeded 1..N, real teams only (skips synthetic "manual:name"
-// rows from a standings import that was never matched to a real team --
-// those can't anchor a real schedule_pairing).
+// Final playoff seeds come from the latest official IBA standings report.
+// App-entered match results are deliberately not added: IBA publishes the
+// authoritative cumulative totals and positions used for league standings.
 export async function computeFinalStandings(divisionId) {
-  const [matches, adj] = await Promise.all([listCompletedMatches(divisionId), listStandingsAdjustments(divisionId)]);
-  return computeStandings(matches, adj).filter(s => typeof s.teamId === "string" && !s.teamId.startsWith("manual:"));
+  const adjustments = await listStandingsAdjustments(divisionId);
+  return computeFinalStandingsFromOfficialRows(adjustments);
 }
 
 async function createPlayoffWeek(divisionId, label) {
@@ -2328,6 +2328,14 @@ export function computeOfficialStandings(adjustments = []) {
     reportLabel: adj.label ?? null, source: "official_iba",
   })).sort((a,b) => a.position == null ? (b.position == null ? 0 : 1) : b.position == null ? -1 : a.position-b.position);
 }
+// Keep playoff seeding on the same official-IBA source as the public
+// standings screen. Unmatched import rows have no real team id and cannot
+// anchor playoff schedule pairings, so exclude them rather than inventing a seed.
+export function computeFinalStandingsFromOfficialRows(adjustments = []) {
+  return computeOfficialStandings(adjustments)
+    .filter(row => typeof row.teamId === "string" && !row.teamId.startsWith("manual:"));
+}
+
 export function computeOfficialMvp(adjustments = []) {
   return (adjustments ?? []).map(adj => ({
     num: adj.player_num ?? `manual:${adj.player_name}`, name: adj.player_name,
@@ -2970,11 +2978,10 @@ export async function getStatsForDivisions(playerNum, divisionIds) {
   return ranked.find(p => p.num === playerNum) ?? zero;
 }
 
-// One team's wins/losses/points/sets-for/sets-against within its division's
-// real standings, plus its rank -- runs the exact same computeStandings()
-// formula the division's own Standings tab uses (points-based, matching the
-// real IBA report), scoped to the whole division so the rank is accurate,
-// then picks out just this one team's row. Powers Team Lookup's record card.
+// One team's official IBA wins/losses/points/sets-for/sets-against and
+// published position within its division. This deliberately uses the same
+// imported snapshot as the Standings screen, not app-recomputed match totals.
+// Powers Team Lookup's record card.
 export async function getTeamStandingsRow(teamId, divisionId) {
   const adjustments = await listStandingsAdjustments(divisionId);
   const standings = computeOfficialStandings(adjustments);
