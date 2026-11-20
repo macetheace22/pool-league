@@ -699,8 +699,19 @@ const css = `
 .practice-scoresheet__players b{font-family:'JetBrains Mono',monospace;font-size:25px;color:#fff;}
 .practice-scoresheet__players>span{font-size:10px;color:#9FC4B4;}
 .practice-scoresheet__meta{font-size:10px;color:#9FC4B4;line-height:1.5;}
-.practice-scoresheet__section{display:flex;flex-direction:column;gap:10px;min-width:0;}
+.practice-scoresheet__section{display:flex;flex-direction:column;gap:7px;min-width:0;}
 .practice-scoresheet__section-title{color:#9A9A9A;}
+/* Shared practice-detail styles live with the scoresheet component so the
+   exact same presentation is available from both Practice and My Stats. */
+.practice-scoresheet__empty{font-size:11px;color:#777;padding:10px;background:#1C1C1C;border-radius:7px;}
+.practice-scoresheet__table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #333;border-radius:7px;}
+.practice-scoresheet__table{width:100%;border-collapse:collapse;font-size:10.5px;white-space:nowrap;color:#E0E0E0;}
+.practice-scoresheet__table th{background:#252525;color:#B7D2C6;text-align:left;font-size:9px;text-transform:uppercase;padding:8px 6px;white-space:nowrap;}
+.practice-scoresheet__table td{padding:8px 6px;border-top:1px solid #303030;color:#E0E0E0;white-space:nowrap;}
+.practice-scoresheet__events{display:flex;flex-direction:column;gap:5px;}
+.practice-scoresheet__event{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;padding:8px;background:#1C1C1C;border-radius:6px;font-size:10.5px;color:#E0E0E0;}
+.practice-scoresheet__event>span:nth-child(2){color:#9FC4B4;text-align:right;}
+.practice-scoresheet__event time{grid-column:1/-1;font-size:9px;color:#777;}
 .league-scoresheet__team-numbers{display:flex;gap:8px;align-items:center;justify-content:center;color:#C4D8CE;font-size:10px;margin-top:8px;}
 .league-scoresheet__team-numbers span{color:#7FA593;}
 .league-scoresheet .view-toggle{margin-bottom:2px;}
