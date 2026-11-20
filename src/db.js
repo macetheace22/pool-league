@@ -1016,11 +1016,24 @@ export async function replaceSchedule(divisionId, parsedWeeks, teams, snapshotCo
     reportPrintedOnDate: snapshotContext.reportPrintedOnDate ?? null,
   };
   await snapshotCurrentIbaSchedule(divisionId, context);
-  const { error: deleteError } = await supabase
+  // Replacement-team makeup fixtures are manager-created schedule records,
+  // not IBA rows. Preserve their custom weeks and pairings across IBA imports;
+  // the associated application table uses RESTRICT FKs so history stays linked.
+  const { data: existingWeeks, error: existingWeeksError } = await supabase
     .from("schedule_weeks")
-    .delete()
+    .select("id, special")
     .eq("division_id", divisionId);
-  if (deleteError) throw new Error(deleteError.message);
+  if (existingWeeksError) throw new Error(existingWeeksError.message);
+  const importedWeekIdsToDelete = (existingWeeks ?? [])
+    .filter(week => !String(week.special ?? "").startsWith("REPLACEMENT_MAKEUP:"))
+    .map(week => week.id);
+  if (importedWeekIdsToDelete.length) {
+    const { error: deleteError } = await supabase
+      .from("schedule_weeks")
+      .delete()
+      .in("id", importedWeekIdsToDelete);
+    if (deleteError) throw new Error(deleteError.message);
+  }
 
   for (const w of parsedWeeks) {
     const isPlayoff = /playoff/i.test(w.special ?? "");
