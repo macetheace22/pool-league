@@ -21,6 +21,7 @@ export default function ReplacementTeamResolution() {
   const [note, setNote] = useState("");
   const [history, setHistory] = useState([]);
   const [makeupMatches, setMakeupMatches] = useState([]);
+  const [scheduleApplications, setScheduleApplications] = useState([]);
   const [makeupDates, setMakeupDates] = useState({});
   const [schedulingMakeupId, setSchedulingMakeupId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -74,6 +75,7 @@ export default function ReplacementTeamResolution() {
     if (!divisionId) {
       setHistory([]);
       setMakeupMatches([]);
+      setScheduleApplications([]);
       return;
     }
     const { data: resolutions, error: resolutionError } = await supabase.from("team_replacement_resolutions")
@@ -87,8 +89,14 @@ export default function ReplacementTeamResolution() {
         .in("replacement_resolution_id", rows.map(row => row.id));
       if (error) { setMessage(error.message); return; }
       setMakeupMatches(allMakeups ?? []);
+      const { data: applications, error: applicationError } = await supabase.from("team_replacement_schedule_applications")
+        .select("id,replacement_resolution_id,status")
+        .in("replacement_resolution_id", rows.map(row => row.id));
+      if (applicationError) { setMessage(applicationError.message); return; }
+      setScheduleApplications(applications ?? []);
     } else {
       setMakeupMatches([]);
+      setScheduleApplications([]);
     }
   }
 
@@ -247,6 +255,19 @@ export default function ReplacementTeamResolution() {
           <strong>{h.replacement_team_id}</strong> — {h.effective_date} — {h.status}
           <div>Inherited points: {h.inherited_standings?.totalPoints ?? 0}; makeup entitlement: {h.makeup_matches_used ?? 0}/{h.makeup_matches_allowed ?? 0} used</div>
           {h.note && <div>{h.note}</div>}
+          {!scheduleApplications.some(row => row.replacement_resolution_id === h.id && row.status === "applied") && (
+            <button className="btn btn-primary" style={{ marginTop:8 }} disabled={applyingSchedule}
+              onClick={async () => {
+                if (!window.confirm("Apply this replacement team to future scheduled matchups? Existing completed matches and BYE weeks will remain unchanged.")) return;
+                setApplyingSchedule(true);
+                setMessage("");
+                const { data, error } = await supabase.rpc("apply_team_replacement_schedule", { p_replacement_resolution_id: h.id });
+                setApplyingSchedule(false);
+                if (error) { setMessage(error.message); return; }
+                setMessage(data?.status === "already_applied" ? "Replacement schedule was already applied." : "Replacement schedule applied.");
+                await loadHistory();
+              }}>Apply replacement to future schedule</button>
+          )}
           {(h.eligible_makeup_weeks ?? []).map(slot => {
             const key = h.id + ":" + slot.sourceByeWeekId;
             const existing = makeupMatches.find(row => row.replacement_resolution_id === h.id && row.source_bye_week_id === slot.sourceByeWeekId && row.status !== "voided");
