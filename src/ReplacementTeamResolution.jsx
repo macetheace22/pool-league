@@ -76,23 +76,14 @@ export default function ReplacementTeamResolution() {
       setMakeupMatches([]);
       return;
     }
-    const [{ data: resolutions, error: resolutionError }, { data: makeups, error: makeupError }] = await Promise.all([
-      supabase.from("team_replacement_resolutions")
-        .select("*").eq("division_id", divisionId).order("resolved_at", { ascending: false }),
-      supabase.from("team_replacement_makeup_matches")
-        .select("*, opponent:teams!team_replacement_makeup_matches_opponent_team_id_fkey(team_num,name)")
-        .in("replacement_resolution_id", (history ?? []).map(row => row.id)),
-    ]);
+    const { data: resolutions, error: resolutionError } = await supabase.from("team_replacement_resolutions")
+      .select("*").eq("division_id", divisionId).order("resolved_at", { ascending: false });
     if (resolutionError) { setMessage(resolutionError.message); return; }
-    if (makeupError && !/empty|invalid input syntax/i.test(makeupError.message)) {
-      setMessage(makeupError.message);
-      return;
-    }
     const rows = resolutions ?? [];
     setHistory(rows);
     if (rows.length) {
       const { data: allMakeups, error } = await supabase.from("team_replacement_makeup_matches")
-        .select("*, opponent:teams!team_replacement_makeup_matches_opponent_team_id_fkey(team_num,name)")
+        .select("*")
         .in("replacement_resolution_id", rows.map(row => row.id));
       if (error) { setMessage(error.message); return; }
       setMakeupMatches(allMakeups ?? []);
