@@ -164,28 +164,51 @@ export async function computeFinalStandings(divisionId) {
   const prepared = prepareOfficialPlayoffSeeds(adjustments);
   if (prepared.error) return prepared;
 
-  // The current view intentionally excludes unmatched team rows. Check the
-  // raw import rows for this same report week so an unresolved team cannot
-  // silently disappear from the bracket seed list.
+  // Validate against the expected real-team roster for the report's own
+  // effective date. BYE placeholders are never standings teams. A dropout
+  // is removed only after both its manager resolution and schedule application
+  // are recorded as applied and the report week is on/after its effective date.
   const weekKey = adjustments[0]?.week_key;
-  const [{ data: unmatchedRows, error: unmatchedError }, { data: divisionTeams, error: teamsError }] = await Promise.all([
+  const [
+    { data: unmatchedRows, error: unmatchedError },
+    { data: divisionTeams, error: teamsError },
+    { data: replacementResolutions, error: resolutionsError },
+    { data: scheduleApplications, error: applicationsError },
+  ] = await Promise.all([
     supabase.from("standings_adjustments").select("team_num")
       .eq("division_id", divisionId).eq("week_key", weekKey).is("team_id", null),
-    supabase.from("teams").select("team_num").eq("division_id", divisionId),
+    supabase.from("teams").select("id,team_num,is_bye").eq("division_id", divisionId),
+    supabase.from("team_replacement_resolutions")
+      .select("id,dropout_team_id,effective_date,status").eq("division_id", divisionId),
+    supabase.from("team_replacement_schedule_applications")
+      .select("replacement_resolution_id,status").eq("division_id", divisionId),
   ]);
-  if (unmatchedError || teamsError) {
-    return { error: "Could not validate unmatched teams in the official IBA standings import." };
+  if (unmatchedError || teamsError || resolutionsError || applicationsError) {
+    return { error: "Could not validate the complete expected team set for the official IBA standings report." };
   }
+
   // Older unmatched rows can remain after a manager fixes the team-number
   // mapping and re-imports the same week (NULL team_id does not conflict in
   // the import upsert). Treat them as resolved when that team number now maps
   // to a real team in this division.
-  const knownTeamNums = new Set((divisionTeams ?? []).map(team => String(team.team_num ?? "").trim()).filter(Boolean));
-  const unresolvedRows = (unmatchedRows ?? []).filter(row => !knownTeamNums.has(String(row.team_num ?? "").trim()));
+  const knownTeamNums = new Set((divisionTeams ?? [])
+    .filter(team => team.is_bye !== true)
+    .map(team => String(team.team_num ?? "").trim()).filter(Boolean));
+  const unresolvedRows = (unmatchedRows ?? []).filter(row =>
+    !knownTeamNums.has(String(row.team_num ?? "").trim())
+  );
   if (unresolvedRows.length) {
     return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
   }
-  return prepared;
+
+  const expected = getExpectedOfficialStandingsTeams(
+    divisionTeams ?? [],
+    replacementResolutions ?? [],
+    scheduleApplications ?? [],
+    weekKey
+  );
+  if (expected.error) return expected;
+  return prepareOfficialPlayoffSeeds(adjustments, false, expected.teams);
 }
 
 async function createPlayoffWeek(divisionId, label) {
