@@ -682,7 +682,7 @@ describe("Section 105 account full names and identity validation", () => {
     expect(practice).toContain("request.requester_full_name");
     expect(practice).toContain("request.target_full_name");
     expect(practice).toContain("p.full_name");
-    expect(practice).toContain("They must confirm before your practice history is linked.");
+    expect(practice).toContain("they must confirm before your practice history is linked.");
   });
 
   it("uses full names for both sides of linked practice history without rewriting saved games", () => {
