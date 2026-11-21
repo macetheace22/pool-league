@@ -31,6 +31,16 @@ describe("Annual MVP Tournament invitations", () => {
     expect(result.crossFormatResolutions).toHaveLength(1);
   });
 
+  it("assigns a player qualifying in Advanced and Masters to Masters only", () => {
+    const result = buildAnnualMvpTournamentInvitations([
+      division("a1", "Advanced", [player(789, 1)]),
+      division("m1", "Masters", [player(789, 15)]),
+    ]);
+    expect(result.invitationsByFormat.Advanced).toHaveLength(0);
+    expect(result.invitationsByFormat.Masters).toHaveLength(1);
+    expect(result.invitationsByFormat.Masters[0].alsoQualifiedIn).toEqual(["Advanced"]);
+  });
+
   it("combines same-format qualifications into one invitation while retaining all divisions", () => {
     const result = buildAnnualMvpTournamentInvitations([
       division("o1", "Open", [player(123, 5)]),
@@ -56,5 +66,6 @@ describe("Annual MVP Tournament invitations", () => {
     ]);
     expect(result.invitationsByFormat.Open).toHaveLength(0);
     expect(result.identityReview).toHaveLength(1);
+    expect(result.complete).toBe(false);
   });
 });
