@@ -2,6 +2,7 @@ import { supabase } from "./supabaseClient";
 import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
 import { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 import { buildRosterSyncPlan } from "./rosterReconciliation";
+import { toLinkedPracticeGame } from "./practiceHistory";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -2903,8 +2904,22 @@ export async function listMyPracticeGames(profileId) {
     linkedGames = data ?? [];
   }
 
+  let linkedGamesWithOwners = linkedGames;
+  if (linkedGames.length > 0) {
+    const { data: owners, error: ownerError } = await supabase.rpc(
+      "list_linked_practice_game_owners",
+      { p_practice_game_ids: linkedGames.map(game => game.id) },
+    );
+    if (ownerError) throw ownerError;
+    const ownerByGameId = new Map((owners ?? []).map(owner => [owner.practice_game_id, owner]));
+    linkedGamesWithOwners = linkedGames.map(game =>
+      toLinkedPracticeGame(game, ownerByGameId.get(game.id) ?? {}),
+    );
+  }
+
   const byId = new Map();
-  [...(ownGames ?? []), ...linkedGames].forEach(game => byId.set(game.id, game));
+  (ownGames ?? []).forEach(game => byId.set(game.id, { ...game, viewer_perspective: "creator" }));
+  linkedGamesWithOwners.forEach(game => byId.set(game.id, game));
   return [...byId.values()].sort((a, b) =>
     new Date(b.played_at ?? b.completed_at ?? 0).getTime() -
     new Date(a.played_at ?? a.completed_at ?? 0).getTime()
