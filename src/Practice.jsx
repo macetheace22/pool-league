@@ -269,7 +269,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
             Enter a claim code to request linking your practice history. The owner must approve.
           </div>
           <div style={{display:"flex",gap:8}}>
-            <input className="input input--code" value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
+            <input className="input" style={{fontSize:14,letterSpacing:"normal",textAlign:"left",textTransform:"none"}} value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
             <button className="btn-primary" onClick={redeemClaimCode} disabled={!claimCodeInput.trim()||claimCodeBusy}>{claimCodeBusy?"Checking…":"Submit"}</button>
           </div>
           {claimCodeMessage && <div className="success-msg" style={{marginTop:8}}>{claimCodeMessage}</div>}
