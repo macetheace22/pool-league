@@ -261,7 +261,7 @@ export default function LiveEntryApp() {
       setMatch((local) => {
         if (!local) return remote;
         // Overwrite if remote has more racks OR more assigned players (covers draft updates too)
-        const countSig = (m) => m.sets.reduce((s, st) => s + st.racks.length + (st.playerHome?1:0) + (st.playerAway?1:0) + (st.complete?1:0), 0) + (m.coinFlipLoser?1:0) + (m.gladiatorNoAvailableHome?1:0) + (m.gladiatorNoAvailableAway?1:0);
+        const countSig = (m) => m.sets.reduce((s, st) => s + st.racks.length + (st.playerHome?1:0) + (st.playerAway?1:0) + (st.complete?1:0), 0) + (m.coinFlipLoser?1:0) + (m.gladiatorPresenceRevision ?? 0);
         return countSig(remote) > countSig(local) ? remote : local;
       });
     }, POLL_INTERVAL_MS);
@@ -884,7 +884,7 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
   if (status === "locked") {
     return <div className="empty-state">This table unlocks once an earlier set finishes.</div>;
   }
-  if (status === "done" || status === "live") {
+  if (status === "done") {
     return (
       <div className="card" style={{textAlign:"center"}}>
         <div style={{fontSize:13,fontWeight:700,color:"#5FCF9E",marginBottom:6}}>Table {setIdx+1} matchup set</div>
@@ -893,6 +893,23 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
           <span className="draft-matchup-display__vs">vs</span>
           <span className="draft-matchup-display__away">{set.playerAway?.name}</span>
         </div>
+      </div>
+    );
+  }
+  if (status === "live") {
+    return (
+      <div className="card" style={{textAlign:"center"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#5FCF9E",marginBottom:6}}>Table {setIdx+1} matchup set</div>
+        <div className="draft-matchup-display">
+          <span className="draft-matchup-display__home">{set.playerHome?.name}</span>
+          <span className="draft-matchup-display__vs">vs</span>
+          <span className="draft-matchup-display__away">{set.playerAway?.name}</span>
+        </div>
+        {canGladiator && (set.racks ?? []).length === 0 && (
+          <button className="btn-secondary" style={{width:"100%",marginTop:10,borderColor:"#B7791F",color:"#F6C66A"}}
+            onClick={() => setGladiatorOpen(true)}>Gladiator Match — both teams have no additional player present</button>
+        )}
+        {gladiatorOpen && <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => setGladiatorOpen(false)} />}
       </div>
     );
   }
@@ -1000,11 +1017,11 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
       <div className="card">
         <div className="card__title">Confirm no additional player is present</div>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:12}}>
-          <input type="checkbox" checked={homeNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableHome: event.target.checked })} />
+          <input type="checkbox" checked={homeNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableHome: event.target.checked, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
           <span>{match.teamHome.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start"}}>
-          <input type="checkbox" checked={awayNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableAway: event.target.checked })} />
+          <input type="checkbox" checked={awayNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableAway: event.target.checked, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
           <span>{match.teamAway.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
       </div>
