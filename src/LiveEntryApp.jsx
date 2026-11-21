@@ -460,7 +460,7 @@ export default function LiveEntryApp() {
           )}
           {!match.makeup && phase === "lineup" && match.coinFlipLoser && (
             <>
-              <DraftScreen match={match} activeSet={activeSet} setActiveSet={setActiveSet} onSave={persist} />
+              <DraftScreen match={match} activeSet={activeSet} setActiveSet={setActiveSet} onSave={persist} mySide={mySide} isManager={isManager} />
               <MidMatchMakeupTrigger match={match} onSave={persist} />
             </>
           )}
@@ -785,7 +785,7 @@ function FullMatchForfeitForm({ match, onCancel, onConfirm }) {
   );
 }
 
-function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
+function DraftScreen({ match, activeSet, setActiveSet, onSave, mySide, isManager }) {
   const [fullMatchForfeitOpen, setFullMatchForfeitOpen] = useState(false);
   const used = usedPlayerNums(match);
 
@@ -858,6 +858,8 @@ function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
           setActiveSet(updated.gladiatorSetIndex ?? setIdx);
           onSave(updated);
         }}
+        mySide={mySide}
+        isManager={isManager}
       />
     </div>
   );
@@ -882,7 +884,7 @@ function DraftSetTabBar({ statuses, activeSet, onSelect }) {
   );
 }
 
-function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGladiator }) {
+function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGladiator, mySide, isManager }) {
   const set = match.sets[setIdx];
   const [forfeiting, setForfeiting] = useState(false);
   const [gladiatorOpen, setGladiatorOpen] = useState(false);
@@ -925,7 +927,7 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
           <button className="btn-secondary" style={{width:"100%",marginTop:10,borderColor:"#B7791F",color:"#F6C66A"}}
             onClick={() => setGladiatorOpen(true)}>Gladiator Match — both teams have no additional player present</button>
         )}
-        {gladiatorOpen && <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => setGladiatorOpen(false)} />}
+        {gladiatorOpen && <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => setGladiatorOpen(false)} mySide={mySide} isManager={isManager} />}
       </div>
     );
   }
@@ -953,9 +955,9 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
     );
   }
   if (gladiatorOpen) {
-    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator}
+    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} mySide={mySide} isManager={isManager}
       onCancel={() => {
-        onGladiator({ ...match, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false });
+        onGladiator({ ...match, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, gladiatorPresenceSetIndex: null, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 });
         setGladiatorOpen(false);
       }} />;
   }
@@ -1012,7 +1014,7 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
   );
 }
 
-function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
+function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave, mySide, isManager }) {
   const [homeNum, setHomeNum] = useState("");
   const [awayNum, setAwayNum] = useState("");
   const sameGladiatorSet = match.gladiatorPresenceSetIndex === setIdx;
@@ -1043,11 +1045,11 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
       <div className="card">
         <div className="card__title">Confirm no additional player is present</div>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:12}}>
-          <input type="checkbox" checked={homeNoPlayer} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableHome: event.target.checked, gladiatorNoAvailableAway: sameGladiatorSet ? match.gladiatorNoAvailableAway : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
+          <input type="checkbox" checked={homeNoPlayer} disabled={!isManager && mySide !== "home"} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableHome: event.target.checked, gladiatorNoAvailableAway: sameGladiatorSet ? match.gladiatorNoAvailableAway : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
           <span>{match.teamHome.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start"}}>
-          <input type="checkbox" checked={awayNoPlayer} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableAway: event.target.checked, gladiatorNoAvailableHome: sameGladiatorSet ? match.gladiatorNoAvailableHome : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
+          <input type="checkbox" checked={awayNoPlayer} disabled={!isManager && mySide !== "away"} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableAway: event.target.checked, gladiatorNoAvailableHome: sameGladiatorSet ? match.gladiatorNoAvailableHome : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
           <span>{match.teamAway.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
       </div>
