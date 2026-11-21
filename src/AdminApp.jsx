@@ -975,6 +975,7 @@ function ComingSoonPage({ title }) {
 // advanced, all-time-across-every-type-of-play stats page is a later build.
 const GAME_TYPE_FILTERS = [{ key: null, label: "All Games" }, { key: "8ball", label: "8-Ball" }, { key: "9ball", label: "9-Ball" }, { key: "10ball", label: "10-Ball" }, { key: "ultimate", label: "Ultimate" }];
 const PLAY_TYPE_FILTERS = [{ key: "all", label: "All Play" }, { key: "league", label: "League" }, { key: "practice", label: "Practice" }];
+const PRACTICE_GAME_TYPE_FILTERS = [{ key: null, label: "All Games" }, { key: "8ball", label: "8-Ball" }, { key: "9ball", label: "9-Ball" }, { key: "10ball", label: "10-Ball" }, { key: "ultimate", label: "Ultimate Pool" }];
 
 function matchesPlayType(event, playType) {
   if (playType === "all") return true;
@@ -1285,7 +1286,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
       .catch(() => { if (!cancelled) setHeadToHead([]); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawEvents, gameTypeFilter, playTypeFilter, effectiveScopeMode, selectedSeasonId, playCategory, includeLeague, includePractice]);
+  }, [rawEvents, gameTypeFilter, practiceGameTypeFilter, playTypeFilter, effectiveScopeMode, selectedSeasonId, playCategory, includeLeague, includePractice]);
 
   const leagueWins = seasonRecord?.wins ?? 0;
   const leagueLosses = seasonRecord?.losses ?? 0;
@@ -1339,14 +1340,16 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
       {showScope && <div className="card">
         <div className="card__title">Scope</div>
-        <div className="seg-control" style={{marginBottom:8}}>
-          <button className={`seg-btn ${scopeMode==="season"?"seg-btn--active":""}`} onClick={()=>setScopeMode("season")}>By Season</button>
-          <button className={`seg-btn ${scopeMode==="career"?"seg-btn--active":""}`} onClick={()=>setScopeMode("career")}>Career (All-Time)</button>
-        </div>
+        {(!defaultCareer || includeLeague) && (
+          <div className="seg-control" style={{marginBottom:8}}>
+            <button className={`seg-btn ${scopeMode==="season"?"seg-btn--active":""}`} onClick={()=>setScopeMode("season")}>By Season</button>
+            <button className={`seg-btn ${scopeMode==="career"?"seg-btn--active":""}`} onClick={()=>setScopeMode("career")}>Career (All-Time)</button>
+          </div>
+        )}
         {includedSources?.includes("practice") && includePractice && (
           <div style={{marginTop:10}}>
             <div style={{fontSize:10,fontWeight:800,letterSpacing:".05em",textTransform:"uppercase",color:"#8A8A8A",marginBottom:6}}>Practice Game Type</div>
-            <FilterChips options={GAME_TYPE_FILTERS} value={practiceGameTypeFilter} onChange={setPracticeGameTypeFilter} />
+            <FilterChips options={PRACTICE_GAME_TYPE_FILTERS} value={practiceGameTypeFilter} onChange={setPracticeGameTypeFilter} />
           </div>
         )}
         {includeLeague && scopeMode === "season" && (
