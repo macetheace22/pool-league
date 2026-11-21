@@ -5536,9 +5536,15 @@ function SeasonalTournamentReview({ seasonId }) {
       if (result?.error) throw new Error(result.error);
       setSnapshot(result);
       setExisting(tournaments);
+      const orderedByCategory = (teams, type) => {
+        const priorities = type === "championship"
+          ? ["first_place_and_division_champion","first_place_not_division_champion","below_first_division_champion"]
+          : ["consolation_champion_back_to_back_wins","consolation_champion_after_bye","consolation_champion_history_unverified","consolation_champion_pending_bracket_history"];
+        return (teams ?? []).map(team => ({ ...team })).sort((a,b) => priorities.indexOf(a.seedCategory) - priorities.indexOf(b.seedCategory));
+      };
       setDrafts({
-        championship: (result.tournaments?.championship?.teams ?? []).map(team => ({ ...team })),
-        consolation: (result.tournaments?.consolation?.teams ?? []).map(team => ({ ...team })),
+        championship: orderedByCategory(result.tournaments?.championship?.teams, "championship"),
+        consolation: orderedByCategory(result.tournaments?.consolation?.teams, "consolation"),
       });
     } catch (e) {
       setError(e?.message || "Unable to load seasonal tournament qualification.");
