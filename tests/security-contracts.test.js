@@ -738,3 +738,29 @@ describe("full-name player lookup and empty stats cards", () => {
     expect(admin).toContain("{rawEvents && (");
   });
 });
+
+
+describe("manual Practice opponent full names", () => {
+  it("stores both entered name parts and carries the full name into the session", () => {
+    const practice = read("src/Practice.jsx");
+    const db = read("src/db.js");
+    expect(practice).toContain("db.findOrCreatePracticeOpponent(profile.id, manualFirstName, manualLastName)");
+    expect(practice).toContain("disabled={!manualFirstName.trim()||!manualLastName.trim()||saving}");
+    expect(db).toContain("export async function findOrCreatePracticeOpponent(profileId, firstName, lastName)");
+    expect(db).toContain("const fullName = [trimmedFirstName, trimmedLastName].filter(Boolean).join(\" \")");
+    expect(practice).toContain("opponentName: o.name");
+  });
+
+  it("lets users correct older manual opponent names and historical Practice labels", () => {
+    const practice = read("src/Practice.jsx");
+    const db = read("src/db.js");
+    const sql = read("supabase-schema-section-107-edit-manual-practice-opponent-full-names.sql");
+    expect(practice).toContain("beginEditOpponent");
+    expect(practice).toContain("db.updatePracticeOpponentName(editingOpponentId, editFirstName, editLastName)");
+    expect(db).toContain('supabase.rpc("update_my_practice_opponent_name"');
+    expect(sql).toContain("security invoker");
+    expect(sql).toContain("and created_by = (select auth.uid())");
+    expect(sql).toContain("set opponent_name = v_full_name");
+    expect(sql).toContain("grant execute on function public.update_my_practice_opponent_name(uuid, text, text) to authenticated");
+  });
+});
