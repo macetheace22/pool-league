@@ -5595,6 +5595,35 @@ function SeasonalTournamentReview({ seasonId }) {
     }
   };
 
+  const reconcileTournament = async (type, saved) => {
+    const teamCount = drafts[type]?.length ?? 0;
+    const matchCount = saved.matches?.length ?? 0;
+    const confirmed = window.confirm(
+      `Approve reconciliation of the Seasonal ${type === "championship" ? "Championship" : "Consolation"} bracket?\\n\\n` +
+      `The current qualification snapshot proposes ${teamCount} teams and ${matchCount} bracket slots. ` +
+      "Unplayed slots may be updated. Completed and in-progress matches and their results will be preserved. " +
+      "If the proposed bracket conflicts with recorded results or changes the bracket layout, the operation will be rejected without changing the saved bracket."
+    );
+    if (!confirmed) return;
+    setSaving("reconcile-" + type);
+    setError("");
+    setNotice("");
+    try {
+      const result = await db.reconcileSeasonalTournament(saved.id, type, drafts[type]);
+      if (result?.error) throw new Error(result.error);
+      setNotice(
+        `Seasonal ${type === "championship" ? "Championship" : "Consolation"} bracket reconciled. ` +
+        `${result.updated_unplayed_matches ?? 0} unplayed slots updated; ` +
+        `${result.preserved_recorded_matches ?? 0} recorded matches preserved.`
+      );
+      await refresh();
+    } catch (e) {
+      setError(e?.message || "Unable to reconcile the seasonal tournament bracket. The saved bracket remains unchanged.");
+    } finally {
+      setSaving("");
+    }
+  };
+
   const categoryLabels = {
     championship: [
       ["first_place_and_division_champion","Category 1 · First place and Division Champion"],
@@ -5636,6 +5665,25 @@ function SeasonalTournamentReview({ seasonId }) {
               </div>
             )}
             <div style={{fontSize:12,color:"#9A9A9A",marginBottom:8}}>The saved seed order and bracket are retained. This workflow does not overwrite confirmed brackets.</div>
+            {saved.status==="needs_review" && (
+              <div style={{margin:"12px 0",padding:10,border:"1px solid #8A6A35",borderRadius:8}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>Proposed authoritative qualification</div>
+                <div style={{fontSize:12,color:"#B8B8B8",marginBottom:8}}>
+                  {teams.length} proposed qualifiers · {plan?.bracketSize || "—"} bracket size · {plan?.byeCount ?? "—"} byes
+                </div>
+                {teams.map((team,index) => (
+                  <div key={team.teamId} style={{fontSize:11,padding:"4px 0",borderTop:"1px solid #333"}}>
+                    #{index+1} · {team.name || team.teamName || team.teamId} · {team.seedCategory.replaceAll("_"," ")}
+                  </div>
+                ))}
+                <button className="btn-primary" style={{marginTop:12}} disabled={saving!=="" || teams.length===0 || unverified || !snapshot?.divisions?.every(row=>!row.error)} onClick={()=>reconcileTournament(type,saved)}>
+                  {saving==="reconcile-"+type ? "Reconciling…" : "Approve & Reconcile Bracket"}
+                </button>
+                {(unverified || plan?.requiresReview || snapshot?.divisions?.some(row=>row.error)) && (
+                  <div style={{fontSize:11,color:"#F0B35A",marginTop:8}}>Reconciliation is disabled until qualification and seeding inputs are complete and verified.</div>
+                )}
+              </div>
+            )}
             {(saved.entries ?? []).map(entry => (
               <div className="list-row" key={entry.id}>
                 <div className="list-row__body">
