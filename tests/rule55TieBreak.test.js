@@ -55,7 +55,7 @@ describe("Rule 5.5 tie-break audit", () => {
         { team_id: "c", player_num: "c1", schedule_week_date: "2026-09-08", matches_played: 10, matches_won: 4 },
       ],
     });
-    expect(rows.find(row => row.teamId === "a").recordVsNext).toEqual({ wins: 1, losses: 0, draws: 0, matches: 1 });
+    expect(rows.find(row => row.teamId === "a").recordVsNext).toBeNull();
     expect(rows.find(row => row.teamId === "b").recordVsNext).toEqual({ wins: 0, losses: 0, draws: 1, matches: 1 });
   });
 
@@ -87,7 +87,7 @@ describe("Rule 5.5 tie-break audit", () => {
     expect(rows.find(row => row.teamId === "a").setsWon).toBe(5);
   });
 
-  it("derives record against the immediately lower official position from weekly set-win deltas", () => {
+  it("does not use another tied team as the team immediately below the tied group", () => {
     const rows = buildRule55TieBreakAudit({
       officialStandings: baseTeams.slice(0, 2),
       schedule: [{ week: 1, date: "9/1/2026", pairings: [{ homeTeamId: "a", awayTeamId: "b" }] }],
