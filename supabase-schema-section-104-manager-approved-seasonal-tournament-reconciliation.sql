@@ -37,6 +37,9 @@ begin
      or jsonb_typeof(p_matches) is distinct from 'array' then
     raise exception 'ENTRIES_AND_MATCHES_MUST_BE_ARRAYS';
   end if;
+  if jsonb_array_length(p_entries) = 0 then
+    raise exception 'NO_QUALIFIED_TEAMS';
+  end if;
 
   select * into v_tournament
     from public.seasonal_tournaments
