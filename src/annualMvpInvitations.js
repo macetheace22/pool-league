@@ -92,7 +92,7 @@ export function buildAnnualMvpTournamentInvitations(divisionResults = []) {
     invitationsByFormat[format].sort((a, b) => a.position - b.position || a.playerName.localeCompare(b.playerName));
   }
   return {
-    complete: (divisionResults ?? []).length > 0 && divisionIssues.length === 0,
+    complete: (divisionResults ?? []).length > 0 && divisionIssues.length === 0 && identityReview.length === 0,
     divisionCount: (divisionResults ?? []).length,
     divisionIssues,
     invitationsByFormat,
