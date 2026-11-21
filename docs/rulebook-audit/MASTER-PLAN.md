@@ -451,3 +451,13 @@ For every implementation PR:
 - PR #165 implements the normalized result ledger, database-backed scoring/undo, active-session resume, and explicit active-session finalization that preserves recorded results. SQL application and live acceptance remain pending.
 
 - Active-session browser storage is retained only as a setup/navigation draft and session UUID; submitted game/rack results and aggregate scores are deliberately stripped from that JSON snapshot and rehydrated from Supabase. Leaving Practice remains supported through the active-session bar. Explicitly ending the active session from that bar finalizes the database practice row without deleting recorded results.
+
+
+### Official division standings/MVP snapshot consistency (implementation PR pending)
+- PR #239 already hardened playoff seeding to reject mixed report weeks, unresolved team mappings, incomplete expected team sets, and invalid published positions. The Team Standings and MVP Standings screens still read `*_adjustments_current`, which independently selects each team's/player's newest row and can therefore mix report weeks after a partial import.
+- The implementation in the current focused PR reuses `computeFinalStandings` for Team Standings so the displayed official table is shown only after the same division-wide expected-team, report-week, mapping, and position checks used for playoff seeding pass. This is read-only; it does not generate brackets or write data.
+- MVP standings now use `prepareOfficialMvpStandings` to require one report week and valid, unique, contiguous IBA-published positions before displaying the official ranking. It intentionally does **not** require every rostered player to appear: the MVP report is a distinct IBA-published ranked population, not a roster census.
+- Official IBA positions and MVP ranking totals remain authoritative; app-entered match calculations remain separately labeled provisional comparisons. Import history and manual paste/import behavior are not changed in this PR.
+- Query errors from the current-snapshot readers now throw rather than silently becoming an empty report, so a failed database read cannot be mistaken for a valid no-data state.
+- No SQL/schema change is expected. Automated tests cover valid single-week MVP snapshots, mixed/missing weeks, missing/duplicate/gapped positions, and empty reports; existing playoff standings tests cover complete/incomplete expected team sets and report-week consistency.
+- After merge, recheck merge-commit CI. No live IBA report scenario is available for acceptance unless the user supplies/imports a suitable report; do not claim real-world partial-import behavior was live-tested.
