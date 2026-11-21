@@ -67,8 +67,13 @@ describe("IBA Rule 5.5 Gladiator match", () => {
     expect(gladiatorPlayerChoices(sets, 2, "away").map(p => p.num)).toEqual(["A1", "A2"]);
   });
 
+
+  it("rejects a Gladiator player who did not play an earlier set", () => {
+    expect(createGladiatorSet(sets[2], 2, played("H9", "Not Played"), played("A2", "Away Two"), sets)).toBeNull();
+  });
+
   it("marks the selected repeat players as a separate Gladiator set", () => {
-    const result = createGladiatorSet(sets[2], 2, played("H1", "Home One"), played("A2", "Away Two"));
+    const result = createGladiatorSet(sets[2], 2, played("H1", "Home One"), played("A2", "Away Two"), sets);
     expect(result.isGladiator).toBe(true);
     expect(result.setNum).toBe(3);
     expect(result.playerHome.num).toBe("H1");
