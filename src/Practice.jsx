@@ -624,10 +624,10 @@ function ConfigStep({ profile, session, setSession, onNext, onBack, onCancel }) 
               {loadingMyRating ? <Loader/> : (
                 <>
                   <div className="field"><div className="form-label">Your Rating</div>
-                    <input className="input" type="number" value={myRating} onChange={e=>setMyRating(e.target.value)} placeholder="Enter your rating"/>
+                    <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={myRating} onChange={e=>setMyRating(e.target.value)} placeholder="Enter your rating"/>
                   </div>
                   <div className="field"><div className="form-label">{session.opponentName}'s Rating</div>
-                    <input className="input" type="number" value={oppRating} onChange={e=>setOppRating(e.target.value)} placeholder="Enter their rating"/>
+                    <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={oppRating} onChange={e=>setOppRating(e.target.value)} placeholder="Enter their rating"/>
                   </div>
                 </>
               )}
