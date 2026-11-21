@@ -171,7 +171,9 @@ function parseMvpImport(raw) {
             const rank = Number(tail.slice(winLen, winLen + rankLen));
             const l = Number(tail.slice(winLen + rankLen, winLen + rankLen + lossLen));
             const p = Number(tail.slice(winLen + rankLen + lossLen));
-            if (rank === p + 200 * w - 200 * l) {
+            const inferredForfeitWins = (p + 200 * w - 200 * l - rank) / 200;
+            if (Number.isSafeInteger(inferredForfeitWins) && inferredForfeitWins >= 0 &&
+                inferredForfeitWins <= w && p >= 125 * inferredForfeitWins) {
               parsed = { playerNum:playerNumCompact, playerName:playerNameCompact, teamNum:tm[1], wins:w, losses:l, pointsScored:p, mvpRankingPoints:rank };
             }
           }
