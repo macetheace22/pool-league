@@ -175,13 +175,13 @@ declare
   v_bye_count integer;
   v_profile_id uuid := (select auth.uid());
 begin
-  if v_profile_id is null or (select public.current_role_name()) <> 'manager' then
+  if v_profile_id is null or (select public.current_role_name()) is distinct from 'manager' then
     raise exception 'MANAGER_ONLY' using errcode = '42501';
   end if;
   if not exists (select 1 from public.seasons s where s.id = p_season_id) then
     raise exception 'SEASON_NOT_FOUND';
   end if;
-  if p_tournament_type not in ('championship', 'consolation') then
+  if p_tournament_type is null or p_tournament_type not in ('championship', 'consolation') then
     raise exception 'INVALID_TOURNAMENT_TYPE';
   end if;
   if jsonb_typeof(p_entries) <> 'array' or jsonb_typeof(p_matches) <> 'array' then
@@ -194,9 +194,6 @@ begin
   while v_bracket_size < v_team_count loop
     v_bracket_size := v_bracket_size * 2;
   end loop;
-  if v_team_count > 1 then
-  else
-  end if;
   v_match_count := (select count(*) from jsonb_array_elements(p_matches));
   if v_match_count <> greatest(v_bracket_size - 1, 0) then
     raise exception 'BRACKET_MATCH_COUNT_INVALID';
