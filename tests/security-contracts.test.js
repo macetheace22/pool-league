@@ -651,13 +651,13 @@ describe("Section 105 account full names and identity validation", () => {
     const auth = read("src/AuthContext.jsx");
     const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
     expect(auth).toContain("First and last name are required.");
-    expect(auth).toContain("db.validatePlayerInviteName(code.trim(), firstName.trim(), lastName.trim())");
     expect(auth).toContain("first_name: firstName.trim(), last_name: lastName.trim()");
+    expect(auth).toContain("verify that your first and last name match the IBA player record");
     expect(sql).toContain("alter table public.profiles");
     expect(sql).toContain("add column if not exists first_name text");
     expect(sql).toContain("add column if not exists last_name text");
     expect(sql).toContain("PLAYER_NAME_MISMATCH");
-    expect(sql).toContain("public.validate_player_invite_name(text, text, text)");
+    expect(sql).toContain("before insert or update of first_name, last_name, player_num");
   });
 
   it("enforces the canonical IBA name when a player number is attached to a profile", () => {
@@ -673,7 +673,10 @@ describe("Section 105 account full names and identity validation", () => {
     const practice = read("src/Practice.jsx");
     expect(sql).toContain("public.validate_practice_opponent_link_names()");
     expect(sql).toContain("PRACTICE_LINK_FULL_NAME_REQUIRED");
-    expect(sql).toContain("before update of linked_profile_id");
+    expect(sql).toContain("before insert or update of linked_profile_id");
+    expect(sql).toContain("request.target_profile_id = (select auth.uid())");
+    expect(sql).toContain("PRACTICE_LINK_CONFIRMATION_REQUIRED");
+    expect(sql).toContain("set status = 'accepted', responded_at = now()");
     expect(sql).toContain("public.search_profiles_for_practice_link(text)");
     expect(sql).toContain("public.list_practice_opponent_link_requests_with_names()");
     expect(practice).toContain("request.requester_full_name");
