@@ -644,3 +644,61 @@ describe("Section 103 linked practice history read access", () => {
     expect(db).not.toContain('.eq("created_by", profileId)\n    .or("winner.not.is.null,completed_at.not.is.null")');
   });
 });
+
+
+describe("Section 105 account full names and identity validation", () => {
+  it("requires first and last name at signup and validates player invite names before account creation", () => {
+    const auth = read("src/AuthContext.jsx");
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    expect(auth).toContain("First and last name are required.");
+    expect(auth).toContain("db.validatePlayerInviteName(code.trim(), firstName.trim(), lastName.trim())");
+    expect(auth).toContain("first_name: firstName.trim(), last_name: lastName.trim()");
+    expect(sql).toContain("alter table public.profiles");
+    expect(sql).toContain("add column if not exists first_name text");
+    expect(sql).toContain("add column if not exists last_name text");
+    expect(sql).toContain("PLAYER_NAME_MISMATCH");
+    expect(sql).toContain("public.validate_player_invite_name(text, text, text)");
+  });
+
+  it("enforces the canonical IBA name when a player number is attached to a profile", () => {
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    expect(sql).toContain("before insert or update of first_name, last_name, player_num");
+    expect(sql).toContain("from public.players player");
+    expect(sql).toContain("v_account_name_normalized is distinct from v_iba_name_normalized");
+    expect(sql).toContain("revoke all on function public.validate_profile_full_name() from public, anon, authenticated");
+  });
+
+  it("keeps practice identity mutual confirmation and requires both accounts to have full names", () => {
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    const practice = read("src/Practice.jsx");
+    expect(sql).toContain("public.validate_practice_opponent_link_names()");
+    expect(sql).toContain("PRACTICE_LINK_FULL_NAME_REQUIRED");
+    expect(sql).toContain("before update of linked_profile_id");
+    expect(sql).toContain("public.search_profiles_for_practice_link(text)");
+    expect(sql).toContain("public.list_practice_opponent_link_requests_with_names()");
+    expect(practice).toContain("request.requester_full_name");
+    expect(practice).toContain("request.target_full_name");
+    expect(practice).toContain("p.full_name");
+    expect(practice).toContain("They must confirm before your practice history is linked.");
+  });
+
+  it("uses full names for both sides of linked practice history without rewriting saved games", () => {
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    const db = read("src/db.js");
+    expect(sql).toContain("public.list_linked_practice_game_owners");
+    expect(sql).toContain("public.list_linked_practice_opponent_names");
+    expect(db).toContain('supabase.rpc("list_linked_practice_opponent_names"');
+    expect(db).toContain('supabase.rpc("list_linked_practice_game_owners"');
+    expect(db).toContain("opponent_name: linkedName");
+    expect(db).not.toContain(".update({ opponent_name:");
+  });
+
+  it("lets existing users complete their profile name and handles server-side name mismatch", () => {
+    const admin = read("src/AdminApp.jsx");
+    const db = read("src/db.js");
+    expect(admin).toContain("Save Full Name");
+    expect(admin).toContain("db.updateOwnFullName(profile.id, firstName.trim(), lastName.trim())");
+    expect(admin).toContain("PLAYER_NAME_MISMATCH");
+    expect(db).toContain("first_name: firstName, last_name: lastName");
+  });
+});
