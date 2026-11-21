@@ -87,6 +87,7 @@ export default function Practice() {
     }
   }, [phase, session]);
   const [history, setHistory] = useState(undefined);
+  const [unfinishedGames, setUnfinishedGames] = useState(undefined);
   const [opponents, setOpponents] = useState(undefined);
 
   const refreshHistory = () => {
@@ -94,12 +95,67 @@ export default function Practice() {
     setHistory(undefined);
     db.listMyPracticeGames(profile.id).then(setHistory).catch(() => setHistory([]));
   };
+  const refreshUnfinishedGames = () => {
+    if (!profile) { setUnfinishedGames([]); return; }
+    setUnfinishedGames(undefined);
+    db.listMyUnfinishedPracticeGames(profile.id).then(setUnfinishedGames).catch(() => setUnfinishedGames([]));
+  };
   const refreshOpponents = () => {
     if (!profile) { setOpponents([]); return; }
     setOpponents(undefined);
     db.listMyPracticeOpponents(profile.id).then(setOpponents).catch(() => setOpponents([]));
   };
-  useEffect(() => { refreshHistory(); refreshOpponents(); }, [profile?.id]);
+  useEffect(() => { refreshHistory(); refreshUnfinishedGames(); refreshOpponents(); }, [profile?.id]);
+
+  const resumeUnfinishedGame = (game) => {
+    const practiceType = game.practice_type ?? "opponent";
+    const sessionToResume = {
+      practiceType,
+      scoringMethod: game.scoring_method ?? null,
+      opponentType: practiceType === "opponent"
+        ? (game.opponent_player_num ? "player" : "manual")
+        : null,
+      opponentPlayerNum: game.opponent_player_num ?? null,
+      opponentId: game.opponent_id ?? null,
+      opponentName: game.opponent_name ?? "",
+      opponentRating: game.opponent_rating ?? null,
+      gameType: game.game_type ?? null,
+      format: game.format ?? null,
+      tableSizeFeet: game.table_size_feet ?? null,
+      x: game.target_games ?? 5,
+      myRating: game.my_rating ?? null,
+      gameId: game.id,
+      myScore: game.my_score ?? 0,
+      opponentScore: game.opponent_score ?? 0,
+      myPts: "",
+      oppPts: "",
+      winner: null,
+    };
+    const nextPhase = practiceType === "skills_drills" ? "skillsplay" : "play";
+    setSessionState(sessionToResume);
+    setActiveSession({
+      type: "practice",
+      ownerId: profile?.id,
+      route: "/practice",
+      title: sessionToResume.opponentName ? `vs ${sessionToResume.opponentName}` : "Practice session",
+      subtitle: [gameTypeLabel(sessionToResume.gameType), `${sessionToResume.myScore}–${sessionToResume.opponentScore}`].filter(Boolean).join(" · "),
+      data: { phase: nextPhase, startedByUser: true, session: practiceSessionSnapshot(sessionToResume) },
+    });
+    setPhase(nextPhase);
+  };
+
+  const discardUnfinishedGame = async (game) => {
+    const confirmed = window.confirm("Discard this practice session? All saved game results and Track a Rack shot details for this unfinished session will be permanently deleted.");
+    if (!confirmed) return;
+    try {
+      await db.discardPracticeGame(game.id);
+      if (activeSession?.data?.session?.gameId === game.id) clearActiveSession();
+      refreshUnfinishedGames();
+      refreshHistory();
+    } catch (error) {
+      window.alert(error?.message || "The practice session could not be discarded. Please try again.");
+    }
+  };
 
   const startSession = () => {
     const initial = {
@@ -151,7 +207,7 @@ export default function Practice() {
     </div>
   );
 
-  if (phase === "landing" && profile && (history === undefined || opponents === undefined)) {
+  if (phase === "landing" && profile && (history === undefined || unfinishedGames === undefined || opponents === undefined)) {
     return wrap(<><PageHeader title="Practice" /><div className="tab-content"><Loader /></div></>);
   }
 
@@ -199,11 +255,20 @@ export default function Practice() {
       onSaved={() => { refreshHistory(); clearActiveSession(); setPhase("landing"); setSessionState(null); }} />);
   }
 
-  return wrap(<LandingStep profile={profile} history={history} rawOpponents={opponents} onStart={startSession} onLinked={() => { refreshOpponents(); refreshHistory(); }} />);
+  return wrap(<LandingStep
+    profile={profile}
+    history={history}
+    unfinishedGames={unfinishedGames}
+    rawOpponents={opponents}
+    onStart={startSession}
+    onResume={resumeUnfinishedGame}
+    onDiscardUnfinished={discardUnfinishedGame}
+    onLinked={() => { refreshOpponents(); refreshHistory(); refreshUnfinishedGames(); }}
+  />);
 }
 
 // ─── Landing ────────────────────────────────────────────────────────────────
-function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
+function LandingStep({ profile, history, unfinishedGames, rawOpponents, onStart, onResume, onDiscardUnfinished, onLinked }) {
   const sessionsRef = useRef(null);
   const [filterOpponent, setFilterOpponent] = useState(null);
   const [showAllSessions, setShowAllSessions] = useState(false);
@@ -237,6 +302,31 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
         <div className="practice-identity-profile-link">
           Practice identity connections and claim codes are managed in <Link to="/me">My Profile</Link>.
         </div>
+        {(unfinishedGames ?? []).length > 0 && (
+          <div className="card" style={{borderColor:"#1F6B4A",background:"#0F2D1F",marginBottom:14}}>
+            <div className="card__title" style={{color:"#5FCF9E"}}>Practice Session in Progress</div>
+            <div style={{fontSize:10.5,color:"#B7D2C6",marginTop:4}}>
+              Your unfinished practice session is saved. Resume it here or discard it permanently.
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
+              {(unfinishedGames ?? []).map(game => (
+                <div key={game.id} className="readonly-bar" style={{display:"flex",flexDirection:"column",gap:7}}>
+                  <div style={{fontSize:12,fontWeight:800}}>
+                    {game.practice_type === "skills_drills" ? "Skills & Drills" : `vs ${game.opponent_name || "Opponent"}`}
+                  </div>
+                  <div style={{fontSize:10.5,color:"#9FC4B4"}}>
+                    {[gameTypeLabel(game.game_type), game.practice_type === "opponent" ? `${game.my_score ?? 0}–${game.opponent_score ?? 0}` : null, game.created_at ? new Date(game.created_at).toLocaleDateString() : null].filter(Boolean).join(" · ")}
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button type="button" className="btn-primary" style={{flex:1}} onClick={() => onResume(game)}>Resume</button>
+                    <button type="button" className="btn-secondary" style={{flex:1,color:"#F87171",borderColor:"#7F3030"}} onClick={() => onDiscardUnfinished(game)}>Discard</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
           <button type="button" onClick={onStart} className="office-list-item">
             <Plus size={16} /><span>New Practice Session</span>
