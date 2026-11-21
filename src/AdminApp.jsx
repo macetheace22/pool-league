@@ -5627,7 +5627,14 @@ function SeasonalTournamentReview({ seasonId }) {
         <div className="card__title">{title}</div>
         {saved ? (
           <>
-            <div style={{fontSize:12,color:"#5FCF9E",margin:"8px 0"}}>Confirmed · {saved.status.replaceAll("_"," ")}</div>
+            <div style={{fontSize:12,color:saved.status==="needs_review"?"#F0B35A":"#5FCF9E",margin:"8px 0"}}>{saved.status==="needs_review"?"Manager review required":"Confirmed"} · {saved.status.replaceAll("_"," ")}</div>
+            {saved.status==="needs_review" && (
+              <div style={{fontSize:12,color:"#F0B35A",lineHeight:1.5,marginBottom:8}}>
+                {saved.review_reason || "An authoritative IBA standings or division-playoff source changed after this bracket was confirmed."}
+                {saved.review_required_at ? " Review flag recorded "+new Date(saved.review_required_at).toLocaleString()+"." : ""}
+                {" "}The saved bracket and all recorded results remain unchanged. Reconciliation must be explicitly approved by the manager.
+              </div>
+            )}
             <div style={{fontSize:12,color:"#9A9A9A",marginBottom:8}}>The saved seed order and bracket are retained. This workflow does not overwrite confirmed brackets.</div>
             {(saved.entries ?? []).map(entry => (
               <div className="list-row" key={entry.id}>
