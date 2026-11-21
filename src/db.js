@@ -3180,8 +3180,18 @@ export async function listMyUnfinishedPracticeGames(profileId) {
     .is("completed_at", null)
     .order("played_at", { ascending: false });
   if (error) throw error;
+  const sharedGames = (data ?? []).filter(game => game.shared_with_profile_id === profileId && game.created_by !== profileId);
+  let ownerByGameId = new Map();
+  if (sharedGames.length > 0) {
+    const { data: owners, error: ownerError } = await supabase.rpc(
+      "list_linked_practice_game_owners",
+      { p_practice_game_ids: sharedGames.map(game => game.id) },
+    );
+    if (ownerError) throw ownerError;
+    ownerByGameId = new Map((owners ?? []).map(owner => [owner.practice_game_id, owner]));
+  }
   return (data ?? []).map(game => game.shared_with_profile_id === profileId && game.created_by !== profileId
-    ? toLinkedPracticeGame(game, {})
+    ? toLinkedPracticeGame(game, ownerByGameId.get(game.id) ?? {})
     : { ...game, viewer_perspective: "creator" });
 }
 
