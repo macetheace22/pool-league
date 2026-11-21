@@ -368,7 +368,8 @@ export default function LiveEntryApp() {
         const completedSets = marked.sets.filter(s => s.complete).length;
         const homeSets = marked.sets.filter(s => s.complete && s.winnerSlot === "home").length;
         const awaySets = marked.sets.filter(s => s.complete && s.winnerSlot === "away").length;
-        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets });
+        const gladiatorSet = marked.sets.find(set => set.isGladiator && set.complete) ?? null;
+        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets, gladiatorSet });
         const winnerId = winnerSlot === "home" ? marked.teamHome?.id : winnerSlot === "away" ? marked.teamAway?.id : null;
 
         // Scheduled league matches use one database transaction for archive
