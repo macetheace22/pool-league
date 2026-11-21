@@ -1,3 +1,51 @@
+## Current reconciliation through PR #286 — latest Section 5 audit (2026-11-21)
+
+This update supersedes the earlier PR #269 baseline and the stale Section 5 status/queue below. The latest three project work sessions continued the rulebook audit through PR #286. The merged work listed here is complete implementation, not future work to repeat.
+
+### Section 5.1–5.4 — brackets, qualification, seeding, and byes
+
+- **5.1 — official postseason bracket import/reconciliation:** PR #271 merged (`9544a0b7`). Imports published IBA bracket structures, creates provisional Championship/Consolation structures when needed, reconciles unplayed first-round matchups to the official structure, preserves completed playoff results, and surfaces structural/team-mapping conflicts. Official IBA standings remain authoritative. Remaining: targeted cross-division consolation consistency check and real imported-bracket acceptance; do not rebuild this feature.
+- **5.2 — playoff pairings/home advantage:** Existing logic uses 1-v-4 and 2-v-3, with the higher seed hosting the final; PR #271 adds official bracket reconciliation. Remaining check is consistency across divisions, especially consolation brackets—not a broad implementation gap.
+- **5.3 — seasonal qualification:** PR #272 merged (`8edd57af`). First place automatically qualifies for Championship; places 2–4 qualify only by winning the Division Championship; the Consolation bracket winner qualifies for Consolation. The read-only snapshot uses official final standings and playoff results; incomplete/ambiguous outcomes fail closed and retain manager-review reasons.
+- **5.4 — seasonal seeding/byes/brackets:** PRs #273–#278 merged (PR #278 merge `50a5969a`). Sections 102–104 SQL were user-confirmed applied. Season-wide seeding categories and standard bracket/bye calculations are implemented; explicit trusted bye rank is honored; unresolved ties at the bye cutoff fail closed. Consolation priority uses actual playoff history rather than guesses. Manager review precedes creation. Manager-only transactional bracket creation persists separate Championship/Consolation brackets and bye advancement. Authoritative source changes flag active brackets for review; manager-approved reconciliation updates unplayed slots only and preserves completed/in-progress matches and winners. No automatic bracket mutation.
+
+### Section 5.5–5.7 — tie-breaks, MVP, and eligibility
+
+- **5.5 — team and Division MVP tie-breaks:** PRs #127/#128 provide audit helpers; #281 merged (`c5e79391`) implements postseason dead-heat resolution only after all five sets are complete (regular-season dead heats remain ties); #282 merged (`9a4b0c8d`) implements the constrained postseason Gladiator exception; #285 (`08d5f137`) hardens team tie-break audit data; #286 (`63ac3eb6`) hardens Division MVP tie resolution. Missing required evidence fails closed; MVP tie resolution occurs only when evidence uniquely identifies a winner. Official IBA standings/MVP positions remain authoritative and are not overridden. Live acceptance remains deferred.
+- **5.6 — MVP formula and Annual MVP Tournament invitations:** PR #279 merged (`1853a278`) validates 125-point forfeit credit without the +200 set-win bonus and preserves official IBA positions. PR #280 merged (`19d26b28`) audits top-15 invitations per division from latest valid official reports, deduplicates registered player numbers, consolidates multiple divisions, and selects the highest qualifying format (Masters > Advanced > Open). Missing/invalid reports and unresolved identities require manager review; no invitation is guessed. Real official-report acceptance remains open.
+- **5.7 — playoff eligibility:** PR #155 remains implemented baseline. Official IBA eligibility codes flow through the `rost` import; Unverified/missing data warns without automatically blocking; known ineligible players cannot shoot but may be listed as their team's forfeiting player where permitted. Real-PDF/live Supabase acceptance remains open.
+
+### Section 5.8–5.14 — agreed dispositions and remaining audit
+
+- **5.8:** Closed as Manual process — agreed. Captains/Tournament Director handle tournament multi-team/event limits, same-match restrictions/exceptions, delayed sets, withdrawals, resulting forfeits, and stalling. Existing forfeit recording is sufficient; no app changes.
+- **5.9:** Closed as Manual process — agreed. League Office handles certification sheets, postseason rating comparisons/adjustments, disqualification determinations, investigations, and appeals; no app workflow.
+- **5.10:** Partial / disposition needed. Forfeit-point scoring exists and 5.5 dead-heat/Gladiator behavior is implemented, but tournament referee exceptions, 8/9/10-ball formats, stopwatch, TD rules sheet/authority, and coaching/sportsmanship still require clause-level review and app-vs-manual decisions.
+- **5.11:** Gap / not fully audited. Regional Team Championship eligibility, Fall roster, common-player, match/season, ranking, and points/set-average tie-break requirements remain. Preserve the user's explicit rule that regional ranking points reset each season, despite calendar-year wording in the rulebook.
+- **5.12:** Gap / not fully audited. Regional Singles membership, Fall roster, score/match/season thresholds, and flight-rating/seeding requirements remain.
+- **5.13:** Decision needed / manual candidate. TD assignment/contact, referee authority, and appeal recordkeeping need an explicit app-vs-paper/League Office disposition.
+- **5.14:** Gap / decision needed. Tournament practice prohibition, warnings, escalating penalties, responsible role, and evidence retention need an explicit disposition.
+
+### PR reconciliation since the previous audit baseline
+
+| PR(s) | Reconciled progress |
+|---|---|
+| #270 | Documentation-only baseline reconciliation through #269; superseded by this update. |
+| #271 | §5.1 official IBA postseason bracket import/reconciliation. |
+| #272 | §5.3 seasonal tournament qualification snapshot. |
+| #273–#278 | §5.4 seeding/bye planning, manager review, persistent brackets, source-change invalidation, manager-approved reconciliation; Sections 102–104 applied. |
+| #279–#280 | §5.6 MVP formula validation and Annual MVP Tournament invitation audit. |
+| #281–#282 | §5.5 postseason dead-heat and Gladiator-match behavior. |
+| #283–#284 | Documentation reconciliation of §5.5; no additional scoring behavior. |
+| #285–#286 | §5.5 team and Division MVP tie-break audit hardening. |
+
+**Evidence boundary:** merged PRs and automated tests/builds do not equal live IBA PDF/import acceptance, live Supabase workflow acceptance, or production user acceptance. User has deferred broad live acceptance while implementation continues. Keep these limitations visible without misclassifying implemented features as build gaps.
+
+### Corrected next work
+
+Do not restart or rebuild §§5.1–5.6. The remaining Section 5 work is: (1) narrow cross-division consolation/bracket consistency and real-import acceptance for §§5.1–5.4; (2) real official MVP/eligibility report acceptance for §§5.6–5.7 when data is available; and (3) finish the clause-level audit and app/manual dispositions for §§5.10–5.14. §§5.8–5.9 are closed as agreed manual processes. The older Phase 4 queue below is superseded by this corrected order; it must not send work back to the start of §5.
+
+---
+
 # IBA Pool League App — Master Rulebook Audit & Implementation Plan
 
 Last reconciled: 2026-11-21 (local project date; GitHub timestamps may display the following UTC date)  
