@@ -554,3 +554,30 @@ describe("Section 101 practice opponent identity confirmation", () => {
     expect(practice).toContain("db.cancelPracticeOpponentLinkRequest(request.request_id)");
   });
 });
+
+
+describe("league player identity claim onboarding", () => {
+  it("explains that existing roster players should claim their canonical player identity", () => {
+    const auth = read("src/AuthContext.jsx");
+    const admin = read("src/AdminApp.jsx");
+    const db = read("src/db.js");
+    expect(auth).toContain("Ask your team captain for a player-specific code before registering.");
+    expect(auth).toContain("don't create a second player entry");
+    expect(auth).toContain("redeem it later from Profile");
+    expect(admin).toContain("This is your league-wide player identity");
+    expect(admin).toContain("Redeem Player Invite Code");
+    expect(admin).toContain("it does not create a new player record");
+    expect(admin).toContain("account not linked");
+    expect(admin).toContain("generate a player-specific invite code and share it with them");
+    expect(db).toContain("Ask your captain to verify that the roster entry is correct.");
+    expect(db).toContain("league manager will need to resolve that exceptional conflict");
+  });
+
+  it("keeps player identity claiming on the existing player-specific invite RPC", () => {
+    const db = read("src/db.js");
+    expect(db).toContain('supabase.rpc("claim_invite_code", { p_code: code })');
+    expect(db).toContain("PLAYER_ALREADY_CLAIMED");
+    expect(db).toContain("PLAYER_NUMBER_ALREADY_LINKED");
+    expect(db).not.toContain("search_profiles_by_username");
+  });
+});
