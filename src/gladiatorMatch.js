@@ -1,8 +1,9 @@
 // Rule 5.5 Gladiator matches are available only in postseason, before
 // five sets have been played, and only when each team can field a previously
 // played player for the sudden-death set.
-export function canOfferGladiatorMatch({ isPlayoff = false, sets = [], setIdx = -1 } = {}) {
+export function canOfferGladiatorMatch({ isPlayoff = false, sets = [], setIdx = -1, homePoints = null, awayPoints = null } = {}) {
   if (!isPlayoff || setIdx < 1 || setIdx >= 5) return false;
+  if (homePoints != null && awayPoints != null && homePoints !== awayPoints) return false;
   const prior = sets.slice(0, setIdx);
   if (!prior.some(set => set?.complete && !set?.forfeited)) return false;
   if (prior.some(set => set?.isGladiator)) return false;
