@@ -215,6 +215,8 @@ function RegisterScreen({ onBack }) {
   const [bootstrap, setBootstrap] = useState(null); // null = checking, true/false once known
   const [code, setCode]         = useState("");
   const [codeValid, setCodeValid] = useState(null); // { role, team_id, team_name } or a bootstrap stand-in
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone]       = useState("");
   const [email, setEmail]       = useState("");
@@ -248,6 +250,7 @@ function RegisterScreen({ onBack }) {
   };
 
   const handleRegister = async () => {
+    if (!firstName.trim() || !lastName.trim()) { setError("First and last name are required."); return; }
     if (!username.trim()) { setError("Username required."); return; }
     if (phone.trim() && phone.replace(/\D/g, "").length < 10) { setError("Enter a valid phone number."); return; }
     if (!email.trim()) { setError("Email required."); return; }
@@ -256,9 +259,20 @@ function RegisterScreen({ onBack }) {
     setLoading(true);
     const taken = await db.isUsernameTaken(username.trim());
     if (taken) { setLoading(false); setError("Username taken."); return; }
+    if (code.trim()) {
+      const nameCheck = await db.validatePlayerInviteName(code.trim(), firstName.trim(), lastName.trim());
+      if (nameCheck !== "OK") {
+        setLoading(false);
+        setError(nameCheck === "PLAYER_NAME_MISMATCH"
+          ? "The first and last name must match the IBA player record for this invite code. Check the roster name with your captain if it looks incorrect."
+          : nameCheck === "PLAYER_NOT_FOUND" ? "The player number on this invite code is not in the current IBA player list. Contact your captain or league manager."
+          : "That invite code is no longer valid. Verify it with your captain.");
+        return;
+      }
+    }
     const { error } = await supabase.auth.signUp({
       email: email.trim(), password,
-      options: { data: { invite_code: code.trim(), username: username.trim(), phone_number: phone.trim() } },
+      options: { data: { invite_code: code.trim(), first_name: firstName.trim(), last_name: lastName.trim(), username: username.trim(), phone_number: phone.trim() } },
     });
     setLoading(false);
     if (error) {
@@ -303,6 +317,10 @@ function RegisterScreen({ onBack }) {
               ? <><AlertCircle size={13}/> No code — you'll have read-only access until your team captain or a league manager gives you a player-specific code to redeem from Profile.</>
               : <><Check size={13}/> Code verified — <strong>{ROLES[codeValid.role].label}</strong>{codeValid.team_name ? ` · ${codeValid.team_name}` : ""}</>}
           </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div className="field"><Label>First Name</Label><input className="input" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name" autoComplete="given-name" /></div>
+            <div className="field"><Label>Last Name</Label><input className="input" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name" autoComplete="family-name" /></div>
+          </div>
           <div className="field"><Label>Username</Label>
             <input className="input" value={username} onChange={e => setUsername(e.target.value)} placeholder="Choose a username" autoCapitalize="none" />
           </div>
@@ -323,7 +341,7 @@ function RegisterScreen({ onBack }) {
             <input className="input" type="password" value={password2} onChange={e => setPassword2(e.target.value)} placeholder="Repeat password" />
           </div>
           {error && <ErrorMsg>{error}</ErrorMsg>}
-          <button className="btn-primary" onClick={handleRegister} disabled={!username || !email || !password || !password2 || loading}>{loading ? "Creating…" : "Create Account"}</button>
+          <button className="btn-primary" onClick={handleRegister} disabled={!firstName.trim() || !lastName.trim() || !username || !email || !password || !password2 || loading}>{loading ? "Creating…" : "Create Account"}</button>
         </>
       )}
     </div>
