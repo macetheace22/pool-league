@@ -177,20 +177,47 @@ export function buildSeasonalTournamentBracket(tournamentType, orderedTeams) {
 
   const bracketSize = byePlan.bracketSize;
   const rounds = bracketSize > 1 ? Math.log2(bracketSize) : 0;
-  const seedPositions = SEED_POSITIONS(bracketSize);
-  const slots = Array(bracketSize).fill(null);
-  rankedTeams.forEach((team, index) => {
-    const slotIndex = seedPositions.indexOf(index + 1);
-    slots[slotIndex] = team;
-  });
+  const byeIds = new Set(byePlan.awardedTeamIds);
+  const byeTeams = rankedTeams.filter(team => byeIds.has(team.teamId));
+  const playingTeams = rankedTeams.filter(team => !byeIds.has(team.teamId));
+  const firstRoundPairCount = bracketSize / 2;
+  const firstRoundPairs = [];
+
+  // Place the highest-priority, manager-ordered bye recipients into the
+  // opening bye slots. Pair the remaining teams highest seed vs lowest seed.
+  for (const team of byeTeams) firstRoundPairs.push([team, null]);
+  for (let index = 0; index < playingTeams.length / 2; index++) {
+    firstRoundPairs.push([
+      playingTeams[index],
+      playingTeams[playingTeams.length - 1 - index],
+    ]);
+  }
+  if (firstRoundPairs.length !== firstRoundPairCount) {
+    return { error: "The seeded first-round layout does not match the bracket size.", byePlan };
+  }
 
   const matches = [];
-  for (let roundNum = 1; roundNum <= rounds; roundNum++) {
+  for (let slotNum = 1; slotNum <= firstRoundPairCount; slotNum++) {
+    const [home, away] = firstRoundPairs[slotNum - 1];
+    const isBye = Boolean(home) !== Boolean(away);
+    matches.push({
+      matchKey: `r1-m${slotNum}`,
+      roundNum: 1,
+      slotNum,
+      teamHomeId: home?.teamId ?? null,
+      teamAwayId: away?.teamId ?? null,
+      winnerTeamId: isBye ? (home?.teamId ?? away?.teamId) : null,
+      isBye,
+      feedsIntoMatchKey: rounds > 1 ? `r2-m${Math.ceil(slotNum / 2)}` : null,
+      feedsIntoSlot: rounds > 1 ? (slotNum % 2 === 1 ? "home" : "away") : null,
+    });
+  }
+
+  for (let roundNum = 2; roundNum <= rounds; roundNum++) {
     const matchCount = bracketSize / (2 ** roundNum);
     for (let slotNum = 1; slotNum <= matchCount; slotNum++) {
-      const matchKey = `r${roundNum}-m${slotNum}`;
-      const match = {
-        matchKey,
+      matches.push({
+        matchKey: `r${roundNum}-m${slotNum}`,
         roundNum,
         slotNum,
         teamHomeId: null,
@@ -199,16 +226,7 @@ export function buildSeasonalTournamentBracket(tournamentType, orderedTeams) {
         isBye: false,
         feedsIntoMatchKey: roundNum < rounds ? `r${roundNum + 1}-m${Math.ceil(slotNum / 2)}` : null,
         feedsIntoSlot: roundNum < rounds ? (slotNum % 2 === 1 ? "home" : "away") : null,
-      };
-      if (roundNum === 1) {
-        match.teamHomeId = slots[(slotNum - 1) * 2]?.teamId ?? null;
-        match.teamAwayId = slots[(slotNum - 1) * 2 + 1]?.teamId ?? null;
-        const hasHome = Boolean(match.teamHomeId);
-        const hasAway = Boolean(match.teamAwayId);
-        match.isBye = hasHome !== hasAway;
-        if (match.isBye) match.winnerTeamId = match.teamHomeId ?? match.teamAwayId;
-      }
-      matches.push(match);
+      });
     }
   }
 
