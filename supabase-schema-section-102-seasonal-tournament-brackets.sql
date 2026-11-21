@@ -172,6 +172,7 @@ declare
   v_team_count integer;
   v_bracket_size integer := 1;
   v_match_count integer;
+  v_bye_count integer;
   v_profile_id uuid := (select auth.uid());
 begin
   if v_profile_id is null or (select public.current_role_name()) <> 'manager' then
@@ -199,6 +200,39 @@ begin
   v_match_count := (select count(*) from jsonb_array_elements(p_matches));
   if v_match_count <> greatest(v_bracket_size - 1, 0) then
     raise exception 'BRACKET_MATCH_COUNT_INVALID';
+  end if;
+
+  if v_team_count > 1 then
+    select count(*) into v_bye_count
+    from jsonb_to_recordset(p_matches) as m(
+      match_key text, round_num integer, slot_num integer, team_home_id uuid,
+      team_away_id uuid, winner_team_id uuid, is_bye boolean,
+      feeds_into_match_key text, feeds_into_slot text
+    )
+    where m.round_num = 1 and coalesce(m.is_bye, false);
+
+    if (
+      select count(*) from jsonb_to_recordset(p_matches) as m(
+        match_key text, round_num integer, slot_num integer, team_home_id uuid,
+        team_away_id uuid, winner_team_id uuid, is_bye boolean,
+        feeds_into_match_key text, feeds_into_slot text
+      ) where m.round_num = 1
+    ) <> v_bracket_size / 2
+    or v_bye_count <> v_bracket_size - v_team_count
+    or exists (
+      select 1 from jsonb_to_recordset(p_matches) as m(
+        match_key text, round_num integer, slot_num integer, team_home_id uuid,
+        team_away_id uuid, winner_team_id uuid, is_bye boolean,
+        feeds_into_match_key text, feeds_into_slot text
+      )
+      where m.round_num = 1 and (
+        (m.team_home_id is null and m.team_away_id is null)
+        or ((m.team_home_id is null or m.team_away_id is null) and coalesce(m.is_bye,false) is false)
+        or (m.team_home_id is not null and m.team_away_id is not null and coalesce(m.is_bye,false) is true)
+      )
+    ) then
+      raise exception 'FIRST_ROUND_BYE_LAYOUT_INVALID';
+    end if;
   end if;
 
   if exists (
