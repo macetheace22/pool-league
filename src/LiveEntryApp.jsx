@@ -13,6 +13,7 @@ import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
 import { hasLaterStartedSet } from "./forfeitRules";
 import { liveSetDisposition } from "./liveSetDisposition";
+import { canOfferGladiatorMatch, createGladiatorSet, gladiatorPlayerChoices } from "./gladiatorMatch";
 import { resolveTeamMatchWinner } from "./playoffMatchRules";
 
 
@@ -130,6 +131,7 @@ function usedPlayerNums(match) {
 function setDraftState(match, setIdx) {
   const set = match.sets[setIdx];
   if (set.complete) return "done";
+  if (match.sets.slice(0, setIdx).some(prior => prior?.isGladiator)) return "locked";
   if (set.playerHome && set.playerAway) return "live"; // both assigned, scoring in progress
   const setNum = setIdx + 1;
 
@@ -204,6 +206,10 @@ export default function LiveEntryApp() {
   const [activeSet, setActiveSet] = useState(0);
 
   useEffect(() => {
+    if (Number.isInteger(match?.gladiatorSetIndex)) setActiveSet(match.gladiatorSetIndex);
+  }, [match?.gladiatorSetIndex]);
+
+  useEffect(() => {
     if (!pairingId || !profile?.id) return;
     setActiveSession({
       type: "live", ownerId: profile.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
@@ -229,6 +235,8 @@ export default function LiveEntryApp() {
         return;
       }
       setMatch(m);
+      const savedGladiatorIndex = (m.sets ?? []).findIndex(set => set?.isGladiator);
+      if (savedGladiatorIndex >= 0) setActiveSet(savedGladiatorIndex);
       if (m.phase !== "archived") {
         setActiveSession({
           type: "live", ownerId: profile?.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
@@ -259,7 +267,7 @@ export default function LiveEntryApp() {
       setMatch((local) => {
         if (!local) return remote;
         // Overwrite if remote has more racks OR more assigned players (covers draft updates too)
-        const countSig = (m) => m.sets.reduce((s, st) => s + st.racks.length + (st.playerHome?1:0) + (st.playerAway?1:0) + (st.complete?1:0), 0) + (m.coinFlipLoser?1:0);
+        const countSig = (m) => m.sets.reduce((s, st) => s + st.racks.length + (st.playerHome?1:0) + (st.playerAway?1:0) + (st.complete?1:0), 0) + (m.coinFlipLoser?1:0) + (m.gladiatorPresenceRevision ?? 0);
         return countSig(remote) > countSig(local) ? remote : local;
       });
     }, POLL_INTERVAL_MS);
@@ -360,7 +368,8 @@ export default function LiveEntryApp() {
         const completedSets = marked.sets.filter(s => s.complete).length;
         const homeSets = marked.sets.filter(s => s.complete && s.winnerSlot === "home").length;
         const awaySets = marked.sets.filter(s => s.complete && s.winnerSlot === "away").length;
-        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets });
+        const gladiatorSet = marked.sets.find(set => set.isGladiator && set.complete) ?? null;
+        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets, gladiatorSet });
         const winnerId = winnerSlot === "home" ? marked.teamHome?.id : winnerSlot === "away" ? marked.teamAway?.id : null;
 
         // Scheduled league matches use one database transaction for archive
@@ -452,7 +461,7 @@ export default function LiveEntryApp() {
           )}
           {!match.makeup && phase === "lineup" && match.coinFlipLoser && (
             <>
-              <DraftScreen match={match} activeSet={activeSet} setActiveSet={setActiveSet} onSave={persist} />
+              <DraftScreen match={match} activeSet={activeSet} setActiveSet={setActiveSet} onSave={persist} mySide={mySide} isManager={isManager} />
               <MidMatchMakeupTrigger match={match} onSave={persist} />
             </>
           )}
@@ -777,7 +786,7 @@ function FullMatchForfeitForm({ match, onCancel, onConfirm }) {
   );
 }
 
-function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
+function DraftScreen({ match, activeSet, setActiveSet, onSave, mySide, isManager }) {
   const [fullMatchForfeitOpen, setFullMatchForfeitOpen] = useState(false);
   const used = usedPlayerNums(match);
 
@@ -846,6 +855,12 @@ function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
         used={used}
         onAssign={assignPlayer}
         onForfeit={forfeitSet}
+        onGladiator={(updated) => {
+          setActiveSet(updated.gladiatorSetIndex ?? setIdx);
+          onSave(updated);
+        }}
+        mySide={mySide}
+        isManager={isManager}
       />
     </div>
   );
@@ -870,14 +885,25 @@ function DraftSetTabBar({ statuses, activeSet, onSelect }) {
   );
 }
 
-function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
+function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGladiator, mySide, isManager }) {
   const set = match.sets[setIdx];
   const [forfeiting, setForfeiting] = useState(false);
+  const [gladiatorOpen, setGladiatorOpen] = useState(false);
+  const { homePoints: currentHomePoints, awayPoints: currentAwayPoints } = db.computeMatchPoints(match);
+  const priorPlayerEligible = (side, player) => {
+    const team = match[side === "home" ? "teamHome" : "teamAway"];
+    const rosterPlayer = (team.roster ?? []).find(candidate => String(candidate.num) === String(player.num)) ?? player;
+    return !playoffIneligibleReason(match, rosterPlayer);
+  };
+  const hasEligibleRepeatPlayers =
+    gladiatorPlayerChoices(match.sets, setIdx, "home").some(player => priorPlayerEligible("home", player)) &&
+    gladiatorPlayerChoices(match.sets, setIdx, "away").some(player => priorPlayerEligible("away", player));
+  const canGladiator = hasEligibleRepeatPlayers && canOfferGladiatorMatch({ isPlayoff: !!match.isPlayoff, sets: match.sets, setIdx, homePoints: currentHomePoints, awayPoints: currentAwayPoints });
 
   if (status === "locked") {
     return <div className="empty-state">This table unlocks once an earlier set finishes.</div>;
   }
-  if (status === "done" || status === "live") {
+  if (status === "done") {
     return (
       <div className="card" style={{textAlign:"center"}}>
         <div style={{fontSize:13,fontWeight:700,color:"#5FCF9E",marginBottom:6}}>Table {setIdx+1} matchup set</div>
@@ -886,6 +912,26 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
           <span className="draft-matchup-display__vs">vs</span>
           <span className="draft-matchup-display__away">{set.playerAway?.name}</span>
         </div>
+      </div>
+    );
+  }
+  if (status === "live") {
+    return (
+      <div className="card" style={{textAlign:"center"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#5FCF9E",marginBottom:6}}>Table {setIdx+1} matchup set</div>
+        <div className="draft-matchup-display">
+          <span className="draft-matchup-display__home">{set.playerHome?.name}</span>
+          <span className="draft-matchup-display__vs">vs</span>
+          <span className="draft-matchup-display__away">{set.playerAway?.name}</span>
+        </div>
+        {canGladiator && (set.racks ?? []).length === 0 && (
+          <button className="btn-secondary" style={{width:"100%",marginTop:10,borderColor:"#B7791F",color:"#F6C66A"}}
+            onClick={() => setGladiatorOpen(true)}>Gladiator Match — both teams have no additional player present</button>
+        )}
+        {gladiatorOpen && <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => {
+          onGladiator({ ...match, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, gladiatorPresenceSetIndex: null, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 });
+          setGladiatorOpen(false);
+        }} mySide={mySide} isManager={isManager} />}
       </div>
     );
   }
@@ -911,6 +957,13 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
         lockedReceivingPlayer={alreadyAssignedSide ? opponentPlayer : null}
         onForfeit={onForfeit} onCancel={()=>setForfeiting(false)} />
     );
+  }
+  if (gladiatorOpen) {
+    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} mySide={mySide} isManager={isManager}
+      onCancel={() => {
+        onGladiator({ ...match, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, gladiatorPresenceSetIndex: null, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 });
+        setGladiatorOpen(false);
+      }} />;
   }
 
   return (
@@ -955,6 +1008,76 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
       <button className="makeup-trigger-link" onClick={()=>setForfeiting(true)}>
         <AlertTriangle size={12}/> No eligible player for this table — forfeit it
       </button>
+      {canGladiator && (
+        <button className="btn-secondary" style={{width:"100%",marginTop:10,borderColor:"#B7791F",color:"#F6C66A"}}
+          onClick={() => setGladiatorOpen(true)}>
+          Gladiator Match — both teams have no additional player present
+        </button>
+      )}
+    </div>
+  );
+}
+
+function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave, mySide, isManager }) {
+  const [homeNum, setHomeNum] = useState("");
+  const [awayNum, setAwayNum] = useState("");
+  const sameGladiatorSet = match.gladiatorPresenceSetIndex === setIdx;
+  const homeNoPlayer = sameGladiatorSet && !!match.gladiatorNoAvailableHome;
+  const awayNoPlayer = sameGladiatorSet && !!match.gladiatorNoAvailableAway;
+  const isEligiblePriorPlayer = (side, player) => {
+    const team = match[side === "home" ? "teamHome" : "teamAway"];
+    const rosterPlayer = (team.roster ?? []).find(candidate => String(candidate.num) === String(player.num)) ?? player;
+    return !playoffIneligibleReason(match, rosterPlayer);
+  };
+  const homeChoices = gladiatorPlayerChoices(match.sets, setIdx, "home").filter(player => isEligiblePriorPlayer("home", player));
+  const awayChoices = gladiatorPlayerChoices(match.sets, setIdx, "away").filter(player => isEligiblePriorPlayer("away", player));
+  const homePlayer = homeChoices.find(player => String(player.num) === homeNum);
+  const awayPlayer = awayChoices.find(player => String(player.num) === awayNum);
+  const ready = homeNoPlayer && awayNoPlayer && !!homePlayer && !!awayPlayer;
+  const submit = () => {
+    if (!ready) return;
+    const gladiatorSet = createGladiatorSet(match.sets[setIdx], setIdx, homePlayer, awayPlayer, match.sets);
+    if (!gladiatorSet) return;
+    const sets = match.sets.map((set, index) => index === setIdx ? gladiatorSet : set);
+    onConfirm({ ...match, sets, gladiatorSetIndex: setIdx, gladiatorMatch: true, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1, phase: "live", confirmedHome: false, confirmedAway: false });
+  };
+  return (
+    <div className="draft-step">
+      <div className="draft-step__banner" style={{background:"#2A1F00",color:"#F6C66A"}}>
+        <AlertTriangle size={13} style={{marginRight:5,verticalAlign:-2}}/> Gladiator Match · Sudden Death
+      </div>
+      <div className="card">
+        <div className="card__title">Confirm no additional player is present</div>
+        <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:12}}>
+          <input type="checkbox" checked={homeNoPlayer} disabled={!isManager && mySide !== "home"} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableHome: event.target.checked, gladiatorNoAvailableAway: sameGladiatorSet ? match.gladiatorNoAvailableAway : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
+          <span>{match.teamHome.name} confirms it has no other player present to accept a forfeit.</span>
+        </label>
+        <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start"}}>
+          <input type="checkbox" checked={awayNoPlayer} disabled={!isManager && mySide !== "away"} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableAway: event.target.checked, gladiatorNoAvailableHome: sameGladiatorSet ? match.gladiatorNoAvailableHome : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
+          <span>{match.teamAway.name} confirms it has no other player present to accept a forfeit.</span>
+        </label>
+      </div>
+      <div className="card">
+        <div className="card__title">{match.teamHome.name} — select a player who already played</div>
+        <select className="input input--select" value={homeNum} onChange={event => setHomeNum(event.target.value)}>
+          <option value="">Select previously played player…</option>
+          {homeChoices.map(player => <option key={player.num} value={player.num}>{player.name} ({player.rating})</option>)}
+        </select>
+      </div>
+      <div className="card">
+        <div className="card__title">{match.teamAway.name} — select a player who already played</div>
+        <select className="input input--select" value={awayNum} onChange={event => setAwayNum(event.target.value)}>
+          <option value="">Select previously played player…</option>
+          {awayChoices.map(player => <option key={player.num} value={player.num}>{player.name} ({player.rating})</option>)}
+        </select>
+      </div>
+      <div style={{fontSize:11,color:"#B7B7B7",lineHeight:1.5,marginBottom:10}}>
+        The selected repeat players will play this marked Gladiator set using normal scoring. Once it is completed, the match proceeds to final confirmation. Any later sets remain unplayed; if a scheduled set remains unplayed, Section 6.10 suppresses the positive rating bonus.
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn-primary" disabled={!ready} onClick={submit} style={{flex:1}}>Start Gladiator Set</button>
+        <button className="btn-secondary" onClick={onCancel}>Back</button>
+      </div>
     </div>
   );
 }
@@ -1081,8 +1204,21 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
     is_live: true,
     state: { ...match, sets: match.sets },
   };
+  const gladiatorSet = match.sets.find(set => set.isGladiator);
+  const canCancelGladiator = !!match.gladiatorMatch && gladiatorSet && !gladiatorSet.complete && !(gladiatorSet.racks ?? []).length;
   return (
     <div className="screen">
+      {canCancelGladiator && (
+        <button className="btn-secondary" style={{width:"100%",borderColor:"#B7791F",color:"#F6C66A"}}
+          onClick={() => {
+            const sets = match.sets.map(set => set === gladiatorSet ? {
+              ...set, playerHome: null, playerAway: null, racks: [], winnerSlot: null, complete: false, isGladiator: false,
+            } : set);
+            onSave({ ...match, sets, gladiatorMatch: false, gladiatorSetIndex: null, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, gladiatorPresenceSetIndex: null, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1, phase: "lineup" });
+          }}>
+          Cancel Gladiator Setup
+        </button>
+      )}
       <SetTabBar sets={match.sets} activeSet={activeSet} onSelect={setActiveSet} />
       <SetEntry
         key={activeSet}
@@ -1094,7 +1230,8 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
         onUpdateSet={(updatedSet) => {
           const newSets = match.sets.map((s, i) => (i === activeSet ? updatedSet : s));
           const allDone = newSets.every((s) => s.complete);
-          onSave({ ...match, sets: newSets, phase: allDone ? "confirm" : "live" });
+          const gladiatorDone = !!updatedSet.isGladiator && updatedSet.complete;
+          onSave({ ...match, sets: newSets, phase: allDone || gladiatorDone ? "confirm" : "live" });
         }}
       />
       {completedCount > 0 && <div className="completed-banner">{completedCount} of 5 sets complete</div>}
@@ -1112,13 +1249,19 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
 }
 
 function SetTabBar({ sets, activeSet, onSelect }) {
+  const gladiatorIndex = sets.findIndex(set => set.isGladiator);
   return (
     <div className="set-tabs">
-      {sets.map((s, i) => (
-        <button key={i} className={`set-tab ${i === activeSet ? "set-tab--active" : ""} ${s.complete ? "set-tab--done" : ""}`} onClick={() => onSelect(i)}>
-          {s.complete ? <Check size={10} /> : i + 1}
-        </button>
-      ))}
+      {sets.map((s, i) => {
+        const locked = gladiatorIndex >= 0 && i > gladiatorIndex;
+        return (
+          <button key={i} disabled={locked}
+            className={`set-tab ${i === activeSet ? "set-tab--active" : ""} ${s.complete ? "set-tab--done" : ""} ${locked ? "set-tab--locked" : ""}`}
+            onClick={() => !locked && onSelect(i)}>
+            {s.isGladiator ? "G" : s.complete ? <Check size={10} /> : i + 1}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -1410,9 +1553,13 @@ function ConfirmScreen({ match, onSave }) {
   const [noteHome, setNoteHome] = useState("");
   const [noteAway, setNoteAway] = useState("");
 
-  const homeSets = match.sets.filter((s) => s.winnerSlot === "home").length;
-  const awaySets = match.sets.filter((s) => s.winnerSlot === "away").length;
-  const matchWinner = homeSets > awaySets ? match.teamHome.name : awaySets > homeSets ? match.teamAway.name : "Tie";
+  const homeSets = match.sets.filter((s) => s.complete && s.winnerSlot === "home").length;
+  const awaySets = match.sets.filter((s) => s.complete && s.winnerSlot === "away").length;
+  const completedSets = match.sets.filter(set => set.complete).length;
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
+  const { homePoints, awayPoints } = db.computeMatchPoints(match);
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
+  const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   const confirmSide = (side) => {
     onSave({ ...match, [side === "home" ? "confirmedHome" : "confirmedAway"]: true });
@@ -1447,7 +1594,7 @@ function ConfirmScreen({ match, onSave }) {
         {match.sets.map((s) => (
           <div key={s.setNum} className="sets-summary__row">
             <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-            <span className="sets-summary__score">{runningTotal(s.racks, "home")}–{runningTotal(s.racks, "away")}</span>
+            <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{liveSetDisposition(s, !!match.makeup) ?? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}`}</span>
             <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
           </div>
         ))}
@@ -1551,7 +1698,7 @@ function FinalSubmitScreen({ match, onSave, homeSets, awaySets, matchWinner }) {
         {match.sets.map((s) => (
           <div key={s.setNum} className="sets-summary__row">
             <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-            <span className="sets-summary__score">{liveSetDisposition(s, !!match.makeup) ?? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}`}</span>
+            <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{liveSetDisposition(s, !!match.makeup) ?? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}`}</span>
             <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
           </div>
         ))}
@@ -1622,7 +1769,11 @@ function DoneScreen({ match, onReset }) {
     );
   }
 
-  const matchWinner = homeSets > awaySets ? match.teamHome.name : awaySets > homeSets ? match.teamAway.name : "Tie";
+  const { homePoints, awayPoints } = db.computeMatchPoints(match);
+  const completedSets = match.sets.filter(set => set.complete).length;
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
+  const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   return (
     <div className="screen">
@@ -1639,7 +1790,7 @@ function DoneScreen({ match, onReset }) {
           return (
             <div key={s.setNum} className="sets-summary__row">
               <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-              <span className="sets-summary__score">{liveSetDisposition(s, false) ?? `${runH}–${runA}`}</span>
+              <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{liveSetDisposition(s, false) ?? `${runH}–${runA}`}</span>
               <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
             </div>
           );
