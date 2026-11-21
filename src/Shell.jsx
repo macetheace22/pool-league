@@ -86,7 +86,7 @@ export function confirmAndLogout(logout) {
 // own match for them.
 const BASE_TABS = [
   { key: "home",        label: "Home",        path: "/",            icon: Home,     match: (p) => p === "/" },
-  { key: "practice",    label: "Practice",     path: "/practice",    icon: Dumbbell, match: (p) => p.startsWith("/practice") },
+  { key: "practice",    label: "Practice",     path: "/practice?home=1",    icon: Dumbbell, match: (p) => p.startsWith("/practice") },
   { key: "tournaments", label: "Tournaments",  path: "/tournaments", icon: Award,    match: (p) => p.startsWith("/tournaments") },
 ];
 
@@ -135,7 +135,7 @@ export function TabBar() {
 const PRIMARY_NAV_ITEMS = [
   { key: "stats",       label: "My Stats",    path: "/my-stats",   icon: BarChart3 },
   { key: "leagues",     label: "Leagues",     path: "/leagues",    icon: Trophy },
-  { key: "practice",    label: "Practice",    path: "/practice",   icon: Dumbbell },
+  { key: "practice",    label: "Practice",    path: "/practice?home=1",   icon: Dumbbell },
   { key: "teamsplayers", label: "Teams and Players", path: "/teams-and-players", icon: Users },
   { key: "tournaments", label: "Tournaments", path: "/tournaments", icon: Award },
 ];
@@ -154,7 +154,7 @@ export const LEAGUE_NAV_ITEMS = [
 
 export const PRACTICE_NAV_ITEMS = [
   { key: "new-practice", label: "New Practice Session", path: "/practice?start=1", icon: Dumbbell },
-  { key: "practice-history", label: "My Practice Sessions", path: "/practice#practice-sessions", icon: Calendar },
+  { key: "practice-history", label: "My Practice Sessions", path: "/practice?home=1#practice-sessions", icon: Calendar },
 ];
 
 const TEAMS_PLAYERS_NAV_ITEMS = [

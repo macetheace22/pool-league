@@ -112,8 +112,13 @@ export default function Practice() {
 
   };
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("start") === "1" && phase === "landing") startSession();
-  }, [location.search]);
+    const params = new URLSearchParams(location.search);
+    if (params.get("home") === "1") {
+      setPhase("landing");
+      return;
+    }
+    if (params.get("start") === "1" && phase === "landing") startSession();
+  }, [location.search, phase]);
   const activatePracticeSession = (nextPhase) => {
     setActiveSession({
       type: "practice", ownerId: profile?.id, route: "/practice",
@@ -970,7 +975,7 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
 
   return (
     <>
-      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${scoringMethodLabel(session.scoringMethod)}`} backFallback="/" />
+      <PageHeader title="Practice" subtitle={`${gameTypeLabel(session.gameType)} · ${scoringMethodLabel(session.scoringMethod)}`} onBack={() => changePhase("landing")} />
       <div className="tab-content">
         <div style={{fontSize:12,color:"#9FC4B4",marginBottom:10}}>Game results and scores are saved to your account as you go. You can leave this screen and resume from the active-session bar.</div>
         {recordStatus === "checking" && <div className="card"><Loader /><div className="card__title">Preparing your practice game…</div></div>}
