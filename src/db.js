@@ -3172,7 +3172,7 @@ export async function listMyUnfinishedPracticeGames(profileId) {
     .eq("created_by", profileId)
     .is("winner", null)
     .is("completed_at", null)
-    .order("created_at", { ascending: false });
+    .order("played_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
