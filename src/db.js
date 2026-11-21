@@ -2778,13 +2778,27 @@ export async function searchProfilesByUsername(query) {
   const { data, error } = await supabase.rpc("search_profiles_by_username", { p_query: query.trim() });
   return error ? [] : (data ?? []);
 }
-// Manual link only -- never inferred by name match. Once linked, that
-// opponent's past and future practice games are understood to be against
-// the real account (the app resolves display/head-to-head off whichever of
-// opponent_player_num/opponent_id/linked_profile_id is present).
-export async function linkPracticeOpponent(opponentId, profileId) {
-  const { error } = await supabase.from("practice_opponents").update({ linked_profile_id: profileId }).eq("id", opponentId);
-  return !error;
+// Practice opponent identity links require confirmation by the account holder.
+// Keep the guest row so historical practice_games retain their opponent_id.
+export async function requestPracticeOpponentLink(opponentId, targetProfileId) {
+  const { data, error } = await supabase.rpc("request_practice_opponent_link", {
+    p_opponent_id: opponentId, p_target_profile_id: targetProfileId,
+  });
+  if (error) return { ok: false, status: "ERROR" };
+  const row = data?.[0];
+  return row ? { ok: row.result_status === "PENDING", ...row } : { ok: false, status: "ERROR" };
+}
+export async function listPracticeOpponentLinkRequests() {
+  const { data, error } = await supabase.rpc("list_practice_opponent_link_requests");
+  return error ? [] : (data ?? []);
+}
+export async function respondPracticeOpponentLink(requestId, accept) {
+  const { data, error } = await supabase.rpc("respond_practice_opponent_link", { p_request_id: requestId, p_accept: accept });
+  return error ? "ERROR" : data;
+}
+export async function cancelPracticeOpponentLinkRequest(requestId) {
+  const { data, error } = await supabase.rpc("cancel_practice_opponent_link_request", { p_request_id: requestId });
+  return !error && data === true;
 }
 
 // Practice creates its parent row before shot logging begins. Its UUID is

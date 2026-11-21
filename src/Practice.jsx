@@ -204,6 +204,9 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [linkingKey, setLinkingKey] = useState(null);
   const [selectedGameId, setSelectedGameId] = useState(null);
+  const [linkRequests, setLinkRequests] = useState([]);
+  const refreshLinkRequests = () => db.listPracticeOpponentLinkRequests().then(setLinkRequests);
+  useEffect(() => { refreshLinkRequests(); }, [profile?.id]);
 
   const opponentKey = (g) => g.opponent_player_num ? `p:${g.opponent_player_num}` : `o:${g.opponent_id}`;
   const byOpponent = {};
@@ -220,6 +223,39 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
     <>
       <PageHeader title="Practice" />
       <div className="tab-content">
+        {linkRequests.length > 0 && (
+          <div className="card">
+            <div className="card__title">Practice Identity Requests</div>
+            {linkRequests.map(request => {
+              const incoming = request.direction === "incoming";
+              const pending = request.status === "pending";
+              const expired = pending && new Date(request.expires_at).getTime() <= Date.now();
+              return (
+                <div key={request.request_id} className="list-row" style={{alignItems:"center",gap:8}}>
+                  <div className="list-row__body">
+                    <div className="list-row__name">
+                      {incoming ? `@${request.requester_username || "player"} wants to claim ${request.opponent_name}`
+                        : `Request to @${request.target_username || "player"} for ${request.opponent_name}`}
+                    </div>
+                    <div className="list-row__sub">
+                      {pending ? (expired ? "Expired — awaiting cleanup" : incoming ? "Confirm this is you to connect their practice history" : "Waiting for their confirmation")
+                        : request.status[0].toUpperCase() + request.status.slice(1)}
+                    </div>
+                  </div>
+                  {pending && incoming && !expired && (
+                    <div style={{display:"flex",gap:5}}>
+                      <button className="btn-icon btn-icon--confirm" onClick={async () => { await db.respondPracticeOpponentLink(request.request_id, true); refreshLinkRequests(); onLinked(); }}><Check size={14}/></button>
+                      <button className="btn-icon" onClick={async () => { await db.respondPracticeOpponentLink(request.request_id, false); refreshLinkRequests(); }}>Decline</button>
+                    </div>
+                  )}
+                  {pending && !incoming && (
+                    <button className="btn-icon" onClick={async () => { await db.cancelPracticeOpponentLinkRequest(request.request_id); refreshLinkRequests(); }}>Cancel</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
           <button type="button" onClick={onStart} className="office-list-item">
             <Plus size={16} /><span>New Practice Session</span>
@@ -257,7 +293,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                       </div>
                     </div>
                     {linkingKey === o.key && (
-                      <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); }} onCancel={() => setLinkingKey(null)} />
+                      <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); refreshLinkRequests(); }} onCancel={() => setLinkingKey(null)} />
                     )}
                   </div>
                 );
@@ -337,34 +373,50 @@ function PracticeTypeStep({ session, setSession, onNext, onCancel }) {
 function LinkOpponentPanel({ opponentId, onDone, onCancel }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
-  const [linking, setLinking] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const t = setTimeout(() => { if (query.trim().length >= 2) db.searchProfilesByUsername(query).then(setResults); else setResults([]); }, 250);
+    const t = setTimeout(() => {
+      if (query.trim().length >= 2) db.searchProfilesByUsername(query).then(setResults);
+      else setResults([]);
+    }, 250);
     return () => clearTimeout(t);
   }, [query]);
 
-  const link = async (p) => {
-    setLinking(true);
-    const ok = await db.linkPracticeOpponent(opponentId, p.id);
-    setLinking(false);
-    if (ok) onDone();
+  const sendRequest = async () => {
+    if (!selected) return;
+    setSending(true);
+    const result = await db.requestPracticeOpponentLink(opponentId, selected.id);
+    setSending(false);
+    if (result.ok) onDone();
+    else setMessage(result.status === "PENDING_EXISTS"
+      ? "A request is already waiting for another account. Cancel it before sending a new one."
+      : result.status === "ALREADY_LINKED" ? "This opponent is already linked."
+      : "Could not send the request. Please try again.");
   };
 
   return (
     <div className="card" style={{marginTop:6,marginBottom:6}}>
-      <div className="form-label" style={{marginBottom:6}}>Link to an account</div>
-      <input className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search by username…" autoFocus />
+      <div className="form-label" style={{marginBottom:6}}>Request an identity link</div>
+      <div style={{fontSize:11,color:"#999",marginBottom:8}}>Search their username. They must confirm before your practice history is linked.</div>
+      <input className="input" value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}} placeholder="Search by username…" autoFocus />
       {results.length > 0 && (
         <div className="list" style={{marginTop:8}}>
           {results.map(p => (
-            <div key={p.id} className="list-row" style={{cursor:"pointer"}} onClick={() => link(p)}>
+            <button type="button" key={p.id} className="list-row" style={{width:"100%",textAlign:"left",background:selected?.id===p.id?"#202A25":undefined}} onClick={() => {setSelected(p);setMessage("");}}>
               <div className="list-row__body"><div className="list-row__name">@{p.username}</div></div>
-            </div>
+              {selected?.id===p.id && <Check size={15}/>}
+            </button>
           ))}
         </div>
       )}
-      <button className="btn-secondary" style={{marginTop:8}} onClick={onCancel} disabled={linking}>Cancel</button>
+      {message && <div className="error-msg" style={{marginTop:8}}>{message}</div>}
+      <div style={{display:"flex",gap:8,marginTop:8}}>
+        <button className="btn-primary" onClick={sendRequest} disabled={!selected||sending}>{sending?"Sending…":"Send Request"}</button>
+        <button className="btn-secondary" onClick={onCancel} disabled={sending}>Cancel</button>
+      </div>
     </div>
   );
 }
