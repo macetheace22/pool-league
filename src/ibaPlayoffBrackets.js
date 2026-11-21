@@ -9,25 +9,25 @@
 // compare the IBA publication against that provisional structure and reconcile
 // only when the imported structure is unambiguous.
 
-const RANK_RE = /^(\\d+)(?:st|nd|rd|th)$/i;
-const TEAM_NUM_RE = /^(?=.*\\d)[A-Z0-9]{5,8}$/i;
+const RANK_RE = /^(\d+)(?:st|nd|rd|th)$/i;
+const TEAM_NUM_RE = /^(?=.*\d)[A-Z0-9]{5,8}$/i;
 
 function cleanLine(value) {
   return String(value ?? "")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .replace(/[|]+/g, " ")
     .trim();
 }
 
 function isNoiseLine(line) {
   return !line ||
-    /^(?:IBA\\s*\\/|International Billiards|Winter|Spring|Summer|Fall|Season|Report printed|Printed|Division\\b|MVP\\b|\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/i.test(line) ||
-    /^#?\\d{1,4}\\s*-?\\s*Division$/i.test(line);
+    /^(?:IBA\s*\/|International Billiards|Winter|Spring|Summer|Fall|Season|Report printed|Printed|Division\b|MVP\b|\d{1,2}\/\d{1,2}\/\d{2,4})/i.test(line) ||
+    /^#?\d{1,4}\s*-?\s*Division$/i.test(line);
 }
 
 function isTeamNumber(line) {
   const value = cleanLine(line);
-  return TEAM_NUM_RE.test(value) && !/^\\d{4}[-/]\\d{1,2}/.test(value);
+  return TEAM_NUM_RE.test(value) && !/^\d{4}[-/]\d{1,2}/.test(value);
 }
 
 function normalizeBracketType(heading) {
@@ -36,8 +36,8 @@ function normalizeBracketType(heading) {
 
 function extractDivisionNum(lines) {
   for (const line of lines) {
-    const match = cleanLine(line).match(/#\\s*(\\d{1,4})\\s*-?\\s*Division\\b/i)
-      || cleanLine(line).match(/\\bDivision\\s*#?\\s*(\\d{1,4})\\b/i);
+    const match = cleanLine(line).match(/#\s*(\d{1,4})\s*-?\s*Division\b/i)
+      || cleanLine(line).match(/\bDivision\s*#?\s*(\d{1,4})\b/i);
     if (match) return match[1];
   }
   return null;
