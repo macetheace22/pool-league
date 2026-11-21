@@ -36,6 +36,13 @@ describe("IBA Rule 5.5 Gladiator match", () => {
     expect(canOfferGladiatorMatch({ isPlayoff: true, sets: laterAssigned, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
+  it("allows Gladiator when one unused player was already put up but no rack was played", () => {
+    const onePlayerPutUp = sets.map((s, i) => i === 2 ? { ...s, playerHome: played("H3", "Home Three") } : s);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: onePlayerPutUp, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(true);
+    const started = onePlayerPutUp.map((s, i) => i === 2 ? { ...s, racks: [{ home: 10, away: 5 }] } : s);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: started, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
+  });
+
   it("does not offer a second Gladiator or proceed after a prior forfeit", () => {
     const priorGladiator = sets.map((s, i) => i === 1 ? { ...s, isGladiator: true } : s);
     const priorForfeit = sets.map((s, i) => i === 1 ? { ...s, forfeited: true } : s);
