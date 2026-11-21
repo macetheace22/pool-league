@@ -13,6 +13,7 @@ import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
 import { hasLaterStartedSet } from "./forfeitRules";
 import { liveSetDisposition } from "./liveSetDisposition";
+import { resolveTeamMatchWinner } from "./playoffMatchRules";
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -355,9 +356,12 @@ export default function LiveEntryApp() {
       (async () => {
         const marked = { ...match, archiving: true };
         await saveMatch(pairingId, marked);
-        const homeSets = marked.sets.filter(s => s.winnerSlot === "home").length;
-        const awaySets = marked.sets.filter(s => s.winnerSlot === "away").length;
-        const winnerId = homeSets > awaySets ? marked.teamHome?.id : awaySets > homeSets ? marked.teamAway?.id : null;
+        const { homePoints, awayPoints } = db.computeMatchPoints(marked);
+        const completedSets = marked.sets.filter(s => s.complete).length;
+        const homeSets = marked.sets.filter(s => s.complete && s.winnerSlot === "home").length;
+        const awaySets = marked.sets.filter(s => s.complete && s.winnerSlot === "away").length;
+        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets });
+        const winnerId = winnerSlot === "home" ? marked.teamHome?.id : winnerSlot === "away" ? marked.teamAway?.id : null;
 
         // Scheduled league matches use one database transaction for archive
         // plus playoff advancement. Recreational matches have no schedule
