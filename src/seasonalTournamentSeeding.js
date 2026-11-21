@@ -117,7 +117,9 @@ export function buildSeasonalTournamentPlans(divisionSnapshots) {
       championshipTeams.push({ ...team, divisionId });
     }
     for (const team of row?.seeding?.consolation ?? []) {
-      consolationTeams.push({ ...team, divisionId });
+      const receivedBye = deriveConsolationByeStatus(team.teamId, row?.playoffMatches);
+      const seedCategory = classifyConsolationSeed({ consolationChampion: true, receivedBye });
+      consolationTeams.push({ ...team, divisionId, receivedBye, seedCategory });
     }
   }
   return {
