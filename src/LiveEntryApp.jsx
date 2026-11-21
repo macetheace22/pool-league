@@ -877,7 +877,8 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
   const set = match.sets[setIdx];
   const [forfeiting, setForfeiting] = useState(false);
   const [gladiatorOpen, setGladiatorOpen] = useState(false);
-  const canGladiator = canOfferGladiatorMatch({ isPlayoff: !!match.isPlayoff, sets: match.sets, setIdx });
+  const { homePoints: currentHomePoints, awayPoints: currentAwayPoints } = db.computeMatchPoints(match);
+  const canGladiator = canOfferGladiatorMatch({ isPlayoff: !!match.isPlayoff, sets: match.sets, setIdx, homePoints: currentHomePoints, awayPoints: currentAwayPoints });
 
   if (status === "locked") {
     return <div className="empty-state">This table unlocks once an earlier set finishes.</div>;
