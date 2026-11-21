@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as db from "./db";
+import { toPracticeResultPerspective } from "./practiceHistory";
 import { ChevronLeft, ChevronRight, FileText, Table as TableIcon, X } from "lucide-react";
 
 const TEAM_RATING_LIMIT = 325; // only used in open/advanced
@@ -606,9 +607,14 @@ function PracticeScoresheetView({ game, profile, onClose, closeLabel }) {
     return () => { cancelled = true; };
   }, [game.id]);
 
+  const isLinkedViewer = game.viewer_perspective === "linked";
+  const displayResults = results?.map(result => toPracticeResultPerspective(result, isLinkedViewer));
   const playerLabel = (num) => {
     if (!num) return "Unlinked player";
     if (String(num) === String(profile?.player_num)) return "You";
+    if (isLinkedViewer && String(num) === String(game.owner_player_num)) {
+      return game.owner_username || "Practice opponent";
+    }
     if (String(num) === String(game.opponent_player_num)) return game.opponent_name || `Player #${num}`;
     return `Player #${num}`;
   };
@@ -651,7 +657,7 @@ function PracticeScoresheetView({ game, profile, onClose, closeLabel }) {
             <div className="practice-scoresheet__table-wrap">
               <table className="practice-scoresheet__table">
                 <thead><tr><th>Game</th><th>You</th><th>{game.opponent_name || "Opponent"}</th><th>Winner</th></tr></thead>
-                <tbody>{results.map(result => (
+                <tbody>{displayResults.map(result => (
                   <tr key={result.id}>
                     <td>{result.game_number}</td>
                     <td>{result.my_points ?? (result.winner === "me" ? "Win" : "—")}</td>
