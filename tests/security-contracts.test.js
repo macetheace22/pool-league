@@ -720,6 +720,19 @@ describe("full-name player lookup and empty stats cards", () => {
     expect(admin).toContain("{p.name}{p.nickname ? ` \"${p.nickname}\"` : \"\"}");
   });
 
+  it("places Practice identity claim and request management in My Profile", () => {
+    const practice = read("src/Practice.jsx");
+    const admin = read("src/AdminApp.jsx");
+    expect(practice).not.toContain("Claim a Practice Identity");
+    expect(practice).not.toContain("Practice Identity Requests");
+    expect(practice).toContain('to="/me">My Profile</Link>');
+    expect(admin).toContain("Identity &amp; Connections");
+    expect(admin).toContain("db.redeemPracticeOpponentClaimCode(practiceClaimCode)");
+    expect(admin).toContain("db.respondPracticeOpponentLink(request.request_id");
+    expect(admin).toContain("db.cancelPracticeOpponentLinkRequest(requestId)");
+    expect(practice).not.toContain('> · Linked</span>');
+  });
+
   it("uses linked account full names in the People you've played before shortcuts", () => {
     const practice = read("src/Practice.jsx");
     const db = read("src/db.js");
