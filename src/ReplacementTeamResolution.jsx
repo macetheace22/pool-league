@@ -192,6 +192,7 @@ export default function ReplacementTeamResolution() {
     setBusy(false);
     if (error) { setMessage(error.message); return; }
     setMessage(`Replacement resolution recorded: ${data?.replacementResolutionId ?? "saved"}.`);
+    setRecordedResolutionId(data?.replacementResolutionId ?? "");
     setPreview(null); setInheritedStandings(null); setNote(""); setDropoutResolutionId(""); setReplacementTeamId("");
     await loadHistory();
   }
