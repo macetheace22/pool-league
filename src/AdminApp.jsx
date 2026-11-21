@@ -13,6 +13,7 @@ import { getActiveTeamIds, getCaptainTeamIds, getCaptainMatchSlot } from "./team
 import TeamContextSelector from "./TeamContextSelector";
 import Scoresheet from "./Scoresheet";
 import { toPlayerMatchPerspective } from "./leagueMatchPerspective";
+import { filterPracticeGamesByType, matchesPracticeGameType } from "./practiceStats";
 import { useAuth } from "./AuthContext";
 import { PageHeader, SubTabBar, SubTabBtn, AccessDenied, shellCss, TabBar } from "./Shell";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
@@ -1076,6 +1077,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [mvpRankRow, setMvpRankRow] = useState(undefined); // undefined = loading/n-a, null = no data for this scope
   const [playoffElig, setPlayoffElig] = useState(undefined); // undefined = loading/n-a, null = nothing imported for this scope
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
+  const [practiceGameTypeFilter, setPracticeGameTypeFilter] = useState(null);
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
   const [headToHead, setHeadToHead] = useState([]);
   const [matchHistory, setMatchHistory] = useState(undefined);
@@ -1166,7 +1168,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
   // My Stats All Play and Practice are career-wide. The season scope only
   // applies to League; Player Lookup keeps its existing season/career control.
-  const showScope = includeLeague || !defaultCareer;
+  const showScope = includeLeague || includePractice || !defaultCareer;
   const effectiveScopeMode = defaultCareer && !includeLeague ? "career" : scopeMode;
   const activeDivisionIds = effectiveScopeMode === "career"
     ? [...new Set((teamHistory ?? []).map(t => t.divisionId).filter(Boolean))]
@@ -1241,6 +1243,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const scopedSeasonRow = singleScopedDivisionId ? (teamHistory ?? []).find(t => t.divisionId === singleScopedDivisionId) : null;
   const scopedSeasonLabel = scopedSeasonRow ? `Div ${scopedSeasonRow.divisionNum} · ${seasonLabelFor(scopedSeasonRow)} ${scopedSeasonRow.seasonYear}` : "";
 
+  const scopedPracticeGames = filterPracticeGamesByType(practiceGames, practiceGameTypeFilter);
   const scopedEvents = rawEvents
     ? (effectiveScopeMode === "career"
         ? rawEvents
@@ -1250,7 +1253,11 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
     (matchesPlayType(e, "league") && includeLeague) ||
     (matchesPlayType(e, "practice") && includePractice)
   );
-  const filteredEvents = sourceEvents.filter(e => (!gameTypeFilter || e.game_type === gameTypeFilter) && (playCategory === "all" ? matchesPlayType(e, playTypeFilter) : true));
+  const filteredEvents = sourceEvents.filter(e =>
+    (!gameTypeFilter || e.game_type === gameTypeFilter) &&
+    matchesPracticeGameType(e, practiceGameTypeFilter) &&
+    (playCategory === "all" ? matchesPlayType(e, playTypeFilter) : true)
+  );
   // Shot-event rows can contain legacy/mixed data. A malformed row must not be able to
   // tear down the entire My Stats page when a source filter changes the event set.
   let shotStats = null;
@@ -1283,9 +1290,9 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const leagueWins = seasonRecord?.wins ?? 0;
   const leagueLosses = seasonRecord?.losses ?? 0;
   const leagueSets = seasonRecord?.sets ?? 0;
-  const practiceWins = (practiceGames ?? []).filter(g => g.winner === "me" && g.practice_type !== "skills_drills").length;
-  const practiceLosses = (practiceGames ?? []).filter(g => g.winner === "opponent" && g.practice_type !== "skills_drills").length;
-  const practiceGamesPlayed = (practiceGames ?? []).filter(g => g.practice_type !== "skills_drills").length;
+  const practiceWins = scopedPracticeGames.filter(g => g.winner === "me").length;
+  const practiceLosses = scopedPracticeGames.filter(g => g.winner === "opponent").length;
+  const practiceGamesPlayed = scopedPracticeGames.length;
   const combinedWins = (includeLeague ? leagueWins : 0) + (includePractice ? practiceWins : 0);
   const combinedLosses = (includeLeague ? leagueLosses : 0) + (includePractice ? practiceLosses : 0);
   const combinedDecided = combinedWins + combinedLosses;
@@ -1336,6 +1343,12 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
           <button className={`seg-btn ${scopeMode==="season"?"seg-btn--active":""}`} onClick={()=>setScopeMode("season")}>By Season</button>
           <button className={`seg-btn ${scopeMode==="career"?"seg-btn--active":""}`} onClick={()=>setScopeMode("career")}>Career (All-Time)</button>
         </div>
+        {includedSources?.includes("practice") && includePractice && (
+          <div style={{marginTop:10}}>
+            <div style={{fontSize:10,fontWeight:800,letterSpacing:".05em",textTransform:"uppercase",color:"#8A8A8A",marginBottom:6}}>Practice Game Type</div>
+            <FilterChips options={GAME_TYPE_FILTERS} value={practiceGameTypeFilter} onChange={setPracticeGameTypeFilter} />
+          </div>
+        )}
         {includeLeague && scopeMode === "season" && (
           years.length === 0 ? <div className="dash-empty">No season history on file.</div> : (
             <div style={{display:"flex",gap:8}}>
@@ -1396,7 +1409,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
           <div style={{fontSize:10.5,color:"#777",marginBottom:8}}>League and practice results are shown together based on your selected play filters. Select any result to view its saved scoresheet.</div>
           {(() => {
             const leagueRows = includeLeague ? (matchHistory ?? []).map(m => ({ ...m, _source: "league", _sortDate: m.confirmed_at || m.created_at })) : [];
-            const practiceRows = includePractice ? (practiceGames ?? []).filter(g => g.practice_type !== "skills_drills").map(g => ({ ...g, _source: "practice", _sortDate: g.completed_at || g.played_at })) : [];
+            const practiceRows = includePractice ? scopedPracticeGames.map(g => ({ ...g, _source: "practice", _sortDate: g.completed_at || g.played_at })) : [];
             const rows = [...leagueRows, ...practiceRows].sort((a,b) => new Date(b._sortDate || 0) - new Date(a._sortDate || 0));
             if (rows.length === 0) return <div className="dash-empty">No completed results are recorded for the selected play.</div>;
             return <div className="list" style={{marginTop:6}}>
