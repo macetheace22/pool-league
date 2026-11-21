@@ -3126,6 +3126,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                   : divisionMvpTieBreakAudit.map((audit, index) => (
                     <div key={index} className="card" style={{margin:"8px 12px"}}>
                       <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>{audit.explanation}</div>
+                      {audit.winnerName && <div className="list-row__sub" style={{fontWeight:700}}>Tie-break winner: {audit.winnerName} · #{audit.winnerNum}</div>}
                       {audit.players.map(player => (
                         <div key={player.num} style={{padding:"7px 0",borderTop:"1px solid var(--border,#333)"}}>
                           <div style={{fontWeight:700,fontSize:13}}>{player.name} · #{player.num}</div>
@@ -3134,10 +3135,11 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                           <div className="list-row__sub">Average opponent rating: {player.averageOpponentRating == null ? player.opponentRatingStatus : player.averageOpponentRating.toFixed(1)} ({player.opponentSets} set(s))</div>
                         </div>
                       ))}
-                      <div style={{fontSize:12,fontWeight:700,marginTop:8,color:audit.outcome==="single-set-playoff-required"?"#F59E0B":"#5FCF9E"}}>
+                      <div style={{fontSize:12,fontWeight:700,marginTop:8,color:["single-set-playoff-required","multi-player-review-required","insufficient-data"].includes(audit.outcome)?"#F59E0B":"#5FCF9E"}}>
                         {audit.outcome==="head-to-head-points" ? "Tie-break: head-to-head points" :
                          audit.outcome==="opponent-rating-average" ? "Tie-break: opponent rating average" :
                          audit.outcome==="insufficient-data" ? "Outcome: insufficient data — review the match records" :
+                         audit.outcome==="multi-player-review-required" ? "Outcome: multi-player tie requires League Office review" :
                          "Outcome: single-set playoff required"}
                       </div>
                     </div>
