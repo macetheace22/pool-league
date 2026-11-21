@@ -975,7 +975,7 @@ function ComingSoonPage({ title }) {
 // advanced, all-time-across-every-type-of-play stats page is a later build.
 const GAME_TYPE_FILTERS = [{ key: null, label: "All Games" }, { key: "8ball", label: "8-Ball" }, { key: "9ball", label: "9-Ball" }, { key: "10ball", label: "10-Ball" }, { key: "ultimate", label: "Ultimate" }];
 const PLAY_TYPE_FILTERS = [{ key: "all", label: "All Play" }, { key: "league", label: "League" }, { key: "practice", label: "Practice" }];
-const PRACTICE_GAME_TYPE_FILTERS = [{ key: null, label: "All Games" }, { key: "8ball", label: "8-Ball" }, { key: "9ball", label: "9-Ball" }, { key: "10ball", label: "10-Ball" }, { key: "ultimate", label: "Ultimate Pool" }];
+const PRACTICE_GAME_TYPE_FILTERS = [{ key: "8ball", label: "8-Ball" }, { key: "9ball", label: "9-Ball" }, { key: "10ball", label: "10-Ball" }, { key: "ultimate", label: "Ultimate Pool" }];
 
 function matchesPlayType(event, playType) {
   if (playType === "all") return true;
@@ -1032,6 +1032,31 @@ function ShotStatsBlock({ stats }) {
   );
 }
 
+function PracticeGameTypeFilter({ value, onChange }) {
+  const selectedTypes = Array.isArray(value) ? value : PRACTICE_GAME_TYPE_FILTERS.map(option => option.key);
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:6}} role="group" aria-label="Practice game type">
+      {PRACTICE_GAME_TYPE_FILTERS.map(option => {
+        const selected = selectedTypes.includes(option.key);
+        return (
+          <button
+            key={option.key}
+            type="button"
+            className={`seg-btn ${selected ? "seg-btn--active" : ""}`}
+            aria-pressed={selected}
+            onClick={() => onChange(selected
+              ? selectedTypes.filter(type => type !== option.key)
+              : [...selectedTypes, option.key]
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function FilterChips({ options, value, onChange }) {
   return (
     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -1078,7 +1103,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [mvpRankRow, setMvpRankRow] = useState(undefined); // undefined = loading/n-a, null = no data for this scope
   const [playoffElig, setPlayoffElig] = useState(undefined); // undefined = loading/n-a, null = nothing imported for this scope
   const [gameTypeFilter, setGameTypeFilter] = useState(null);
-  const [practiceGameTypeFilter, setPracticeGameTypeFilter] = useState(null);
+  const [practiceGameTypeFilter, setPracticeGameTypeFilter] = useState(() => PRACTICE_GAME_TYPE_FILTERS.map(option => option.key));
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
   const [headToHead, setHeadToHead] = useState([]);
   const [matchHistory, setMatchHistory] = useState(undefined);
@@ -1349,7 +1374,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         {includedSources?.includes("practice") && includePractice && (
           <div style={{marginTop:10}}>
             <div style={{fontSize:10,fontWeight:800,letterSpacing:".05em",textTransform:"uppercase",color:"#8A8A8A",marginBottom:6}}>Practice Game Type</div>
-            <FilterChips options={PRACTICE_GAME_TYPE_FILTERS} value={practiceGameTypeFilter} onChange={setPracticeGameTypeFilter} />
+            <PracticeGameTypeFilter value={practiceGameTypeFilter} onChange={setPracticeGameTypeFilter} />
           </div>
         )}
         {includeLeague && scopeMode === "season" && (
