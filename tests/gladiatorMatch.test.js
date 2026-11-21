@@ -12,22 +12,27 @@ const sets = [
 
 describe("IBA Rule 5.5 Gladiator match", () => {
   it("is offered only in postseason after at least one set and before five", () => {
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 2 })).toBe(true);
-    expect(canOfferGladiatorMatch({ isPlayoff: false, sets, setIdx: 2 })).toBe(false);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 0 })).toBe(false);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 5 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(true);
+    expect(canOfferGladiatorMatch({ isPlayoff: false, sets, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 0, homePoints: 200, awayPoints: 200 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 5, homePoints: 200, awayPoints: 200 })).toBe(false);
+  });
+
+
+  it("does not offer Gladiator when one team already leads on match points", () => {
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 2, homePoints: 201, awayPoints: 200 })).toBe(false);
   });
 
   it("requires the current set to be unassigned and unplayed", () => {
     const assigned = sets.map((s, i) => i === 2 ? { ...s, playerHome: played("H3", "Home Three") } : s);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: assigned, setIdx: 2 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: assigned, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
   it("does not offer a second Gladiator or proceed after a prior forfeit", () => {
     const priorGladiator = sets.map((s, i) => i === 1 ? { ...s, isGladiator: true } : s);
     const priorForfeit = sets.map((s, i) => i === 1 ? { ...s, forfeited: true } : s);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: priorGladiator, setIdx: 2 })).toBe(false);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: priorForfeit, setIdx: 2 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: priorGladiator, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: priorForfeit, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
   it("offers only players who completed a prior non-forfeit set for that team", () => {
