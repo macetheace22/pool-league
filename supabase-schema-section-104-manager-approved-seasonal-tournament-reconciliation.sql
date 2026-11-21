@@ -193,7 +193,7 @@ begin
     end if;
 
     if exists (
-      select 1 from jsonb_array_elements(v_proposed) item
+      select 1 from jsonb_array_elements(v_proposed) as proposed(item)
        where item->>'match_key' = v_target_key
          and nullif(item->>v_target_slot, '') is not null
          and (item->>v_target_slot)::uuid <> v_match.winner_team_id
