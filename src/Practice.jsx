@@ -565,7 +565,7 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
     setEditMessage("");
   };
   const createManual = async () => {
-    if (!manualFirstName.trim()) return;
+    if (!manualFirstName.trim() || !manualLastName.trim()) return;
     setSaving(true);
     const o = await db.findOrCreatePracticeOpponent(profile.id, manualFirstName, manualLastName);
     setSaving(false);
