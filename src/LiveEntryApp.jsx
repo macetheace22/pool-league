@@ -1531,7 +1531,7 @@ function ConfirmScreen({ match, onSave }) {
         {match.sets.map((s) => (
           <div key={s.setNum} className="sets-summary__row">
             <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-            <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{runningTotal(s.racks, "home")}–{runningTotal(s.racks, "away")}</span>
+            <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{liveSetDisposition(s, !!match.makeup) ?? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}`}</span>
             <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
           </div>
         ))}
