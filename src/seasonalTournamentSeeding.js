@@ -72,3 +72,64 @@ export function buildSeasonalByePlan(tournamentType, teams) {
     unresolvedByes: Math.max(0, byeCount - awarded.length),
   };
 }
+
+/**
+ * Determines whether a consolation champion advanced through a recorded bye.
+ * Returns null when the playoff rows do not prove either required path.
+ */
+export function deriveConsolationByeStatus(teamId, playoffMatches) {
+  const matches = Array.isArray(playoffMatches) ? playoffMatches : [];
+  const finals = matches.filter(match =>
+    match?.bracket_type === "consolation" &&
+    match?.round === "final" &&
+    String(match?.winner_team_id ?? "") === String(teamId)
+  );
+  if (finals.length !== 1) return null;
+  const final = finals[0];
+  const groupKey = final.bracket_group ?? final.bracket_label;
+  if (!groupKey) return null;
+  const group = matches.filter(match =>
+    match?.bracket_type === "consolation" &&
+    (match.bracket_group ?? match.bracket_label) === groupKey
+  );
+  const byeSemifinals = group.filter(match =>
+    match.round === "semifinal" && (match.is_bye_home === true || match.is_bye_away === true)
+  );
+  const byeTeamIds = byeSemifinals.map(match =>
+    match.is_bye_home === true ? match.team_home_id : match.team_away_id
+  );
+  if (byeTeamIds.some(id => String(id ?? "") === String(teamId))) return true;
+  const recordedSemifinalWins = group.filter(match =>
+    match.round === "semifinal" &&
+    !(match.is_bye_home === true || match.is_bye_away === true) &&
+    String(match.winner_team_id ?? "") === String(teamId)
+  );
+  return recordedSemifinalWins.length > 0 ? false : null;
+}
+
+/** Aggregate all divisions into the two season-wide tournaments (Rulebook 5.3). */
+export function buildSeasonalTournamentPlans(divisionSnapshots) {
+  const championshipTeams = [];
+  const consolationTeams = [];
+  for (const row of divisionSnapshots ?? []) {
+    const divisionId = row?.division?.id ?? null;
+    for (const team of row?.seeding?.championship ?? []) {
+      championshipTeams.push({ ...team, divisionId });
+    }
+    for (const team of row?.seeding?.consolation ?? []) {
+      const receivedBye = deriveConsolationByeStatus(team.teamId, row?.playoffMatches);
+      const seedCategory = classifyConsolationSeed({ consolationChampion: true, receivedBye });
+      consolationTeams.push({ ...team, divisionId, receivedBye, seedCategory });
+    }
+  }
+  return {
+    championship: {
+      teams: championshipTeams,
+      byePlan: buildSeasonalByePlan("championship", championshipTeams),
+    },
+    consolation: {
+      teams: consolationTeams,
+      byePlan: buildSeasonalByePlan("consolation", consolationTeams),
+    },
+  };
+}
