@@ -194,6 +194,7 @@ export default function Practice() {
       setSessionState(null);
       setPhase("landing");
       refreshHistory();
+      refreshUnfinishedGames();
     } catch (error) {
       window.alert(error?.message || "The practice session could not be discarded. Please try again.");
     }
@@ -252,7 +253,7 @@ export default function Practice() {
   }
   if (phase === "done") {
     return wrap(<DoneStep profile={profile} session={session}
-      onSaved={() => { refreshHistory(); clearActiveSession(); setPhase("landing"); setSessionState(null); }} />);
+      onSaved={() => { refreshHistory(); refreshUnfinishedGames(); clearActiveSession(); setPhase("landing"); setSessionState(null); }} />);
   }
 
   return wrap(<LandingStep
