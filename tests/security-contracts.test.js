@@ -569,14 +569,14 @@ describe("Section 101 practice opponent identity confirmation", () => {
     const db = read("src/db.js");
     const practice = read("src/Practice.jsx");
     expect(db).toContain('supabase.rpc("request_practice_opponent_link"');
-    expect(db).toContain('supabase.rpc("list_practice_opponent_link_requests")');
+    expect(db).toContain('supabase.rpc("list_practice_opponent_link_requests_with_names")');
     expect(db).toContain('supabase.rpc("respond_practice_opponent_link"');
     expect(db).toContain('supabase.rpc("cancel_practice_opponent_link_request"');
     expect(db).not.toContain("export async function linkPracticeOpponent(");
-    expect(practice).toContain("They must confirm before your practice history is linked.");
+    expect(practice).toContain("they must confirm before your practice history is linked.");
     expect(practice).toContain("Practice Identity Requests");
-    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
-    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, false)");
+    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
+    expect(practice).toContain("respondToLinkRequest(request.request_id, false)");
     expect(practice).toContain("db.cancelPracticeOpponentLinkRequest(request.request_id)");
   });
 });
@@ -615,7 +615,7 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(practice).toContain("The owner must approve.");
     expect(practice).toContain("generateClaimCode(o.opponentId)");
     expect(practice).toContain("request.link_type === \"claim\"");
-    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
+    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
   });
 });
 
@@ -642,5 +642,70 @@ describe("Section 103 linked practice history read access", () => {
     expect(db).toContain('.in("opponent_id", linkedOpponentIds)');
     expect(db).toContain("const byId = new Map()");
     expect(db).not.toContain('.eq("created_by", profileId)\n    .or("winner.not.is.null,completed_at.not.is.null")');
+  });
+});
+
+
+describe("Section 105 account full names and identity validation", () => {
+  it("requires first and last name at signup and validates player invite names before account creation", () => {
+    const auth = read("src/AuthContext.jsx");
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    expect(auth).toContain("First and last name are required.");
+    expect(auth).toContain("first_name: firstName.trim(), last_name: lastName.trim()");
+    expect(auth).toContain("verify that your first and last name match the IBA player record");
+    expect(sql).toContain("alter table public.profiles");
+    expect(sql).toContain("add column if not exists first_name text");
+    expect(sql).toContain("add column if not exists last_name text");
+    expect(sql).toContain("PLAYER_NAME_MISMATCH");
+    expect(sql).toContain("before insert or update of first_name, last_name, player_num");
+  });
+
+  it("enforces the canonical IBA name when a player number is attached to a profile", () => {
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    expect(sql).toContain("before insert or update of first_name, last_name, player_num");
+    expect(sql).toContain("from public.players player");
+    expect(sql).toContain("v_account_name_normalized is distinct from v_iba_name_normalized");
+    expect(sql).toContain("revoke all on function public.validate_profile_full_name() from public, anon, authenticated");
+  });
+
+  it("keeps practice identity mutual confirmation and requires both accounts to have full names", () => {
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    const practice = read("src/Practice.jsx");
+    expect(sql).toContain("public.validate_practice_opponent_link_names()");
+    expect(sql).toContain("PRACTICE_LINK_FULL_NAME_REQUIRED");
+    expect(sql).toContain("before insert or update of linked_profile_id");
+    expect(sql).toContain("request.target_profile_id = (select auth.uid())");
+    expect(sql).toContain("PRACTICE_LINK_CONFIRMATION_REQUIRED");
+    expect(sql).toContain("set status = 'accepted', responded_at = now()");
+    expect(sql).toContain("create or replace function public.search_profiles_for_practice_link(p_query text)");
+    expect(sql).toContain("public.list_practice_opponent_link_requests_with_names()");
+    expect(practice).toContain("request.requester_full_name");
+    expect(practice).toContain("request.target_full_name");
+    expect(practice).toContain("Both accounts must have first and last names saved in Profile");
+    expect(practice).toContain("p.full_name");
+    expect(practice).toContain("they must confirm before your practice history is linked.");
+  });
+
+  it("uses full names for both sides of linked practice history without rewriting saved games", () => {
+    const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
+    const db = read("src/db.js");
+    const practice = read("src/Practice.jsx");
+    expect(sql).toContain("public.list_linked_practice_game_owners");
+    expect(sql).toContain("public.list_linked_practice_opponent_names");
+    expect(db).toContain('supabase.rpc("list_linked_practice_opponent_names"');
+    expect(db).toContain('"list_linked_practice_game_owners"');
+    expect(db).toContain("opponent_name: linkedName");
+    expect(db).toContain('return "FULL_NAME_REQUIRED"');
+    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
+    expect(db).not.toContain(".update({ opponent_name:");
+  });
+
+  it("lets existing users complete their profile name and handles server-side name mismatch", () => {
+    const admin = read("src/AdminApp.jsx");
+    const db = read("src/db.js");
+    expect(admin).toContain("Save Full Name");
+    expect(admin).toContain("db.updateOwnFullName(profile.id, firstName.trim(), lastName.trim())");
+    expect(admin).toContain("PLAYER_NAME_MISMATCH");
+    expect(db).toContain("first_name: firstName, last_name: lastName");
   });
 });

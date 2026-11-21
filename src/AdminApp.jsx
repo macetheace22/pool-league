@@ -4089,6 +4089,8 @@ function WeeklyImportPanel({ divisionId, teams, mode }) {
 
 // ─── Account Settings ─────────────────────────────────────────────────────────
 function AccountSettings({ profile, onProfileRefresh }) {
+  const [firstName, setFirstName] = useState(profile.first_name ?? "");
+  const [lastName, setLastName] = useState(profile.last_name ?? "");
   const [username, setUsername] = useState(profile.username);
   const [phone, setPhone]       = useState(profile.phone_number ?? "");
   const [playerNum, setPlayerNum] = useState(profile.player_num ?? "");
@@ -4147,6 +4149,18 @@ function AccountSettings({ profile, onProfileRefresh }) {
     if (onProfileRefresh) await onProfileRefresh();
   };
 
+  const saveFullName = async () => {
+    if (!firstName.trim() || !lastName.trim()) { setError("First and last name are required."); return; }
+    const result = await db.updateOwnFullName(profile.id, firstName.trim(), lastName.trim());
+    if (!result.ok) {
+      setError(result.message?.includes("PLAYER_NAME_MISMATCH")
+        ? "Your name must match the canonical IBA player name linked to this account. Ask your captain or league manager to correct an inaccurate roster name."
+        : "Could not update your name. Check both fields and try again.");
+      return;
+    }
+    setError(""); setSuccess("Full name updated."); setTimeout(() => setSuccess(""), 2500);
+    if (onProfileRefresh) await onProfileRefresh();
+  };
   const saveUsername = async () => {
     if (!username.trim()) { setError("Username required."); return; }
     if (username.trim() !== profile.username && await db.isUsernameTaken(username.trim())) { setError("Username taken."); return; }
@@ -4168,6 +4182,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
     if (!result.ok) {
       setError(result.reason === "not_found" ? "We don't recognize that player number yet."
         : result.reason === "already_claimed" ? "That player number is already linked to another account."
+        : result.reason === "name_mismatch" ? "Your first and last name must match the IBA player record for this number."
         : "Could not update player number.");
       return;
     }
@@ -4196,6 +4211,15 @@ function AccountSettings({ profile, onProfileRefresh }) {
   return (
     <>
       <div className="settings-who"><RolePill role={profile.role}/><span className="settings-username">{profile.username}</span></div>
+      <div className="card">
+        <div className="card__title">Full Name</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <div className="field"><Label>First Name</Label><input className="input" value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" /></div>
+          <div className="field"><Label>Last Name</Label><input className="input" value={lastName} onChange={e=>setLastName(e.target.value)} autoComplete="family-name" /></div>
+        </div>
+        <button className="btn-secondary" onClick={saveFullName} disabled={!firstName.trim() || !lastName.trim() || (firstName.trim()===profile.first_name && lastName.trim()===profile.last_name)}>Save Full Name</button>
+        <div style={{fontSize:10.5,color:"#777",marginTop:6}}>Your full name is used to verify your IBA player identity and identify participants in linked Practice history.</div>
+      </div>
       <div className="card">
         <div className="card__title">Username</div>
         <div className="field"><input className="input" value={username} onChange={e=>setUsername(e.target.value)} autoCapitalize="none"/></div>

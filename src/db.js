@@ -47,6 +47,12 @@ export async function claimInviteCode(code) {
   if (error?.message?.includes("PLAYER_NUMBER_ALREADY_LINKED")) {
     return { error: "Your account is already linked to a different player number. Ask your captain for the player-specific invite code for your correct roster entry. If your existing player-number link is incorrect, the league manager will need to resolve that exceptional conflict." };
   }
+  if (error?.message?.includes("PLAYER_NAME_MISMATCH")) {
+    return { error: "The first and last name on your profile do not match the IBA player record for this invite code. Update your profile name or ask your captain/league manager to correct an inaccurate roster name." };
+  }
+  if (error?.message?.includes("PROFILE_FULL_NAME_REQUIRED")) {
+    return { error: "Add your first and last name in Profile before redeeming a player invite code." };
+  }
   if (error) return { error: error.message };
   return { role: data?.[0]?.role, team_id: data?.[0]?.team_id };
 }
@@ -71,6 +77,10 @@ export async function getProfile(userId) {
     captain_team_ids: captainTeamsError ? [] : (captainTeams ?? []).map(team => team.id),
   };
 }
+export async function updateOwnFullName(userId, firstName, lastName) {
+  const { error } = await supabase.from("profiles").update({ first_name: firstName, last_name: lastName }).eq("id", userId);
+  return error ? { ok: false, message: error.message } : { ok: true };
+}
 export async function updateOwnUsername(userId, username) {
   const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);
   return !error;
@@ -85,6 +95,7 @@ export async function setOwnPlayerNumber(playerNum) {
   if (!error) return { ok: true };
   if (error.message?.includes("PLAYER_NOT_FOUND")) return { ok: false, reason: "not_found" };
   if (error.message?.includes("PLAYER_ALREADY_CLAIMED")) return { ok: false, reason: "already_claimed" };
+  if (error.message?.includes("PLAYER_NAME_MISMATCH")) return { ok: false, reason: "name_mismatch" };
   return { ok: false, reason: "error" };
 }
 // Manager-only self-service: sets or clears the manager's own team_id (the
@@ -2775,11 +2786,10 @@ export async function findOrCreatePracticeOpponent(profileId, name) {
   const { data, error } = await supabase.from("practice_opponents").insert({ created_by: profileId, name: trimmed }).select().single();
   return error ? null : data;
 }
-// Narrow search (id + username only) so any player can look up an account to
-// link a practice opponent to -- doesn't expose phone/email like listProfiles().
+// Narrow practice-link identity search: full name and username only, never contact details.
 export async function searchProfilesByUsername(query) {
   if (!query || query.trim().length < 2) return [];
-  const { data, error } = await supabase.rpc("search_profiles_by_username", { p_query: query.trim() });
+  const { data, error } = await supabase.rpc("search_profiles_for_practice_link", { p_query: query.trim() });
   return error ? [] : (data ?? []);
 }
 // Practice opponent identity links require confirmation by the account holder.
@@ -2793,7 +2803,7 @@ export async function requestPracticeOpponentLink(opponentId, targetProfileId) {
   return row ? { ok: row.result_status === "PENDING", ...row } : { ok: false, status: "ERROR" };
 }
 export async function listPracticeOpponentLinkRequests() {
-  const { data, error } = await supabase.rpc("list_practice_opponent_link_requests");
+  const { data, error } = await supabase.rpc("list_practice_opponent_link_requests_with_names");
   return error ? [] : (data ?? []);
 }
 export async function createPracticeOpponentClaimCode(opponentId) {
@@ -2812,6 +2822,8 @@ export async function redeemPracticeOpponentClaimCode(code) {
 }
 export async function respondPracticeOpponentLink(requestId, accept) {
   const { data, error } = await supabase.rpc("respond_practice_opponent_link", { p_request_id: requestId, p_accept: accept });
+  if (error?.message?.includes("PRACTICE_LINK_FULL_NAME_REQUIRED")) return "FULL_NAME_REQUIRED";
+  if (error?.message?.includes("PRACTICE_LINK_CONFIRMATION_REQUIRED")) return "CONFIRMATION_REQUIRED";
   return error ? "ERROR" : data;
 }
 export async function cancelPracticeOpponentLinkRequest(requestId) {
@@ -2917,8 +2929,21 @@ export async function listMyPracticeGames(profileId) {
     );
   }
 
+  let ownGamesWithLinkedNames = ownGames ?? [];
+  if (ownGamesWithLinkedNames.length > 0) {
+    const { data: names, error: nameError } = await supabase.rpc("list_linked_practice_opponent_names", {
+      p_practice_game_ids: ownGamesWithLinkedNames.map(game => game.id),
+    });
+    if (nameError) throw nameError;
+    const nameByGameId = new Map((names ?? []).map(row => [row.practice_game_id, row.display_name]));
+    ownGamesWithLinkedNames = ownGamesWithLinkedNames.map(game => {
+      const linkedName = nameByGameId.get(game.id);
+      return linkedName ? { ...game, linked_opponent_display_name: linkedName, opponent_name: linkedName } : game;
+    });
+  }
+
   const byId = new Map();
-  (ownGames ?? []).forEach(game => byId.set(game.id, { ...game, viewer_perspective: "creator" }));
+  ownGamesWithLinkedNames.forEach(game => byId.set(game.id, { ...game, viewer_perspective: "creator" }));
   linkedGamesWithOwners.forEach(game => byId.set(game.id, game));
   return [...byId.values()].sort((a, b) =>
     new Date(b.played_at ?? b.completed_at ?? 0).getTime() -
