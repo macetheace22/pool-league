@@ -174,7 +174,8 @@ begin
   for v_match in
     select * from public.seasonal_tournament_matches
      where tournament_id = p_tournament_id
-       and status in ('completed', 'in_progress')
+       and status = 'completed'
+       and winner_team_id is not null
        and feeds_into_match_id is not null
   loop
     select match_key into v_target_key
