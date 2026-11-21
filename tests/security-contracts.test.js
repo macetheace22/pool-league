@@ -782,3 +782,34 @@ describe("manual Practice opponent full names", () => {
     expect(sql).toContain("grant execute on function public.update_my_practice_opponent_name(uuid, text, text) to authenticated");
   });
 });
+
+describe("Section 102 seasonal tournament bracket persistence", () => {
+  it("creates separate season-wide tournament, entry, and match records with RLS and manager-only confirmation", () => {
+    const sql = read("supabase-schema-section-102-seasonal-tournament-brackets.sql");
+    expect(sql).toContain("create table if not exists public.seasonal_tournaments");
+    expect(sql).toContain("create table if not exists public.seasonal_tournament_entries");
+    expect(sql).toContain("create table if not exists public.seasonal_tournament_matches");
+    expect(sql).toContain("alter table public.seasonal_tournaments enable row level security");
+    expect(sql).toContain("alter table public.seasonal_tournament_entries enable row level security");
+    expect(sql).toContain("alter table public.seasonal_tournament_matches enable row level security");
+    expect(sql).toContain("revoke all on public.seasonal_tournaments from public, anon, authenticated");
+    expect(sql).toContain("grant select on public.seasonal_tournaments to authenticated");
+    expect(sql).toContain("public.current_role_name()) <> 'manager'");
+    expect(sql).toContain("grant execute on function public.create_seasonal_tournament(uuid, text, jsonb, jsonb, uuid) to authenticated");
+    expect(sql).toContain("TOURNAMENT_ALREADY_EXISTS");
+    expect(sql).toContain("FIRST_ROUND_ENTRIES_MUST_APPEAR_EXACTLY_ONCE");
+  });
+
+  it("uses the confirmed bracket builder and RPC rather than mutating division playoff records", () => {
+    const db = read("src/db.js");
+    const seeding = read("src/seasonalTournamentSeeding.js");
+    const admin = read("src/AdminApp.jsx");
+    expect(db).toContain("buildSeasonalTournamentBracket(tournamentType, orderedTeams)");
+    expect(db).toContain('supabase.rpc("create_seasonal_tournament"');
+    expect(db).toContain('supabase.from("seasonal_tournament_matches")');
+    expect(admin).toContain("Confirm & Create Bracket");
+    expect(admin).toContain("db.createSeasonalTournament(seasonId, type, drafts[type])");
+    expect(seeding).toContain("export function buildSeasonalTournamentBracket");
+    expect(admin).toContain("seedCategorySource: \"manager_verified\"");
+  });
+});
