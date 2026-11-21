@@ -11,6 +11,10 @@ const HOME_AWAY_KEY_PAIRS = [
   ["home", "away"],
   ["homeTotal", "awayTotal"],
   ["homePoints", "awayPoints"],
+  ["safetyHome", "safetyAway"],
+  ["timeoutHomeCount", "timeoutAwayCount"],
+  ["timeoutHome", "timeoutAway"],
+  ["pointsHome", "pointsAway"],
 ];
 
 const HOME_AWAY_VALUE_KEYS = new Set([
