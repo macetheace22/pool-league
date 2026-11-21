@@ -1018,12 +1018,12 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
         {isEightBall && !winner && (
           <div className="card">
             <div className="card__title">Record This Game's Score</div>
-            <div style={{display:"flex",gap:10,alignItems:"flex-end",marginTop:6}}>
-              <div className="field" style={{flex:1}}><div className="form-label">You</div>
-                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={myPts} onChange={e=>setSession(s=>({...s,myPts:e.target.value}))} placeholder="Enter score" /></div>
-              <div style={{fontSize:13,color:"#6A6A6A",paddingBottom:12}}>–</div>
-              <div className="field" style={{flex:1}}><div className="form-label">{session.opponentName}</div>
-                <input className="input" type="text" inputMode="numeric" pattern="[0-9]*" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="Enter score" /></div>
+            <div className="practice-score-entry">
+              <div className="field practice-score-entry__field"><div className="form-label">You</div>
+                <input className="input practice-score-entry__input" type="text" inputMode="numeric" pattern="[0-9]*" value={myPts} onChange={e=>setSession(s=>({...s,myPts:e.target.value}))} placeholder="Enter score" /></div>
+              <div className="practice-score-entry__separator">–</div>
+              <div className="field practice-score-entry__field"><div className="form-label">{session.opponentName}</div>
+                <input className="input practice-score-entry__input" type="text" inputMode="numeric" pattern="[0-9]*" value={oppPts} onChange={e=>setSession(s=>({...s,oppPts:e.target.value}))} placeholder="Enter score" /></div>
             </div>
             {err && <div className="error-msg" style={{marginTop:8}}>{err}</div>}
             <button className="btn-primary" style={{marginTop:10}} onClick={recordGame} disabled={savingResult || recordStatus !== "ready"}>{savingResult ? "Saving…" : "Submit Game Score"}</button>
@@ -1086,6 +1086,11 @@ function DoneStep({ profile, session, onSaved }) {
 }
 
 export const practiceCss = `
+.practice-score-entry{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:end;margin-top:6px;}
+.practice-score-entry__field{min-width:0;}
+.practice-score-entry__input{min-height:44px;font-size:16px;}
+.practice-score-entry__separator{font-size:13px;color:#6A6A6A;padding-bottom:12px;}
+@media (max-width:360px){.practice-score-entry{gap:6px;}.practice-score-entry__input{padding-left:9px;padding-right:9px;}}
 .practice-history-button{width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 0;text-align:left;}
 .practice-scoresheet{margin:8px 0 12px;padding:12px;background:#141414;border:1px solid #333;border-radius:10px;display:flex;flex-direction:column;gap:12px;}
 .practice-scoresheet__header{background:#0B3D2E;border-radius:8px;padding:12px;}
