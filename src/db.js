@@ -71,6 +71,14 @@ export async function getProfile(userId) {
     captain_team_ids: captainTeamsError ? [] : (captainTeams ?? []).map(team => team.id),
   };
 }
+export async function validatePlayerInviteName(code, firstName, lastName) {
+  const { data, error } = await supabase.rpc("validate_player_invite_name", { p_code: code, p_first_name: firstName, p_last_name: lastName });
+  return error ? "ERROR" : data;
+}
+export async function updateOwnFullName(userId, firstName, lastName) {
+  const { error } = await supabase.from("profiles").update({ first_name: firstName, last_name: lastName }).eq("id", userId);
+  return error ? { ok: false, message: error.message } : { ok: true };
+}
 export async function updateOwnUsername(userId, username) {
   const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);
   return !error;
@@ -2775,11 +2783,10 @@ export async function findOrCreatePracticeOpponent(profileId, name) {
   const { data, error } = await supabase.from("practice_opponents").insert({ created_by: profileId, name: trimmed }).select().single();
   return error ? null : data;
 }
-// Narrow search (id + username only) so any player can look up an account to
-// link a practice opponent to -- doesn't expose phone/email like listProfiles().
+// Narrow practice-link identity search: full name and username only, never contact details.
 export async function searchProfilesByUsername(query) {
   if (!query || query.trim().length < 2) return [];
-  const { data, error } = await supabase.rpc("search_profiles_by_username", { p_query: query.trim() });
+  const { data, error } = await supabase.rpc("search_profiles_for_practice_link", { p_query: query.trim() });
   return error ? [] : (data ?? []);
 }
 // Practice opponent identity links require confirmation by the account holder.
@@ -2793,7 +2800,7 @@ export async function requestPracticeOpponentLink(opponentId, targetProfileId) {
   return row ? { ok: row.result_status === "PENDING", ...row } : { ok: false, status: "ERROR" };
 }
 export async function listPracticeOpponentLinkRequests() {
-  const { data, error } = await supabase.rpc("list_practice_opponent_link_requests");
+  const { data, error } = await supabase.rpc("list_practice_opponent_link_requests_with_names");
   return error ? [] : (data ?? []);
 }
 export async function createPracticeOpponentClaimCode(opponentId) {
@@ -2917,8 +2924,21 @@ export async function listMyPracticeGames(profileId) {
     );
   }
 
+  let ownGamesWithLinkedNames = ownGames ?? [];
+  if (ownGamesWithLinkedNames.length > 0) {
+    const { data: names, error: nameError } = await supabase.rpc("list_linked_practice_opponent_names", {
+      p_practice_game_ids: ownGamesWithLinkedNames.map(game => game.id),
+    });
+    if (nameError) throw nameError;
+    const nameByGameId = new Map((names ?? []).map(row => [row.practice_game_id, row.display_name]));
+    ownGamesWithLinkedNames = ownGamesWithLinkedNames.map(game => {
+      const linkedName = nameByGameId.get(game.id);
+      return linkedName ? { ...game, linked_opponent_display_name: linkedName, opponent_name: linkedName } : game;
+    });
+  }
+
   const byId = new Map();
-  (ownGames ?? []).forEach(game => byId.set(game.id, { ...game, viewer_perspective: "creator" }));
+  ownGamesWithLinkedNames.forEach(game => byId.set(game.id, { ...game, viewer_perspective: "creator" }));
   linkedGamesWithOwners.forEach(game => byId.set(game.id, game));
   return [...byId.values()].sort((a, b) =>
     new Date(b.played_at ?? b.completed_at ?? 0).getTime() -
