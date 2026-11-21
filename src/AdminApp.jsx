@@ -1035,7 +1035,7 @@ function ShotStatsBlock({ stats }) {
 function PracticeGameTypeFilter({ value, onChange }) {
   const selectedTypes = Array.isArray(value) ? value : PRACTICE_GAME_TYPE_FILTERS.map(option => option.key);
   return (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:6}} role="group" aria-label="Practice game type">
+    <div className="seg-control" role="group" aria-label="Practice game type">
       {PRACTICE_GAME_TYPE_FILTERS.map(option => {
         const selected = selectedTypes.includes(option.key);
         return (
