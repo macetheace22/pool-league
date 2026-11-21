@@ -262,3 +262,29 @@ export function buildSeasonalTournamentBracket(tournamentType, orderedTeams) {
     championTeamId: rankedTeams.length === 1 ? rankedTeams[0].teamId : null,
   };
 }
+
+/** Convert the pure bracket model to the snake_case contract used by the SQL RPC. */
+export function serializeSeasonalTournamentBracket(bracket) {
+  return {
+    entries: (bracket?.entries ?? []).map(entry => ({
+      team_id: entry.teamId,
+      division_id: entry.divisionId,
+      seed_num: entry.seedNum,
+      seed_category: entry.seedCategory,
+      seed_category_source: entry.seedCategorySource,
+      division_position: entry.divisionPosition,
+      received_bye_history: entry.receivedByeHistory,
+    })),
+    matches: (bracket?.matches ?? []).map(match => ({
+      match_key: match.matchKey,
+      round_num: match.roundNum,
+      slot_num: match.slotNum,
+      team_home_id: match.teamHomeId,
+      team_away_id: match.teamAwayId,
+      winner_team_id: match.winnerTeamId,
+      is_bye: match.isBye,
+      feeds_into_match_key: match.feedsIntoMatchKey,
+      feeds_into_slot: match.feedsIntoSlot,
+    })),
+  };
+}
