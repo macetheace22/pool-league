@@ -38,11 +38,13 @@ describe("IBA Rule 5.5 Gladiator match", () => {
     expect(canOfferGladiatorMatch({ isPlayoff: true, sets: laterAssigned, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
-  it("does not offer Gladiator after a player has been assigned to the current set", () => {
+  it("allows an assigned but unplayed lineup to convert to Gladiator before any rack starts", () => {
     const onePlayerPutUp = sets.map((s, i) => i === 2 ? { ...s, playerHome: played("H3", "Home Three") } : s);
     const bothPutUp = onePlayerPutUp.map((s, i) => i === 2 ? { ...s, playerAway: played("A3", "Away Three") } : s);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: onePlayerPutUp, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: bothPutUp, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: onePlayerPutUp, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(true);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: bothPutUp, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(true);
+    const started = bothPutUp.map((set, i) => i === 2 ? { ...set, racks: [{ home: 10, away: 5 }] } : set);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: started, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
   it("does not offer Gladiator if either side has no previously played player", () => {
