@@ -1531,7 +1531,7 @@ function ConfirmScreen({ match, onSave }) {
         {match.sets.map((s) => (
           <div key={s.setNum} className="sets-summary__row">
             <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-            <span className="sets-summary__score">{runningTotal(s.racks, "home")}–{runningTotal(s.racks, "away")}</span>
+            <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{runningTotal(s.racks, "home")}–{runningTotal(s.racks, "away")}</span>
             <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
           </div>
         ))}
@@ -1706,7 +1706,11 @@ function DoneScreen({ match, onReset }) {
     );
   }
 
-  const matchWinner = homeSets > awaySets ? match.teamHome.name : awaySets > homeSets ? match.teamAway.name : "Tie";
+  const { homePoints, awayPoints } = db.computeMatchPoints(match);
+  const completedSets = match.sets.filter(set => set.complete).length;
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
+  const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   return (
     <div className="screen">
@@ -1723,7 +1727,7 @@ function DoneScreen({ match, onReset }) {
           return (
             <div key={s.setNum} className="sets-summary__row">
               <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-              <span className="sets-summary__score">{liveSetDisposition(s, false) ?? `${runH}–${runA}`}</span>
+              <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{liveSetDisposition(s, false) ?? `${runH}–${runA}`}</span>
               <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
             </div>
           );
