@@ -206,6 +206,10 @@ export default function LiveEntryApp() {
   const [activeSet, setActiveSet] = useState(0);
 
   useEffect(() => {
+    if (Number.isInteger(match?.gladiatorSetIndex)) setActiveSet(match.gladiatorSetIndex);
+  }, [match?.gladiatorSetIndex]);
+
+  useEffect(() => {
     if (!pairingId || !profile?.id) return;
     setActiveSession({
       type: "live", ownerId: profile.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
@@ -950,7 +954,11 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
     );
   }
   if (gladiatorOpen) {
-    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => setGladiatorOpen(false)} />;
+    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator}
+      onCancel={() => {
+        onGladiator({ ...match, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false });
+        setGladiatorOpen(false);
+      }} />;
   }
 
   return (
@@ -1191,8 +1199,21 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
     is_live: true,
     state: { ...match, sets: match.sets },
   };
+  const gladiatorSet = match.sets.find(set => set.isGladiator);
+  const canCancelGladiator = !!match.gladiatorMatch && gladiatorSet && !gladiatorSet.complete && !(gladiatorSet.racks ?? []).length;
   return (
     <div className="screen">
+      {canCancelGladiator && (
+        <button className="btn-secondary" style={{width:"100%",borderColor:"#B7791F",color:"#F6C66A"}}
+          onClick={() => {
+            const sets = match.sets.map(set => set === gladiatorSet ? {
+              ...set, playerHome: null, playerAway: null, racks: [], winnerSlot: null, complete: false, isGladiator: false,
+            } : set);
+            onSave({ ...match, sets, gladiatorMatch: false, gladiatorSetIndex: null, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, phase: "lineup" });
+          }}>
+          Cancel Gladiator Setup
+        </button>
+      )}
       <SetTabBar sets={match.sets} activeSet={activeSet} onSelect={setActiveSet} />
       <SetEntry
         key={activeSet}
