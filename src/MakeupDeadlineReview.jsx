@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Scale } from "lucide-react";
 import { useAuth } from "./AuthContext";
-import { PageHeader } from "./Shell";
+import { PageHeader, shellCss } from "./Shell";
 import { css } from "./AdminApp";
 import { supabase } from "./supabaseClient";
 import { listRosterForTeam } from "./db";
@@ -105,7 +105,7 @@ export default function MakeupDeadlineReview() {
 
   if (!profile) return null;
   if (!canManage) return (
-    <div className="app"><style>{css}</style>
+    <div className="app"><style>{css}</style><style>{shellCss}</style>
       <PageHeader title="Makeup Deadline Review" subtitle="Rule 8.5" backFallback="/league-office" />
       <div className="tab-content"><div className="card"><strong>Access denied.</strong> League Management only.</div></div>
     </div>
@@ -113,7 +113,7 @@ export default function MakeupDeadlineReview() {
 
   return (
     <div className="app">
-      <style>{css}</style>
+      <style>{css}</style><style>{shellCss}</style>
       <PageHeader title="Makeup Deadline Review" subtitle="Rule 8.5" backFallback="/league-office" />
       <div className="tab-content">
         <div className="card" style={{borderColor:"#92400E"}}>
