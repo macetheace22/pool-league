@@ -2514,8 +2514,10 @@ export function computeMvp(matches, adjustments = []) {
         const winner = s.forfeitedBy === "home" ? away : home;
         const loser = s.forfeitedBy === "home" ? home : away;
         byPlayer[winner.num].wins++; byPlayer[winner.num].forfeitWins++;
-        byPlayer[winner.num].pointsScored += s.forfeitPoints ?? 0;
-        byPlayer[winner.num].mvpRanking += s.forfeitPoints ?? 0; // forfeit win: no +200 bonus
+        // Rule 5.6 sets the MVP credit for a forfeit win at 125 points,
+        // independent of the format-specific team-match forfeit score.
+        byPlayer[winner.num].pointsScored += 125;
+        byPlayer[winner.num].mvpRanking += 125; // no additional +200 win bonus
         byPlayer[loser.num].losses++;
         byPlayer[loser.num].mvpRanking -= 200;
         continue;
