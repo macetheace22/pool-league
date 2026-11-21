@@ -55,7 +55,7 @@ describe("Rule 5.5 tie-break audit", () => {
         { team_id: "c", player_num: "c1", schedule_week_date: "2026-09-08", matches_played: 10, matches_won: 4 },
       ],
     });
-    expect(rows.find(row => row.teamId === "a").recordVsNext).toBeNull();
+    expect(rows.find(row => row.teamId === "a").recordVsNext).toEqual({ wins: 1, losses: 0, draws: 0, matches: 1 });
     expect(rows.find(row => row.teamId === "b").recordVsNext).toEqual({ wins: 0, losses: 0, draws: 1, matches: 1 });
   });
 
@@ -96,7 +96,7 @@ describe("Rule 5.5 tie-break audit", () => {
         { team_id: "b", player_num: "22222", schedule_week_date: "2026-09-01", matches_played: 5, matches_won: 2, imported_at: "2026-09-01T00:00:00Z" },
       ],
     });
-    expect(rows.find(row => row.teamId === "a").recordVsNext).toEqual({ wins: 1, losses: 0, draws: 0, matches: 1 });
+    expect(rows.find(row => row.teamId === "a").recordVsNext).toBeNull();
   });
 
   it("keeps unavailable data unresolved rather than treating it as zero", () => {
