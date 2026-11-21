@@ -36,6 +36,9 @@ alter table public.practice_opponent_link_requests enable row level security;
 -- Do not expose request rows directly. The RPCs below return only the fields
 -- needed by the two participants and enforce auth.uid() in every operation.
 revoke all on public.practice_opponent_link_requests from public, anon, authenticated;
+-- SELECT is the only direct Data API privilege; no SELECT policy exists,
+-- so RLS returns no rows. All supported operations use the scoped RPCs.
+grant select on public.practice_opponent_link_requests to authenticated;
 
 create or replace function public.request_practice_opponent_link(
   p_opponent_id uuid,
