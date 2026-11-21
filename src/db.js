@@ -2519,9 +2519,9 @@ export async function getMyStats(profile) {
 }
 
 // ─── Standings / MVP seed imports ───────────────────────────────────────────
-export async function listStandingsAdjustments(divisionId) {
+export async function listStandingsAdjustments(divisionId, { strict = false } = {}) {
   const { data, error } = await supabase.from("standings_adjustments_current").select("*").eq("division_id", divisionId);
-  if (error) throw new Error(`Could not load official IBA standings: ${error.message}`);
+  if (error && strict) throw new Error(`Could not load official IBA standings: ${error.message}`);
   return data ?? [];
 }
 
@@ -2583,9 +2583,9 @@ export async function importStandingsForWeek(divisionId, rows, teams, weekTag) {
   return !error;
 }
 
-export async function listMvpAdjustments(divisionId) {
+export async function listMvpAdjustments(divisionId, { strict = false } = {}) {
   const { data, error } = await supabase.from("mvp_adjustments_current").select("*").eq("division_id", divisionId);
-  if (error) throw new Error(`Could not load official IBA MVP standings: ${error.message}`);
+  if (error && strict) throw new Error(`Could not load official IBA MVP standings: ${error.message}`);
   return data ?? [];
 }
 // Player numbers are now validated against the real registry (players.num)
