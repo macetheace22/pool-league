@@ -19,8 +19,8 @@ describe("buildPracticeOpponentShortcuts", () => {
       {
         practice_type: "opponent",
         viewer_perspective: "linked",
-        owner_player_num: "33159",
-        owner_display_name: "Jason Phad",
+        player_num: "33159",
+        display_name: "Jason Phad",
         my_rating: 6,
       },
     ]);
