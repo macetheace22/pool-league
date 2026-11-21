@@ -728,7 +728,7 @@ describe("full-name player lookup and empty stats cards", () => {
     expect(practice).toContain('to="/me">My Profile</Link>');
     expect(admin).toContain("Identity &amp; Connections");
     expect(admin).toContain("db.redeemPracticeOpponentClaimCode(practiceClaimCode)");
-    expect(admin).toContain("db.respondPracticeOpponentLink(request.request_id");
+    expect(admin).toContain("db.respondPracticeOpponentLink(requestId, accept)");
     expect(admin).toContain("db.cancelPracticeOpponentLinkRequest(requestId)");
     expect(practice).not.toContain('> · Linked</span>');
   });
