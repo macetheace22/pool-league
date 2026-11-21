@@ -21,26 +21,18 @@ describe("IBA Rule 5.5 team match dead heats", () => {
   });
 
 
-  it("uses the completed Gladiator set winner as the sudden-death match winner", () => {
+  it("treats a Gladiator set as ordinary scoring and keeps team points primary", () => {
     expect(resolveTeamMatchWinner({
-      homePoints: 450, awayPoints: 470, homeSets: 1, awaySets: 2, isPlayoff: true,
-      completedSets: 3, gladiatorSet: { isGladiator: true, complete: true, winnerSlot: "home" },
+      homePoints: 450, awayPoints: 470, homeSets: 2, awaySets: 1, isPlayoff: true,
+      completedSets: 3,
+    })).toBe("away");
+  });
+
+  it("uses the ordinary postseason dead-heat rule after five sets including a Gladiator set", () => {
+    expect(resolveTeamMatchWinner({
+      homePoints: 500, awayPoints: 500, homeSets: 3, awaySets: 2, isPlayoff: true,
+      completedSets: 5,
     })).toBe("home");
-  });
-
-
-  it("does not apply a Gladiator winner to a regular-season match", () => {
-    expect(resolveTeamMatchWinner({
-      homePoints: 450, awayPoints: 470, homeSets: 1, awaySets: 2, isPlayoff: false,
-      completedSets: 3, gladiatorSet: { isGladiator: true, complete: true, winnerSlot: "home" },
-    })).toBe("away");
-  });
-
-  it("does not treat an unfinished Gladiator set as a match winner", () => {
-    expect(resolveTeamMatchWinner({
-      homePoints: 450, awayPoints: 470, homeSets: 1, awaySets: 2, isPlayoff: true,
-      completedSets: 3, gladiatorSet: { isGladiator: true, complete: false, winnerSlot: "home" },
-    })).toBe("away");
   });
 
   it("fails closed if five completed sets do not produce a three-set winner", () => {
