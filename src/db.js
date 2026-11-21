@@ -5,6 +5,7 @@ import { buildRosterSyncPlan } from "./rosterReconciliation";
 import { toLinkedPracticeGame } from "./practiceHistory";
 import { normalizeImportedPlayoffBracket } from "./ibaPlayoffBrackets";
 import { buildSeasonalQualificationSnapshot, buildSeasonalSeedingInputs } from "./seasonalQualification";
+import { buildAnnualMvpTournamentInvitations } from "./annualMvpInvitations";
 import { buildSeasonalTournamentPlans, buildSeasonalTournamentBracket, serializeSeasonalTournamentBracket } from "./seasonalTournamentSeeding";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
@@ -531,6 +532,35 @@ export async function getSeasonalQualificationSnapshot(seasonId) {
   const error = results.find(row => row.error)?.error;
   return { error: error ?? null, divisions: results, tournaments: error ? null : buildSeasonalTournamentPlans(results) };
 }
+/**
+ * Read-only Annual MVP Tournament invitation audit across every division in
+ * the season. Each division contributes its latest official IBA MVP report;
+ * prepareOfficialMvpStandings rejects mixed/missing report weeks and invalid
+ * published positions before invitations are derived.
+ */
+export async function getAnnualMvpTournamentInvitations(seasonId) {
+  const { data: divisions, error } = await supabase
+    .from("divisions")
+    .select("id, num, name, format, day")
+    .eq("season_id", seasonId)
+    .order("format")
+    .order("day")
+    .order("num");
+  if (error) return { error: error.message, invitations: null };
+  const results = await Promise.all((divisions ?? []).map(async division => {
+    try {
+      const rows = await listMvpAdjustments(division.id, { strict: true });
+      const official = prepareOfficialMvpStandings(rows);
+      if (official.error) return { division, error: official.error };
+      return { division, standings: official.standings };
+    } catch (e) {
+      return { division, error: e?.message || "Official MVP standings could not be loaded." };
+    }
+  }));
+  const invitations = buildAnnualMvpTournamentInvitations(results);
+  return { error: null, ...invitations };
+}
+
 export async function listSeasonalTournaments(seasonId) {
   const { data, error } = await supabase.from("seasonal_tournaments")
     .select("*").eq("season_id", seasonId).order("tournament_type");
