@@ -300,7 +300,7 @@ function RegisterScreen({ onBack }) {
             {codeValid.isBootstrap
               ? <><Check size={13}/> First account on this league — you'll be the League Manager.</>
               : codeValid.isSkipped
-              ? <><AlertCircle size={13}/> No code — you'll have read-only access until a league manager gives you a code to redeem from your profile.</>
+              ? <><AlertCircle size={13}/> No code — you'll have read-only access until your team captain or a league manager gives you a player-specific code to redeem from Profile.</>
               : <><Check size={13}/> Code verified — <strong>{ROLES[codeValid.role].label}</strong>{codeValid.team_name ? ` · ${codeValid.team_name}` : ""}</>}
           </div>
           <div className="field"><Label>Username</Label>
