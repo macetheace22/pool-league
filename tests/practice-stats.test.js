@@ -10,19 +10,25 @@ const games = [
 ];
 
 describe("Practice game-type stats filter", () => {
-  it("keeps all opponent game types for All Games and excludes Skills & Drills", () => {
-    expect(filterPracticeGamesByType(games).map(game => game.id)).toEqual(["8a", "9a", "10a", "ua"]);
+  it("selects all game types by default and excludes Skills & Drills", () => {
+    expect(filterPracticeGamesByType(games, ["8ball", "9ball", "10ball", "ultimate"]).map(game => game.id))
+      .toEqual(["8a", "9a", "10a", "ua"]);
   });
 
   it.each(["8ball", "9ball", "10ball", "ultimate"])(
-    "filters Practice results to %s", gameType => {
-      expect(filterPracticeGamesByType(games, gameType).map(game => game.game_type)).toEqual([gameType]);
+    "filters Practice results to only selected %s", gameType => {
+      expect(filterPracticeGamesByType(games, [gameType]).map(game => game.game_type)).toEqual([gameType]);
     }
   );
 
+  it("supports combinations and an empty selection", () => {
+    expect(filterPracticeGamesByType(games, ["8ball", "9ball"]).map(game => game.id)).toEqual(["8a", "9a"]);
+    expect(filterPracticeGamesByType(games, []).map(game => game.id)).toEqual([]);
+  });
+
   it("does not apply the Practice-only filter to League shot events", () => {
-    expect(matchesPracticeGameType({ context_type: "live_match", game_type: "9ball" }, "8ball")).toBe(true);
-    expect(matchesPracticeGameType({ context_type: "practice_game", game_type: "9ball" }, "8ball")).toBe(false);
-    expect(matchesPracticeGameType({ context_type: "practice_game", game_type: "8ball" }, "8ball")).toBe(true);
+    expect(matchesPracticeGameType({ context_type: "live_match", game_type: "9ball" }, ["8ball"])).toBe(true);
+    expect(matchesPracticeGameType({ context_type: "practice_game", game_type: "9ball" }, ["8ball"])).toBe(false);
+    expect(matchesPracticeGameType({ context_type: "practice_game", game_type: "8ball" }, ["8ball"])).toBe(true);
   });
 });
