@@ -2792,6 +2792,20 @@ export async function listPracticeOpponentLinkRequests() {
   const { data, error } = await supabase.rpc("list_practice_opponent_link_requests");
   return error ? [] : (data ?? []);
 }
+export async function createPracticeOpponentClaimCode(opponentId) {
+  const { data, error } = await supabase.rpc("create_practice_opponent_claim_code", {
+    p_opponent_id: opponentId,
+  });
+  return error ? null : data;
+}
+export async function redeemPracticeOpponentClaimCode(code) {
+  const { data, error } = await supabase.rpc("redeem_practice_opponent_claim_code", {
+    p_code: code.trim(),
+  });
+  if (error) return { ok: false, status: "ERROR" };
+  const row = data?.[0];
+  return row ? { ok: row.result_status === "PENDING", ...row } : { ok: false, status: "ERROR" };
+}
 export async function respondPracticeOpponentLink(requestId, accept) {
   const { data, error } = await supabase.rpc("respond_practice_opponent_link", { p_request_id: requestId, p_accept: accept });
   return error ? "ERROR" : data;
