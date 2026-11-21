@@ -136,3 +136,179 @@ export function buildSeasonalTournamentPlans(divisionSnapshots) {
     },
   };
 }
+
+const SEED_POSITIONS = bracketSize => {
+  let positions = [1, 2];
+  while (positions.length < bracketSize) {
+    const nextSeed = positions.length * 2 + 1;
+    positions = positions.flatMap(seed => [seed, nextSeed - seed]);
+  }
+  return positions;
+};
+
+/**
+ * Build a complete single-elimination bracket from manager-ordered entries.
+ * Entries must already be grouped by rulebook category priority. Ordering
+ * within a category is the manager's explicit seed decision.
+ */
+export function buildSeasonalTournamentBracket(tournamentType, orderedTeams) {
+  const priority = PRIORITY[tournamentType];
+  if (!priority) throw new Error("tournamentType must be championship or consolation");
+  const teams = Array.isArray(orderedTeams) ? orderedTeams : [];
+  if (!teams.length) return { error: "At least one qualified team is required." };
+  const categoryOrder = teams.map(team => priority.indexOf(team.seedCategory));
+  if (categoryOrder.some(index => index < 0)) {
+    return { error: "Every team must have a verified rulebook seeding category." };
+  }
+  if (categoryOrder.some((value, index) => index > 0 && value < categoryOrder[index - 1])) {
+    return { error: "Teams must be ordered by the rulebook seeding categories." };
+  }
+
+  const categoryRanks = new Map();
+  const rankedTeams = teams.map(team => {
+    const rank = categoryRanks.get(team.seedCategory) ?? 0;
+    categoryRanks.set(team.seedCategory, rank + 1);
+    return { ...team, byeRank: rank };
+  });
+  const byePlan = buildSeasonalByePlan(tournamentType, rankedTeams);
+  if (byePlan.requiresReview || byePlan.awardedTeamIds.length !== byePlan.byeCount) {
+    return { error: "Bye allocation is unresolved. Review the category order before creating the bracket.", byePlan };
+  }
+
+  const bracketSize = byePlan.bracketSize;
+  if (rankedTeams.length === 1) {
+    const team = rankedTeams[0];
+    return {
+      tournamentType,
+      qualifiedTeamCount: 1,
+      bracketSize: 1,
+      byePlan,
+      entries: [{
+        teamId: team.teamId,
+        divisionId: team.divisionId,
+        seedNum: 1,
+        seedCategory: team.seedCategory,
+        seedCategorySource: team.seedCategorySource ?? "rulebook_derived",
+        divisionPosition: team.position ?? team.divisionFinishPosition ?? null,
+        receivedByeHistory: team.seedCategory === "consolation_champion_after_bye"
+          ? true
+          : team.seedCategory === "consolation_champion_back_to_back_wins"
+            ? false
+            : null,
+      }],
+      matches: [],
+      championTeamId: team.teamId,
+    };
+  }
+  const rounds = bracketSize > 1 ? Math.log2(bracketSize) : 0;
+  const byeIds = new Set(byePlan.awardedTeamIds);
+  const byeTeams = rankedTeams.filter(team => byeIds.has(team.teamId));
+  const playingTeams = rankedTeams.filter(team => !byeIds.has(team.teamId));
+  const firstRoundPairCount = bracketSize / 2;
+  const firstRoundPairs = [];
+
+  // Place the highest-priority, manager-ordered bye recipients into the
+  // opening bye slots. Pair the remaining teams highest seed vs lowest seed.
+  for (const team of byeTeams) firstRoundPairs.push([team, null]);
+  for (let index = 0; index < playingTeams.length / 2; index++) {
+    firstRoundPairs.push([
+      playingTeams[index],
+      playingTeams[playingTeams.length - 1 - index],
+    ]);
+  }
+  if (firstRoundPairs.length !== firstRoundPairCount) {
+    return { error: "The seeded first-round layout does not match the bracket size.", byePlan };
+  }
+
+  const matches = [];
+  for (let slotNum = 1; slotNum <= firstRoundPairCount; slotNum++) {
+    const [home, away] = firstRoundPairs[slotNum - 1];
+    const isBye = Boolean(home) !== Boolean(away);
+    matches.push({
+      matchKey: `r1-m${slotNum}`,
+      roundNum: 1,
+      slotNum,
+      teamHomeId: home?.teamId ?? null,
+      teamAwayId: away?.teamId ?? null,
+      winnerTeamId: isBye ? (home?.teamId ?? away?.teamId) : null,
+      isBye,
+      feedsIntoMatchKey: rounds > 1 ? `r2-m${Math.ceil(slotNum / 2)}` : null,
+      feedsIntoSlot: rounds > 1 ? (slotNum % 2 === 1 ? "home" : "away") : null,
+    });
+  }
+
+  for (let roundNum = 2; roundNum <= rounds; roundNum++) {
+    const matchCount = bracketSize / (2 ** roundNum);
+    for (let slotNum = 1; slotNum <= matchCount; slotNum++) {
+      matches.push({
+        matchKey: `r${roundNum}-m${slotNum}`,
+        roundNum,
+        slotNum,
+        teamHomeId: null,
+        teamAwayId: null,
+        winnerTeamId: null,
+        isBye: false,
+        feedsIntoMatchKey: roundNum < rounds ? `r${roundNum + 1}-m${Math.ceil(slotNum / 2)}` : null,
+        feedsIntoSlot: roundNum < rounds ? (slotNum % 2 === 1 ? "home" : "away") : null,
+      });
+    }
+  }
+
+  const matchesByKey = new Map(matches.map(match => [match.matchKey, match]));
+  for (const match of matches) {
+    if (!match.winnerTeamId || !match.feedsIntoMatchKey) continue;
+    const target = matchesByKey.get(match.feedsIntoMatchKey);
+    if (match.feedsIntoSlot === "home") target.teamHomeId = match.winnerTeamId;
+    else target.teamAwayId = match.winnerTeamId;
+  }
+
+  const entries = rankedTeams.map((team, index) => ({
+    teamId: team.teamId,
+    divisionId: team.divisionId,
+    seedNum: index + 1,
+    seedCategory: team.seedCategory,
+    seedCategorySource: team.seedCategorySource ?? "rulebook_derived",
+    divisionPosition: team.position ?? team.divisionFinishPosition ?? null,
+    receivedByeHistory: team.seedCategory === "consolation_champion_after_bye"
+      ? true
+      : team.seedCategory === "consolation_champion_back_to_back_wins"
+        ? false
+        : null,
+  }));
+
+  return {
+    tournamentType,
+    qualifiedTeamCount: rankedTeams.length,
+    bracketSize,
+    byePlan,
+    entries,
+    matches,
+    championTeamId: rankedTeams.length === 1 ? rankedTeams[0].teamId : null,
+  };
+}
+
+/** Convert the pure bracket model to the snake_case contract used by the SQL RPC. */
+export function serializeSeasonalTournamentBracket(bracket) {
+  return {
+    entries: (bracket?.entries ?? []).map(entry => ({
+      team_id: entry.teamId,
+      division_id: entry.divisionId,
+      seed_num: entry.seedNum,
+      seed_category: entry.seedCategory,
+      seed_category_source: entry.seedCategorySource,
+      division_position: entry.divisionPosition,
+      received_bye_history: entry.receivedByeHistory,
+    })),
+    matches: (bracket?.matches ?? []).map(match => ({
+      match_key: match.matchKey,
+      round_num: match.roundNum,
+      slot_num: match.slotNum,
+      team_home_id: match.teamHomeId,
+      team_away_id: match.teamAwayId,
+      winner_team_id: match.winnerTeamId,
+      is_bye: match.isBye,
+      feeds_into_match_key: match.feedsIntoMatchKey,
+      feeds_into_slot: match.feedsIntoSlot,
+    })),
+  };
+}

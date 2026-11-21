@@ -5518,16 +5518,34 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
 
 function SeasonalTournamentReview({ seasonId }) {
   const [snapshot, setSnapshot] = useState(null);
+  const [existing, setExisting] = useState([]);
+  const [drafts, setDrafts] = useState({ championship: [], consolation: [] });
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const refresh = async () => {
     setLoading(true);
     setError("");
     try {
-      const result = await db.getSeasonalQualificationSnapshot(seasonId);
+      const [result, tournaments] = await Promise.all([
+        db.getSeasonalQualificationSnapshot(seasonId),
+        db.listSeasonalTournaments(seasonId),
+      ]);
       if (result?.error) throw new Error(result.error);
       setSnapshot(result);
+      setExisting(tournaments);
+      const orderedByCategory = (teams, type) => {
+        const priorities = type === "championship"
+          ? ["first_place_and_division_champion","first_place_not_division_champion","below_first_division_champion"]
+          : ["consolation_champion_back_to_back_wins","consolation_champion_after_bye","consolation_champion_history_unverified","consolation_champion_pending_bracket_history"];
+        return (teams ?? []).map(team => ({ ...team })).sort((a,b) => priorities.indexOf(a.seedCategory) - priorities.indexOf(b.seedCategory));
+      };
+      setDrafts({
+        championship: orderedByCategory(result.tournaments?.championship?.teams, "championship"),
+        consolation: orderedByCategory(result.tournaments?.consolation?.teams, "consolation"),
+      });
     } catch (e) {
       setError(e?.message || "Unable to load seasonal tournament qualification.");
       setSnapshot(null);
@@ -5537,63 +5555,159 @@ function SeasonalTournamentReview({ seasonId }) {
   };
   useEffect(() => { refresh(); }, [seasonId]);
 
-  if (loading) return <div className="card"><Loader /></div>;
-  if (error) return <div className="card"><SectionHeader title="Seasonal Tournament Review" /><ErrorMsg>{error}</ErrorMsg><button className="btn-secondary" onClick={refresh}>Retry</button></div>;
-  if (!snapshot) return null;
+  const moveTeam = (type, teamId, direction) => {
+    setDrafts(current => {
+      const rows = [...(current[type] ?? [])];
+      const index = rows.findIndex(team => team.teamId === teamId);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= rows.length || rows[target].seedCategory !== rows[index].seedCategory) return current;
+      [rows[index], rows[target]] = [rows[target], rows[index]];
+      return { ...current, [type]: rows };
+    });
+  };
 
-  const renderTournament = (key, title, categoryLabels) => {
-    const tournament = snapshot.tournaments?.[key];
-    if (!tournament) return null;
-    const plan = tournament.byePlan;
-    const teams = tournament.teams ?? [];
-    const byCategory = categoryLabels.map(([category, label]) => ({
+  const verifyConsolationHistory = (teamId, value) => {
+    setDrafts(current => ({
+      ...current,
+      consolation: current.consolation.map(team => team.teamId !== teamId ? team : {
+        ...team,
+        receivedByeHistory: value === "bye" ? true : false,
+        receivedBye: value === "bye",
+        seedCategory: value === "bye" ? "consolation_champion_after_bye" : "consolation_champion_back_to_back_wins",
+        seedCategorySource: "manager_verified",
+      }),
+    }));
+  };
+
+  const createTournament = async type => {
+    setSaving(type);
+    setError("");
+    setNotice("");
+    try {
+      const result = await db.createSeasonalTournament(seasonId, type, drafts[type]);
+      if (result?.error) throw new Error(result.error);
+      setNotice(type === "championship" ? "Seasonal Championship bracket confirmed." : "Seasonal Consolation bracket confirmed.");
+      await refresh();
+    } catch (e) {
+      setError(e?.message || "Unable to create the seasonal tournament bracket.");
+    } finally {
+      setSaving("");
+    }
+  };
+
+  const categoryLabels = {
+    championship: [
+      ["first_place_and_division_champion","Category 1 · First place and Division Champion"],
+      ["first_place_not_division_champion","Category 2 · First place, not Division Champion"],
+      ["below_first_division_champion","Category 3 · Below first, Division Champion"],
+    ],
+    consolation: [
+      ["consolation_champion_back_to_back_wins","Category 1 · Won with back-to-back wins"],
+      ["consolation_champion_after_bye","Category 2 · Won after receiving a bye"],
+      ["consolation_champion_history_unverified","History unverified"],
+      ["consolation_champion_pending_bracket_history","History pending"],
+    ],
+  };
+
+  const renderTournament = (type, title) => {
+    const current = snapshot?.tournaments?.[type];
+    const plan = current?.byePlan;
+    const teams = drafts[type] ?? [];
+    const saved = existing.find(row => row.tournament_type === type);
+    const unresolved = new Set([...(plan?.pendingTeamIds ?? []), ...(plan?.unclassifiedTeamIds ?? [])]);
+    const unverified = teams.some(team => type === "consolation" && ![
+      "consolation_champion_back_to_back_wins","consolation_champion_after_bye"
+    ].includes(team.seedCategory));
+    const categoryGroups = categoryLabels[type].map(([category, label]) => ({
       category, label, teams: teams.filter(team => team.seedCategory === category),
     })).filter(group => group.teams.length);
-    const unresolved = new Set([...(plan.pendingTeamIds ?? []), ...(plan.unclassifiedTeamIds ?? [])]);
+    const canCreate = !saved && teams.length > 0 && !unverified && !snapshot?.error && !snapshot?.divisions?.some(row => row.error);
     return (
-      <div className="card" key={key}>
+      <div className="card" key={type}>
         <div className="card__title">{title}</div>
-        <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12,margin:"8px 0"}}>
-          <span>Qualified: <strong>{plan.qualifiedTeamCount}</strong></span>
-          <span>Bracket size: <strong>{plan.bracketSize || "—"}</strong></span>
-          <span>Byes: <strong>{plan.byeCount}</strong></span>
-          <span>Awarded: <strong>{plan.awardedTeamIds.length}</strong></span>
-        </div>
-        {plan.requiresReview && (
-          <div style={{fontSize:12,color:"#F0B35A",marginBottom:8}}>
-            Manager review required: {plan.unresolvedByes} bye(s) remain unresolved, or one or more teams need verified seeding history.
-          </div>
-        )}
-        {!teams.length ? <div className="empty-state">No teams currently qualify.</div> : byCategory.map(group => (
-          <div key={group.category} style={{marginTop:10}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#9A9A9A",marginBottom:4}}>{group.label}</div>
-            {group.teams.map(team => {
-              const getsBye = plan.awardedTeamIds.includes(team.teamId);
-              const needsReview = unresolved.has(team.teamId);
-              return (
-                <div className="list-row" key={team.teamId}>
-                  <div className="list-row__body">
-                    <div className="list-row__name">{team.name || team.teamName || team.teamId}</div>
-                    <div className="list-row__sub">{team.divisionLabel || team.divisionId || "Division"} · Regular-season position {team.position ?? team.divisionFinishPosition ?? "—"}</div>
-                  </div>
-                  <div style={{fontSize:11,fontWeight:700,color:needsReview?"#F0B35A":getsBye?"#5FCF9E":"#9A9A9A"}}>
-                    {needsReview ? "Review" : getsBye ? "Bye" : "No bye"}
-                  </div>
+        {saved ? (
+          <>
+            <div style={{fontSize:12,color:"#5FCF9E",margin:"8px 0"}}>Confirmed · {saved.status.replaceAll("_"," ")}</div>
+            <div style={{fontSize:12,color:"#9A9A9A",marginBottom:8}}>The saved seed order and bracket are retained. This workflow does not overwrite confirmed brackets.</div>
+            {(saved.entries ?? []).map(entry => (
+              <div className="list-row" key={entry.id}>
+                <div className="list-row__body">
+                  <div className="list-row__name">#{entry.seed_num} · {entry.teams?.name || entry.team_id}</div>
+                  <div className="list-row__sub">{entry.seed_category.replaceAll("_"," ")}</div>
                 </div>
-              );
-            })}
-          </div>
-        ))}
+              </div>
+            ))}
+            <div style={{fontSize:12,color:"#9A9A9A",marginTop:8}}>{saved.matches?.length ?? 0} bracket slots · {saved.matches?.filter(match => match.is_bye).length ?? 0} automatic byes</div>
+          </>
+        ) : (
+          <>
+            <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12,margin:"8px 0"}}>
+              <span>Qualified: <strong>{plan?.qualifiedTeamCount ?? teams.length}</strong></span>
+              <span>Bracket size: <strong>{plan?.bracketSize || "—"}</strong></span>
+              <span>Byes: <strong>{plan?.byeCount ?? "—"}</strong></span>
+            </div>
+            <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5,marginBottom:8}}>
+              Review the order within each category. Earlier teams receive higher seeds and priority for any byes. This explicit manager ordering resolves ordering decisions that the rulebook does not specify.
+            </div>
+            {!teams.length ? <div className="empty-state">No teams currently qualify.</div> : categoryGroups.map(group => (
+              <div key={group.category} style={{marginTop:12}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#9A9A9A",marginBottom:4}}>{group.label}</div>
+                {group.teams.map(team => {
+                  const index = teams.findIndex(row => row.teamId === team.teamId);
+                  const needsReview = unresolved.has(team.teamId) || (type === "consolation" && ![
+                    "consolation_champion_back_to_back_wins","consolation_champion_after_bye"
+                  ].includes(team.seedCategory));
+                  return (
+                    <div className="list-row" key={team.teamId}>
+                      <div className="list-row__body">
+                        <div className="list-row__name">{team.name || team.teamName || team.teamId}</div>
+                        <div className="list-row__sub">{team.divisionLabel || team.divisionId || "Division"} · Regular-season position {team.position ?? "—"}</div>
+                        {type === "consolation" && team.seedCategory === "consolation_champion_history_unverified" && (
+                          <div style={{marginTop:6}}>
+                            <select aria-label={"Verify Consolation history for " + (team.name || team.teamId)} value="" onChange={event => verifyConsolationHistory(team.teamId,event.target.value)} style={{maxWidth:"100%",padding:7,borderRadius:6}}>
+                              <option value="" disabled>Verify semifinal path…</option>
+                              <option value="back_to_back">Won semifinal and final</option>
+                              <option value="bye">Received bye, then won final</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                        <div style={{fontSize:10,fontWeight:700,color:needsReview?"#F0B35A":"#9A9A9A"}}>{needsReview?"Review":("Seed "+(index+1))}</div>
+                        <button className="btn-secondary" style={{padding:"4px 7px",minWidth:28}} disabled={index===0 || teams[index-1]?.seedCategory!==team.seedCategory} onClick={()=>moveTeam(type,team.teamId,-1)} aria-label={"Move "+(team.name||team.teamId)+" up"}>↑</button>
+                        <button className="btn-secondary" style={{padding:"4px 7px",minWidth:28}} disabled={index===teams.length-1 || teams[index+1]?.seedCategory!==team.seedCategory} onClick={()=>moveTeam(type,team.teamId,1)} aria-label={"Move "+(team.name||team.teamId)+" down"}>↓</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {plan?.requiresReview && (
+              <div style={{fontSize:12,color:"#F0B35A",marginTop:10}}>
+                Bye assignment needs review. Use the ordering controls above; unresolved Consolation history must also be verified before confirmation.
+              </div>
+            )}
+            <button className="btn-primary" style={{marginTop:14}} disabled={!canCreate || saving!==""} onClick={()=>createTournament(type)}>
+              {saving===type ? "Confirming…" : "Confirm & Create Bracket"}
+            </button>
+          </>
+        )}
       </div>
     );
   };
 
+  if (loading) return <div className="card"><Loader /></div>;
+  if (error && !snapshot) return <div className="card"><SectionHeader title="Seasonal Tournament Review" /><ErrorMsg>{error}</ErrorMsg><button className="btn-secondary" onClick={refresh}>Retry</button></div>;
+  if (!snapshot) return null;
+
   return (
     <div style={{marginBottom:16}}>
-      <SectionHeader title="Seasonal Tournament Qualification & Seeding" />
+      <SectionHeader title="Seasonal Tournament Qualification & Brackets" />
       <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
-        Season-wide view across all divisions. Qualification uses official final IBA standings and recorded division playoff results. This preview does not create or modify tournament brackets.
+        Season-wide view across all divisions. Qualification uses official final IBA standings and recorded division playoff results. Confirmed seasonal brackets are separate from division playoffs and do not modify their results.
       </div>
+      {error && <div className="card"><ErrorMsg>{error}</ErrorMsg></div>}
+      {notice && <div className="card" style={{color:"#5FCF9E",fontSize:12}}>{notice}</div>}
       {(snapshot.divisions ?? []).some(row => row.error) && (
         <div className="card" style={{border:"1px solid #92400E"}}>
           <div className="card__title">Some divisions need attention</div>
@@ -5604,17 +5718,8 @@ function SeasonalTournamentReview({ seasonId }) {
           ))}
         </div>
       )}
-      {renderTournament("championship","Seasonal Championship",[
-        ["first_place_and_division_champion","Category 1 · First place and Division Champion"],
-        ["first_place_not_division_champion","Category 2 · First place, not Division Champion"],
-        ["below_first_division_champion","Category 3 · Below first, Division Champion"],
-      ])}
-      {renderTournament("consolation","Seasonal Consolation",[
-        ["consolation_champion_back_to_back_wins","Category 1 · Won with back-to-back wins"],
-        ["consolation_champion_after_bye","Category 2 · Won after receiving a bye"],
-        ["consolation_champion_history_unverified","History unverified"],
-        ["consolation_champion_pending_bracket_history","History pending"],
-      ])}
+      {renderTournament("championship","Seasonal Championship")}
+      {renderTournament("consolation","Seasonal Consolation")}
       <button className="btn-secondary" onClick={refresh}>Refresh qualification</button>
     </div>
   );
