@@ -5,7 +5,7 @@ import { buildRosterSyncPlan } from "./rosterReconciliation";
 import { toLinkedPracticeGame } from "./practiceHistory";
 import { normalizeImportedPlayoffBracket } from "./ibaPlayoffBrackets";
 import { buildSeasonalQualificationSnapshot, buildSeasonalSeedingInputs } from "./seasonalQualification";
-import { buildSeasonalTournamentPlans, buildSeasonalTournamentBracket } from "./seasonalTournamentSeeding";
+import { buildSeasonalTournamentPlans, buildSeasonalTournamentBracket, serializeSeasonalTournamentBracket } from "./seasonalTournamentSeeding";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -549,11 +549,12 @@ export async function listSeasonalTournaments(seasonId) {
 export async function createSeasonalTournament(seasonId, tournamentType, orderedTeams) {
   const bracket = buildSeasonalTournamentBracket(tournamentType, orderedTeams);
   if (bracket.error) return { error: bracket.error, byePlan: bracket.byePlan ?? null };
+  const payload = serializeSeasonalTournamentBracket(bracket);
   const { data, error } = await supabase.rpc("create_seasonal_tournament", {
     p_season_id: seasonId,
     p_tournament_type: tournamentType,
-    p_entries: bracket.entries,
-    p_matches: bracket.matches,
+    p_entries: payload.entries,
+    p_matches: payload.matches,
     p_champion_team_id: bracket.championTeamId,
   });
   if (error) return { error: error.message };
