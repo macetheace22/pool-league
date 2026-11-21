@@ -2769,11 +2769,12 @@ export async function getPlayerRating(playerNum) {
 // Previously-typed-in (no-login) opponents, most recently created first --
 // so a name doesn't have to be retyped every session.
 export async function listMyPracticeOpponents(profileId) {
-  const { data, error } = await supabase.from("practice_opponents").select("*")
-    .or(`created_by.eq.${profileId},linked_profile_id.eq.${profileId}`)
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.rpc("list_my_practice_opponents_with_names");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(opponent => ({
+    ...opponent,
+    name: opponent.display_name || opponent.name,
+  }));
 }
 // Reuses an existing opponent with the same name (case-insensitive) instead
 // of creating a duplicate every time the same person is typed in again.
