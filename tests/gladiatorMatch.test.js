@@ -52,11 +52,11 @@ describe("IBA Rule 5.5 Gladiator match", () => {
     expect(canOfferGladiatorMatch({ isPlayoff: true, sets: missingHome, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
-  it("does not offer a second Gladiator or proceed after a prior forfeit", () => {
+  it("does not offer a second Gladiator but permits an earlier forfeit when both teams have played", () => {
     const priorGladiator = sets.map((s, i) => i === 1 ? { ...s, isGladiator: true } : s);
     const priorForfeit = sets.map((s, i) => i === 1 ? { ...s, forfeited: true } : s);
     expect(canOfferGladiatorMatch({ isPlayoff: true, sets: priorGladiator, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: priorForfeit, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: priorForfeit, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(true);
   });
 
   it("excludes players from completed sets that have no recorded winner", () => {
