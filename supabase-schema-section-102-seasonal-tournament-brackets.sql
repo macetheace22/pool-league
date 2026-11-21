@@ -198,6 +198,80 @@ begin
   if v_match_count <> greatest(v_bracket_size - 1, 0) then
     raise exception 'BRACKET_MATCH_COUNT_INVALID';
   end if;
+  if v_team_count > 1 and p_champion_team_id is not null then
+    raise exception 'CHAMPION_CANNOT_BE_PREDECLARED';
+  end if;
+
+  if v_team_count > 1 and exists (
+    select 1
+    from generate_series(1, v_round_count) as round_no
+    where (
+      select count(*) from jsonb_to_recordset(p_matches) as m(
+        match_key text, round_num integer, slot_num integer, team_home_id uuid,
+        team_away_id uuid, winner_team_id uuid, is_bye boolean,
+        feeds_into_match_key text, feeds_into_slot text
+      ) where m.round_num = round_no
+    ) <> (v_bracket_size / power(2, round_no))::integer
+    or (
+      select count(distinct m.slot_num) from jsonb_to_recordset(p_matches) as m(
+        match_key text, round_num integer, slot_num integer, team_home_id uuid,
+        team_away_id uuid, winner_team_id uuid, is_bye boolean,
+        feeds_into_match_key text, feeds_into_slot text
+      ) where m.round_num = round_no
+    ) <> (v_bracket_size / power(2, round_no))::integer
+    or (
+      select coalesce(min(m.slot_num),0) from jsonb_to_recordset(p_matches) as m(
+        match_key text, round_num integer, slot_num integer, team_home_id uuid,
+        team_away_id uuid, winner_team_id uuid, is_bye boolean,
+        feeds_into_match_key text, feeds_into_slot text
+      ) where m.round_num = round_no
+    ) <> 1
+    or (
+      select coalesce(max(m.slot_num),0) from jsonb_to_recordset(p_matches) as m(
+        match_key text, round_num integer, slot_num integer, team_home_id uuid,
+        team_away_id uuid, winner_team_id uuid, is_bye boolean,
+        feeds_into_match_key text, feeds_into_slot text
+      ) where m.round_num = round_no
+    ) <> (v_bracket_size / power(2, round_no))::integer
+  ) then raise exception 'BRACKET_ROUND_LAYOUT_INVALID'; end if;
+
+  if v_team_count > 1 and (
+    select count(*) from jsonb_to_recordset(p_matches) as m(
+      match_key text, round_num integer, slot_num integer, team_home_id uuid,
+      team_away_id uuid, winner_team_id uuid, is_bye boolean,
+      feeds_into_match_key text, feeds_into_slot text
+    )
+    where m.round_num = 1 and coalesce(m.is_bye,false) is true
+  ) <> v_bracket_size - v_team_count then
+    raise exception 'FIRST_ROUND_BYE_COUNT_INVALID';
+  end if;
+
+  if v_team_count > 1 and exists (
+    select 1 from jsonb_to_recordset(p_matches) as m(
+      match_key text, round_num integer, slot_num integer, team_home_id uuid,
+      team_away_id uuid, winner_team_id uuid, is_bye boolean,
+      feeds_into_match_key text, feeds_into_slot text
+    )
+    where (m.round_num = 1 and coalesce(m.is_bye,false) = false
+      and (m.team_home_id is null or m.team_away_id is null))
+      or (m.round_num < v_round_count and (
+        m.feeds_into_match_key is null
+        or m.feeds_into_slot <> case when mod(m.slot_num,2)=1 then 'home' else 'away' end
+        or not exists (
+          select 1 from jsonb_to_recordset(p_matches) as target(
+            match_key text, round_num integer, slot_num integer, team_home_id uuid,
+            team_away_id uuid, winner_team_id uuid, is_bye boolean,
+            feeds_into_match_key text, feeds_into_slot text
+          )
+          where target.match_key = m.feeds_into_match_key
+            and target.round_num = m.round_num + 1
+            and target.slot_num = ceil(m.slot_num::numeric / 2)::integer
+        )
+      ))
+      or (m.round_num = v_round_count and (
+        m.feeds_into_match_key is not null or m.feeds_into_slot is not null
+      ))
+  ) then raise exception 'BRACKET_ADVANCEMENT_LAYOUT_INVALID'; end if;
 
   if v_team_count > 1 then
     select count(*) into v_bye_count
