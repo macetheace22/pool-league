@@ -884,7 +884,15 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
   const [forfeiting, setForfeiting] = useState(false);
   const [gladiatorOpen, setGladiatorOpen] = useState(false);
   const { homePoints: currentHomePoints, awayPoints: currentAwayPoints } = db.computeMatchPoints(match);
-  const canGladiator = canOfferGladiatorMatch({ isPlayoff: !!match.isPlayoff, sets: match.sets, setIdx, homePoints: currentHomePoints, awayPoints: currentAwayPoints });
+  const priorPlayerEligible = (side, player) => {
+    const team = match[side === "home" ? "teamHome" : "teamAway"];
+    const rosterPlayer = (team.roster ?? []).find(candidate => String(candidate.num) === String(player.num)) ?? player;
+    return !playoffIneligibleReason(match, rosterPlayer);
+  };
+  const hasEligibleRepeatPlayers =
+    gladiatorPlayerChoices(match.sets, setIdx, "home").some(player => priorPlayerEligible("home", player)) &&
+    gladiatorPlayerChoices(match.sets, setIdx, "away").some(player => priorPlayerEligible("away", player));
+  const canGladiator = hasEligibleRepeatPlayers && canOfferGladiatorMatch({ isPlayoff: !!match.isPlayoff, sets: match.sets, setIdx, homePoints: currentHomePoints, awayPoints: currentAwayPoints });
 
   if (status === "locked") {
     return <div className="empty-state">This table unlocks once an earlier set finishes.</div>;
@@ -1000,8 +1008,9 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
 function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
   const [homeNum, setHomeNum] = useState("");
   const [awayNum, setAwayNum] = useState("");
-  const homeNoPlayer = !!match.gladiatorNoAvailableHome;
-  const awayNoPlayer = !!match.gladiatorNoAvailableAway;
+  const sameGladiatorSet = match.gladiatorPresenceSetIndex === setIdx;
+  const homeNoPlayer = sameGladiatorSet && !!match.gladiatorNoAvailableHome;
+  const awayNoPlayer = sameGladiatorSet && !!match.gladiatorNoAvailableAway;
   const isEligiblePriorPlayer = (side, player) => {
     const team = match[side === "home" ? "teamHome" : "teamAway"];
     const rosterPlayer = (team.roster ?? []).find(candidate => String(candidate.num) === String(player.num)) ?? player;
@@ -1027,11 +1036,11 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
       <div className="card">
         <div className="card__title">Confirm no additional player is present</div>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:12}}>
-          <input type="checkbox" checked={homeNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableHome: event.target.checked, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
+          <input type="checkbox" checked={homeNoPlayer} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableHome: event.target.checked, gladiatorNoAvailableAway: sameGladiatorSet ? match.gladiatorNoAvailableAway : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
           <span>{match.teamHome.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start"}}>
-          <input type="checkbox" checked={awayNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableAway: event.target.checked, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
+          <input type="checkbox" checked={awayNoPlayer} onChange={event => onSave({ ...match, gladiatorPresenceSetIndex: setIdx, gladiatorNoAvailableAway: event.target.checked, gladiatorNoAvailableHome: sameGladiatorSet ? match.gladiatorNoAvailableHome : false, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 })} />
           <span>{match.teamAway.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
       </div>
