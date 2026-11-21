@@ -44,7 +44,7 @@ describe("IBA Rule 5.5 Gladiator match", () => {
   });
 
   it("does not offer Gladiator if either side has no previously played player", () => {
-    const missingHome = sets.map((s, i) => i === 0 ? { ...s, playerHome: null } : s);
+    const missingHome = sets.map(s => ({ ...s, playerHome: null }));
     expect(canOfferGladiatorMatch({ isPlayoff: true, sets: missingHome, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
@@ -78,5 +78,6 @@ describe("IBA Rule 5.5 Gladiator match", () => {
     expect(result.playerAway.num).toBe("A2");
     expect(result.racks).toEqual([]);
     expect(result.complete).toBe(false);
+    expect(createGladiatorSet(sets[2], 2, played("H3", "Never Played"), played("A2", "Away Two"), sets)).toBeNull();
   });
 });
