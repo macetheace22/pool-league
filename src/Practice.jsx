@@ -234,9 +234,11 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
       await refreshLinkRequests();
       return;
     }
-    setLinkResponseMessage(result === "ERROR"
+    setLinkResponseMessage(result === "FULL_NAME_REQUIRED"
       ? "Both accounts must have first and last names saved in Profile before this practice identity can be linked. Ask the other person to complete their name, then try again."
-      : "That identity request is no longer available. Refresh the page and check its status.");
+      : result === "CONFIRMATION_REQUIRED"
+        ? "This link needs a current confirmation request addressed to your account. Refresh the page and try again."
+        : "That identity request could not be completed. Refresh the page and check its status.");
     await refreshLinkRequests();
   };
 
