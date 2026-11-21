@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSeasonalByePlan, buildSeasonalTournamentBracket, buildSeasonalTournamentPlans, classifyChampionshipSeed, classifyConsolationSeed, deriveConsolationByeStatus } from "../src/seasonalTournamentSeeding";
+import { buildSeasonalByePlan, buildSeasonalTournamentBracket, buildSeasonalTournamentPlans, serializeSeasonalTournamentBracket, classifyChampionshipSeed, classifyConsolationSeed, deriveConsolationByeStatus } from "../src/seasonalTournamentSeeding";
 
 describe("Section 5.4 seasonal tournament seeding", () => {
   it("classifies the three Championship categories", () => {
@@ -198,5 +198,21 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     expect(bracket.byePlan.awardedTeamIds).toEqual(["seed-1","seed-2","seed-3"]);
     expect(bracket.matches.filter(match => match.roundNum === 1 && match.isBye).map(match => match.winnerTeamId))
       .toEqual(["seed-1","seed-2","seed-3"]);
+  });
+
+  it("serializes bracket entries and matches using the SQL RPC field contract", () => {
+    const serialized = serializeSeasonalTournamentBracket({
+      entries: [{ teamId: "team-1", divisionId: "division-1", seedNum: 1, seedCategory: "first_place_and_division_champion", seedCategorySource: "rulebook_derived", divisionPosition: 1, receivedByeHistory: null }],
+      matches: [{ matchKey: "r1-m1", roundNum: 1, slotNum: 1, teamHomeId: "team-1", teamAwayId: null, winnerTeamId: "team-1", isBye: true, feedsIntoMatchKey: "r2-m1", feedsIntoSlot: "home" }],
+    });
+    expect(serialized.entries[0]).toMatchObject({
+      team_id: "team-1", division_id: "division-1", seed_num: 1,
+      seed_category: "first_place_and_division_champion",
+    });
+    expect(serialized.matches[0]).toMatchObject({
+      match_key: "r1-m1", round_num: 1, slot_num: 1,
+      team_home_id: "team-1", team_away_id: null, winner_team_id: "team-1",
+      is_bye: true, feeds_into_match_key: "r2-m1", feeds_into_slot: "home",
+    });
   });
 });
