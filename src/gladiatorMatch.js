@@ -26,8 +26,11 @@ export function gladiatorPlayerChoices(sets = [], setIdx = -1, side = "home") {
   return [...byNum.values()];
 }
 
-export function createGladiatorSet(set, setIdx, homePlayer, awayPlayer) {
+export function createGladiatorSet(set, setIdx, homePlayer, awayPlayer, priorSets = []) {
   if (!set || !homePlayer?.num || !awayPlayer?.num) return null;
+  const homeWasPlayed = gladiatorPlayerChoices(priorSets, setIdx, "home").some(player => String(player.num) === String(homePlayer.num));
+  const awayWasPlayed = gladiatorPlayerChoices(priorSets, setIdx, "away").some(player => String(player.num) === String(awayPlayer.num));
+  if (!homeWasPlayed || !awayWasPlayed) return null;
   return {
     ...set,
     setNum: setIdx + 1,
