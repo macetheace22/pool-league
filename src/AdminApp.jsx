@@ -4182,6 +4182,7 @@ function AccountSettings({ profile, onProfileRefresh }) {
     if (!result.ok) {
       setError(result.reason === "not_found" ? "We don't recognize that player number yet."
         : result.reason === "already_claimed" ? "That player number is already linked to another account."
+        : result.reason === "name_mismatch" ? "Your first and last name must match the IBA player record for this number."
         : "Could not update player number.");
       return;
     }
