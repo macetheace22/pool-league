@@ -244,7 +244,10 @@ as $function$
     and profile.is_active is true
     and nullif(trim(profile.first_name), '') is not null
     and nullif(trim(profile.last_name), '') is not null
-    and lower(profile.username) like '%' || lower(trim(coalesce(p_query, ''))) || '%'
+    and (
+      lower(profile.username) like '%' || lower(trim(coalesce(p_query, ''))) || '%'
+      or lower(concat_ws(' ', profile.first_name, profile.last_name)) like '%' || lower(trim(coalesce(p_query, ''))) || '%'
+    )
   order by profile.username
   limit 20;
 $function$;
