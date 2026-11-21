@@ -1032,6 +1032,25 @@ function ShotStatsBlock({ stats }) {
   );
 }
 
+function PracticeGameTypeFilter({ value, onChange }) {
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:6}} role="group" aria-label="Practice game type">
+      {PRACTICE_GAME_TYPE_FILTERS.map((option, index) => (
+        <button
+          key={String(option.key)}
+          type="button"
+          className={`seg-btn ${value === option.key ? "seg-btn--active" : ""}`}
+          style={index === 0 ? {gridColumn:"1 / -1"} : {}}
+          aria-pressed={value === option.key}
+          onClick={() => onChange(option.key)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function FilterChips({ options, value, onChange }) {
   return (
     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -1349,7 +1368,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
         {includedSources?.includes("practice") && includePractice && (
           <div style={{marginTop:10}}>
             <div style={{fontSize:10,fontWeight:800,letterSpacing:".05em",textTransform:"uppercase",color:"#8A8A8A",marginBottom:6}}>Practice Game Type</div>
-            <FilterChips options={PRACTICE_GAME_TYPE_FILTERS} value={practiceGameTypeFilter} onChange={setPracticeGameTypeFilter} />
+            <PracticeGameTypeFilter value={practiceGameTypeFilter} onChange={setPracticeGameTypeFilter} />
           </div>
         )}
         {includeLeague && scopeMode === "season" && (
