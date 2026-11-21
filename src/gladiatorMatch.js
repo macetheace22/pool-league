@@ -18,7 +18,7 @@ export function gladiatorPlayerChoices(sets = [], setIdx = -1, side = "home") {
   const key = side === "home" ? "playerHome" : "playerAway";
   const byNum = new Map();
   for (const set of sets.slice(0, setIdx)) {
-    if (!set?.complete || set?.forfeited) continue;
+    if (!set?.complete || set?.forfeited || !["home", "away"].includes(set?.winnerSlot)) continue;
     const player = set[key];
     if (player?.num != null && !byNum.has(String(player.num))) byNum.set(String(player.num), player);
   }
