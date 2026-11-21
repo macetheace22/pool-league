@@ -239,7 +239,7 @@ export function Home() {
               </>
             )}
           </DashCard>
-        )}}
+        )}
         </>}
       </div>
       <TabBar />
