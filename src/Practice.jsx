@@ -10,6 +10,7 @@ import { useActiveSession } from "./ActiveSessionContext";
 import { isResumablePracticeSession } from "./activeSessionUtils";
 import ShotTracker, { shotTrackerCss } from "./ShotTracker";
 import Scoresheet from "./Scoresheet";
+import { buildPracticeOpponentShortcuts } from "./practiceOpponentShortcuts";
 
 const PRACTICE_TYPES = [
   { key: "skills_drills", label: "Practice Skills & Drills", desc: "Work on your own game with Track a Rack and focused practice drills — no opponent or match result." },
@@ -234,7 +235,7 @@ export default function Practice() {
       onNext={(type) => changePhase(type === "skills_drills" ? "gametype" : "opponent")} onCancel={cancelSession} />);
   }
   if (phase === "opponent") {
-    return wrap(<OpponentStep profile={profile} session={session} setSession={setSession}
+    return wrap(<OpponentStep profile={profile} session={session} setSession={setSession} history={history ?? []}
       onNext={() => changePhase("gametype")} onBack={() => changePhase("type")} onCancel={cancelSession} />);
   }
   if (phase === "gametype") {
@@ -521,7 +522,7 @@ function LinkOpponentPanel({ opponentId, onDone, onCancel }) {
   );
 }
 
-function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }) {
+function OpponentStep({ profile, session, setSession, history, onNext, onBack, onCancel }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [manualFirstName, setManualFirstName] = useState("");
@@ -532,6 +533,7 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editMessage, setEditMessage] = useState("");
+  const previousOpponents = buildPracticeOpponentShortcuts(history, myOpponents);
 
   useEffect(() => { if (profile) db.listMyPracticeOpponents(profile.id).then(setMyOpponents); }, [profile?.id]);
   useEffect(() => {
@@ -546,6 +548,13 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
   const pickManualExisting = (o) => {
     setSession(s => ({ ...s, opponentType: "manual", opponentPlayerNum: null, opponentId: o.id, opponentName: o.display_name || o.name, opponentRating: null }));
     onNext();
+  };
+  const pickPreviousOpponent = (opponent) => {
+    if (opponent.type === "player") {
+      pickPlayer({ num: opponent.num, name: opponent.name, rating: opponent.rating });
+    } else {
+      pickManualExisting(opponent);
+    }
   };
   const beginEditOpponent = (opponent) => {
     const parts = (opponent.name || "").trim().split(/\\s+/).filter(Boolean);
@@ -614,14 +623,14 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
           </div>
         </div>
 
-        {myOpponents.length > 0 && (
+        {previousOpponents.length > 0 && (
           <div className="field">
             <div className="form-label">People you've played before</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {myOpponents.map(o => (
-                <div key={o.id} style={{display:"flex",alignItems:"center",gap:3}}>
-                  <button className="chip" onClick={() => pickManualExisting(o)}>{o.display_name || o.name}</button>
-                  {!o.linked_profile_id && (
+              {previousOpponents.map(o => (
+                <div key={o.key} style={{display:"flex",alignItems:"center",gap:3}}>
+                  <button className="chip" onClick={() => pickPreviousOpponent(o)}>{o.name}</button>
+                  {o.type === "manual" && !o.linked_profile_id && (
                     <button className="btn-icon" aria-label={`Edit ${o.name}`} onClick={() => beginEditOpponent(o)}><Pencil size={12}/></button>
                   )}
                 </div>

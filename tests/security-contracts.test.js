@@ -741,7 +741,9 @@ describe("full-name player lookup and empty stats cards", () => {
     const db = read("src/db.js");
     const sql = read("supabase-schema-section-106-practice-opponent-shortcut-names.sql");
     expect(db).toContain('supabase.rpc("list_my_practice_opponents_with_names")');
-    expect(practice).toContain("{o.display_name || o.name}");
+    expect(practice).toContain("buildPracticeOpponentShortcuts(history, myOpponents)");
+    expect(practice).toContain("{o.name}");
+    expect(practice).toContain("pickPreviousOpponent(o)");
     expect(sql).toContain("public.list_my_practice_opponents_with_names()");
     expect(sql).toContain("opponent.linked_profile_id = (select auth.uid())");
     expect(sql).toContain("grant execute on function public.list_my_practice_opponents_with_names() to authenticated");
