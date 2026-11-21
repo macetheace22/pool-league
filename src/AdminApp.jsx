@@ -645,7 +645,10 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             <div className="empty-state">Select a season and division to view imported playoff eligibility.</div>
           )}
           {page === "playoffs" && viewingSeason && (
-            <SeasonalTournamentReview key={viewingSeason.id} seasonId={viewingSeason.id} />
+            <>
+              <AnnualMvpInvitationReview key={"annual-mvp-"+viewingSeason.id} seasonId={viewingSeason.id} />
+              <SeasonalTournamentReview key={viewingSeason.id} seasonId={viewingSeason.id} />
+            </>
           )}
           {page === "playoffs" && viewingDiv && (
             <PlayoffsTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} />
@@ -5525,6 +5528,80 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   );
 }
 
+
+function AnnualMvpInvitationReview({ seasonId }) {
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const refresh = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await db.getAnnualMvpTournamentInvitations(seasonId);
+      if (data?.error) throw new Error(data.error);
+      setResult(data);
+    } catch (e) {
+      setError(e?.message || "Unable to load Annual MVP Tournament invitations.");
+      setResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { refresh(); }, [seasonId]);
+
+  return (
+    <div className="card">
+      <div className="card__title">Annual MVP Tournament · Top 15 Invitations</div>
+      <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5,margin:"6px 0 12px"}}>
+        Read-only invitation audit using each division's latest complete official IBA MVP report. A player qualifying in multiple formats is assigned to the highest format only: Masters, then Advanced, then Open.
+      </div>
+      {loading ? <div className="empty-state">Loading official MVP reports…</div> :
+        error ? <ErrorMsg>{error}</ErrorMsg> : <>
+          <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12,marginBottom:10}}>
+            <span>Divisions checked: <strong>{result.divisionCount}</strong></span>
+            <span>Invitations: <strong>{result.totalInvitations}</strong></span>
+            <span>Identity review: <strong>{result.identityReview.length}</strong></span>
+          </div>
+          {!result.complete && <div style={{fontSize:12,color:"#F0B35A",lineHeight:1.5,marginBottom:10}}>
+            The invitation snapshot is incomplete. Do not finalize invitations until every division has a valid official MVP report.
+          </div>}
+          {result.divisionIssues.map((issue,index) => <div key={issue.divisionId || index} style={{fontSize:11,color:"#F0B35A",padding:"5px 0",borderTop:"1px solid #333"}}>
+            {issue.divisionLabel}: {issue.issue}
+          </div>)}
+          {["Masters","Advanced","Open"].map(format => {
+            const rows = result.invitationsByFormat[format] ?? [];
+            return <div key={format} style={{marginTop:14}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>{format} · {rows.length} invitations</div>
+              {!rows.length ? <div className="list-row__sub">No confirmed invitations in this format.</div> :
+                rows.map(row => <div className="list-row" key={row.playerNum}>
+                  <div className="list-row__body">
+                    <span className="list-row__id">{row.position}</span>
+                    <div style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
+                      <span className="list-row__name">{row.playerName}</span>
+                      <span className="list-row__sub">Player #{row.playerNum} · {row.qualifyingDivisions.map(item => item.divisionLabel).join(", ")}</span>
+                      {row.alsoQualifiedIn.length > 0 && <span className="list-row__sub" style={{color:"#5FCF9E"}}>Also qualified in {row.alsoQualifiedIn.join(", ")}; assigned to {format}</span>}
+                    </div>
+                  </div>
+                </div>)}
+            </div>;
+          })}
+          {result.crossFormatResolutions.length > 0 && <div style={{marginTop:14}}>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:5}}>Higher-format resolutions</div>
+            {result.crossFormatResolutions.map(row => <div key={row.playerNum} className="list-row__sub" style={{padding:"4px 0"}}>
+              {row.playerName} (#{row.playerNum}) → {row.eligibleFormat}; lower-format invitation suppressed.
+            </div>)}
+          </div>}
+          {result.identityReview.length > 0 && <div style={{marginTop:14}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#F0B35A",marginBottom:5}}>Unlinked identities · manager review</div>
+            {result.identityReview.map((row,index) => <div key={row.divisionId+"-"+index} className="list-row__sub" style={{padding:"4px 0"}}>
+              {row.playerName} · {row.format} · {row.divisionLabel}: {row.issue}
+            </div>)}
+          </div>}
+          <button className="btn-secondary" style={{marginTop:12}} onClick={refresh}>Refresh official MVP reports</button>
+        </>}
+    </div>
+  );
+}
 
 function SeasonalTournamentReview({ seasonId }) {
   const [snapshot, setSnapshot] = useState(null);
