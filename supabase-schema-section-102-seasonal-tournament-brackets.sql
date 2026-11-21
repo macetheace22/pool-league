@@ -91,7 +91,42 @@ revoke all on public.seasonal_tournament_entries from public, anon, authenticate
 revoke all on public.seasonal_tournament_matches from public, anon, authenticated;
 grant select on public.seasonal_tournaments to authenticated;
 grant select on public.seasonal_tournament_entries to authenticated;
-grant select on public.seasonal_tournament_matches to authenticated;
+grant select, insert on public.seasonal_tournament_matches to authenticated;
+grant insert on public.seasonal_tournaments to authenticated;
+grant insert on public.seasonal_tournament_entries to authenticated;
+
+
+drop policy if exists seasonal_tournaments_manager_insert on public.seasonal_tournaments;
+create policy seasonal_tournaments_manager_insert
+  on public.seasonal_tournaments for insert to authenticated
+  with check (
+    (select public.current_role_name()) = 'manager'
+    and confirmed_by = (select auth.uid())
+  );
+
+drop policy if exists seasonal_tournament_entries_manager_insert on public.seasonal_tournament_entries;
+create policy seasonal_tournament_entries_manager_insert
+  on public.seasonal_tournament_entries for insert to authenticated
+  with check (
+    exists (
+      select 1 from public.seasonal_tournaments t
+      where t.id = tournament_id
+        and t.confirmed_by = (select auth.uid())
+        and (select public.current_role_name()) = 'manager'
+    )
+  );
+
+drop policy if exists seasonal_tournament_matches_manager_insert on public.seasonal_tournament_matches;
+create policy seasonal_tournament_matches_manager_insert
+  on public.seasonal_tournament_matches for insert to authenticated
+  with check (
+    exists (
+      select 1 from public.seasonal_tournaments t
+      where t.id = tournament_id
+        and t.confirmed_by = (select auth.uid())
+        and (select public.current_role_name()) = 'manager'
+    )
+  );
 
 drop policy if exists seasonal_tournaments_manager_select on public.seasonal_tournaments;
 create policy seasonal_tournaments_manager_select
@@ -129,7 +164,7 @@ create or replace function public.create_seasonal_tournament(
 )
 returns uuid
 language plpgsql
-security definer
+security invoker
 set search_path = ''
 as $function$
 declare
@@ -137,8 +172,6 @@ declare
   v_team_count integer;
   v_bracket_size integer := 1;
   v_match_count integer;
-  v_round_count integer := 0;
-  v_distinct_rounds integer;
   v_profile_id uuid := (select auth.uid());
 begin
   if v_profile_id is null or (select public.current_role_name()) <> 'manager' then
@@ -159,12 +192,9 @@ begin
 
   while v_bracket_size < v_team_count loop
     v_bracket_size := v_bracket_size * 2;
-    v_round_count := v_round_count + 1;
   end loop;
   if v_team_count > 1 then
-    v_round_count := v_round_count + 1;
   else
-    v_round_count := 0;
   end if;
   v_match_count := (select count(*) from jsonb_array_elements(p_matches));
   if v_match_count <> greatest(v_bracket_size - 1, 0) then
