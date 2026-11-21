@@ -879,3 +879,37 @@ describe("Section 103 seasonal tournament source invalidation", () => {
     expect(db).toContain('supabase.from("completed_matches").insert(row)');
   });
 });
+
+
+describe("Section 104 manager-approved seasonal tournament reconciliation", () => {
+  it("requires a manager and a flagged tournament before reconciling", () => {
+    const sql = read("supabase-schema-section-104-manager-approved-seasonal-tournament-reconciliation.sql");
+    expect(sql).toContain("public.reconcile_seasonal_tournament");
+    expect(sql).toContain("public.current_role_name()) is distinct from 'manager'");
+    expect(sql).toContain("TOURNAMENT_DOES_NOT_REQUIRE_REVIEW");
+    expect(sql).toContain("NO_QUALIFIED_TEAMS");
+    expect(sql).toContain("grant execute on function public.reconcile_seasonal_tournament(uuid, jsonb, jsonb)");
+  });
+
+  it("preserves completed and in-progress matches and rejects incompatible historical changes", () => {
+    const sql = read("supabase-schema-section-104-manager-approved-seasonal-tournament-reconciliation.sql");
+    expect(sql).toContain("status in ('completed', 'in_progress')");
+    expect(sql).toContain("RECORDED_MATCH_PARTICIPANTS_CHANGED");
+    expect(sql).toContain("QUALIFIED_ENTRIES_CHANGED_AFTER_RESULTS_RECORDED");
+    expect(sql).toContain("RECORDED_WINNER_CONFLICTS_WITH_PROPOSED_BRACKET");
+    expect(sql).toContain("saved.status not in ('completed', 'in_progress')");
+    expect(sql).toContain("review_required_at = null");
+  });
+
+  it("uses a transactional RPC and an explicit manager approval in the admin review", () => {
+    const db = read("src/db.js");
+    const admin = read("src/AdminApp.jsx");
+    expect(db).toContain('supabase.rpc("reconcile_seasonal_tournament"');
+    expect(db).toContain("export async function reconcileSeasonalTournament");
+    expect(admin).toContain("Approve & Reconcile Bracket");
+    expect(admin).toContain("window.confirm(");
+    expect(admin).toContain("db.reconcileSeasonalTournament(saved.id, type, drafts[type])");
+    expect(admin).toContain("Completed and in-progress matches and their results will be preserved");
+    expect(admin).toContain("plan?.requiresReview");
+  });
+});
