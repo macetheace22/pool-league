@@ -1002,8 +1002,13 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
   const [awayNum, setAwayNum] = useState("");
   const homeNoPlayer = !!match.gladiatorNoAvailableHome;
   const awayNoPlayer = !!match.gladiatorNoAvailableAway;
-  const homeChoices = gladiatorPlayerChoices(match.sets, setIdx, "home").filter(player => !playoffIneligibleReason(match, player));
-  const awayChoices = gladiatorPlayerChoices(match.sets, setIdx, "away").filter(player => !playoffIneligibleReason(match, player));
+  const isEligiblePriorPlayer = (side, player) => {
+    const team = match[side === "home" ? "teamHome" : "teamAway"];
+    const rosterPlayer = (team.roster ?? []).find(candidate => String(candidate.num) === String(player.num)) ?? player;
+    return !playoffIneligibleReason(match, rosterPlayer);
+  };
+  const homeChoices = gladiatorPlayerChoices(match.sets, setIdx, "home").filter(player => isEligiblePriorPlayer("home", player));
+  const awayChoices = gladiatorPlayerChoices(match.sets, setIdx, "away").filter(player => isEligiblePriorPlayer("away", player));
   const homePlayer = homeChoices.find(player => String(player.num) === homeNum);
   const awayPlayer = awayChoices.find(player => String(player.num) === awayNum);
   const ready = homeNoPlayer && awayNoPlayer && !!homePlayer && !!awayPlayer;
