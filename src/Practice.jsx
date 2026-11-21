@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { Search, Check, ChevronRight, Trophy, Plus, Pencil, X } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
@@ -209,61 +209,8 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [linkingKey, setLinkingKey] = useState(null);
   const [selectedGameId, setSelectedGameId] = useState(null);
-  const [linkRequests, setLinkRequests] = useState([]);
-  const [linkResponseMessage, setLinkResponseMessage] = useState("");
-  const [claimCodeInput, setClaimCodeInput] = useState("");
-  const [claimCodeMessage, setClaimCodeMessage] = useState("");
-  const [claimCodeBusy, setClaimCodeBusy] = useState(false);
   const [generatedClaimCodes, setGeneratedClaimCodes] = useState({});
   const [generatingClaimCodeFor, setGeneratingClaimCodeFor] = useState(null);
-  const refreshLinkRequests = () => db.listPracticeOpponentLinkRequests().then(setLinkRequests);
-  useEffect(() => { refreshLinkRequests(); }, [profile?.id]);
-  const actionableLinkRequests = linkRequests.filter(request =>
-    request.status === "pending" && new Date(request.expires_at).getTime() > Date.now()
-  );
-  const respondToLinkRequest = async (requestId, accept) => {
-    const result = await db.respondPracticeOpponentLink(requestId, accept);
-    if (result === "ACCEPTED") {
-      setLinkResponseMessage("");
-      await refreshLinkRequests();
-      onLinked();
-      return;
-    }
-    if (result === "DECLINED") {
-      setLinkResponseMessage("");
-      await refreshLinkRequests();
-      return;
-    }
-    setLinkResponseMessage(result === "FULL_NAME_REQUIRED"
-      ? "Both accounts must have first and last names saved in Profile before this practice identity can be linked. Ask the other person to complete their name, then try again."
-      : result === "CONFIRMATION_REQUIRED"
-        ? "This link needs a current confirmation request addressed to your account. Refresh the page and try again."
-        : "That identity request could not be completed. Refresh the page and check its status.");
-    await refreshLinkRequests();
-  };
-
-  const redeemClaimCode = async () => {
-    if (!claimCodeInput.trim()) return;
-    setClaimCodeBusy(true);
-    setClaimCodeMessage("");
-    const result = await db.redeemPracticeOpponentClaimCode(claimCodeInput);
-    setClaimCodeBusy(false);
-    if (result.ok) {
-      setClaimCodeInput("");
-      setClaimCodeMessage("Claim request sent. The owner must approve before the practice history is linked.");
-      refreshLinkRequests();
-    } else {
-      const messages = {
-        INVALID_CODE: "That claim code wasn't recognized.",
-        CODE_USED: "That claim code has already been used or revoked.",
-        CODE_EXPIRED: "That claim code has expired.",
-        OWN_CODE: "You can't redeem a claim code you created.",
-        PENDING_EXISTS: "There is already a pending identity request for this opponent.",
-        OPPONENT_UNAVAILABLE: "That practice opponent is no longer available to claim.",
-      };
-      setClaimCodeMessage(messages[result.status] || "Couldn't redeem the code. Please try again.");
-    }
-  };
 
   const generateClaimCode = async (opponentId) => {
     setGeneratingClaimCodeFor(opponentId);
@@ -287,57 +234,9 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
     <>
       <PageHeader title="Practice" />
       <div className="tab-content">
-        <div className="card">
-          <div className="card__title">Claim a Practice Identity</div>
-          <div style={{fontSize:11,color:"#999",lineHeight:1.5,marginBottom:8}}>
-            Enter a claim code to request linking your practice history. The owner must approve.
-          </div>
-          <div style={{display:"flex",gap:8}}>
-            <input className="input" style={{fontSize:14,letterSpacing:"normal",textAlign:"left",textTransform:"none"}} value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
-            <button className="btn-primary" onClick={redeemClaimCode} disabled={!claimCodeInput.trim()||claimCodeBusy}>{claimCodeBusy?"Checking…":"Submit"}</button>
-          </div>
-          {claimCodeMessage && <div className="success-msg" style={{marginTop:8}}>{claimCodeMessage}</div>}
+        <div className="practice-identity-profile-link">
+          Practice identity connections and claim codes are managed in <Link to="/me">My Profile</Link>.
         </div>
-        {actionableLinkRequests.length > 0 && (
-          <div className="card">
-            <div className="card__title">Practice Identity Requests</div>
-            {linkResponseMessage && <div className="error-msg" style={{marginBottom:8}}>{linkResponseMessage}</div>}
-            {actionableLinkRequests.map(request => {
-              const incoming = request.direction === "incoming";
-              const pending = request.status === "pending";
-              const expired = pending && new Date(request.expires_at).getTime() <= Date.now();
-              return (
-                <div key={request.request_id} className="list-row" style={{alignItems:"center",gap:8}}>
-                  <div className="list-row__body">
-                    <div className="list-row__name">
-                      {incoming
-                        ? (request.link_type === "claim"
-                          ? `${request.requester_full_name || "A player"} (@${request.requester_username || "player"}) wants to claim your ${request.opponent_name} entry`
-                          : `You were asked to link ${request.opponent_name} to ${request.requester_full_name || "a player"} (@${request.requester_username || "player"})`)
-                        : (request.link_type === "claim"
-                          ? `Your claim for ${request.opponent_name} is awaiting ${request.target_full_name || "the owner"} approval`
-                          : `Request to ${request.target_full_name || "a player"} (@${request.target_username || "player"}) for ${request.opponent_name}`)}
-                    </div>
-                    <div className="list-row__sub">
-                      {pending ? (expired ? "Expired — awaiting cleanup" : incoming ? "Confirm this is you to connect their practice history" : "Waiting for their confirmation")
-                        : request.status[0].toUpperCase() + request.status.slice(1)}
-                      {pending && <div style={{fontSize:10.5,color:"#9A9A9A",marginTop:3}}>Accounts: {request.requester_full_name || "Name unavailable"} ↔ {request.target_full_name || "Name unavailable"}</div>}
-                    </div>
-                  </div>
-                  {pending && incoming && !expired && (
-                    <div style={{display:"flex",gap:5}}>
-                      <button className="btn-icon btn-icon--confirm" onClick={() => respondToLinkRequest(request.request_id, true)}><Check size={14}/></button>
-                      <button className="btn-icon" onClick={() => respondToLinkRequest(request.request_id, false)}>Decline</button>
-                    </div>
-                  )}
-                  {pending && !incoming && (
-                    <button className="btn-icon" onClick={async () => { await db.cancelPracticeOpponentLinkRequest(request.request_id); refreshLinkRequests(); }}>Cancel</button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
           <button type="button" onClick={onStart} className="office-list-item">
             <Plus size={16} /><span>New Practice Session</span>
@@ -365,7 +264,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                           <div className="list-row__name">{o.name}</div>
                           <div className="list-row__sub">
                             {o.wins}W – {o.losses}L
-                            {isManual && linked && <span style={{color:"#5FCF9E"}}> · Linked</span>}
+                
                           </div>
                         </div>
                         {isManual && !linked && (
@@ -380,7 +279,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                       </div>
                     </div>
                     {linkingKey === o.key && (
-                      <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); refreshLinkRequests(); }} onCancel={() => setLinkingKey(null)} />
+                      <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); }} onCancel={() => setLinkingKey(null)} />
                     )}
                     {!linked && generatedClaimCodes[o.opponentId] && (
                       <div className="readonly-bar" style={{marginTop:5,display:"flex",flexDirection:"column",gap:6}}>
@@ -1158,6 +1057,7 @@ function DoneStep({ profile, session, onSaved }) {
 }
 
 export const practiceCss = `
+.practice-identity-profile-link{font-size:11px;color:#8A8A8A;margin:0 0 14px;padding:9px 11px;border:1px solid #292929;border-radius:8px;background:#171717;}.practice-identity-profile-link a{color:#9FC4B4;text-decoration:underline;text-underline-offset:2px;}
 .practice-score-entry{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:10px;align-items:end;margin-top:6px;}
 .practice-score-entry__field{min-width:0;}
 .practice-score-entry__input{min-height:44px;font-size:16px;}

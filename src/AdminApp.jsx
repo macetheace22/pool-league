@@ -4088,6 +4088,60 @@ function AccountSettings({ profile, onProfileRefresh }) {
   const [success, setSuccess] = useState("");
   const [claimCode, setClaimCode] = useState("");
   const [claiming, setClaiming]   = useState(false);
+  const [practiceClaimCode, setPracticeClaimCode] = useState("");
+  const [practiceClaimMessage, setPracticeClaimMessage] = useState("");
+  const [practiceClaimBusy, setPracticeClaimBusy] = useState(false);
+  const [practiceLinkRequests, setPracticeLinkRequests] = useState([]);
+  const [practiceLinkMessage, setPracticeLinkMessage] = useState("");
+
+  const refreshPracticeLinkRequests = async () => {
+    try { setPracticeLinkRequests(await db.listPracticeOpponentLinkRequests()); }
+    catch { setPracticeLinkRequests([]); }
+  };
+  useEffect(() => { refreshPracticeLinkRequests(); }, [profile.id]);
+  const actionablePracticeLinkRequests = practiceLinkRequests.filter(request =>
+    request.status === "pending" && new Date(request.expires_at).getTime() > Date.now()
+  );
+  const redeemPracticeClaimCode = async () => {
+    if (!practiceClaimCode.trim()) return;
+    setPracticeClaimBusy(true);
+    setPracticeClaimMessage("");
+    const result = await db.redeemPracticeOpponentClaimCode(practiceClaimCode);
+    setPracticeClaimBusy(false);
+    if (result.ok) {
+      setPracticeClaimCode("");
+      setPracticeClaimMessage("Claim request sent. The owner must approve before the practice history is linked.");
+      await refreshPracticeLinkRequests();
+    } else {
+      const messages = {
+        INVALID_CODE: "That claim code wasn't recognized.",
+        CODE_USED: "That claim code has already been used or revoked.",
+        CODE_EXPIRED: "That claim code has expired.",
+        OWN_CODE: "You can't redeem a claim code you created.",
+        PENDING_EXISTS: "There is already a pending identity request for this opponent.",
+        OPPONENT_UNAVAILABLE: "That practice opponent is no longer available to claim.",
+      };
+      setPracticeClaimMessage(messages[result.status] || "Couldn't redeem the code. Please try again.");
+    }
+  };
+  const respondToPracticeLinkRequest = async (requestId, accept) => {
+    const result = await db.respondPracticeOpponentLink(requestId, accept);
+    if (result === "ACCEPTED" || result === "DECLINED") {
+      setPracticeLinkMessage("");
+      await refreshPracticeLinkRequests();
+      return;
+    }
+    setPracticeLinkMessage(result === "FULL_NAME_REQUIRED"
+      ? "Both accounts must have first and last names saved in Profile before this practice identity can be linked. Ask the other person to complete their name, then try again."
+      : result === "CONFIRMATION_REQUIRED"
+        ? "This link needs a current confirmation request addressed to your account. Refresh the page and try again."
+        : "That identity request could not be completed. Refresh the page and check its status.");
+    await refreshPracticeLinkRequests();
+  };
+  const cancelPracticeLinkRequest = async (requestId) => {
+    await db.cancelPracticeOpponentLinkRequest(requestId);
+    await refreshPracticeLinkRequests();
+  };
 
   const [allTeamsForManager, setAllTeamsForManager] = useState(null);
   const [teamSearch, setTeamSearch] = useState("");
@@ -4204,6 +4258,58 @@ function AccountSettings({ profile, onProfileRefresh }) {
         </div>
         <button className="btn-secondary" onClick={saveFullName} disabled={!firstName.trim() || !lastName.trim() || (firstName.trim()===profile.first_name && lastName.trim()===profile.last_name)}>Save Full Name</button>
         <div style={{fontSize:10.5,color:"#777",marginTop:6}}>Your full name is used to verify your IBA player identity and identify participants in linked Practice history.</div>
+      </div>
+      <div className="card">
+        <div className="card__title">Identity &amp; Connections</div>
+        <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5,marginBottom:9}}>
+          Manage requests to connect practice histories with another account. Both players must confirm the identity link.
+        </div>
+        <div className="field">
+          <Label>Claim a Practice Identity</Label>
+          <div style={{display:"flex",gap:8}}>
+            <input className="input" style={{fontSize:14,letterSpacing:"normal",textAlign:"left",textTransform:"none"}} value={practiceClaimCode} onChange={e=>setPracticeClaimCode(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
+            <button className="btn-secondary" onClick={redeemPracticeClaimCode} disabled={!practiceClaimCode.trim()||practiceClaimBusy}>{practiceClaimBusy?"Checking…":"Submit"}</button>
+          </div>
+          {practiceClaimMessage && <div className="success-msg" style={{marginTop:8}}>{practiceClaimMessage}</div>}
+        </div>
+        {practiceLinkMessage && <ErrorMsg>{practiceLinkMessage}</ErrorMsg>}
+        {actionablePracticeLinkRequests.length > 0 ? (
+          <div style={{marginTop:10}}>
+            <div className="form-label">Pending Practice Identity Requests</div>
+            {actionablePracticeLinkRequests.map(request => {
+              const incoming = request.direction === "incoming";
+              return (
+                <div key={request.request_id} className="list-row" style={{alignItems:"center",gap:8}}>
+                  <div className="list-row__body">
+                    <div className="list-row__name">
+                      {incoming
+                        ? (request.link_type === "claim"
+                          ? `${request.requester_full_name || "A player"} (@${request.requester_username || "player"}) wants to claim your ${request.opponent_name} entry`
+                          : `You were asked to link ${request.opponent_name} to ${request.requester_full_name || "a player"} (@${request.requester_username || "player"})`)
+                        : (request.link_type === "claim"
+                          ? `Your claim for ${request.opponent_name} is awaiting ${request.target_full_name || "the owner"} approval`
+                          : `Request to ${request.target_full_name || "a player"} (@${request.target_username || "player"}) for ${request.opponent_name}`)}
+                    </div>
+                    <div className="list-row__sub">
+                      {incoming ? "Confirm this is you to connect their practice history" : "Waiting for their confirmation"}
+                      <div style={{fontSize:10.5,color:"#9A9A9A",marginTop:3}}>Accounts: {request.requester_full_name || "Name unavailable"} ↔ {request.target_full_name || "Name unavailable"}</div>
+                    </div>
+                  </div>
+                  {incoming ? (
+                    <div style={{display:"flex",gap:5}}>
+                      <button className="btn-icon btn-icon--confirm" aria-label="Approve identity request" onClick={() => respondToPracticeLinkRequest(request.request_id,true)}><Check size={14}/></button>
+                      <button className="btn-icon" onClick={() => respondToPracticeLinkRequest(request.request_id,false)}>Decline</button>
+                    </div>
+                  ) : (
+                    <button className="btn-icon" onClick={() => cancelPracticeLinkRequest(request.request_id)}>Cancel</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="dash-empty" style={{marginTop:8}}>No pending Practice identity requests.</div>
+        )}
       </div>
       <div className="card">
         <div className="card__title">Username</div>

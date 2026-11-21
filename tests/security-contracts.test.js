@@ -568,16 +568,17 @@ describe("Section 101 practice opponent identity confirmation", () => {
   it("uses request, response, and cancellation RPCs instead of direct opponent linking", () => {
     const db = read("src/db.js");
     const practice = read("src/Practice.jsx");
+    const admin = read("src/AdminApp.jsx");
     expect(db).toContain('supabase.rpc("request_practice_opponent_link"');
     expect(db).toContain('supabase.rpc("list_practice_opponent_link_requests_with_names")');
     expect(db).toContain('supabase.rpc("respond_practice_opponent_link"');
     expect(db).toContain('supabase.rpc("cancel_practice_opponent_link_request"');
     expect(db).not.toContain("export async function linkPracticeOpponent(");
     expect(practice).toContain("they must confirm before your practice history is linked.");
-    expect(practice).toContain("Practice Identity Requests");
-    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
-    expect(practice).toContain("respondToLinkRequest(request.request_id, false)");
-    expect(practice).toContain("db.cancelPracticeOpponentLinkRequest(request.request_id)");
+    expect(admin).toContain("Pending Practice Identity Requests");
+    expect(admin).toContain("respondToPracticeLinkRequest(request.request_id,true)");
+    expect(admin).toContain("respondToPracticeLinkRequest(request.request_id,false)");
+    expect(admin).toContain("cancelPracticeLinkRequest(request.request_id)");
   });
 });
 
@@ -606,16 +607,17 @@ describe("Section 102 practice opponent claim codes", () => {
     }
   });
 
-  it("exposes claim-code APIs and self-service Practice UI", () => {
+  it("exposes claim-code APIs in Profile while keeping opponent-specific code generation in Practice", () => {
     const db = read("src/db.js");
     const practice = read("src/Practice.jsx");
+    const admin = read("src/AdminApp.jsx");
     expect(db).toContain('supabase.rpc("create_practice_opponent_claim_code"');
     expect(db).toContain('supabase.rpc("redeem_practice_opponent_claim_code"');
-    expect(practice).toContain("Claim a Practice Identity");
-    expect(practice).toContain("The owner must approve.");
+    expect(admin).toContain("Claim a Practice Identity");
+    expect(admin).toContain("The owner must approve before the practice history is linked.");
     expect(practice).toContain("generateClaimCode(o.opponentId)");
-    expect(practice).toContain("request.link_type === \"claim\"");
-    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
+    expect(admin).toContain('request.link_type === "claim"');
+    expect(admin).toContain("respondToPracticeLinkRequest(request.request_id,true)");
   });
 });
 
@@ -671,6 +673,7 @@ describe("Section 105 account full names and identity validation", () => {
   it("keeps practice identity mutual confirmation and requires both accounts to have full names", () => {
     const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
     const practice = read("src/Practice.jsx");
+    const admin = read("src/AdminApp.jsx");
     expect(sql).toContain("public.validate_practice_opponent_link_names()");
     expect(sql).toContain("PRACTICE_LINK_FULL_NAME_REQUIRED");
     expect(sql).toContain("before insert or update of linked_profile_id");
@@ -679,9 +682,9 @@ describe("Section 105 account full names and identity validation", () => {
     expect(sql).toContain("set status = 'accepted', responded_at = now()");
     expect(sql).toContain("create or replace function public.search_profiles_for_practice_link(p_query text)");
     expect(sql).toContain("public.list_practice_opponent_link_requests_with_names()");
-    expect(practice).toContain("request.requester_full_name");
-    expect(practice).toContain("request.target_full_name");
-    expect(practice).toContain("Both accounts must have first and last names saved in Profile");
+    expect(admin).toContain("request.requester_full_name");
+    expect(admin).toContain("request.target_full_name");
+    expect(admin).toContain("Both accounts must have first and last names saved in Profile");
     expect(practice).toContain("p.full_name");
     expect(practice).toContain("they must confirm before your practice history is linked.");
   });
@@ -689,14 +692,14 @@ describe("Section 105 account full names and identity validation", () => {
   it("uses full names for both sides of linked practice history without rewriting saved games", () => {
     const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
     const db = read("src/db.js");
-    const practice = read("src/Practice.jsx");
+    const admin = read("src/AdminApp.jsx");
     expect(sql).toContain("public.list_linked_practice_game_owners");
     expect(sql).toContain("public.list_linked_practice_opponent_names");
     expect(db).toContain('supabase.rpc("list_linked_practice_opponent_names"');
     expect(db).toContain('"list_linked_practice_game_owners"');
     expect(db).toContain("opponent_name: linkedName");
     expect(db).toContain('return "FULL_NAME_REQUIRED"');
-    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
+    expect(admin).toContain("respondToPracticeLinkRequest(request.request_id,true)");
     expect(db).not.toContain(".update({ opponent_name:");
   });
 
@@ -718,6 +721,19 @@ describe("full-name player lookup and empty stats cards", () => {
     expect(db).toContain('.ilike("name", `%${query.trim()}%`)');
     expect(admin).toContain("Search by first or last name…");
     expect(admin).toContain("{p.name}{p.nickname ? ` \"${p.nickname}\"` : \"\"}");
+  });
+
+  it("places Practice identity claim and request management in My Profile", () => {
+    const practice = read("src/Practice.jsx");
+    const admin = read("src/AdminApp.jsx");
+    expect(practice).not.toContain("Claim a Practice Identity");
+    expect(practice).not.toContain("Practice Identity Requests");
+    expect(practice).toContain('to="/me">My Profile</Link>');
+    expect(admin).toContain("Identity &amp; Connections");
+    expect(admin).toContain("db.redeemPracticeOpponentClaimCode(practiceClaimCode)");
+    expect(admin).toContain("db.respondPracticeOpponentLink(requestId, accept)");
+    expect(admin).toContain("db.cancelPracticeOpponentLinkRequest(requestId)");
+    expect(practice).not.toContain('> · Linked</span>');
   });
 
   it("uses linked account full names in the People you've played before shortcuts", () => {
