@@ -913,3 +913,15 @@ describe("Section 104 manager-approved seasonal tournament reconciliation", () =
     expect(admin).toContain("plan?.requiresReview");
   });
 });
+
+
+describe("unfinished Practice session recovery query", () => {
+  it("orders unfinished practice games by the existing played_at column", () => {
+    const db = read("src/db.js");
+    const start = db.indexOf("export async function listMyUnfinishedPracticeGames");
+    const end = db.indexOf("\n}\n", start);
+    const query = db.slice(start, end);
+    expect(query).toContain('.order("played_at", { ascending: false })');
+    expect(query).not.toContain('.order("created_at"');
+  });
+});
