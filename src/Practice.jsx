@@ -199,7 +199,7 @@ export default function Practice() {
       onSaved={() => { refreshHistory(); clearActiveSession(); setPhase("landing"); setSessionState(null); }} />);
   }
 
-  return wrap(<LandingStep profile={profile} history={history} rawOpponents={opponents} onStart={startSession} onLinked={refreshOpponents} />);
+  return wrap(<LandingStep profile={profile} history={history} rawOpponents={opponents} onStart={startSession} onLinked={() => { refreshOpponents(); refreshHistory(); }} />);
 }
 
 // ─── Landing ────────────────────────────────────────────────────────────────
@@ -210,6 +210,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const [linkingKey, setLinkingKey] = useState(null);
   const [selectedGameId, setSelectedGameId] = useState(null);
   const [linkRequests, setLinkRequests] = useState([]);
+  const [linkResponseMessage, setLinkResponseMessage] = useState("");
   const [claimCodeInput, setClaimCodeInput] = useState("");
   const [claimCodeMessage, setClaimCodeMessage] = useState("");
   const [claimCodeBusy, setClaimCodeBusy] = useState(false);
@@ -220,6 +221,24 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const actionableLinkRequests = linkRequests.filter(request =>
     request.status === "pending" && new Date(request.expires_at).getTime() > Date.now()
   );
+  const respondToLinkRequest = async (requestId, accept) => {
+    const result = await db.respondPracticeOpponentLink(requestId, accept);
+    if (result === "ACCEPTED") {
+      setLinkResponseMessage("");
+      await refreshLinkRequests();
+      onLinked();
+      return;
+    }
+    if (result === "DECLINED") {
+      setLinkResponseMessage("");
+      await refreshLinkRequests();
+      return;
+    }
+    setLinkResponseMessage(result === "ERROR"
+      ? "Both accounts must have first and last names saved in Profile before this practice identity can be linked. Ask the other person to complete their name, then try again."
+      : "That identity request is no longer available. Refresh the page and check its status.");
+    await refreshLinkRequests();
+  };
 
   const redeemClaimCode = async () => {
     if (!claimCodeInput.trim()) return;
@@ -280,6 +299,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
         {actionableLinkRequests.length > 0 && (
           <div className="card">
             <div className="card__title">Practice Identity Requests</div>
+            {linkResponseMessage && <div className="error-msg" style={{marginBottom:8}}>{linkResponseMessage}</div>}
             {actionableLinkRequests.map(request => {
               const incoming = request.direction === "incoming";
               const pending = request.status === "pending";
@@ -304,8 +324,8 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                   </div>
                   {pending && incoming && !expired && (
                     <div style={{display:"flex",gap:5}}>
-                      <button className="btn-icon btn-icon--confirm" onClick={async () => { await db.respondPracticeOpponentLink(request.request_id, true); refreshLinkRequests(); onLinked(); }}><Check size={14}/></button>
-                      <button className="btn-icon" onClick={async () => { await db.respondPracticeOpponentLink(request.request_id, false); refreshLinkRequests(); }}>Decline</button>
+                      <button className="btn-icon btn-icon--confirm" onClick={() => respondToLinkRequest(request.request_id, true)}><Check size={14}/></button>
+                      <button className="btn-icon" onClick={() => respondToLinkRequest(request.request_id, false)}>Decline</button>
                     </div>
                   )}
                   {pending && !incoming && (
