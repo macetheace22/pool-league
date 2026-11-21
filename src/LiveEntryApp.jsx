@@ -928,7 +928,10 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
           <button className="btn-secondary" style={{width:"100%",marginTop:10,borderColor:"#B7791F",color:"#F6C66A"}}
             onClick={() => setGladiatorOpen(true)}>Gladiator Match — both teams have no additional player present</button>
         )}
-        {gladiatorOpen && <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => setGladiatorOpen(false)} mySide={mySide} isManager={isManager} />}
+        {gladiatorOpen && <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => {
+          onGladiator({ ...match, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, gladiatorPresenceSetIndex: null, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1 });
+          setGladiatorOpen(false);
+        }} mySide={mySide} isManager={isManager} />}
       </div>
     );
   }
@@ -1553,8 +1556,9 @@ function ConfirmScreen({ match, onSave }) {
   const homeSets = match.sets.filter((s) => s.complete && s.winnerSlot === "home").length;
   const awaySets = match.sets.filter((s) => s.complete && s.winnerSlot === "away").length;
   const completedSets = match.sets.filter(set => set.complete).length;
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
   const { homePoints, awayPoints } = db.computeMatchPoints(match);
-  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets });
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
   const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   const confirmSide = (side) => {
@@ -1767,7 +1771,8 @@ function DoneScreen({ match, onReset }) {
 
   const { homePoints, awayPoints } = db.computeMatchPoints(match);
   const completedSets = match.sets.filter(set => set.complete).length;
-  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets });
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
   const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   return (
