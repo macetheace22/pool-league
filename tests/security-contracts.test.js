@@ -618,3 +618,29 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
   });
 });
+
+
+describe("Section 103 linked practice history read access", () => {
+  it("adds read-only access for linked practice identities without expanding write ownership", () => {
+    const sql = read("supabase-schema-section-103-linked-practice-history.sql");
+    expect(sql).toContain('drop policy if exists "read linked practice opponents"');
+    expect(sql).toContain('create policy "read linked practice opponents"');
+    expect(sql).toContain('drop policy if exists "read linked practice games"');
+    expect(sql).toContain('create policy "read linked practice games"');
+    expect(sql).toContain('drop policy if exists "read linked practice game results"');
+    expect(sql).toContain('create policy "read linked practice game results"');
+    expect(sql).toContain('drop policy if exists "read linked practice shot events"');
+    expect(sql).toContain('create policy "read linked practice shot events"');
+    expect(sql).toContain("linked_profile_id = (select auth.uid())");
+    expect(sql).toContain("context_type = 'practice_game'");
+  });
+
+  it("includes linked opponents and linked historical games in the Practice data layer", () => {
+    const db = read("src/db.js");
+    expect(db).toContain("linked_profile_id.eq.");
+    expect(db).toContain('.eq("linked_profile_id", profileId)');
+    expect(db).toContain('.in("opponent_id", linkedOpponentIds)');
+    expect(db).toContain("const byId = new Map()");
+    expect(db).not.toContain('.eq("created_by", profileId)\n    .or("winner.not.is.null,completed_at.not.is.null")');
+  });
+});
