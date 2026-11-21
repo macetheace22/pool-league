@@ -554,3 +554,41 @@ describe("Section 101 practice opponent identity confirmation", () => {
     expect(practice).toContain("db.cancelPracticeOpponentLinkRequest(request.request_id)");
   });
 });
+
+
+describe("Section 102 practice opponent claim codes", () => {
+  it("creates expiring one-time claim codes and requires owner approval", () => {
+    const sql = read("supabase-schema-section-102-practice-opponent-claim-codes.sql");
+    expect(sql).toContain("create table if not exists public.practice_opponent_claim_codes");
+    expect(sql).toContain("expires_at timestamptz not null default (now() + interval '7 days')");
+    expect(sql).toContain("redeemed_at timestamptz");
+    expect(sql).toContain("revoked_at timestamptz");
+    expect(sql).toContain("revoke all on public.practice_opponent_claim_codes from public, anon, authenticated");
+    expect(sql).toContain("grant select on public.practice_opponent_claim_codes to authenticated");
+    expect(sql).toContain("where c.code::text = lower(trim(p_code))");
+    expect(sql).toContain("set redeemed_at = now()");
+    expect(sql).toContain("values (\n    v_code.opponent_id, (select auth.uid()), v_owner, (select auth.uid())");
+    expect(sql).toContain("v_request.link_profile_id");
+    expect(sql).toContain("if v_request.target_profile_id <> (select auth.uid()) then");
+    expect(sql).toContain("case when r.link_profile_id = r.requested_by then 'claim' else 'link' end");
+    for (const signature of [
+      "create_practice_opponent_claim_code(uuid)",
+      "redeem_practice_opponent_claim_code(text)",
+    ]) {
+      expect(sql).toContain(`revoke all on function public.${signature} from public, anon, authenticated`);
+      expect(sql).toContain(`grant execute on function public.${signature} to authenticated`);
+    }
+  });
+
+  it("exposes claim-code APIs and self-service Practice UI", () => {
+    const db = read("src/db.js");
+    const practice = read("src/Practice.jsx");
+    expect(db).toContain('supabase.rpc("create_practice_opponent_claim_code"');
+    expect(db).toContain('supabase.rpc("redeem_practice_opponent_claim_code"');
+    expect(practice).toContain("Claim a Practice Identity");
+    expect(practice).toContain("person who created that opponent entry must approve your request");
+    expect(practice).toContain("generateClaimCode(o.opponentId)");
+    expect(practice).toContain("request.link_type === \"claim\"");
+    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
+  });
+});

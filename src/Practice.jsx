@@ -205,8 +205,43 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const [linkingKey, setLinkingKey] = useState(null);
   const [selectedGameId, setSelectedGameId] = useState(null);
   const [linkRequests, setLinkRequests] = useState([]);
+  const [claimCodeInput, setClaimCodeInput] = useState("");
+  const [claimCodeMessage, setClaimCodeMessage] = useState("");
+  const [claimCodeBusy, setClaimCodeBusy] = useState(false);
+  const [generatedClaimCodes, setGeneratedClaimCodes] = useState({});
+  const [generatingClaimCodeFor, setGeneratingClaimCodeFor] = useState(null);
   const refreshLinkRequests = () => db.listPracticeOpponentLinkRequests().then(setLinkRequests);
   useEffect(() => { refreshLinkRequests(); }, [profile?.id]);
+
+  const redeemClaimCode = async () => {
+    if (!claimCodeInput.trim()) return;
+    setClaimCodeBusy(true);
+    setClaimCodeMessage("");
+    const result = await db.redeemPracticeOpponentClaimCode(claimCodeInput);
+    setClaimCodeBusy(false);
+    if (result.ok) {
+      setClaimCodeInput("");
+      setClaimCodeMessage("Claim request sent. The owner must approve before the practice history is linked.");
+      refreshLinkRequests();
+    } else {
+      const messages = {
+        INVALID_CODE: "That claim code wasn't recognized.",
+        CODE_USED: "That claim code has already been used or revoked.",
+        CODE_EXPIRED: "That claim code has expired.",
+        OWN_CODE: "You can't redeem a claim code you created.",
+        PENDING_EXISTS: "There is already a pending identity request for this opponent.",
+        OPPONENT_UNAVAILABLE: "That practice opponent is no longer available to claim.",
+      };
+      setClaimCodeMessage(messages[result.status] || "Couldn't redeem the code. Please try again.");
+    }
+  };
+
+  const generateClaimCode = async (opponentId) => {
+    setGeneratingClaimCodeFor(opponentId);
+    const code = await db.createPracticeOpponentClaimCode(opponentId);
+    setGeneratingClaimCodeFor(null);
+    if (code) setGeneratedClaimCodes(prev => ({ ...prev, [opponentId]: code }));
+  };
 
   const opponentKey = (g) => g.opponent_player_num ? `p:${g.opponent_player_num}` : `o:${g.opponent_id}`;
   const byOpponent = {};
@@ -223,6 +258,17 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
     <>
       <PageHeader title="Practice" />
       <div className="tab-content">
+        <div className="card">
+          <div className="card__title">Claim a Practice Identity</div>
+          <div style={{fontSize:11,color:"#999",lineHeight:1.5,marginBottom:8}}>
+            If someone shared a claim code for a practice opponent that represents you, enter it here. The person who created that opponent entry must approve your request.
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <input className="input input--code" value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
+            <button className="btn-primary" onClick={redeemClaimCode} disabled={!claimCodeInput.trim()||claimCodeBusy}>{claimCodeBusy?"Checking…":"Submit"}</button>
+          </div>
+          {claimCodeMessage && <div className="success-msg" style={{marginTop:8}}>{claimCodeMessage}</div>}
+        </div>
         {linkRequests.length > 0 && (
           <div className="card">
             <div className="card__title">Practice Identity Requests</div>
@@ -234,8 +280,13 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                 <div key={request.request_id} className="list-row" style={{alignItems:"center",gap:8}}>
                   <div className="list-row__body">
                     <div className="list-row__name">
-                      {incoming ? `@${request.requester_username || "player"} wants to claim ${request.opponent_name}`
-                        : `Request to @${request.target_username || "player"} for ${request.opponent_name}`}
+                      {incoming
+                        ? (request.link_type === "claim"
+                          ? `@${request.requester_username || "player"} wants to claim your ${request.opponent_name} entry`
+                          : `You were asked to link ${request.opponent_name} to @${request.requester_username || "player"}`)
+                        : (request.link_type === "claim"
+                          ? `Your claim for ${request.opponent_name} is awaiting owner approval`
+                          : `Request to @${request.target_username || "player"} for ${request.opponent_name}`)}
                     </div>
                     <div className="list-row__sub">
                       {pending ? (expired ? "Expired — awaiting cleanup" : incoming ? "Confirm this is you to connect their practice history" : "Waiting for their confirmation")
@@ -287,13 +338,25 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                           </div>
                         </div>
                         {isManual && !linked && (
-                          <button className="btn-icon" onClick={(e)=>{e.stopPropagation(); setLinkingKey(linkingKey===o.key?null:o.key);}}>Link</button>
+                          <div style={{display:"flex",gap:5}}>
+                            <button className="btn-icon" onClick={(e)=>{e.stopPropagation(); setLinkingKey(linkingKey===o.key?null:o.key);}}>Link Account</button>
+                            <button className="btn-icon" onClick={async (e)=>{e.stopPropagation(); await generateClaimCode(o.opponentId);}} disabled={generatingClaimCodeFor===o.opponentId}>
+                              {generatingClaimCodeFor===o.opponentId?"…":"Claim Code"}
+                            </button>
+                          </div>
                         )}
                         <ChevronRight size={14} color="#6A6A6A" />
                       </div>
                     </div>
                     {linkingKey === o.key && (
                       <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); refreshLinkRequests(); }} onCancel={() => setLinkingKey(null)} />
+                    )}
+                    {generatedClaimCodes[o.opponentId] && (
+                      <div className="readonly-bar" style={{marginTop:5,display:"flex",flexDirection:"column",gap:6}}>
+                        <span>Share this one-time claim code with the person represented by this opponent entry. It expires in 7 days.</span>
+                        <strong style={{fontSize:13,letterSpacing:1.2,wordBreak:"break-all"}}>{generatedClaimCodes[o.opponentId]}</strong>
+                        <button className="btn-secondary" onClick={() => navigator.clipboard?.writeText(generatedClaimCodes[o.opponentId])}>Copy Code</button>
+                      </div>
                     )}
                   </div>
                 );
