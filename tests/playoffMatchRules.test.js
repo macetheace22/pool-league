@@ -20,6 +20,21 @@ describe("IBA Rule 5.5 team match dead heats", () => {
     expect(resolveTeamMatchWinner({ homePoints: 500, awayPoints: 500, homeSets: 2, awaySets: 1, isPlayoff: true, completedSets: 3 })).toBeNull();
   });
 
+
+  it("uses the completed Gladiator set winner as the sudden-death match winner", () => {
+    expect(resolveTeamMatchWinner({
+      homePoints: 450, awayPoints: 470, homeSets: 1, awaySets: 2, isPlayoff: true,
+      completedSets: 3, gladiatorSet: { isGladiator: true, complete: true, winnerSlot: "home" },
+    })).toBe("home");
+  });
+
+  it("does not treat an unfinished Gladiator set as a match winner", () => {
+    expect(resolveTeamMatchWinner({
+      homePoints: 450, awayPoints: 470, homeSets: 1, awaySets: 2, isPlayoff: true,
+      completedSets: 3, gladiatorSet: { isGladiator: true, complete: false, winnerSlot: "home" },
+    })).toBe("away");
+  });
+
   it("fails closed if five completed sets do not produce a three-set winner", () => {
     expect(resolveTeamMatchWinner({ homePoints: 500, awayPoints: 500, homeSets: 2, awaySets: 2, isPlayoff: true, completedSets: 5 })).toBeNull();
   });
