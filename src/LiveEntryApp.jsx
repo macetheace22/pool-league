@@ -231,6 +231,8 @@ export default function LiveEntryApp() {
         return;
       }
       setMatch(m);
+      const savedGladiatorIndex = (m.sets ?? []).findIndex(set => set?.isGladiator);
+      if (savedGladiatorIndex >= 0) setActiveSet(savedGladiatorIndex);
       if (m.phase !== "archived") {
         setActiveSession({
           type: "live", ownerId: profile?.id, route: `/live?pairing=${encodeURIComponent(pairingId)}`,
@@ -849,7 +851,10 @@ function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
         used={used}
         onAssign={assignPlayer}
         onForfeit={forfeitSet}
-        onGladiator={onSave}
+        onGladiator={(updated) => {
+          setActiveSet(updated.gladiatorSetIndex ?? setIdx);
+          onSave(updated);
+        }}
       />
     </div>
   );
@@ -1007,7 +1012,7 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
     const gladiatorSet = createGladiatorSet(match.sets[setIdx], setIdx, homePlayer, awayPlayer, match.sets);
     if (!gladiatorSet) return;
     const sets = match.sets.map((set, index) => index === setIdx ? gladiatorSet : set);
-    onConfirm({ ...match, sets, gladiatorSetIndex: setIdx, gladiatorMatch: true, phase: "live", confirmedHome: false, confirmedAway: false });
+    onConfirm({ ...match, sets, gladiatorSetIndex: setIdx, gladiatorMatch: true, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1, phase: "live", confirmedHome: false, confirmedAway: false });
   };
   return (
     <div className="draft-step">
