@@ -1,11 +1,48 @@
 import { describe, it, expect } from "vitest";
-import { computeMvp, computeOfficialMvp } from "../src/db.js";
+import { computeMvp, computeOfficialMvp, prepareOfficialMvpStandings } from "../src/db.js";
 
 describe("official MVP source precedence", () => {
   it("uses imported ranking totals and positions without adding app match results", () => {
     const official = computeOfficialMvp([{player_num:"9",player_name:"Carol",total_points:500,mvp_ranking_points:700,position:3},{player_num:"8",player_name:"Dana",total_points:600,mvp_ranking_points:900,position:1}]);
     expect(official.map(x=>x.num)).toEqual(["8","9"]);
     expect(official.find(x=>x.num==="9")).toMatchObject({mvpRanking:700,rank:3,pointsScored:500});
+  });
+
+  it("accepts a complete MVP snapshot from one report week", () => {
+    const result = prepareOfficialMvpStandings([
+      { player_num:"9", player_name:"Carol", week_key:"2026-11-18", position:2 },
+      { player_num:"8", player_name:"Dana", week_key:"2026-11-18", position:1 },
+    ]);
+    expect(result.error).toBeUndefined();
+    expect(result.standings.map(row=>row.num)).toEqual(["8","9"]);
+  });
+
+  it("blocks MVP snapshots assembled from mixed or missing report weeks", () => {
+    expect(prepareOfficialMvpStandings([
+      { player_num:"9", player_name:"Carol", week_key:"2026-11-18", position:1 },
+      { player_num:"8", player_name:"Dana", week_key:"2026-11-11", position:2 },
+    ]).error).toMatch(/mixed or missing report weeks/i);
+    expect(prepareOfficialMvpStandings([
+      { player_num:"9", player_name:"Carol", week_key:null, position:1 },
+    ]).error).toMatch(/mixed or missing report weeks/i);
+  });
+
+  it("blocks missing, duplicate, and gapped official MVP positions", () => {
+    expect(prepareOfficialMvpStandings([
+      { player_num:"9", player_name:"Carol", week_key:"2026-11-18", position:null },
+    ]).error).toMatch(/missing or duplicate published positions/i);
+    expect(prepareOfficialMvpStandings([
+      { player_num:"9", player_name:"Carol", week_key:"2026-11-18", position:1 },
+      { player_num:"8", player_name:"Dana", week_key:"2026-11-18", position:1 },
+    ]).error).toMatch(/missing or duplicate published positions/i);
+    expect(prepareOfficialMvpStandings([
+      { player_num:"9", player_name:"Carol", week_key:"2026-11-18", position:1 },
+      { player_num:"8", player_name:"Dana", week_key:"2026-11-18", position:3 },
+    ]).error).toMatch(/gaps in its published positions/i);
+  });
+
+  it("treats an empty MVP snapshot as no report rather than an error", () => {
+    expect(prepareOfficialMvpStandings([])).toEqual({ standings: [] });
   });
 });
 

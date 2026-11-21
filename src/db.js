@@ -2476,6 +2476,28 @@ export function computeOfficialMvp(adjustments = []) {
   })).sort((a,b) => a.position == null ? (b.position == null ? 0 : 1) : b.position == null ? -1 : a.position-b.position);
 }
 
+// The MVP current-row view selects each player's latest import independently.
+// Never present a division ranking assembled from different IBA report weeks,
+// missing positions, or a broken published position sequence.
+export function prepareOfficialMvpStandings(adjustments = []) {
+  const rows = adjustments ?? [];
+  if (!rows.length) return { standings: [] };
+  const weekKeys = new Set(rows.map(row => String(row.week_key ?? "").trim()).filter(Boolean));
+  if (rows.some(row => !String(row.week_key ?? "").trim()) || weekKeys.size !== 1) {
+    return { error: "The imported MVP standings contain mixed or missing report weeks. Re-import the complete division MVP report before relying on these rankings." };
+  }
+  const positions = rows.map(row => row.position);
+  if (positions.some(position => !Number.isInteger(position) || position < 1) ||
+      new Set(positions).size !== positions.length) {
+    return { error: "The official IBA MVP report has missing or duplicate published positions. Correct the import before relying on these rankings." };
+  }
+  const sortedPositions = [...positions].sort((a, b) => a - b);
+  if (sortedPositions.some((position, index) => position !== index + 1)) {
+    return { error: "The official IBA MVP report has gaps in its published positions. Re-import the complete division report before relying on these rankings." };
+  }
+  return { standings: computeOfficialMvp(rows) };
+}
+
 // One player's own slice of computeMvp's scan -- same trusted formula the
 // real MVP standings use, just narrowed to a single player_num instead of
 // ranking everyone. Scoped to the player's CURRENT team's division (v1
@@ -2497,8 +2519,9 @@ export async function getMyStats(profile) {
 }
 
 // ─── Standings / MVP seed imports ───────────────────────────────────────────
-export async function listStandingsAdjustments(divisionId) {
-  const { data } = await supabase.from("standings_adjustments_current").select("*").eq("division_id", divisionId);
+export async function listStandingsAdjustments(divisionId, { strict = false } = {}) {
+  const { data, error } = await supabase.from("standings_adjustments_current").select("*").eq("division_id", divisionId);
+  if (error && strict) throw new Error(`Could not load official IBA standings: ${error.message}`);
   return data ?? [];
 }
 
@@ -2560,8 +2583,9 @@ export async function importStandingsForWeek(divisionId, rows, teams, weekTag) {
   return !error;
 }
 
-export async function listMvpAdjustments(divisionId) {
-  const { data } = await supabase.from("mvp_adjustments_current").select("*").eq("division_id", divisionId);
+export async function listMvpAdjustments(divisionId, { strict = false } = {}) {
+  const { data, error } = await supabase.from("mvp_adjustments_current").select("*").eq("division_id", divisionId);
+  if (error && strict) throw new Error(`Could not load official IBA MVP standings: ${error.message}`);
   return data ?? [];
 }
 // Player numbers are now validated against the real registry (players.num)

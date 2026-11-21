@@ -2763,6 +2763,8 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   const [matches, setMatches] = useState([]);
   const [standingsAdj, setStandingsAdj] = useState([]);
   const [mvpAdj, setMvpAdj] = useState([]);
+  const [officialStandingsResult, setOfficialStandingsResult] = useState(null);
+  const [officialMvpResult, setOfficialMvpResult] = useState(null);
   const [rule55AuditData, setRule55AuditData] = useState(null);
   const mvpTieBreakData = rule55AuditData;
   const [loading, setLoading] = useState(true);
@@ -2849,19 +2851,24 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
     setLoadError("");
     Promise.all([
       db.listCompletedMatches(divisionId),
-      db.listStandingsAdjustments(divisionId),
-      db.listMvpAdjustments(divisionId),
+      db.listStandingsAdjustments(divisionId, { strict: true }),
+      db.listMvpAdjustments(divisionId, { strict: true }),
+      db.computeFinalStandings(divisionId).catch(error => ({ error: error?.message || "Official IBA standings could not be validated. Try reloading the report." })),
       isManager ? db.getRule55TieBreakAuditData(divisionId, teams).catch(error => { console.error("Rule 5.5 audit data could not be loaded:", error); return null; }) : Promise.resolve(null),
-    ]).then(([m, sa, ma, auditData]) => {
+    ]).then(([m, sa, ma, standingsResult, auditData]) => {
       setMatches(m ?? []);
       setStandingsAdj(sa ?? []);
       setMvpAdj(ma ?? []);
+      setOfficialStandingsResult(standingsResult);
+      setOfficialMvpResult(db.prepareOfficialMvpStandings(ma ?? []));
       setRule55AuditData(auditData);
     }).catch(e => {
       setLoadError(e?.message || "Unable to load match history.");
       setMatches([]);
       setStandingsAdj([]);
       setMvpAdj([]);
+      setOfficialStandingsResult({ error: "Official IBA standings could not be validated. Try reloading the report." });
+      setOfficialMvpResult({ error: "Official IBA MVP standings could not be validated. Try reloading the report." });
     }).finally(() => setLoading(false));
   };
   useEffect(refresh, [divisionId, isManager, teams]);
@@ -3012,8 +3019,8 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   if (loading) return <Loader/>;
   if (loadError) return <div className="empty-state">{loadError}</div>;
 
-  const standings = db.computeOfficialStandings(standingsAdj);
-  const mvp = db.computeOfficialMvp(mvpAdj);
+  const standings = officialStandingsResult?.standings ?? [];
+  const mvp = officialMvpResult?.standings ?? [];
   const appStandings = db.computeStandings(matches, []);
   const appMvp = db.computeMvp(matches, []);
   const rule55Audit = rule55AuditData ? buildRule55TieBreakAudit({ officialStandings: standings, schedule: rule55AuditData.schedule, standingsHistory: rule55AuditData.standingsHistory, counterSnapshots: rule55AuditData.counterSnapshots }) : [];
@@ -3032,7 +3039,9 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
       {subTab==="standings" && (
         <>
           <div className="list">
-            {standings.length === 0 && <div className="empty-state" style={{border:"none"}}>No official IBA standings report has been imported for this division yet.</div>}
+            {officialStandingsResult?.error
+              ? <div className="empty-state" style={{border:"none"}}>{officialStandingsResult.error}</div>
+              : standings.length === 0 && <div className="empty-state" style={{border:"none"}}>No official IBA standings report has been imported for this division yet.</div>}
             {standings.length > 0 && <div className="list-row__sub" style={{padding:"8px 12px"}}>Official IBA standings{standings[0].reportLabel ? ` · ${standings[0].reportLabel}` : ""}</div>}
             {standings.map(t => (
               <div key={t.teamId} className="list-row"><div className="list-row__body">
@@ -3107,7 +3116,9 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
       {subTab==="mvp" && (
         <>
           <div className="list">
-            {mvp.length === 0 && <div className="empty-state" style={{border:"none"}}>No official IBA MVP report has been imported for this division yet.</div>}
+            {officialMvpResult?.error
+              ? <div className="empty-state" style={{border:"none"}}>{officialMvpResult.error}</div>
+              : mvp.length === 0 && <div className="empty-state" style={{border:"none"}}>No official IBA MVP report has been imported for this division yet.</div>}
             {mvp.length > 0 && <div className="list-row__sub" style={{padding:"8px 12px"}}>Official IBA MVP standings{mvp[0].reportLabel ? ` · ${mvp[0].reportLabel}` : ""}</div>}
             {mvp.map(p => (<div key={p.num} className="list-row"><div className="list-row__body">
               <span className="list-row__id">{p.position ?? "—"}</span>
