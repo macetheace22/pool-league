@@ -131,6 +131,7 @@ function usedPlayerNums(match) {
 function setDraftState(match, setIdx) {
   const set = match.sets[setIdx];
   if (set.complete) return "done";
+  if (match.sets.slice(0, setIdx).some(prior => prior?.isGladiator)) return "locked";
   if (set.playerHome && set.playerAway) return "live"; // both assigned, scoring in progress
   const setNum = setIdx + 1;
 
@@ -1186,13 +1187,19 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
 }
 
 function SetTabBar({ sets, activeSet, onSelect }) {
+  const gladiatorIndex = sets.findIndex(set => set.isGladiator);
   return (
     <div className="set-tabs">
-      {sets.map((s, i) => (
-        <button key={i} className={`set-tab ${i === activeSet ? "set-tab--active" : ""} ${s.complete ? "set-tab--done" : ""}`} onClick={() => onSelect(i)}>
-          {s.isGladiator ? "G" : s.complete ? <Check size={10} /> : i + 1}
-        </button>
-      ))}
+      {sets.map((s, i) => {
+        const locked = gladiatorIndex >= 0 && i > gladiatorIndex;
+        return (
+          <button key={i} disabled={locked}
+            className={`set-tab ${i === activeSet ? "set-tab--active" : ""} ${s.complete ? "set-tab--done" : ""} ${locked ? "set-tab--locked" : ""}`}
+            onClick={() => !locked && onSelect(i)}>
+            {s.isGladiator ? "G" : s.complete ? <Check size={10} /> : i + 1}
+          </button>
+        );
+      })}
     </div>
   );
 }
