@@ -14,8 +14,13 @@ export function toLinkedPracticeGame(game, owner = {}) {
     owner_display_name: owner.display_name ?? null,
     owner_player_num: owner.player_num ?? null,
     opponent_name: owner.display_name || game.opponent_name,
+    opponent_player_num: owner.player_num ?? null,
     my_score: game.opponent_score ?? 0,
     opponent_score: game.my_score ?? 0,
+    my_rating: game.opponent_rating ?? null,
+    opponent_rating: game.my_rating ?? null,
+    my_target: game.opponent_target ?? null,
+    opponent_target: game.my_target ?? null,
     winner: reversePracticeWinner(game.winner),
   };
 }
