@@ -516,7 +516,8 @@ describe("Section 101 practice opponent identity confirmation", () => {
     expect(sql).toContain("create table if not exists public.practice_opponent_link_requests");
     expect(sql).toContain("alter table public.practice_opponent_link_requests enable row level security");
     expect(sql).toContain("revoke all on public.practice_opponent_link_requests from public, anon, authenticated");
-    expect(sql).toContain("grant select, insert, update, delete on public.practice_opponent_link_requests to authenticated");
+    expect(sql).toContain("grant select on public.practice_opponent_link_requests to authenticated");
+    expect(sql).not.toContain("grant select, insert, update, delete on public.practice_opponent_link_requests");
     expect(sql).toContain("if v_owner <> (select auth.uid()) then");
     expect(sql).toContain("create unique index if not exists practice_opponent_link_requests_one_pending_per_opponent");
     expect(sql).toContain("r.requested_by = (select auth.uid())");
