@@ -1493,10 +1493,11 @@ function ConfirmScreen({ match, onSave }) {
 
   const homeSets = match.sets.filter((s) => s.complete && s.winnerSlot === "home").length;
   const awaySets = match.sets.filter((s) => s.complete && s.winnerSlot === "away").length;
-  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete);
-  const matchWinner = gladiatorSet
-    ? (gladiatorSet.winnerSlot === "home" ? match.teamHome.name : match.teamAway.name)
-    : (homeSets > awaySets ? match.teamHome.name : awaySets > homeSets ? match.teamAway.name : "Tie");
+  const completedSets = match.sets.filter(set => set.complete).length;
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
+  const { homePoints, awayPoints } = db.computeMatchPoints(match);
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
+  const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   const confirmSide = (side) => {
     onSave({ ...match, [side === "home" ? "confirmedHome" : "confirmedAway"]: true });
