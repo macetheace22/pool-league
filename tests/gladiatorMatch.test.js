@@ -23,9 +23,11 @@ describe("IBA Rule 5.5 Gladiator match", () => {
     expect(canOfferGladiatorMatch({ isPlayoff: true, sets, setIdx: 2, homePoints: 201, awayPoints: 200 })).toBe(false);
   });
 
-  it("requires the current set to be unassigned and unplayed", () => {
-    const assigned = sets.map((s, i) => i === 2 ? { ...s, playerHome: played("H3", "Home Three") } : s);
-    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: assigned, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
+  it("requires the current set to be unplayed", () => {
+    const completed = sets.map((s, i) => i === 2 ? { ...s, complete: true, winnerSlot: "home" } : s);
+    const rackStarted = sets.map((s, i) => i === 2 ? { ...s, racks: [{ home: 1, away: 0 }] } : s);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: completed, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
+    expect(canOfferGladiatorMatch({ isPlayoff: true, sets: rackStarted, setIdx: 2, homePoints: 200, awayPoints: 200 })).toBe(false);
   });
 
 
