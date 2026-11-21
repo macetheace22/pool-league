@@ -2496,6 +2496,48 @@ export function computeStandings(matches, adjustments = []) {
 // imported weeks use the report's own pre-computed ranking total instead of
 // guessing, since an import doesn't reveal which of a player's wins were
 // forfeits (which would change the bonus).
+// Section 5.6 audit: IBA's imported MVP ranking and position remain
+// authoritative. Infer the number of 125-point forfeit wins from the report
+// totals, then independently validate the published ranking without rewriting it.
+export function validateMvpImportRow(row = {}) {
+  const pointsScored = Number(row.total_points ?? row.pointsScored);
+  const wins = Number(row.wins);
+  const losses = Number(row.losses);
+  const publishedRankingPoints = Number(row.mvp_ranking_points ?? row.mvpRankingPoints);
+  const inferredForfeitWins = (pointsScored + 200 * wins - 200 * losses - publishedRankingPoints) / 200;
+  let issue = null;
+  if (![pointsScored, wins, losses, publishedRankingPoints].every(Number.isSafeInteger) ||
+      pointsScored < 0 || wins < 0 || losses < 0) {
+    issue = "Missing or invalid whole-number MVP totals.";
+  } else if (!Number.isSafeInteger(inferredForfeitWins) || inferredForfeitWins < 0 ||
+      inferredForfeitWins > wins || pointsScored < 125 * inferredForfeitWins) {
+    issue = "Published ranking does not reconcile with the Section 5.6 formula and 125-point forfeit credits.";
+  }
+  return {
+    valid: !issue,
+    issue,
+    inferredForfeitWins: issue ? null : inferredForfeitWins,
+    calculatedRankingPoints: issue ? null : pointsScored + 200 * (wins - inferredForfeitWins) - 200 * losses,
+    publishedRankingPoints: Number.isFinite(publishedRankingPoints) ? publishedRankingPoints : null,
+  };
+}
+
+export function validateMvpImportRows(rows = []) {
+  const results = (rows ?? []).map(row => ({
+    playerNum: row.player_num ?? row.playerNum ?? null,
+    playerName: row.player_name ?? row.playerName ?? "Unknown player",
+    position: row.position ?? null,
+    ...validateMvpImportRow(row),
+  }));
+  return {
+    total: results.length,
+    validCount: results.filter(row => row.valid).length,
+    invalidRows: results.filter(row => !row.valid),
+    inferredForfeitWins: results.reduce((sum, row) => sum + (row.inferredForfeitWins ?? 0), 0),
+    rows: results,
+  };
+}
+
 export function computeMvp(matches, adjustments = []) {
   const byPlayer = {}; // key -> { num, name, sets, wins, losses, forfeitWins, pointsScored, mvpRanking }
   const bump = (num, name) => { if (!byPlayer[num]) byPlayer[num] = { num, name, sets: 0, wins: 0, losses: 0, forfeitWins: 0, pointsScored: 0, mvpRanking: 0 }; };
@@ -2514,8 +2556,10 @@ export function computeMvp(matches, adjustments = []) {
         const winner = s.forfeitedBy === "home" ? away : home;
         const loser = s.forfeitedBy === "home" ? home : away;
         byPlayer[winner.num].wins++; byPlayer[winner.num].forfeitWins++;
-        byPlayer[winner.num].pointsScored += s.forfeitPoints ?? 0;
-        byPlayer[winner.num].mvpRanking += s.forfeitPoints ?? 0; // forfeit win: no +200 bonus
+        // Rule 5.6 sets the MVP credit for a forfeit win at 125 points,
+        // independent of the format-specific team-match forfeit score.
+        byPlayer[winner.num].pointsScored += 125;
+        byPlayer[winner.num].mvpRanking += 125; // no additional +200 win bonus
         byPlayer[loser.num].losses++;
         byPlayer[loser.num].mvpRanking -= 200;
         continue;

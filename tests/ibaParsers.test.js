@@ -69,6 +69,14 @@ describe("IBA parsers", () => {
     ]);
   });
 
+  it("parses compact MVP rows with an inferred 125-point forfeit win", () => {
+    const raw = "12345Joe Smith1510137001500";
+    expect(parseMvpImport(raw)[0]).toMatchObject({
+      playerNum:"12345", playerName:"Joe Smith", teamNum:"15101",
+      wins:3, losses:1, pointsScored:500, mvpRankingPoints:700, position:1,
+    });
+  });
+
   it("parses compact current MVP PDF rows and preserves player-number zeroes", () => {
     const raw = ["Plyr # Player Name Team Sets Won Total MVP Ranking Points Sets Lost Points Scored", "00609 Scott Peterson15103415200720", "27585 Mike Quackenbush15103414371837", "MVP Standings"].join("\n");
     expect(parseMvpImport(raw)).toEqual([
