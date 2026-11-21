@@ -33,6 +33,7 @@ set search_path = ''
 as $function$
 declare
   v_metadata jsonb;
+  v_metadata_full_name text;
   v_iba_name text;
   v_account_name_normalized text;
   v_iba_name_normalized text;
@@ -43,8 +44,22 @@ begin
     from auth.users u
     where u.id = new.id;
 
-    new.first_name := coalesce(nullif(trim(new.first_name), ''), nullif(trim(v_metadata->>'first_name'), ''));
-    new.last_name := coalesce(nullif(trim(new.last_name), ''), nullif(trim(v_metadata->>'last_name'), ''));
+    v_metadata_full_name := coalesce(
+      nullif(trim(v_metadata->>'full_name'), ''),
+      nullif(trim(v_metadata->>'name'), '')
+    );
+    new.first_name := coalesce(
+      nullif(trim(new.first_name), ''),
+      nullif(trim(v_metadata->>'first_name'), ''),
+      nullif(trim(v_metadata->>'given_name'), ''),
+      nullif(split_part(v_metadata_full_name, ' ', 1), '')
+    );
+    new.last_name := coalesce(
+      nullif(trim(new.last_name), ''),
+      nullif(trim(v_metadata->>'last_name'), ''),
+      nullif(trim(v_metadata->>'family_name'), ''),
+      nullif(regexp_replace(v_metadata_full_name, '^\\S+\\s*', ''), '')
+    );
   end if;
 
   new.first_name := nullif(trim(new.first_name), '');
