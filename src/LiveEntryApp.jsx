@@ -1050,7 +1050,7 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
         </select>
       </div>
       <div style={{fontSize:11,color:"#B7B7B7",lineHeight:1.5,marginBottom:10}}>
-        The selected repeat players will play this marked Gladiator set. It is scored normally. Once it is completed, the match proceeds to final confirmation; remaining sets stay unplayed and the positive rating bonus is suppressed.
+        The selected repeat players will play this marked Gladiator set using normal scoring. Once it is completed, the match proceeds to final confirmation. Any later sets remain unplayed; if a scheduled set remains unplayed, Section 6.10 suppresses the positive rating bonus.
       </div>
       <div style={{display:"flex",gap:8}}>
         <button className="btn-primary" disabled={!ready} onClick={submit} style={{flex:1}}>Start Gladiator Set</button>
