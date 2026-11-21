@@ -264,7 +264,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
             If someone shared a claim code for a practice opponent that represents you, enter it here. The person who created that opponent entry must approve your request.
           </div>
           <div style={{display:"flex",gap:8}}>
-            <input className="input input--code" value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="characters" />
+            <input className="input input--code" value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
             <button className="btn-primary" onClick={redeemClaimCode} disabled={!claimCodeInput.trim()||claimCodeBusy}>{claimCodeBusy?"Checking…":"Submit"}</button>
           </div>
           {claimCodeMessage && <div className="success-msg" style={{marginTop:8}}>{claimCodeMessage}</div>}
