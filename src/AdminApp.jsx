@@ -2851,8 +2851,8 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
     setLoadError("");
     Promise.all([
       db.listCompletedMatches(divisionId),
-      db.listStandingsAdjustments(divisionId),
-      db.listMvpAdjustments(divisionId),
+      db.listStandingsAdjustments(divisionId, { strict: true }),
+      db.listMvpAdjustments(divisionId, { strict: true }),
       db.computeFinalStandings(divisionId).catch(error => ({ error: error?.message || "Official IBA standings could not be validated. Try reloading the report." })),
       isManager ? db.getRule55TieBreakAuditData(divisionId, teams).catch(error => { console.error("Rule 5.5 audit data could not be loaded:", error); return null; }) : Promise.resolve(null),
     ]).then(([m, sa, ma, standingsResult, auditData]) => {
