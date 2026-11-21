@@ -607,16 +607,16 @@ describe("Section 102 practice opponent claim codes", () => {
     }
   });
 
-  it("exposes claim-code APIs and self-service Practice UI", () => {
+  it("exposes claim-code APIs in Profile while keeping opponent-specific code generation in Practice", () => {
     const db = read("src/db.js");
     const practice = read("src/Practice.jsx");
     const admin = read("src/AdminApp.jsx");
     expect(db).toContain('supabase.rpc("create_practice_opponent_claim_code"');
     expect(db).toContain('supabase.rpc("redeem_practice_opponent_claim_code"');
-    expect(practice).toContain("Claim a Practice Identity");
-    expect(practice).toContain("The owner must approve.");
+    expect(admin).toContain("Claim a Practice Identity");
+    expect(admin).toContain("The owner must approve before the practice history is linked.");
     expect(practice).toContain("generateClaimCode(o.opponentId)");
-    expect(practice).toContain("request.link_type === \"claim\"");
+    expect(admin).toContain('request.link_type === "claim"');
     expect(admin).toContain("respondToPracticeLinkRequest(request.request_id,true)");
   });
 });
@@ -699,7 +699,7 @@ describe("Section 105 account full names and identity validation", () => {
     expect(db).toContain('"list_linked_practice_game_owners"');
     expect(db).toContain("opponent_name: linkedName");
     expect(db).toContain('return "FULL_NAME_REQUIRED"');
-    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
+    expect(admin).toContain("respondToPracticeLinkRequest(request.request_id,true)");
     expect(db).not.toContain(".update({ opponent_name:");
   });
 
