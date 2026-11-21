@@ -176,6 +176,30 @@ export function buildSeasonalTournamentBracket(tournamentType, orderedTeams) {
   }
 
   const bracketSize = byePlan.bracketSize;
+  if (rankedTeams.length === 1) {
+    const team = rankedTeams[0];
+    return {
+      tournamentType,
+      qualifiedTeamCount: 1,
+      bracketSize: 1,
+      byePlan,
+      entries: [{
+        teamId: team.teamId,
+        divisionId: team.divisionId,
+        seedNum: 1,
+        seedCategory: team.seedCategory,
+        seedCategorySource: team.seedCategorySource ?? "rulebook_derived",
+        divisionPosition: team.position ?? team.divisionFinishPosition ?? null,
+        receivedByeHistory: team.seedCategory === "consolation_champion_after_bye"
+          ? true
+          : team.seedCategory === "consolation_champion_back_to_back_wins"
+            ? false
+            : null,
+      }],
+      matches: [],
+      championTeamId: team.teamId,
+    };
+  }
   const rounds = bracketSize > 1 ? Math.log2(bracketSize) : 0;
   const byeIds = new Set(byePlan.awardedTeamIds);
   const byeTeams = rankedTeams.filter(team => byeIds.has(team.teamId));
