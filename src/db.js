@@ -5,7 +5,7 @@ import { buildRosterSyncPlan } from "./rosterReconciliation";
 import { toLinkedPracticeGame } from "./practiceHistory";
 import { normalizeImportedPlayoffBracket } from "./ibaPlayoffBrackets";
 import { buildSeasonalQualificationSnapshot, buildSeasonalSeedingInputs } from "./seasonalQualification";
-import { buildSeasonalTournamentPlans } from "./seasonalTournamentSeeding";
+import { buildSeasonalTournamentPlans, buildSeasonalTournamentBracket } from "./seasonalTournamentSeeding";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -531,6 +531,35 @@ export async function getSeasonalQualificationSnapshot(seasonId) {
   const error = results.find(row => row.error)?.error;
   return { error: error ?? null, divisions: results, tournaments: error ? null : buildSeasonalTournamentPlans(results) };
 }
+export async function listSeasonalTournaments(seasonId) {
+  const { data, error } = await supabase.from("seasonal_tournaments")
+    .select("*").eq("season_id", seasonId).order("tournament_type");
+  if (error) throw error;
+  return Promise.all((data ?? []).map(async tournament => {
+    const [entriesResult, matchesResult] = await Promise.all([
+      supabase.from("seasonal_tournament_entries").select("*, teams(name, team_num)").eq("tournament_id", tournament.id).order("seed_num"),
+      supabase.from("seasonal_tournament_matches").select("*").eq("tournament_id", tournament.id).order("round_num").order("slot_num"),
+    ]);
+    if (entriesResult.error) throw entriesResult.error;
+    if (matchesResult.error) throw matchesResult.error;
+    return { ...tournament, entries: entriesResult.data ?? [], matches: matchesResult.data ?? [] };
+  }));
+}
+
+export async function createSeasonalTournament(seasonId, tournamentType, orderedTeams) {
+  const bracket = buildSeasonalTournamentBracket(tournamentType, orderedTeams);
+  if (bracket.error) return { error: bracket.error, byePlan: bracket.byePlan ?? null };
+  const { data, error } = await supabase.rpc("create_seasonal_tournament", {
+    p_season_id: seasonId,
+    p_tournament_type: tournamentType,
+    p_entries: bracket.entries,
+    p_matches: bracket.matches,
+    p_champion_team_id: bracket.championTeamId,
+  });
+  if (error) return { error: error.message };
+  return { ok: true, tournamentId: data, bracket };
+}
+
 export async function listPlayoffBrackets(divisionId) {
   const { data } = await supabase.from("playoff_matches").select("*, schedule_pairings(id)")
     .eq("division_id", divisionId).order("bracket_group").order("round").order("slot_num");
