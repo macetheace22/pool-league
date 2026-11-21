@@ -99,6 +99,7 @@ export async function setOwnPlayerNumber(playerNum) {
   if (!error) return { ok: true };
   if (error.message?.includes("PLAYER_NOT_FOUND")) return { ok: false, reason: "not_found" };
   if (error.message?.includes("PLAYER_ALREADY_CLAIMED")) return { ok: false, reason: "already_claimed" };
+  if (error.message?.includes("PLAYER_NAME_MISMATCH")) return { ok: false, reason: "name_mismatch" };
   return { ok: false, reason: "error" };
 }
 // Manager-only self-service: sets or clears the manager's own team_id (the
