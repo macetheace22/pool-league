@@ -689,6 +689,7 @@ describe("Section 105 account full names and identity validation", () => {
   it("uses full names for both sides of linked practice history without rewriting saved games", () => {
     const sql = read("supabase-schema-section-105-account-full-names-and-identity-validation.sql");
     const db = read("src/db.js");
+    const practice = read("src/Practice.jsx");
     expect(sql).toContain("public.list_linked_practice_game_owners");
     expect(sql).toContain("public.list_linked_practice_opponent_names");
     expect(db).toContain('supabase.rpc("list_linked_practice_opponent_names"');
