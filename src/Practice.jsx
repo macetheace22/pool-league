@@ -183,7 +183,24 @@ export default function Practice() {
       data: { phase: nextPhase, startedByUser: true, session: practiceSessionSnapshot(session) },
     });
   };
-  const cancelSession = () => { clearActiveSession(); setSessionState(null); setPhase("landing"); };
+  const cancelSession = () => {
+    if (session?.gameId) {
+      const confirmed = window.confirm(
+        "Leave Practice setup? Your unfinished session and all saved results will be kept. You can resume it from Practice > Practice Session in Progress. To permanently delete it, choose Discard Practice instead."
+      );
+      if (!confirmed) return;
+    }
+    clearActiveSession();
+    setSessionState(null);
+    setPhase("landing");
+    refreshUnfinishedGames();
+  };
+  const returnToSetup = () => {
+    const confirmed = window.confirm(
+      "Return to setup? Your unfinished practice session and saved results will be kept. You can resume it later from Practice > Practice Session in Progress. This will not delete your session."
+    );
+    if (confirmed) changePhase("config");
+  };
   const discardSession = async () => {
     if (!session?.gameId || !profile?.id) return;
     const confirmed = window.confirm("Discard this practice session? All saved game results and Track a Rack shot details for this unfinished session will be permanently deleted.");
@@ -249,7 +266,7 @@ export default function Practice() {
   }
   if (phase === "play") {
     return wrap(<PlayStep profile={profile} session={session} setSession={setSession}
-      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={() => changePhase("config")} onDiscard={discardSession} />);
+      onDone={(finalSession) => { setSessionState(finalSession); setPhase("done"); setActiveSession({ type: "practice", route: "/practice", title: "Saving practice result", subtitle: finalSession.opponentName, data: { phase: "done", session: practiceSessionSnapshot(finalSession) } }); }} onBack={returnToSetup} onDiscard={discardSession} />);
   }
   if (phase === "done") {
     return wrap(<DoneStep profile={profile} session={session}
