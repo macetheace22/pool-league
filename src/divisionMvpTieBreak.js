@@ -12,10 +12,12 @@ function individualSetPoints(set, side, format) {
   const isMasters = String(format ?? "masters").toLowerCase() === "masters";
   const isOpen = String(format ?? "masters").toLowerCase() === "open";
   const fixedTarget = isOpen ? 45 : 50;
-  const unrated = home.rating == null || away.rating == null ||
-    Number(home.rating) <= 0 || Number(away.rating) <= 0;
-  const targetHome = unrated ? fixedTarget : Number(home.rating);
-  const targetAway = unrated ? fixedTarget : Number(away.rating);
+  const homeRating = Number(home.rating);
+  const awayRating = Number(away.rating);
+  const unrated = !Number.isFinite(homeRating) || homeRating <= 0 ||
+    !Number.isFinite(awayRating) || awayRating <= 0;
+  const targetHome = unrated ? fixedTarget : homeRating;
+  const targetAway = unrated ? fixedTarget : awayRating;
   const runHome = (set.racks ?? []).reduce((sum, rack) => sum + Number(rack.home ?? 0), 0);
   const runAway = (set.racks ?? []).reduce((sum, rack) => sum + Number(rack.away ?? 0), 0);
   let homePoints = 0, awayPoints = 0;
@@ -140,25 +142,42 @@ export function buildDivisionMvpTieBreakAudit({ officialMvp = [], matches = [], 
   const hasHeadToHead = rows.some(row => row.headToHeadStatus !== "No regular-season head-to-head set found");
   let outcome = "insufficient-data";
   let explanation = "Available match or rating data is incomplete; the tie-break cannot be determined from the records currently stored.";
+  let winnerNum = null;
+  let winnerName = null;
   const headToHeadComplete = headToHeadValues.every(value => value != null);
-  const headToHeadResolved = headToHeadComplete && hasHeadToHead && new Set(headToHeadValues).size > 1;
-  const headToHeadTied = headToHeadComplete && hasHeadToHead && new Set(headToHeadValues).size === 1;
+  const headToHeadRanked = rows.filter(row => row.headToHeadPoints != null)
+    .sort((a, b) => b.headToHeadPoints - a.headToHeadPoints);
+  const headToHeadResolved = headToHeadComplete && hasHeadToHead &&
+    headToHeadRanked.length === rows.length &&
+    headToHeadRanked[0].headToHeadPoints > headToHeadRanked[1].headToHeadPoints;
+  const headToHeadUnresolved = headToHeadComplete && hasHeadToHead && !headToHeadResolved;
 
   if (headToHeadResolved) {
     outcome = "head-to-head-points";
-    explanation = "The player with more individual points in their regular-season head-to-head set(s) wins.";
-  } else if (!hasHeadToHead || (headToHeadTied && headToHeadComplete)) {
-    const ratings = rows.map(row => row.averageOpponentRating);
-    if (ratings.every(value => value != null)) {
-      const difference = Math.abs(ratings[0] - ratings[1]);
+    winnerNum = headToHeadRanked[0].num;
+    winnerName = headToHeadRanked[0].name;
+    explanation = `${winnerName} has the most individual points in regular-season head-to-head sets.`;
+  } else if (!hasHeadToHead || headToHeadUnresolved) {
+    const ratings = rows.filter(row => row.averageOpponentRating != null)
+      .sort((a, b) => b.averageOpponentRating - a.averageOpponentRating);
+    if (ratings.length === rows.length) {
+      const difference = ratings[0].averageOpponentRating - ratings[1].averageOpponentRating;
       if (difference >= 5) {
         outcome = "opponent-rating-average";
-        explanation = "The player with the higher average opponent rating wins (difference of at least 5).";
-      } else {
+        winnerNum = ratings[0].num;
+        winnerName = ratings[0].name;
+        explanation = `${winnerName} has the higher average opponent rating by at least 5 points.`;
+      } else if (rows.length === 2) {
         outcome = "single-set-playoff-required";
         explanation = "The head-to-head and opponent-rating tie-breaks do not resolve the tie; a single set is required.";
+      } else {
+        outcome = "multi-player-review-required";
+        explanation = "More than two players remain tied and the rulebook does not specify a multi-player playoff format; League Office review is required.";
       }
     }
+  } else if (rows.length > 2 && hasHeadToHead && !headToHeadComplete) {
+    outcome = "insufficient-data";
+    explanation = "Head-to-head scoring is incomplete for the multi-player tie; the comparison cannot be resolved safely.";
   }
-  return [{ players: rows, outcome, explanation }];
+  return [{ players: rows, outcome, explanation, winnerNum, winnerName }];
 }
