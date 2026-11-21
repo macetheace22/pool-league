@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as db from "./db";
 import { toPracticeResultPerspective } from "./practiceHistory";
+import { toPlayerMatchPerspective } from "./leagueMatchPerspective";
 import { ChevronLeft, ChevronRight, FileText, Table as TableIcon, X } from "lucide-react";
 
 const TEAM_RATING_LIMIT = 325; // only used in open/advanced
