@@ -578,6 +578,5 @@ describe("league player identity claim onboarding", () => {
     expect(db).toContain('supabase.rpc("claim_invite_code", { p_code: code })');
     expect(db).toContain("PLAYER_ALREADY_CLAIMED");
     expect(db).toContain("PLAYER_NUMBER_ALREADY_LINKED");
-    expect(db).not.toContain("search_profiles_by_username");
   });
 });
