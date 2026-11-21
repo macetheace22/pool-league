@@ -351,6 +351,9 @@ begin
 end;
 $function$;
 
+-- Section 101 already created this function with a different return shape.
+-- PostgreSQL cannot change a function's OUT/RETURNS TABLE signature via
+-- CREATE OR REPLACE, so explicitly drop the old zero-argument overload first.
 drop function if exists public.list_practice_opponent_link_requests();
 
 create function public.list_practice_opponent_link_requests()
