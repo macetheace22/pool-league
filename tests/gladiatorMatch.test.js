@@ -3,8 +3,8 @@ import { canOfferGladiatorMatch, createGladiatorSet, gladiatorPlayerChoices } fr
 
 const played = (num, name) => ({ num, name, rating: 70 });
 const sets = [
-  { setNum: 1, complete: true, playerHome: played("H1", "Home One"), playerAway: played("A1", "Away One") },
-  { setNum: 2, complete: true, playerHome: played("H2", "Home Two"), playerAway: played("A2", "Away Two") },
+  { setNum: 1, complete: true, winnerSlot: "home", playerHome: played("H1", "Home One"), playerAway: played("A1", "Away One") },
+  { setNum: 2, complete: true, winnerSlot: "away", playerHome: played("H2", "Home Two"), playerAway: played("A2", "Away Two") },
   { setNum: 3, complete: false, playerHome: null, playerAway: null },
   { setNum: 4, complete: false, playerHome: null, playerAway: null },
   { setNum: 5, complete: false, playerHome: null, playerAway: null },
