@@ -575,8 +575,8 @@ describe("Section 101 practice opponent identity confirmation", () => {
     expect(db).not.toContain("export async function linkPracticeOpponent(");
     expect(practice).toContain("they must confirm before your practice history is linked.");
     expect(practice).toContain("Practice Identity Requests");
-    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
-    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, false)");
+    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
+    expect(practice).toContain("respondToLinkRequest(request.request_id, false)");
     expect(practice).toContain("db.cancelPracticeOpponentLinkRequest(request.request_id)");
   });
 });
@@ -615,7 +615,7 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(practice).toContain("The owner must approve.");
     expect(practice).toContain("generateClaimCode(o.opponentId)");
     expect(practice).toContain("request.link_type === \"claim\"");
-    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
+    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
   });
 });
 
