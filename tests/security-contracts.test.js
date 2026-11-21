@@ -846,3 +846,36 @@ describe("seasonal tournament bracket security contracts", () => {
     expect(admin).toContain("The saved seed order and bracket are retained");
   });
 });
+
+
+describe("Section 103 seasonal tournament source invalidation", () => {
+  it("flags unfinished seasonal brackets for manager review when official standings or playoff records change", () => {
+    const sql = read("supabase-schema-section-103-invalidate-seasonal-tournaments-on-source-change.sql");
+    expect(sql).toContain("status in ('confirmed', 'in_progress', 'needs_review', 'completed', 'cancelled')");
+    expect(sql).toContain("review_required_at");
+    expect(sql).toContain("review_reason");
+    expect(sql).toContain("after insert or update or delete on public.playoff_matches");
+    expect(sql).toContain("after insert or update or delete on public.standings_adjustments");
+    expect(sql).toContain("status in ('confirmed', 'in_progress')");
+    expect(sql).toContain("security definer");
+    expect(sql).toContain("create policy seasonal_tournaments_manager_update");
+    expect(sql).toContain("grant update (status, review_required_at, review_reason)");
+  });
+
+  it("does not rewrite or delete saved seasonal tournament matches during invalidation", () => {
+    const sql = read("supabase-schema-section-103-invalidate-seasonal-tournaments-on-source-change.sql");
+    expect(sql).not.toMatch(/update public\\.seasonal_tournament_matches/i);
+    expect(sql).not.toMatch(/delete from public\\.seasonal_tournament_matches/i);
+    const admin = read("src/AdminApp.jsx");
+    expect(admin).toContain("Manager review required");
+    expect(admin).toContain("The saved bracket and all recorded results remain unchanged");
+    expect(admin).toContain("Reconciliation must be explicitly approved by the manager");
+  });
+
+  it("uses the canonical playoff match records regardless of whether results were imported or live-scored", () => {
+    const db = read("src/db.js");
+    expect(db).toContain('supabase.from("playoff_matches").update({ winner_team_id: winnerTeamId, winner_seed: winnerSeed })');
+    expect(db).toContain("advancePlayoffBracket(schedulePairingId, winnerTeamId)");
+    expect(db).toContain('supabase.from("completed_matches").insert(row)');
+  });
+});
