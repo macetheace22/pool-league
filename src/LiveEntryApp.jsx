@@ -361,7 +361,8 @@ export default function LiveEntryApp() {
         const completedSets = marked.sets.filter(s => s.complete).length;
         const homeSets = marked.sets.filter(s => s.complete && s.winnerSlot === "home").length;
         const awaySets = marked.sets.filter(s => s.complete && s.winnerSlot === "away").length;
-        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets });
+        const gladiatorSet = marked.sets.find(set => set.isGladiator && set.complete) ?? null;
+        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets, gladiatorSet });
         const winnerId = winnerSlot === "home" ? marked.teamHome?.id : winnerSlot === "away" ? marked.teamAway?.id : null;
 
         // Scheduled league matches use one database transaction for archive
@@ -977,8 +978,8 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel }) {
   const [awayNoPlayer, setAwayNoPlayer] = useState(false);
   const [homeNum, setHomeNum] = useState("");
   const [awayNum, setAwayNum] = useState("");
-  const homeChoices = gladiatorPlayerChoices(match.sets, setIdx, "home");
-  const awayChoices = gladiatorPlayerChoices(match.sets, setIdx, "away");
+  const homeChoices = gladiatorPlayerChoices(match.sets, setIdx, "home").filter(player => !playoffIneligibleReason(match, player));
+  const awayChoices = gladiatorPlayerChoices(match.sets, setIdx, "away").filter(player => !playoffIneligibleReason(match, player));
   const homePlayer = homeChoices.find(player => String(player.num) === homeNum);
   const awayPlayer = awayChoices.find(player => String(player.num) === awayNum);
   const ready = homeNoPlayer && awayNoPlayer && !!homePlayer && !!awayPlayer;
@@ -1188,7 +1189,7 @@ function SetTabBar({ sets, activeSet, onSelect }) {
     <div className="set-tabs">
       {sets.map((s, i) => (
         <button key={i} className={`set-tab ${i === activeSet ? "set-tab--active" : ""} ${s.complete ? "set-tab--done" : ""}`} onClick={() => onSelect(i)}>
-          {s.complete ? <Check size={10} /> : i + 1}
+          {s.isGladiator ? "G" : s.complete ? <Check size={10} /> : i + 1}
         </button>
       ))}
     </div>
@@ -1482,9 +1483,12 @@ function ConfirmScreen({ match, onSave }) {
   const [noteHome, setNoteHome] = useState("");
   const [noteAway, setNoteAway] = useState("");
 
-  const homeSets = match.sets.filter((s) => s.winnerSlot === "home").length;
-  const awaySets = match.sets.filter((s) => s.winnerSlot === "away").length;
-  const matchWinner = homeSets > awaySets ? match.teamHome.name : awaySets > homeSets ? match.teamAway.name : "Tie";
+  const homeSets = match.sets.filter((s) => s.complete && s.winnerSlot === "home").length;
+  const awaySets = match.sets.filter((s) => s.complete && s.winnerSlot === "away").length;
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete);
+  const matchWinner = gladiatorSet
+    ? (gladiatorSet.winnerSlot === "home" ? match.teamHome.name : match.teamAway.name)
+    : (homeSets > awaySets ? match.teamHome.name : awaySets > homeSets ? match.teamAway.name : "Tie");
 
   const confirmSide = (side) => {
     onSave({ ...match, [side === "home" ? "confirmedHome" : "confirmedAway"]: true });
@@ -1623,7 +1627,7 @@ function FinalSubmitScreen({ match, onSave, homeSets, awaySets, matchWinner }) {
         {match.sets.map((s) => (
           <div key={s.setNum} className="sets-summary__row">
             <span className={`sets-summary__name ${s.winnerSlot === "home" ? "sets-summary__name--won" : ""}`}>{s.playerHome?.name}</span>
-            <span className="sets-summary__score">{liveSetDisposition(s, !!match.makeup) ?? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}`}</span>
+            <span className="sets-summary__score">{s.isGladiator ? "GLADIATOR · " : ""}{liveSetDisposition(s, !!match.makeup) ?? `${runningTotal(s.racks, "home")}–${runningTotal(s.racks, "away")}`}</span>
             <span className={`sets-summary__name sets-summary__name--right ${s.winnerSlot === "away" ? "sets-summary__name--won" : ""}`}>{s.playerAway?.name}</span>
           </div>
         ))}
