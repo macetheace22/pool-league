@@ -1,6 +1,6 @@
 import * as db from "./db";
 import { classifyIbaReportImport, getValidatedScheduleWeekTag } from "./ibaImportValidation";
-import { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseLeagueRoster, parseStandingsImport, parseMvpImport } from "./ibaParsers";
+import { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseLeagueRoster, parseStandingsImport, parseMvpImport, parseIbaPlayoffBrackets } from "./ibaParsers";
 
 const FORMAT_TO_CODE = { masters: "mast", advanced: "adv", open: "open" };
 const DAY_TO_CODE = { monday: "mon", tuesday: "tues", wednesday: "wed", thursday: "thur", friday: "fri", saturday: "sat", sunday: "sun" };
@@ -348,6 +348,7 @@ export async function importIbaReports(reports, season, schedule, preflight) {
     roster: { updatedDivisions: [], unmatchedTeams: [], ambiguousTeamIds: [], warnings: [], eligibilityImported: 0 },
     standings: { imported: 0, skipped: [] },
     mvp: { imported: 0, skipped: [] },
+    playoffs: { reconciled: 0, unchanged: 0, reviewRequired: 0, warnings: [] },
     warnings: [],
     skippedDuplicateDivisions: preflight.checks
       .filter(check => check.status === "duplicate")

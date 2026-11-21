@@ -3,6 +3,7 @@ import { getActiveTeamIds, getCaptainTeamIds } from "./teamMembership";
 import { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 import { buildRosterSyncPlan } from "./rosterReconciliation";
 import { toLinkedPracticeGame } from "./practiceHistory";
+import { normalizeImportedPlayoffBracket } from "./ibaPlayoffBrackets";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -390,6 +391,109 @@ export async function generateConsolationBrackets(divisionId, brackets) {
     ]);
   }
   return true;
+}
+
+export async function reconcileIbaPlayoffBrackets(divisionId, importedBrackets) {
+  if (!divisionId || !Array.isArray(importedBrackets) || !importedBrackets.length) {
+    return { status: "no_imported_brackets", updated: 0, unchanged: 0, conflicts: [] };
+  }
+
+  const { data: teams, error: teamsError } = await supabase
+    .from("teams")
+    .select("id, team_num, name")
+    .eq("division_id", divisionId);
+  if (teamsError) return { status: "blocked", updated: 0, unchanged: 0, conflicts: [{ reason: teamsError.message }] };
+
+  const teamByNum = Object.fromEntries((teams ?? []).map(team => [String(team.team_num).trim(), team]));
+  const existing = await listPlayoffBrackets(divisionId);
+  const completed = new Set();
+  const { data: completedRows } = await supabase
+    .from("completed_matches")
+    .select("id, state")
+    .eq("division_id", divisionId);
+  for (const row of completedRows ?? []) {
+    const pairingId = row?.state?.schedulePairingId ?? row?.state?.schedule_pairing_id;
+    if (pairingId) completed.add(String(pairingId));
+  }
+
+  const imported = importedBrackets.map(normalizeImportedPlayoffBracket);
+  const importedChampionship = imported.find(b => b.bracketType === "championship");
+  const importedConsolation = imported.filter(b => b.bracketType === "consolation");
+  const existingChampionship = existing.filter(m => m.bracket_type === "championship" && m.round === "semifinal")
+    .sort((a, b) => Number(a.slot_num) - Number(b.slot_num));
+  const existingConsolation = existing.filter(m => m.bracket_type === "consolation" && m.round === "semifinal")
+    .sort((a, b) => String(a.bracket_group).localeCompare(String(b.bracket_group)) || Number(a.slot_num) - Number(b.slot_num));
+
+  const conflicts = [];
+  let updated = 0;
+  let unchanged = 0;
+
+  const reconcileOne = async (label, importedBracket, matches) => {
+    if (!importedBracket) return;
+    if (importedBracket.firstRoundMatches.length !== matches.length) {
+      conflicts.push({ bracket: label, reason: "IBA bracket has a different number of first-round matches than the provisional bracket.", importedCount: importedBracket.firstRoundMatches.length, generatedCount: matches.length });
+      return;
+    }
+    for (let i = 0; i < matches.length; i++) {
+      const source = importedBracket.firstRoundMatches[i];
+      const target = matches[i];
+      const home = teamByNum[String(source.teamNumHome).trim()];
+      const away = teamByNum[String(source.teamNumAway).trim()];
+      if (!home || !away) {
+        conflicts.push({ bracket: label, slot: i + 1, reason: "IBA bracket references a team number that is not mapped to this division.", teamNumHome: source.teamNumHome, teamNumAway: source.teamNumAway });
+        continue;
+      }
+
+      const same = String(target.team_home_id) === String(home.id) &&
+        String(target.team_away_id) === String(away.id) &&
+        Number(target.seed_home) === Number(source.seedHome) &&
+        Number(target.seed_away) === Number(source.seedAway);
+      if (same) {
+        unchanged++;
+        continue;
+      }
+
+      if (target.schedule_pairing_id && completed.has(String(target.schedule_pairing_id))) {
+        conflicts.push({ bracket: label, slot: i + 1, reason: "The IBA bracket differs from a completed playoff matchup; the completed result was preserved.", matchId: target.id });
+        continue;
+      }
+
+      const { error: matchError } = await supabase.from("playoff_matches").update({
+        seed_home: source.seedHome,
+        seed_away: source.seedAway,
+        team_home_id: home.id,
+        team_away_id: away.id,
+      }).eq("id", target.id);
+      if (matchError) {
+        conflicts.push({ bracket: label, slot: i + 1, reason: matchError.message });
+        continue;
+      }
+
+      if (target.schedule_pairing_id) {
+        const { error: pairingError } = await supabase.from("schedule_pairings").update({
+          home_team_id: home.id,
+          away_team_id: away.id,
+        }).eq("id", target.schedule_pairing_id);
+        if (pairingError) {
+          conflicts.push({ bracket: label, slot: i + 1, reason: pairingError.message });
+          continue;
+        }
+      }
+      updated++;
+    }
+  };
+
+  await reconcileOne("championship", importedChampionship, existingChampionship);
+  for (let i = 0; i < importedConsolation.length; i++) {
+    await reconcileOne(`consolation-${i + 1}`, importedConsolation[i], existingConsolation.slice(i * 2, i * 2 + 2));
+  }
+
+  return {
+    status: conflicts.length ? "review_required" : "reconciled",
+    updated,
+    unchanged,
+    conflicts,
+  };
 }
 
 export async function listPlayoffBrackets(divisionId) {
