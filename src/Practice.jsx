@@ -356,9 +356,9 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                     {linkingKey === o.key && (
                       <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); refreshLinkRequests(); }} onCancel={() => setLinkingKey(null)} />
                     )}
-                    {generatedClaimCodes[o.opponentId] && (
+                    {!linked && generatedClaimCodes[o.opponentId] && (
                       <div className="readonly-bar" style={{marginTop:5,display:"flex",flexDirection:"column",gap:6}}>
-                        <span>Share this one-time claim code with the person represented by this opponent entry. It expires in 7 days.</span>
+                        <span>Share this code with the player. Expires in 7 days.</span>
                         <strong style={{fontSize:13,letterSpacing:1.2,wordBreak:"break-all"}}>{generatedClaimCodes[o.opponentId]}</strong>
                         <button className="btn-secondary" onClick={() => navigator.clipboard?.writeText(generatedClaimCodes[o.opponentId])}>Copy Code</button>
                       </div>
