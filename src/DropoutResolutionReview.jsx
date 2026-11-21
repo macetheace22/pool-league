@@ -90,7 +90,7 @@ export default function DropoutResolutionReview() {
 
   if (profile?.role !== "manager") return <AccessDenied />;
   return (
-    <div style={shellCss}>
+    <div className="app"><style>{shellCss}</style>
       <PageHeader title="Team Dropout Resolution" subtitle="Rule 8.7 — record management's chosen remedy without rewriting match history" />
       <div className="admin-card">
         <div className="form-grid">
