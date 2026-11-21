@@ -794,8 +794,9 @@ describe("Section 102 seasonal tournament bracket persistence", () => {
     expect(sql).toContain("alter table public.seasonal_tournament_matches enable row level security");
     expect(sql).toContain("revoke all on public.seasonal_tournaments from public, anon, authenticated");
     expect(sql).toContain("grant select on public.seasonal_tournaments to authenticated");
-    expect(sql).toContain("public.current_role_name()) <> 'manager'");
-    expect(sql).toContain("grant execute on function public.create_seasonal_tournament(uuid, text, jsonb, jsonb, uuid) to authenticated");
+    expect(sql).toContain("public.current_role_name()) is distinct from 'manager'");
+    expect(sql).toContain("grant execute on function public.create_seasonal_tournament(uuid, text, jsonb, jsonb, uuid)");
+    expect(sql).toContain("to authenticated;");
     expect(sql).toContain("TOURNAMENT_ALREADY_EXISTS");
     expect(sql).toContain("FIRST_ROUND_ENTRIES_MUST_APPEAR_EXACTLY_ONCE");
   });
