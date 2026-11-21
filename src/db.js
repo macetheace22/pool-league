@@ -2778,14 +2778,28 @@ export async function listMyPracticeOpponents(profileId) {
 }
 // Reuses an existing opponent with the same name (case-insensitive) instead
 // of creating a duplicate every time the same person is typed in again.
-export async function findOrCreatePracticeOpponent(profileId, name) {
-  const trimmed = name.trim();
-  if (!trimmed) return null;
+export async function findOrCreatePracticeOpponent(profileId, firstName, lastName) {
+  const trimmedFirstName = (firstName ?? "").trim();
+  const trimmedLastName = (lastName ?? "").trim();
+  const fullName = [trimmedFirstName, trimmedLastName].filter(Boolean).join(" ");
+  if (!trimmedFirstName || !trimmedLastName) return null;
   const { data: existing } = await supabase.from("practice_opponents").select("*")
-    .eq("created_by", profileId).ilike("name", trimmed).maybeSingle();
+    .eq("created_by", profileId).ilike("name", fullName).maybeSingle();
   if (existing) return existing;
-  const { data, error } = await supabase.from("practice_opponents").insert({ created_by: profileId, name: trimmed }).select().single();
+  const { data, error } = await supabase.from("practice_opponents").insert({ created_by: profileId, name: fullName }).select().single();
   return error ? null : data;
+}
+
+export async function updatePracticeOpponentName(opponentId, firstName, lastName) {
+  const trimmedFirstName = (firstName ?? "").trim();
+  const trimmedLastName = (lastName ?? "").trim();
+  if (!opponentId || !trimmedFirstName || !trimmedLastName) return false;
+  const { data, error } = await supabase.rpc("update_my_practice_opponent_name", {
+    p_opponent_id: opponentId,
+    p_first_name: trimmedFirstName,
+    p_last_name: trimmedLastName,
+  });
+  return !error && data === true;
 }
 // Narrow practice-link identity search: full name and username only, never contact details.
 export async function searchProfilesByUsername(query) {
