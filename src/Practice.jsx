@@ -293,7 +293,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                       </div>
                     </div>
                     {linkingKey === o.key && (
-                      <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); }} onCancel={() => setLinkingKey(null)} />
+                      <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); refreshLinkRequests(); }} onCancel={() => setLinkingKey(null)} />
                     )}
                   </div>
                 );
