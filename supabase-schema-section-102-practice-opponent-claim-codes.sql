@@ -97,7 +97,7 @@ begin
   select c.*
     into v_code
   from public.practice_opponent_claim_codes c
-  where c.code::text = trim(p_code)
+  where c.code::text = lower(trim(p_code))
   for update;
 
   if not found then
