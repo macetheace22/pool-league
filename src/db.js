@@ -2822,6 +2822,8 @@ export async function redeemPracticeOpponentClaimCode(code) {
 }
 export async function respondPracticeOpponentLink(requestId, accept) {
   const { data, error } = await supabase.rpc("respond_practice_opponent_link", { p_request_id: requestId, p_accept: accept });
+  if (error?.message?.includes("PRACTICE_LINK_FULL_NAME_REQUIRED")) return "FULL_NAME_REQUIRED";
+  if (error?.message?.includes("PRACTICE_LINK_CONFIRMATION_REQUIRED")) return "CONFIRMATION_REQUIRED";
   return error ? "ERROR" : data;
 }
 export async function cancelPracticeOpponentLinkRequest(requestId) {
