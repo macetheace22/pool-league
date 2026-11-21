@@ -1555,15 +1555,6 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
 
       </>
       )}
-      {rawEvents === null && !rawEventsError && (
-        <>
-          <div className="card">
-            <div className="card__title">Track a Rack — Individual Stats</div>
-            <div className="dash-empty">No Track a Rack shots have been recorded yet for this play type.</div>
-          </div>
-
-        </>
-      )}
     </>
   );
 }
@@ -1697,12 +1688,6 @@ function MyStatsPage({ profile }) {
           </>
         )}
 
-        {includeTournaments && (
-          <div className="card">
-            <div className="card__title">Tournament Statistics</div>
-            <div className="dash-empty">Tournament tracking is not available yet. Tournament results will appear here once tournament play and result entry are added to the app. Available league and practice statistics remain above.</div>
-          </div>
-        )}
       </div>
     </>
   );
@@ -1746,7 +1731,7 @@ function PlayerLookupPage() {
         {!selected ? (
           <div className="card">
             <div className="card__title">Search Players</div>
-            <input className="input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Start typing a name…" autoFocus />
+            <input className="input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by first or last name…" autoFocus />
             {results.length > 0 && (
               <div className="list" style={{marginTop:8}}>
                 {results.map(p => (
@@ -1775,7 +1760,7 @@ function PlayerLookupPage() {
               )}
               {compareOpen && !compareSelected && (
                 <>
-                  <input className="input" value={compareQuery} onChange={e => setCompareQuery(e.target.value)} placeholder="Search the other player's name…" autoFocus />
+                  <input className="input" value={compareQuery} onChange={e => setCompareQuery(e.target.value)} placeholder="Search by first or last name…" autoFocus />
                   {compareResults.length > 0 && (
                     <div className="list" style={{marginTop:8}}>
                       {compareResults.filter(p => p.num !== selected.num).map(p => (

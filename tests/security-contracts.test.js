@@ -637,7 +637,7 @@ describe("Section 103 linked practice history read access", () => {
 
   it("includes linked opponents and linked historical games in the Practice data layer", () => {
     const db = read("src/db.js");
-    expect(db).toContain("linked_profile_id.eq.");
+    expect(db).toContain('supabase.rpc("list_my_practice_opponents_with_names")');
     expect(db).toContain('.eq("linked_profile_id", profileId)');
     expect(db).toContain('.in("opponent_id", linkedOpponentIds)');
     expect(db).toContain("const byId = new Map()");
@@ -707,5 +707,34 @@ describe("Section 105 account full names and identity validation", () => {
     expect(admin).toContain("db.updateOwnFullName(profile.id, firstName.trim(), lastName.trim())");
     expect(admin).toContain("PLAYER_NAME_MISMATCH");
     expect(db).toContain("first_name: firstName, last_name: lastName");
+  });
+});
+
+describe("full-name player lookup and empty stats cards", () => {
+  it("searches and displays players by their full canonical IBA name", () => {
+    const admin = read("src/AdminApp.jsx");
+    const db = read("src/db.js");
+    expect(db).toContain('.select("num, name, nickname")');
+    expect(db).toContain('.ilike("name", `%${query.trim()}%`)');
+    expect(admin).toContain("Search by first or last name…");
+    expect(admin).toContain("{p.name}{p.nickname ? ` \"${p.nickname}\"` : \"\"}");
+  });
+
+  it("uses linked account full names in the People you've played before shortcuts", () => {
+    const practice = read("src/Practice.jsx");
+    const db = read("src/db.js");
+    const sql = read("supabase-schema-section-106-practice-opponent-shortcut-names.sql");
+    expect(db).toContain('supabase.rpc("list_my_practice_opponents_with_names")');
+    expect(practice).toContain("{o.display_name || o.name}");
+    expect(sql).toContain("public.list_my_practice_opponents_with_names()");
+    expect(sql).toContain("opponent.linked_profile_id = (select auth.uid())");
+    expect(sql).toContain("grant execute on function public.list_my_practice_opponents_with_names() to authenticated");
+  });
+
+  it("does not render empty Track a Rack or unavailable Tournament Statistics cards", () => {
+    const admin = read("src/AdminApp.jsx");
+    expect(admin).not.toContain("No Track a Rack shots have been recorded yet for this play type.");
+    expect(admin).not.toContain("Tournament tracking is not available yet.");
+    expect(admin).toContain("{rawEvents && (");
   });
 });
