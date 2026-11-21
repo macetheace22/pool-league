@@ -241,4 +241,3 @@ export default function ReplacementTeamResolution() {
     </div>
   );
 }
-}
