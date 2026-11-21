@@ -116,7 +116,11 @@ export function buildRule55TieBreakAudit({
 
       const finalTeamDate = lastMatchDateByTeam.get(team.teamId);
       const finalCounters = finalTeamDate ? counterTotalAtDate(team.teamId, finalTeamDate, counterSnapshots) : null;
-      const nextTeam = ranked.find(candidate => Number(candidate.position) === Number(team.position) + 1);
+      // A tie group shares the same next-ranked opponent below the group.
+      const bottomTiedPosition = Math.max(...group.map(candidate => Number(candidate.position)).filter(Number.isFinite));
+      const nextTeam = ranked
+        .filter(candidate => !tiedIds.has(candidate.teamId) && Number.isFinite(Number(candidate.position)) && Number(candidate.position) > bottomTiedPosition)
+        .sort((a, b) => Number(a.position) - Number(b.position))[0] ?? null;
       let recordVsNext = null;
       let recordVsNextComplete = !!nextTeam;
       if (nextTeam) {
@@ -161,7 +165,7 @@ export function buildRule55TieBreakAudit({
         position: team.position,
         totalPoints: team.totalPoints,
         tiedWith: group.filter(other => other.teamId !== team.teamId).map(other => other.name),
-        headToHeadPoints: headToHeadComplete ? headToHeadPoints : null,
+        headToHeadPoints: headToHeadEncountered && headToHeadComplete ? headToHeadPoints : null,
         setsWon: finalCounters?.won ?? null,
         pointsLost: pointsLostComplete ? pointsLost : null,
         recordVsNext,
