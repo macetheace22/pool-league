@@ -677,7 +677,7 @@ describe("Section 105 account full names and identity validation", () => {
     expect(sql).toContain("request.target_profile_id = (select auth.uid())");
     expect(sql).toContain("PRACTICE_LINK_CONFIRMATION_REQUIRED");
     expect(sql).toContain("set status = 'accepted', responded_at = now()");
-    expect(sql).toContain("public.search_profiles_for_practice_link(text)");
+    expect(sql).toContain("create or replace function public.search_profiles_for_practice_link(p_query text)");
     expect(sql).toContain("public.list_practice_opponent_link_requests_with_names()");
     expect(practice).toContain("request.requester_full_name");
     expect(practice).toContain("request.target_full_name");
