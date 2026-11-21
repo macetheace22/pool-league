@@ -709,3 +709,21 @@ describe("Section 105 account full names and identity validation", () => {
     expect(db).toContain("first_name: firstName, last_name: lastName");
   });
 });
+
+describe("full-name player lookup and empty stats cards", () => {
+  it("searches and displays players by their full canonical IBA name", () => {
+    const admin = read("src/AdminApp.jsx");
+    const db = read("src/db.js");
+    expect(db).toContain('.select("num, name, nickname")');
+    expect(db).toContain('.ilike("name", `%${query.trim()}%`)');
+    expect(admin).toContain("Search by first or last name…");
+    expect(admin).toContain("{p.name}{p.nickname ? ` \"${p.nickname}\"` : \"\"}");
+  });
+
+  it("does not render empty Track a Rack or unavailable Tournament Statistics cards", () => {
+    const admin = read("src/AdminApp.jsx");
+    expect(admin).not.toContain("No Track a Rack shots have been recorded yet for this play type.");
+    expect(admin).not.toContain("Tournament tracking is not available yet.");
+    expect(admin).toContain("{rawEvents && (");
+  });
+});
