@@ -309,6 +309,9 @@ begin
   ) then raise exception 'INVALID_MATCH_PARTICIPANT_OR_BYE'; end if;
 
   if v_team_count > 1 then
+    if p_champion_team_id is not null then
+      raise exception 'CHAMPION_CANNOT_BE_PRESELECTED';
+    end if;
     if (
       select count(*) from (
         select team_home_id as team_id
