@@ -561,6 +561,19 @@ export async function createSeasonalTournament(seasonId, tournamentType, ordered
   return { ok: true, tournamentId: data, bracket };
 }
 
+export async function reconcileSeasonalTournament(tournamentId, tournamentType, orderedTeams) {
+  const bracket = buildSeasonalTournamentBracket(tournamentType, orderedTeams);
+  if (bracket.error) return { error: bracket.error, byePlan: bracket.byePlan ?? null };
+  const payload = serializeSeasonalTournamentBracket(bracket);
+  const { data, error } = await supabase.rpc("reconcile_seasonal_tournament", {
+    p_tournament_id: tournamentId,
+    p_entries: payload.entries,
+    p_matches: payload.matches,
+  });
+  if (error) return { error: error.message };
+  return { ...data, bracket };
+}
+
 export async function listPlayoffBrackets(divisionId) {
   const { data } = await supabase.from("playoff_matches").select("*, schedule_pairings(id)")
     .eq("division_id", divisionId).order("bracket_group").order("round").order("slot_num");
