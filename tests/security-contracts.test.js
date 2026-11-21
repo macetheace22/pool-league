@@ -694,6 +694,8 @@ describe("Section 105 account full names and identity validation", () => {
     expect(db).toContain('supabase.rpc("list_linked_practice_opponent_names"');
     expect(db).toContain('"list_linked_practice_game_owners"');
     expect(db).toContain("opponent_name: linkedName");
+    expect(db).toContain('return "FULL_NAME_REQUIRED"');
+    expect(practice).toContain("respondToLinkRequest(request.request_id, true)");
     expect(db).not.toContain(".update({ opponent_name:");
   });
 
