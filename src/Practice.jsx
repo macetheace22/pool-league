@@ -290,15 +290,16 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                     <div className="list-row__name">
                       {incoming
                         ? (request.link_type === "claim"
-                          ? `@${request.requester_username || "player"} wants to claim your ${request.opponent_name} entry`
-                          : `You were asked to link ${request.opponent_name} to @${request.requester_username || "player"}`)
+                          ? `${request.requester_full_name || "A player"} (@${request.requester_username || "player"}) wants to claim your ${request.opponent_name} entry`
+                          : `You were asked to link ${request.opponent_name} to ${request.requester_full_name || "a player"} (@${request.requester_username || "player"})`)
                         : (request.link_type === "claim"
-                          ? `Your claim for ${request.opponent_name} is awaiting owner approval`
-                          : `Request to @${request.target_username || "player"} for ${request.opponent_name}`)}
+                          ? `Your claim for ${request.opponent_name} is awaiting ${request.target_full_name || "the owner"} approval`
+                          : `Request to ${request.target_full_name || "a player"} (@${request.target_username || "player"}) for ${request.opponent_name}`)}
                     </div>
                     <div className="list-row__sub">
                       {pending ? (expired ? "Expired — awaiting cleanup" : incoming ? "Confirm this is you to connect their practice history" : "Waiting for their confirmation")
                         : request.status[0].toUpperCase() + request.status.slice(1)}
+                      {pending && <div style={{fontSize:10.5,color:"#9A9A9A",marginTop:3}}>Accounts: {request.requester_full_name || "Name unavailable"} ↔ {request.target_full_name || "Name unavailable"}</div>}
                     </div>
                   </div>
                   {pending && incoming && !expired && (
@@ -438,9 +439,8 @@ function PracticeTypeStep({ session, setSession, onNext, onCancel }) {
 
 // ─── Step 1: opponent ───────────────────────────────────────────────────────
 // Inline search to link a manually-typed practice opponent to a real
-// account, once that person actually signs up. Narrow search (id +
-// username only, via a security-definer RPC) since a regular player can't
-// read the full profiles table.
+// account. The scoped RPC returns full name and username, not private contact
+// details; the account holder must still confirm the link.
 function LinkOpponentPanel({ opponentId, onDone, onCancel }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -471,13 +471,13 @@ function LinkOpponentPanel({ opponentId, onDone, onCancel }) {
   return (
     <div className="card" style={{marginTop:6,marginBottom:6}}>
       <div className="form-label" style={{marginBottom:6}}>Request an identity link</div>
-      <div style={{fontSize:11,color:"#999",marginBottom:8}}>Search their username. They must confirm before your practice history is linked.</div>
+      <div style={{fontSize:11,color:"#999",marginBottom:8}}>Search by username or full name. Check the full name before sending; they must confirm before your practice history is linked.</div>
       <input className="input" value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}} placeholder="Search by username…" autoFocus />
       {results.length > 0 && (
         <div className="list" style={{marginTop:8}}>
           {results.map(p => (
             <button type="button" key={p.id} className="list-row" style={{width:"100%",textAlign:"left",background:selected?.id===p.id?"#202A25":undefined}} onClick={() => {setSelected(p);setMessage("");}}>
-              <div className="list-row__body"><div className="list-row__name">@{p.username}</div></div>
+              <div className="list-row__body"><div className="list-row__name">{p.full_name || [p.first_name, p.last_name].filter(Boolean).join(" ")}</div><div className="list-row__sub">@{p.username}</div></div>
               {selected?.id===p.id && <Check size={15}/>}
             </button>
           ))}
