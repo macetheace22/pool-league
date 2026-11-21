@@ -3106,7 +3106,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
                     <div style={{display:"flex",flexDirection:"column",gap:3,flex:1}}>
                       <span className="list-row__name">{t.teamName}</span>
                       <span className="list-row__sub">Tied with {t.tiedWith.join(", ")}</span>
-                      <span className="list-row__sub">1. Head-to-head points: {value(t.headToHeadPoints)}</span>
+                      <span className="list-row__sub">1. Head-to-head points: {t.headToHeadPoints == null ? (t.headToHeadStatus === "No regular-season head-to-head set found" ? "No head-to-head set found" : "Unavailable") : t.headToHeadPoints}</span>
                       <span className="list-row__sub">2. Regular-season sets won: {value(t.setsWon)}</span>
                       <span className="list-row__sub">3. Points lost to opponents: {value(t.pointsLost)}</span>
                       <span className="list-row__sub">4. Record vs. next team below: {record}</span>

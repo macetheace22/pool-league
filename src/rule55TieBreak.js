@@ -93,6 +93,7 @@ export function buildRule55TieBreakAudit({
     const tiedIds = new Set(group.map(team => team.teamId));
     for (const team of group) {
       let headToHeadPoints = 0;
+      let headToHeadEncountered = false;
       let headToHeadComplete = true;
       let pointsLost = 0;
       let pointsLostComplete = true;
@@ -107,6 +108,7 @@ export function buildRule55TieBreakAudit({
           if (opponentPoints == null) pointsLostComplete = false;
           else pointsLost += Number(opponentPoints);
           if (tiedIds.has(opponentId)) {
+            headToHeadEncountered = true;
             const ownPoints = pointsByTeamDate.get(`${team.teamId}:${week.dateKey}`);
             if (ownPoints == null) headToHeadComplete = false;
             else headToHeadPoints += Number(ownPoints);
@@ -116,7 +118,12 @@ export function buildRule55TieBreakAudit({
 
       const finalTeamDate = lastMatchDateByTeam.get(team.teamId);
       const finalCounters = finalTeamDate ? counterTotalAtDate(team.teamId, finalTeamDate, counterSnapshots) : null;
-      const nextTeam = ranked.find(candidate => Number(candidate.position) === Number(team.position) + 1);
+      // A tie group shares the same next-ranked opponent below the group.
+      const tiedPositions = group.map(candidate => Number(candidate.position));
+      const bottomTiedPosition = tiedPositions.every(Number.isFinite) ? Math.max(...tiedPositions) : null;
+      const nextTeam = bottomTiedPosition == null ? null : ranked
+        .filter(candidate => !tiedIds.has(candidate.teamId) && Number.isFinite(Number(candidate.position)) && Number(candidate.position) > bottomTiedPosition)
+        .sort((a, b) => Number(a.position) - Number(b.position))[0] ?? null;
       let recordVsNext = null;
       let recordVsNextComplete = !!nextTeam;
       if (nextTeam) {
@@ -161,7 +168,8 @@ export function buildRule55TieBreakAudit({
         position: team.position,
         totalPoints: team.totalPoints,
         tiedWith: group.filter(other => other.teamId !== team.teamId).map(other => other.name),
-        headToHeadPoints: headToHeadComplete ? headToHeadPoints : null,
+        headToHeadPoints: headToHeadEncountered && headToHeadComplete ? headToHeadPoints : null,
+        headToHeadStatus: !headToHeadEncountered ? "No regular-season head-to-head set found" : headToHeadComplete ? "Available" : "Incomplete head-to-head points data",
         setsWon: finalCounters?.won ?? null,
         pointsLost: pointsLostComplete ? pointsLost : null,
         recordVsNext,
