@@ -637,7 +637,7 @@ describe("Section 103 linked practice history read access", () => {
 
   it("includes linked opponents and linked historical games in the Practice data layer", () => {
     const db = read("src/db.js");
-    expect(db).toContain("linked_profile_id.eq.");
+    expect(db).toContain('supabase.rpc("list_my_practice_opponents_with_names")');
     expect(db).toContain('.eq("linked_profile_id", profileId)');
     expect(db).toContain('.in("opponent_id", linkedOpponentIds)');
     expect(db).toContain("const byId = new Map()");
