@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStandings, computeOfficialStandings, prepareOfficialPlayoffSeeds } from "../src/db.js";
+import { computeStandings, computeOfficialStandings, getExpectedOfficialStandingsTeams, prepareOfficialPlayoffSeeds } from "../src/db.js";
 
 describe("official standings source precedence", () => {
   it("uses official IBA positions for playoff seeds", () => {
@@ -35,6 +35,64 @@ describe("official standings source precedence", () => {
     expect(computeStandings(appMatches, []).find(x=>x.teamId==="t1").totalPoints).toBe(500);
     expect(official.map(x=>x.teamId)).toEqual(["t2","t1"]);
     expect(official.find(x=>x.teamId==="t1")).toMatchObject({totalPoints:1200,rank:2});
+  });
+});
+
+describe("official playoff standings completeness", () => {
+  const weekKey = "2026-11-18";
+  const expectedTeams = [
+    { id: "t1", team_num: "10101", is_bye: false },
+    { id: "t2", team_num: "10102", is_bye: false },
+    { id: "t3", team_num: "10103", is_bye: false },
+    { id: "bye", team_num: "10199", is_bye: true },
+  ];
+  const completeRows = [
+    { team_id: "t1", team_num: "10101", team_name: "Team A", total_points: 1200, position: 1, week_key: weekKey },
+    { team_id: "t2", team_num: "10102", team_name: "Team B", total_points: 1100, position: 2, week_key: weekKey },
+    { team_id: "t3", team_num: "10103", team_name: "Team C", total_points: 1000, position: 3, week_key: weekKey },
+  ];
+
+  it("accepts a complete first official report for every real team and excludes BYE placeholders", () => {
+    const expected = getExpectedOfficialStandingsTeams(expectedTeams, [], [], weekKey);
+    expect(expected.teams.map(team => team.id)).toEqual(["t1", "t2", "t3"]);
+    expect(prepareOfficialPlayoffSeeds(completeRows, false, expected.teams).standings).toHaveLength(3);
+  });
+
+  it("blocks a partial first report even when every imported row has the same week and valid positions", () => {
+    const expected = getExpectedOfficialStandingsTeams(expectedTeams, [], [], weekKey);
+    const result = prepareOfficialPlayoffSeeds(completeRows.slice(0, 2), false, expected.teams);
+    expect(result.error).toMatch(/incomplete or does not match/i);
+    expect(result.error).toContain("10103");
+  });
+
+  it("blocks a report row mapped to a BYE placeholder as an unexpected team", () => {
+    const expected = getExpectedOfficialStandingsTeams(expectedTeams, [], [], weekKey);
+    const result = prepareOfficialPlayoffSeeds([
+      ...completeRows.slice(0, 2),
+      { team_id: "bye", team_num: "10199", team_name: "BYE", position: 3, week_key: weekKey },
+    ], false, expected.teams);
+    expect(result.error).toMatch(/unexpected team numbers/i);
+  });
+
+  it("does not apply a recorded replacement until its schedule application is applied", () => {
+    const resolutions = [{ id: "r1", dropout_team_id: "t1", replacement_team_id: "t3", effective_date: "2026-11-01", status: "applied" }];
+    expect(getExpectedOfficialStandingsTeams(expectedTeams, resolutions, [], weekKey).teams.map(team => team.id))
+      .toEqual(["t1", "t2", "t3"]);
+  });
+
+  it("excludes the dropout team only for reports on or after an applied replacement's effective date", () => {
+    const resolutions = [{ id: "r1", dropout_team_id: "t1", replacement_team_id: "t3", effective_date: "2026-11-19", status: "applied" }];
+    const applications = [{ replacement_resolution_id: "r1", status: "applied" }];
+    expect(getExpectedOfficialStandingsTeams(expectedTeams, resolutions, applications, weekKey).teams.map(team => team.id))
+      .toEqual(["t1", "t2", "t3"]);
+    expect(getExpectedOfficialStandingsTeams(expectedTeams, resolutions, applications, "2026-11-20").teams.map(team => team.id))
+      .toEqual(["t2", "t3"]);
+  });
+
+  it("blocks gaps in published positions even when the team set is complete", () => {
+    const expected = getExpectedOfficialStandingsTeams(expectedTeams, [], [], weekKey);
+    const rows = completeRows.map(row => ({ ...row, position: row.position + 1 }));
+    expect(prepareOfficialPlayoffSeeds(rows, false, expected.teams).error).toMatch(/gaps in its published positions/i);
   });
 });
 

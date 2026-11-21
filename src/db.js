@@ -164,28 +164,51 @@ export async function computeFinalStandings(divisionId) {
   const prepared = prepareOfficialPlayoffSeeds(adjustments);
   if (prepared.error) return prepared;
 
-  // The current view intentionally excludes unmatched team rows. Check the
-  // raw import rows for this same report week so an unresolved team cannot
-  // silently disappear from the bracket seed list.
+  // Validate against the expected real-team roster for the report's own
+  // effective date. BYE placeholders are never standings teams. A dropout
+  // is removed only after both its manager resolution and schedule application
+  // are recorded as applied and the report week is on/after its effective date.
   const weekKey = adjustments[0]?.week_key;
-  const [{ data: unmatchedRows, error: unmatchedError }, { data: divisionTeams, error: teamsError }] = await Promise.all([
+  const [
+    { data: unmatchedRows, error: unmatchedError },
+    { data: divisionTeams, error: teamsError },
+    { data: replacementResolutions, error: resolutionsError },
+    { data: scheduleApplications, error: applicationsError },
+  ] = await Promise.all([
     supabase.from("standings_adjustments").select("team_num")
       .eq("division_id", divisionId).eq("week_key", weekKey).is("team_id", null),
-    supabase.from("teams").select("team_num").eq("division_id", divisionId),
+    supabase.from("teams").select("id,team_num,is_bye").eq("division_id", divisionId),
+    supabase.from("team_replacement_resolutions")
+      .select("id,dropout_team_id,effective_date,status").eq("division_id", divisionId),
+    supabase.from("team_replacement_schedule_applications")
+      .select("replacement_resolution_id,status").eq("division_id", divisionId),
   ]);
-  if (unmatchedError || teamsError) {
-    return { error: "Could not validate unmatched teams in the official IBA standings import." };
+  if (unmatchedError || teamsError || resolutionsError || applicationsError) {
+    return { error: "Could not validate the complete expected team set for the official IBA standings report." };
   }
+
   // Older unmatched rows can remain after a manager fixes the team-number
   // mapping and re-imports the same week (NULL team_id does not conflict in
   // the import upsert). Treat them as resolved when that team number now maps
   // to a real team in this division.
-  const knownTeamNums = new Set((divisionTeams ?? []).map(team => String(team.team_num ?? "").trim()).filter(Boolean));
-  const unresolvedRows = (unmatchedRows ?? []).filter(row => !knownTeamNums.has(String(row.team_num ?? "").trim()));
+  const knownTeamNums = new Set((divisionTeams ?? [])
+    .filter(team => team.is_bye !== true)
+    .map(team => String(team.team_num ?? "").trim()).filter(Boolean));
+  const unresolvedRows = (unmatchedRows ?? []).filter(row =>
+    !knownTeamNums.has(String(row.team_num ?? "").trim())
+  );
   if (unresolvedRows.length) {
     return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
   }
-  return prepared;
+
+  const expected = getExpectedOfficialStandingsTeams(
+    divisionTeams ?? [],
+    replacementResolutions ?? [],
+    scheduleApplications ?? [],
+    weekKey
+  );
+  if (expected.error) return expected;
+  return prepareOfficialPlayoffSeeds(adjustments, false, expected.teams);
 }
 
 async function createPlayoffWeek(divisionId, label) {
@@ -2362,7 +2385,41 @@ export function computeOfficialStandings(adjustments = []) {
 // The current view selects the latest row per team, so a partial import can
 // otherwise leave teams on different report weeks. Fail closed on mixed weeks,
 // unmatched teams, or unusable/duplicate published positions.
-export function prepareOfficialPlayoffSeeds(adjustments = [], hasUnmatchedRows = false) {
+export function getExpectedOfficialStandingsTeams(
+  teams = [],
+  replacementResolutions = [],
+  scheduleApplications = [],
+  reportWeekKey = ""
+) {
+  const expected = (teams ?? []).filter(team => team && team.is_bye !== true);
+  const weekDate = String(reportWeekKey ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekDate)) {
+    return { error: "The official standings report date is invalid, so replacement-team status cannot be verified." };
+  }
+  const appliedResolutionIds = new Set((scheduleApplications ?? [])
+    .filter(application => application?.status === "applied")
+    .map(application => application.replacement_resolution_id));
+  const effectiveDropoutIds = new Set();
+  for (const resolution of replacementResolutions ?? []) {
+    if (resolution?.status !== "applied" || !appliedResolutionIds.has(resolution.id)) continue;
+    const effectiveDate = String(resolution.effective_date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+      return { error: "An applied replacement has an invalid effective date. Correct the replacement record before generating playoff brackets." };
+    }
+    if (effectiveDate <= weekDate) effectiveDropoutIds.add(resolution.dropout_team_id);
+  }
+  const activeTeams = expected.filter(team => !effectiveDropoutIds.has(team.id));
+  if (!activeTeams.length) {
+    return { error: "Could not determine the division's expected real teams for official standings." };
+  }
+  return { teams: activeTeams };
+}
+
+// Validate the imported report before using it for bracket generation.
+// The current view selects the latest row per team, so a partial import can
+// otherwise leave teams on different report weeks. Validate the complete
+// expected real-team set as well as report week, mappings, and positions.
+export function prepareOfficialPlayoffSeeds(adjustments = [], hasUnmatchedRows = false, expectedTeams = null) {
   const rows = adjustments ?? [];
   if (!rows.length) return { error: "Import the official IBA standings report before generating playoff brackets." };
   if (hasUnmatchedRows || rows.some(row => !row.team_id)) {
@@ -2375,6 +2432,35 @@ export function prepareOfficialPlayoffSeeds(adjustments = [], hasUnmatchedRows =
   const positions = rows.map(row => row.position);
   if (positions.some(position => !Number.isInteger(position) || position < 1) || new Set(positions).size !== positions.length) {
     return { error: "The official standings report has missing or duplicate positions. Correct the import before generating playoff brackets." };
+  }
+  if (expectedTeams !== null) {
+    const expected = expectedTeams ?? [];
+    if (!expected.length) return { error: "Could not determine the division's expected real teams for official standings." };
+    const expectedById = new Map(expected.map(team => [team.id, team]));
+    const actualIds = rows.map(row => row.team_id);
+    const actualIdSet = new Set(actualIds);
+    const duplicateTeamIds = actualIds.length !== actualIdSet.size;
+    const missing = expected.filter(team => !actualIdSet.has(team.id));
+    const unexpected = rows.filter(row => !expectedById.has(row.team_id));
+    const teamNumberMismatches = rows.filter(row => {
+      const team = expectedById.get(row.team_id);
+      return team && String(row.team_num ?? "").trim() !== String(team.team_num ?? "").trim();
+    });
+    if (duplicateTeamIds || missing.length || unexpected.length || teamNumberMismatches.length) {
+      const missingNums = missing.map(team => team.team_num).filter(Boolean);
+      const unexpectedNums = unexpected.map(row => row.team_num).filter(Boolean);
+      const details = [
+        missingNums.length ? `missing team numbers: ${missingNums.join(", ")}` : "",
+        unexpectedNums.length ? `unexpected team numbers: ${unexpectedNums.join(", ")}` : "",
+        teamNumberMismatches.length ? "team-number mappings do not match the division roster" : "",
+        duplicateTeamIds ? "duplicate team rows" : "",
+      ].filter(Boolean).join("; ");
+      return { error: `The official standings report is incomplete or does not match the division's expected teams (${details}). Import the complete, current division report and resolve any team-number mismatches before generating playoff brackets.` };
+    }
+    const sortedPositions = [...positions].sort((a, b) => a - b);
+    if (sortedPositions.some((position, index) => position !== index + 1)) {
+      return { error: "The official standings report has gaps in its published positions. Correct the import before generating playoff brackets." };
+    }
   }
   return { standings: computeOfficialStandings(rows) };
 }
