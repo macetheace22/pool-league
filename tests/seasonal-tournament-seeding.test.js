@@ -141,4 +141,62 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     expect(bracket.matches).toEqual([]);
     expect(bracket.championTeamId).toBe("solo");
   });
+
+  it("builds a single-team tournament without inventing a match", () => {
+    const bracket = buildSeasonalTournamentBracket("championship", [
+      { teamId: "solo", divisionId: "d1", seedCategory: "first_place_and_division_champion" },
+    ]);
+    expect(bracket.error).toBeUndefined();
+    expect(bracket.championTeamId).toBe("solo");
+    expect(bracket.entries).toHaveLength(1);
+    expect(bracket.matches).toEqual([]);
+  });
+
+  it("builds a six-team Championship bracket with byes assigned to the top two seeds", () => {
+    const teams = Array.from({ length: 6 }, (_, index) => ({
+      teamId: "team-" + (index + 1),
+      divisionId: "division-" + (index + 1),
+      seedCategory: "first_place_and_division_champion",
+      name: "Team " + (index + 1),
+    }));
+    const bracket = buildSeasonalTournamentBracket("championship", teams);
+    expect(bracket.error).toBeUndefined();
+    expect(bracket.bracketSize).toBe(8);
+    expect(bracket.entries.map(entry => entry.seedNum)).toEqual([1,2,3,4,5,6]);
+    expect(bracket.matches).toHaveLength(7);
+    expect(bracket.matches.filter(match => match.roundNum === 1 && match.isBye).map(match => match.winnerTeamId))
+      .toEqual(["team-1","team-2"]);
+    expect(bracket.matches.filter(match => match.roundNum === 1 && !match.isBye)).toHaveLength(2);
+    expect(bracket.matches.filter(match => match.roundNum === 2)).toHaveLength(2);
+    expect(bracket.matches.filter(match => match.roundNum === 3)).toHaveLength(1);
+  });
+
+  it("rejects teams outside the rulebook category order", () => {
+    const bracket = buildSeasonalTournamentBracket("championship", [
+      { teamId: "lower", seedCategory: "below_first_division_champion" },
+      { teamId: "top", seedCategory: "first_place_and_division_champion" },
+    ]);
+    expect(bracket.error).toMatch(/rulebook seeding categories/i);
+  });
+
+  it("does not create a Consolation bracket while history is unverified", () => {
+    const bracket = buildSeasonalTournamentBracket("consolation", [
+      { teamId: "unknown", seedCategory: "consolation_champion_history_unverified" },
+      { teamId: "known", seedCategory: "consolation_champion_back_to_back_wins" },
+    ]);
+    expect(bracket.error).toMatch(/verified rulebook seeding category/i);
+  });
+
+  it("uses manager-confirmed order within a category to allocate byes", () => {
+    const teams = Array.from({ length: 5 }, (_, index) => ({
+      teamId: "seed-" + (index + 1),
+      divisionId: "division-" + (index + 1),
+      seedCategory: "first_place_not_division_champion",
+    }));
+    const bracket = buildSeasonalTournamentBracket("championship", teams);
+    expect(bracket.error).toBeUndefined();
+    expect(bracket.byePlan.awardedTeamIds).toEqual(["seed-1","seed-2","seed-3"]);
+    expect(bracket.matches.filter(match => match.roundNum === 1 && match.isBye).map(match => match.winnerTeamId))
+      .toEqual(["seed-1","seed-2","seed-3"]);
+  });
 });
