@@ -14,12 +14,15 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     expect(classifyConsolationSeed({ consolationChampion: true })).toBe("consolation_champion_history_unverified");
     expect(classifyConsolationSeed({ consolationChampion: false })).toBeNull();
   });
-  it("calculates standard single-elimination byes from field size", () => {
+  it("calculates field-size byes but does not break an unstated within-category tie", () => {
     const teams = Array.from({ length: 6 }, (_, i) => ({ teamId: "t" + (i + 1), seedCategory: "first_place_and_division_champion" }));
     const plan = buildSeasonalByePlan("championship", teams);
     expect(plan.bracketSize).toBe(8);
     expect(plan.byeCount).toBe(2);
-    expect(plan.awardedTeamIds).toEqual(["t1", "t2"]);
+    expect(plan.awardedTeamIds).toEqual([]);
+    expect(plan.pendingTeamIds).toEqual(["t1", "t2", "t3", "t4", "t5", "t6"]);
+    expect(plan.unresolvedByes).toBe(2);
+    expect(plan.requiresReview).toBe(true);
   });
   it("holds a category tied at the bye cutoff for review", () => {
     const teams = [
@@ -45,10 +48,11 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     ];
     const plan = buildSeasonalByePlan("championship", teams);
     expect(plan.awardedTeamIds).toEqual(["a", "c", "b"]);
-    expect(plan.pendingTeamIds).toEqual(["d"]);
+    expect(plan.nonByeTeamIds).toEqual(["d"]);
+    expect(plan.pendingTeamIds).toEqual([]);
     expect(plan.requiresReview).toBe(false);
   });
-  it("prioritizes back-to-back Consolation champions before champions who received a bye", () => {
+  it("prioritizes back-to-back Consolation champions but holds their internal tie for review", () => {
     const teams = [
       { teamId: "bye-winner", seedCategory: "consolation_champion_after_bye" },
       { teamId: "two-wins", seedCategory: "consolation_champion_back_to_back_wins" },
@@ -56,8 +60,9 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     ];
     const plan = buildSeasonalByePlan("consolation", teams);
     expect(plan.byeCount).toBe(1);
-    expect(plan.awardedTeamIds).toEqual(["two-wins"]);
-    expect(plan.pendingTeamIds).toEqual(["two-wins-2"]);
+    expect(plan.awardedTeamIds).toEqual([]);
+    expect(plan.pendingTeamIds).toEqual(["two-wins", "two-wins-2"]);
+    expect(plan.nonByeTeamIds).toEqual(["bye-winner"]);
     expect(plan.requiresReview).toBe(true);
   });
 });
