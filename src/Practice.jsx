@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { Search, Check, ChevronRight, Trophy, Plus } from "lucide-react";
+import { Search, Check, ChevronRight, Trophy, Plus, Pencil, X } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, TabBar, shellCss } from "./Shell";
 import { css, Loader } from "./AdminApp";
@@ -521,6 +521,10 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
   const [manualLastName, setManualLastName] = useState("");
   const [myOpponents, setMyOpponents] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [editingOpponentId, setEditingOpponentId] = useState(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editMessage, setEditMessage] = useState("");
 
   useEffect(() => { if (profile) db.listMyPracticeOpponents(profile.id).then(setMyOpponents); }, [profile?.id]);
   useEffect(() => {
@@ -533,8 +537,32 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
     onNext();
   };
   const pickManualExisting = (o) => {
-    setSession(s => ({ ...s, opponentType: "manual", opponentPlayerNum: null, opponentId: o.id, opponentName: o.name, opponentRating: null }));
+    setSession(s => ({ ...s, opponentType: "manual", opponentPlayerNum: null, opponentId: o.id, opponentName: o.display_name || o.name, opponentRating: null }));
     onNext();
+  };
+  const beginEditOpponent = (opponent) => {
+    const parts = (opponent.name || "").trim().split(/\\s+/).filter(Boolean);
+    setEditFirstName(parts.shift() || "");
+    setEditLastName(parts.join(" "));
+    setEditMessage("");
+    setEditingOpponentId(opponent.id);
+  };
+  const saveEditedOpponent = async () => {
+    if (!editFirstName.trim() || !editLastName.trim()) {
+      setEditMessage("Enter both a first and last name.");
+      return;
+    }
+    setSaving(true);
+    const updated = await db.updatePracticeOpponentName(editingOpponentId, editFirstName, editLastName);
+    setSaving(false);
+    if (!updated) {
+      setEditMessage("Couldn't update that opponent name. Please try again.");
+      return;
+    }
+    const refreshed = await db.listMyPracticeOpponents(profile.id);
+    setMyOpponents(refreshed);
+    setEditingOpponentId(null);
+    setEditMessage("");
   };
   const createManual = async () => {
     if (!manualFirstName.trim()) return;
@@ -575,7 +603,7 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
           <div style={{display:"flex",gap:6}}>
             <input className="input" style={{flex:1}} value={manualFirstName} onChange={e=>setManualFirstName(e.target.value)} placeholder="First name" />
             <input className="input" style={{flex:1}} value={manualLastName} onChange={e=>setManualLastName(e.target.value)} placeholder="Last name" />
-            <button className="btn-icon btn-icon--confirm" onClick={createManual} disabled={!manualFirstName.trim()||saving}><Check size={14}/></button>
+            <button className="btn-icon btn-icon--confirm" onClick={createManual} disabled={!manualFirstName.trim()||!manualLastName.trim()||saving}><Check size={14}/></button>
           </div>
         </div>
 
@@ -584,9 +612,23 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
             <div className="form-label">People you've played before</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
               {myOpponents.map(o => (
-                <button key={o.id} className="chip" onClick={() => pickManualExisting(o)}>{o.display_name || o.name}</button>
+                <div key={o.id} style={{display:"flex",alignItems:"center",gap:3}}>
+                  <button className="chip" onClick={() => pickManualExisting(o)}>{o.display_name || o.name}</button>
+                  {!o.linked_profile_id && (
+                    <button className="btn-icon" aria-label={`Edit ${o.name}`} onClick={() => beginEditOpponent(o)}><Pencil size={12}/></button>
+                  )}
+                </div>
               ))}
             </div>
+            {editingOpponentId && (
+              <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
+                <input className="input" style={{flex:1}} value={editFirstName} onChange={e=>setEditFirstName(e.target.value)} placeholder="First name"/>
+                <input className="input" style={{flex:1}} value={editLastName} onChange={e=>setEditLastName(e.target.value)} placeholder="Last name"/>
+                <button className="btn-icon btn-icon--confirm" onClick={saveEditedOpponent} disabled={saving||!editFirstName.trim()||!editLastName.trim()}><Check size={14}/></button>
+                <button className="btn-icon" onClick={() => setEditingOpponentId(null)} disabled={saving}><X size={14}/></button>
+              </div>
+            )}
+            {editMessage && <div className="error-msg" style={{marginTop:6}}>{editMessage}</div>}
           </div>
         )}
 
