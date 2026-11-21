@@ -117,8 +117,8 @@ create trigger validate_profile_full_name
 -- and later invite redemption. No anonymous name-check RPC is exposed.
 
 -- A practice identity can only be linked when both participants have
--- completed their account names. The existing mutual-confirmation RPC remains
--- the only way to set linked_profile_id.
+-- completed their account names. A pending request addressed to the confirming
+-- profile is required before linked_profile_id can be changed.
 create or replace function public.validate_practice_opponent_link_names()
 returns trigger
 language plpgsql
