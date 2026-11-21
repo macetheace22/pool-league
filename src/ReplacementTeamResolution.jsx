@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, AccessDenied, shellCss } from "./Shell";
+import { css } from "./AdminApp";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import { normalizeReplacementPreview, validateReplacementResolution } from "./replacementResolution";
@@ -198,96 +199,46 @@ export default function ReplacementTeamResolution() {
   if (profile?.role !== "manager") return <AccessDenied />;
 
   return (
-    <div className="app"><style>{shellCss}</style>
-      <PageHeader title="Replacement Team Resolution" subtitle="Rule 8.8 — record replacement-team points and makeup entitlement" />
-      <div className="admin-card">
-        <div className="form-grid">
-          <label>Season<select value={seasonId} onChange={e => setSeasonId(e.target.value)}><option value="">Select…</option>{seasons.map(s => <option key={s.id} value={s.id}>{s.type} · {s.year}</option>)}</select></label>
-          <label>Division<select value={divisionId} onChange={e => setDivisionId(e.target.value)} disabled={!seasonId}><option value="">Select…</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.num} · {d.name} · {d.format} · {d.day}</option>)}</select></label>
-          <label>Dropout resolution<select value={dropoutResolutionId} onChange={e => setDropoutResolutionId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{dropoutResolutions.map(r => <option key={r.id} value={r.id}>{r.dropout_team_id} · effective {r.effective_date}</option>)}</select></label>
-          <label>Replacement team<select value={replacementTeamId} onChange={e => setReplacementTeamId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{teams.filter(t => t.id !== dropoutResolutions.find(r => r.id === dropoutResolutionId)?.dropout_team_id).map(t => <option key={t.id} value={t.id}>{t.team_num} · {t.name}</option>)}</select></label>
-          <label>Effective replacement date<input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} /></label>
+    <div className="app">
+      <style>{css}</style><style>{shellCss}</style>
+      <PageHeader title="Replacement Team Resolution" subtitle="Rule 8.8 — record replacement-team points and makeup entitlement" backFallback="/league-office" />
+      <div className="tab-content">
+        <div className="card">
+          <div className="section-header"><div className="section-header__title">Record replacement team</div></div>
+          <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.45}}>Preview the replacement impact before recording it. Completed dropout match history and established BYE weeks remain unchanged.</div>
+          <div className="field"><span className="form-label">Season</span><select className="input input--select" value={seasonId} onChange={e=>setSeasonId(e.target.value)}><option value="">Select…</option>{seasons.map(s=><option key={s.id} value={s.id}>{s.type} · {s.year}</option>)}</select></div>
+          <div className="field"><span className="form-label">Division</span><select className="input input--select" value={divisionId} onChange={e=>setDivisionId(e.target.value)} disabled={!seasonId}><option value="">Select…</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.num} · {d.name} · {d.format} · {d.day}</option>)}</select></div>
+          <div className="field"><span className="form-label">Dropout resolution</span><select className="input input--select" value={dropoutResolutionId} onChange={e=>setDropoutResolutionId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{dropoutResolutions.map(r=><option key={r.id} value={r.id}>{r.dropout_team_id} · effective {r.effective_date}</option>)}</select></div>
+          <div className="field"><span className="form-label">Replacement team</span><select className="input input--select" value={replacementTeamId} onChange={e=>setReplacementTeamId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{teams.filter(t=>t.id!==dropoutResolutions.find(r=>r.id===dropoutResolutionId)?.dropout_team_id).map(t=><option key={t.id} value={t.id}>{t.team_num} · {t.name}</option>)}</select></div>
+          <div className="field"><span className="form-label">Effective replacement date</span><input className="input" type="date" value={effectiveDate} onChange={e=>setEffectiveDate(e.target.value)} /></div>
+          <button className="btn-primary" onClick={getPreview} disabled={busy}>Preview replacement impact</button>
         </div>
-        <button className="btn btn-primary" onClick={getPreview} disabled={busy}>Preview replacement impact</button>
-        {preview && <div className="admin-card" style={{ marginTop: 16 }}>
-          <strong>Replacement impact</strong>
-          <p>{preview.dropoutTeamName} → {preview.replacementTeamName}</p>
-          <p>Eligible post-dropout bye weeks: {preview.eligibleMakeupWeekCount} (maximum three).</p>
-          <p>Inherited official IBA snapshot: {inheritedStandings?.totalPoints ?? 0} points; report {inheritedStandings?.reportLabel || inheritedStandings?.weekKey || "unknown week"}.</p>
-          <p>Original completed match history remains unchanged. This records the manager's replacement decision and entitlement; future makeup scheduling remains part of the existing makeup workflow.</p>
-        </div>}
-        <label style={{ display:"block", marginTop:16 }}>Management note<textarea rows="4" value={note} onChange={e => setNote(e.target.value)} /></label>
-        <button className="btn btn-success" onClick={recordResolution} disabled={busy || !preview}>Record replacement resolution</button>
-        {recordedResolutionId && (
-          <button
-            className="btn btn-primary"
-            style={{ marginLeft: 8 }}
-            disabled={applyingSchedule}
-            onClick={async () => {
-              if (!window.confirm("Apply this replacement team to future scheduled matchups? Existing completed matches and BYE weeks will remain unchanged.")) return;
-              setApplyingSchedule(true);
-              setMessage("");
-              const { data, error } = await supabase.rpc("apply_team_replacement_schedule", {
-                p_replacement_resolution_id: recordedResolutionId,
-              });
-              setApplyingSchedule(false);
-              if (error) {
-                setMessage(error.message);
-                return;
-              }
-              setMessage(
-                data?.status === "already_applied"
-                  ? "Replacement schedule was already applied."
-                  : `Replacement schedule applied: ${data?.changedMatchupCount ?? 0} future matchup(s) updated.`,
-              );
-              setRecordedResolutionId("");
-              await loadHistory();
-            }}
-          >
-            {applyingSchedule ? "Applying…" : "Apply replacement to future schedule"}
-          </button>
-        )}
-        {message && <p style={{ marginTop:12 }}>{message}</p>}
-      </div>
-      <div className="admin-card" style={{ marginTop:16 }}>
-        <h3>Replacement resolution history</h3>
-        {!history.length ? <p>No replacement resolutions recorded for this division.</p> : history.map(h => <div key={h.id} style={{ borderTop:"1px solid #444", padding:"12px 0" }}>
-          <strong>{h.replacement_team_id}</strong> — {h.effective_date} — {h.status}
-          <div>Inherited points: {h.inherited_standings?.totalPoints ?? 0}; makeup entitlement: {h.makeup_matches_used ?? 0}/{h.makeup_matches_allowed ?? 0} used</div>
-          {h.note && <div>{h.note}</div>}
-          {!scheduleApplications.some(row => row.replacement_resolution_id === h.id && row.status === "applied") && (
-            <button className="btn btn-primary" style={{ marginTop:8 }} disabled={applyingSchedule}
-              onClick={async () => {
-                if (!window.confirm("Apply this replacement team to future scheduled matchups? Existing completed matches and BYE weeks will remain unchanged.")) return;
-                setApplyingSchedule(true);
-                setMessage("");
-                const { data, error } = await supabase.rpc("apply_team_replacement_schedule", { p_replacement_resolution_id: h.id });
-                setApplyingSchedule(false);
-                if (error) { setMessage(error.message); return; }
-                setMessage(data?.status === "already_applied" ? "Replacement schedule was already applied." : "Replacement schedule applied.");
-                await loadHistory();
-              }}>Apply replacement to future schedule</button>
-          )}
-          {(h.eligible_makeup_weeks ?? []).map(slot => {
-            const key = h.id + ":" + slot.sourceByeWeekId;
-            const existing = makeupMatches.find(row => row.replacement_resolution_id === h.id && row.source_bye_week_id === slot.sourceByeWeekId && row.status !== "voided");
-            return <div key={key} style={{ marginTop:10, padding:10, border:"1px solid #555", borderRadius:8 }}>
-              <strong>Bye from Week {slot.sourceWeekNum ?? "—"} · {slot.sourceWeekDate ?? ""}</strong>
-              <div>Opponent: {slot.opponentName ?? "Unknown team"}</div>
-              {existing ? (
-                <div style={{ marginTop:6 }}>Scheduled {existing.scheduled_date} · {existing.status}</div>
-              ) : (
-                <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"end", marginTop:8 }}>
-                  <label>Makeup date<input type="date" value={makeupDates[key] ?? ""} onChange={event => setMakeupDates(prev => ({ ...prev, [key]: event.target.value }))} /></label>
-                  <button className="btn btn-primary" disabled={!!schedulingMakeupId || (h.makeup_matches_used ?? 0) >= (h.makeup_matches_allowed ?? 0)} onClick={() => scheduleMakeup(h, slot)}>
-                    {schedulingMakeupId === key ? "Scheduling…" : "Schedule makeup"}
-                  </button>
-                </div>
-              )}
-            </div>;
-          })}
-        </div>)}
+        {preview&&<div className="card"><div className="card__title">Replacement impact</div><div style={{fontSize:12.5,lineHeight:1.5}}>
+          <div>{preview.dropoutTeamName} → {preview.replacementTeamName}</div>
+          <div>Eligible post-dropout bye weeks: {preview.eligibleMakeupWeekCount} (maximum three).</div>
+          <div>Inherited official IBA snapshot: {inheritedStandings?.totalPoints??0} points; report {inheritedStandings?.reportLabel||inheritedStandings?.weekKey||"unknown week"}.</div>
+          <div style={{marginTop:6}}>Original completed match history remains unchanged. This records the manager's replacement decision and entitlement; future makeup scheduling remains part of the existing workflow.</div>
+        </div></div>}
+        <div className="card">
+          <div className="field"><span className="form-label">Management note</span><textarea className="input" rows="4" value={note} onChange={e=>setNote(e.target.value)} /></div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <button className="btn-primary" onClick={recordResolution} disabled={busy||!preview}>Record replacement resolution</button>
+            {recordedResolutionId&&<button className="btn-next" disabled={applyingSchedule} onClick={async()=>{if(!window.confirm("Apply this replacement team to future scheduled matchups? Existing completed matches and BYE weeks will remain unchanged."))return;setApplyingSchedule(true);setMessage("");const {data,error}=await supabase.rpc("apply_team_replacement_schedule",{p_replacement_resolution_id:recordedResolutionId});setApplyingSchedule(false);if(error){setMessage(error.message);return;}setMessage(data?.status==="already_applied"?"Replacement schedule was already applied":`Replacement schedule applied: ${data?.changedMatchupCount??0} future matchup(s) updated.`);setRecordedResolutionId("");await loadHistory();}}>{applyingSchedule?"Applying…":"Apply replacement to future schedule"}</button>}
+          </div>
+          {message&&<div className={message.includes("applied")||message.includes("recorded")?"success-msg":"error-msg"}>{message}</div>}
+        </div>
+        <div className="card">
+          <div className="card__title">Replacement resolution history</div>
+          {!history.length?<div className="empty-state">No replacement resolutions recorded for this division.</div>:history.map(h=><div key={h.id} style={{borderTop:"1px solid #2A2A2A",padding:"12px 0",fontSize:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:8}}><strong>{h.replacement_team_id}</strong><span className="role-pill role-pill--sm">{h.status}</span></div>
+            <div style={{color:"#9A9A9A",marginTop:4}}>Effective {h.effective_date} · Inherited points {h.inherited_standings?.totalPoints??0} · Makeup {h.makeup_matches_used??0}/{h.makeup_matches_allowed??0} used</div>
+            {h.note&&<div style={{marginTop:4}}>{h.note}</div>}
+            {!scheduleApplications.some(row=>row.replacement_resolution_id===h.id&&row.status==="applied")&&<button className="btn-next" style={{marginTop:8}} disabled={applyingSchedule} onClick={async()=>{if(!window.confirm("Apply this replacement team to future scheduled matchups? Existing completed matches and BYE weeks will remain unchanged."))return;setApplyingSchedule(true);setMessage("");const {data,error}=await supabase.rpc("apply_team_replacement_schedule",{p_replacement_resolution_id:h.id});setApplyingSchedule(false);if(error){setMessage(error.message);return;}setMessage(data?.status==="already_applied"?"Replacement schedule was already applied.":"Replacement schedule applied.");await loadHistory();}}>Apply replacement to future schedule</button>}
+            {(h.eligible_makeup_weeks??[]).map(slot=>{const key=h.id+":"+slot.sourceByeWeekId;const existing=makeupMatches.find(row=>row.replacement_resolution_id===h.id&&row.source_bye_week_id===slot.sourceByeWeekId&&row.status!=="voided");return <div key={key} style={{marginTop:10,padding:10,border:"1px solid #2E2E2E",borderRadius:10,background:"#141414"}}><strong>Bye from Week {slot.sourceWeekNum??"—"} · {slot.sourceWeekDate??""}</strong><div style={{color:"#9A9A9A",marginTop:3}}>Opponent: {slot.opponentName??"Unknown team"}</div>{existing?<div style={{marginTop:6}}>Scheduled {existing.scheduled_date} · {existing.status}</div>:<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8}}><div className="field"><span className="form-label">Makeup date</span><input className="input" type="date" value={makeupDates[key]??""} onChange={event=>setMakeupDates(prev=>({...prev,[key]:event.target.value}))}/></div><button className="btn-primary" disabled={!!schedulingMakeupId||(h.makeup_matches_used??0)>=(h.makeup_matches_allowed??0)} onClick={()=>scheduleMakeup(h,slot)}>{schedulingMakeupId===key?"Scheduling…":"Schedule makeup"}</button></div>}</div>})}
+          </div>)}
+        </div>
       </div>
     </div>
   );
+}
 }
