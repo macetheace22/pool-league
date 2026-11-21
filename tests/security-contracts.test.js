@@ -569,11 +569,11 @@ describe("Section 101 practice opponent identity confirmation", () => {
     const db = read("src/db.js");
     const practice = read("src/Practice.jsx");
     expect(db).toContain('supabase.rpc("request_practice_opponent_link"');
-    expect(db).toContain('supabase.rpc("list_practice_opponent_link_requests")');
+    expect(db).toContain('supabase.rpc("list_practice_opponent_link_requests_with_names")');
     expect(db).toContain('supabase.rpc("respond_practice_opponent_link"');
     expect(db).toContain('supabase.rpc("cancel_practice_opponent_link_request"');
     expect(db).not.toContain("export async function linkPracticeOpponent(");
-    expect(practice).toContain("They must confirm before your practice history is linked.");
+    expect(practice).toContain("they must confirm before your practice history is linked.");
     expect(practice).toContain("Practice Identity Requests");
     expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
     expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, false)");
@@ -691,7 +691,7 @@ describe("Section 105 account full names and identity validation", () => {
     expect(sql).toContain("public.list_linked_practice_game_owners");
     expect(sql).toContain("public.list_linked_practice_opponent_names");
     expect(db).toContain('supabase.rpc("list_linked_practice_opponent_names"');
-    expect(db).toContain('supabase.rpc("list_linked_practice_game_owners"');
+    expect(db).toContain('"list_linked_practice_game_owners"');
     expect(db).toContain("opponent_name: linkedName");
     expect(db).not.toContain(".update({ opponent_name:");
   });
