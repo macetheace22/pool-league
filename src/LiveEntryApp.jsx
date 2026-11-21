@@ -1004,7 +1004,7 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
   const ready = homeNoPlayer && awayNoPlayer && !!homePlayer && !!awayPlayer;
   const submit = () => {
     if (!ready) return;
-    const gladiatorSet = createGladiatorSet(match.sets[setIdx], setIdx, homePlayer, awayPlayer);
+    const gladiatorSet = createGladiatorSet(match.sets[setIdx], setIdx, homePlayer, awayPlayer, match.sets);
     if (!gladiatorSet) return;
     const sets = match.sets.map((set, index) => index === setIdx ? gladiatorSet : set);
     onConfirm({ ...match, sets, gladiatorSetIndex: setIdx, gladiatorMatch: true, phase: "live", confirmedHome: false, confirmedAway: false });
