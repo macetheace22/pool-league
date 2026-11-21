@@ -50,7 +50,8 @@ export function buildSeasonalByePlan(tournamentType, teams) {
       remaining -= group.length;
       continue;
     }
-    const hasCompleteByeRank = group.every(team => Number.isFinite(Number(team.byeRank))) && new Set(group.map(team => Number(team.byeRank))).size === group.length;
+    const ranks = group.map(team => Number(team.byeRank));
+    const hasCompleteByeRank = group.every(team => team.byeRank !== undefined && team.byeRank !== null && Number.isFinite(Number(team.byeRank))) && new Set(ranks).size === group.length;
     if (hasCompleteByeRank) {
       const sorted = [...group].sort((a, b) => Number(a.byeRank) - Number(b.byeRank));
       awarded.push(...sorted.slice(0, remaining).map(team => team.teamId));
@@ -59,9 +60,13 @@ export function buildSeasonalByePlan(tournamentType, teams) {
     }
     remaining = 0;
   }
+  const awardedSet = new Set(awarded);
+  const pendingSet = new Set(pending);
   return {
     tournamentType, qualifiedTeamCount: field.length, bracketSize, byeCount,
-    awardedTeamIds: awarded, pendingTeamIds: pending,
+    awardedTeamIds: awarded,
+    nonByeTeamIds: eligible.filter(team => !awardedSet.has(team.teamId) && !pendingSet.has(team.teamId)).map(team => team.teamId),
+    pendingTeamIds: pending,
     unclassifiedTeamIds: invalid.map(team => team.teamId),
     requiresReview: pending.length > 0 || invalid.length > 0,
     unresolvedByes: Math.max(0, byeCount - awarded.length),
