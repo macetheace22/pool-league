@@ -58,7 +58,7 @@ begin
       nullif(trim(new.last_name), ''),
       nullif(trim(v_metadata->>'last_name'), ''),
       nullif(trim(v_metadata->>'family_name'), ''),
-      nullif(regexp_replace(v_metadata_full_name, '^\\S+\\s*', ''), '')
+      nullif(regexp_replace(v_metadata_full_name, '^[^[:space:]]+[[:space:]]*', ''), '')
     );
   end if;
 
