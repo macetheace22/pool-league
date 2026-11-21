@@ -584,7 +584,7 @@ function OpponentStep({ profile, session, setSession, onNext, onBack, onCancel }
             <div className="form-label">People you've played before</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
               {myOpponents.map(o => (
-                <button key={o.id} className="chip" onClick={() => pickManualExisting(o)}>{o.name}</button>
+                <button key={o.id} className="chip" onClick={() => pickManualExisting(o)}>{o.display_name || o.name}</button>
               ))}
             </div>
           </div>
