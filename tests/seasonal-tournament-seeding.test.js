@@ -108,4 +108,37 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     expect(plans.championship.teams[0].divisionLabel).toBe("Division 7");
     expect(plans.consolation.teams[0].divisionLabel).toBe("Division 7");
   });
+
+  it("builds a complete single-elimination bracket with category-priority byes", () => {
+    const teams = [
+      { teamId: "c1", divisionId: "d1", seedCategory: "first_place_and_division_champion" },
+      { teamId: "c2", divisionId: "d2", seedCategory: "first_place_not_division_champion" },
+      { teamId: "c3", divisionId: "d3", seedCategory: "below_first_division_champion" },
+      { teamId: "c4", divisionId: "d4", seedCategory: "below_first_division_champion" },
+      { teamId: "c5", divisionId: "d5", seedCategory: "below_first_division_champion" },
+    ];
+    const bracket = buildSeasonalTournamentBracket("championship", teams);
+    expect(bracket.error).toBeUndefined();
+    expect(bracket.entries.map(entry => entry.seedNum)).toEqual([1, 2, 3, 4, 5]);
+    expect(bracket.byePlan.awardedTeamIds).toEqual(["c1", "c2", "c3"]);
+    expect(bracket.matches).toHaveLength(7);
+    expect(bracket.matches.filter(match => match.isBye).map(match => match.winnerTeamId).sort()).toEqual(["c1", "c2", "c3"]);
+    expect(bracket.matches.every(match => !match.feedsIntoMatchKey || bracket.matches.some(target => target.matchKey === match.feedsIntoMatchKey))).toBe(true);
+  });
+  it("requires category verification and category-priority order before building", () => {
+    expect(buildSeasonalTournamentBracket("consolation", [
+      { teamId: "x1", seedCategory: "consolation_champion_history_unverified" },
+    ]).error).toContain("verified");
+    expect(buildSeasonalTournamentBracket("championship", [
+      { teamId: "x1", seedCategory: "below_first_division_champion" },
+      { teamId: "x2", seedCategory: "first_place_and_division_champion" },
+    ]).error).toContain("ordered");
+  });
+  it("handles a one-team seasonal tournament as an immediate champion", () => {
+    const bracket = buildSeasonalTournamentBracket("championship", [
+      { teamId: "solo", divisionId: "d1", seedCategory: "first_place_and_division_champion" },
+    ]);
+    expect(bracket.matches).toEqual([]);
+    expect(bracket.championTeamId).toBe("solo");
+  });
 });
