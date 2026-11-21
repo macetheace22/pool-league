@@ -263,7 +263,7 @@ function RegisterScreen({ onBack }) {
     setLoading(false);
     if (error) {
       setError(error.message?.includes("PLAYER_ALREADY_CLAIMED")
-        ? "That player number is already linked to another account. Ask your league manager to verify the roster entry."
+        ? "This roster player number is already linked to another account. Ask your captain to verify that the roster entry is correct. If the existing account link is wrong, the league manager will need to resolve that exceptional conflict."
         : error.message);
       return;
     }
@@ -284,6 +284,9 @@ function RegisterScreen({ onBack }) {
       ) : !codeValid ? (
         <>
           <div className="auth-screen__sub">Enter your invite code</div>
+          <div style={{fontSize:11,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
+            Already on an IBA team roster? Ask your team captain for a player-specific code before registering. It connects your account to your existing player number and league history—don't create a second player entry. You can also register without a code and redeem one later from Profile.
+          </div>
           <div className="field"><Label>Invite Code</Label>
             <input className="input input--code" value={code} onChange={e => setCode(e.target.value)} placeholder="XXXXXX" autoCapitalize="characters" />
           </div>
@@ -306,7 +309,7 @@ function RegisterScreen({ onBack }) {
           <div className="field"><Label>Phone Number (optional)</Label>
             <input className="input" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(555) 555-5555" />
           </div>
-          <div style={{fontSize:10.5,color:"#6A6A6A",lineHeight:1.5}}>Your player number is linked securely through a player-specific invite code. If you already play in the league, ask your captain or league manager for one.</div>
+          <div style={{fontSize:10.5,color:"#6A6A6A",lineHeight:1.5}}>A player-specific invite code links this account to an existing IBA player record and roster membership. If you already play, get the code from your team captain. If you skipped the code, redeem it later in Profile → Redeem Invite Code.</div>
           <div className="field"><Label>Email</Label>
             <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" autoCapitalize="none" />
           </div>
