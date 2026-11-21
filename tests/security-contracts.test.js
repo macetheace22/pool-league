@@ -563,7 +563,7 @@ describe("league player identity claim onboarding", () => {
     const db = read("src/db.js");
     expect(auth).toContain("Ask your team captain for a player-specific code before registering.");
     expect(auth).toContain("don't create a second player entry");
-    expect(auth).toContain("redeem it later from Profile");
+    expect(auth).toContain("redeem it later in Profile");
     expect(admin).toContain("This is your league-wide player identity");
     expect(admin).toContain("Redeem Player Invite Code");
     expect(admin).toContain("it does not create a new player record");
