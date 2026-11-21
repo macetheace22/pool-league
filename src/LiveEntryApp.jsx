@@ -1551,7 +1551,8 @@ function ConfirmScreen({ match, onSave }) {
   const awaySets = match.sets.filter((s) => s.complete && s.winnerSlot === "away").length;
   const completedSets = match.sets.filter(set => set.complete).length;
   const { homePoints, awayPoints } = db.computeMatchPoints(match);
-  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets });
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
   const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   const confirmSide = (side) => {
@@ -1764,7 +1765,8 @@ function DoneScreen({ match, onReset }) {
 
   const { homePoints, awayPoints } = db.computeMatchPoints(match);
   const completedSets = match.sets.filter(set => set.complete).length;
-  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets });
+  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
   const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   return (
