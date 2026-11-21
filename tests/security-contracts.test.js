@@ -515,7 +515,7 @@ describe("Section 101 practice opponent identity confirmation", () => {
     const sql = read("supabase-schema-section-101-practice-opponent-link-requests.sql");
     expect(sql).toContain("create table if not exists public.practice_opponent_link_requests");
     expect(sql).toContain("alter table public.practice_opponent_link_requests enable row level security");
-    expect(sql).toContain("revoke all on table public.practice_opponent_link_requests from public, anon, authenticated");
+    expect(sql).toContain("revoke all on public.practice_opponent_link_requests from public, anon, authenticated");
     expect(sql).toContain("create unique index if not exists practice_opponent_link_requests_one_pending_per_opponent");
     expect(sql).toContain("r.requested_by = (select auth.uid())");
     expect(sql).toContain("r.target_profile_id = (select auth.uid())");
