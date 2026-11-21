@@ -156,12 +156,36 @@ export async function resumeMakeupMatch(matchRow) {
 }
 
 // ─── Playoffs ───────────────────────────────────────────────────────────────
-// Final standings, seeded 1..N, real teams only (skips synthetic "manual:name"
-// rows from a standings import that was never matched to a real team --
-// those can't anchor a real schedule_pairing).
+// Final playoff seeds come from the latest official IBA standings report.
+// App-entered match results are deliberately not added: IBA publishes the
+// authoritative cumulative totals and positions used for league standings.
 export async function computeFinalStandings(divisionId) {
-  const [matches, adj] = await Promise.all([listCompletedMatches(divisionId), listStandingsAdjustments(divisionId)]);
-  return computeStandings(matches, adj).filter(s => typeof s.teamId === "string" && !s.teamId.startsWith("manual:"));
+  const adjustments = await listStandingsAdjustments(divisionId);
+  const prepared = prepareOfficialPlayoffSeeds(adjustments);
+  if (prepared.error) return prepared;
+
+  // The current view intentionally excludes unmatched team rows. Check the
+  // raw import rows for this same report week so an unresolved team cannot
+  // silently disappear from the bracket seed list.
+  const weekKey = adjustments[0]?.week_key;
+  const [{ data: unmatchedRows, error: unmatchedError }, { data: divisionTeams, error: teamsError }] = await Promise.all([
+    supabase.from("standings_adjustments").select("team_num")
+      .eq("division_id", divisionId).eq("week_key", weekKey).is("team_id", null),
+    supabase.from("teams").select("team_num").eq("division_id", divisionId),
+  ]);
+  if (unmatchedError || teamsError) {
+    return { error: "Could not validate unmatched teams in the official IBA standings import." };
+  }
+  // Older unmatched rows can remain after a manager fixes the team-number
+  // mapping and re-imports the same week (NULL team_id does not conflict in
+  // the import upsert). Treat them as resolved when that team number now maps
+  // to a real team in this division.
+  const knownTeamNums = new Set((divisionTeams ?? []).map(team => String(team.team_num ?? "").trim()).filter(Boolean));
+  const unresolvedRows = (unmatchedRows ?? []).filter(row => !knownTeamNums.has(String(row.team_num ?? "").trim()));
+  if (unresolvedRows.length) {
+    return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
+  }
+  return prepared;
 }
 
 async function createPlayoffWeek(divisionId, label) {
@@ -180,8 +204,10 @@ export async function generateChampionshipBracket(divisionId) {
   const existing = await listPlayoffBrackets(divisionId);
   if (existing.some(m => m.bracket_type === "championship")) return { error: "A championship bracket already exists for this division." };
 
-  const standings = await computeFinalStandings(divisionId);
-  if (standings.length < 4) return { error: "Need at least 4 teams with standings to seed a championship bracket." };
+  const seedResult = await computeFinalStandings(divisionId);
+  if (seedResult.error) return seedResult;
+  const standings = seedResult.standings;
+  if (standings.length < 4) return { error: "Need at least 4 teams with official IBA standings to seed a championship bracket." };
   const [s1, s2, s3, s4] = standings;
 
   const week = await createPlayoffWeek(divisionId, "Championship Semifinals");
@@ -229,9 +255,13 @@ export async function previewConsolationBrackets(divisionId) {
   const divisionIds = (sisterDivisions ?? []).map(d => d.id);
 
   const pools = await Promise.all(divisionIds.map(async (divId) => {
-    const standings = await computeFinalStandings(divId);
-    return { divisionId: divId, consolationTeams: standings.slice(4) }; // 5th place onward
+    const result = await computeFinalStandings(divId);
+    return result.error
+      ? { divisionId: divId, error: result.error }
+      : { divisionId: divId, consolationTeams: result.standings.slice(4) }; // 5th place onward
   }));
+  const invalidPool = pools.find(pool => pool.error);
+  if (invalidPool) return { error: invalidPool.error };
 
   let pool = pools.find(p => p.divisionId === divisionId)?.consolationTeams ?? [];
   const otherPools = pools.filter(p => p.divisionId !== divisionId && p.consolationTeams.length > 0);
@@ -2328,6 +2358,27 @@ export function computeOfficialStandings(adjustments = []) {
     reportLabel: adj.label ?? null, source: "official_iba",
   })).sort((a,b) => a.position == null ? (b.position == null ? 0 : 1) : b.position == null ? -1 : a.position-b.position);
 }
+// Validate the imported report before using it for bracket generation.
+// The current view selects the latest row per team, so a partial import can
+// otherwise leave teams on different report weeks. Fail closed on mixed weeks,
+// unmatched teams, or unusable/duplicate published positions.
+export function prepareOfficialPlayoffSeeds(adjustments = [], hasUnmatchedRows = false) {
+  const rows = adjustments ?? [];
+  if (!rows.length) return { error: "Import the official IBA standings report before generating playoff brackets." };
+  if (hasUnmatchedRows || rows.some(row => !row.team_id)) {
+    return { error: "Resolve all unmatched teams in the official IBA standings import before generating playoff brackets." };
+  }
+  const weekKeys = new Set(rows.map(row => row.week_key).filter(Boolean));
+  if (rows.some(row => !row.week_key) || weekKeys.size !== 1) {
+    return { error: "The imported standings contain mixed or missing report weeks. Re-import the complete division report before generating playoff brackets." };
+  }
+  const positions = rows.map(row => row.position);
+  if (positions.some(position => !Number.isInteger(position) || position < 1) || new Set(positions).size !== positions.length) {
+    return { error: "The official standings report has missing or duplicate positions. Correct the import before generating playoff brackets." };
+  }
+  return { standings: computeOfficialStandings(rows) };
+}
+
 export function computeOfficialMvp(adjustments = []) {
   return (adjustments ?? []).map(adj => ({
     num: adj.player_num ?? `manual:${adj.player_name}`, name: adj.player_name,
@@ -2970,11 +3021,10 @@ export async function getStatsForDivisions(playerNum, divisionIds) {
   return ranked.find(p => p.num === playerNum) ?? zero;
 }
 
-// One team's wins/losses/points/sets-for/sets-against within its division's
-// real standings, plus its rank -- runs the exact same computeStandings()
-// formula the division's own Standings tab uses (points-based, matching the
-// real IBA report), scoped to the whole division so the rank is accurate,
-// then picks out just this one team's row. Powers Team Lookup's record card.
+// One team's official IBA wins/losses/points/sets-for/sets-against and
+// published position within its division. This deliberately uses the same
+// imported snapshot as the Standings screen, not app-recomputed match totals.
+// Powers Team Lookup's record card.
 export async function getTeamStandingsRow(teamId, divisionId) {
   const adjustments = await listStandingsAdjustments(divisionId);
   const standings = computeOfficialStandings(adjustments);
