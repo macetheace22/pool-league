@@ -925,3 +925,53 @@ describe("unfinished Practice session recovery query", () => {
     expect(query).not.toContain('.order("created_at"');
   });
 });
+
+
+describe("Section 108 shared Practice sessions", () => {
+  it("shares only newly created opponent sessions with a confirmed linked account", () => {
+    const sql = read("supabase-schema-section-108-shared-practice-sessions.sql");
+    expect(sql).toContain("add column if not exists shared_with_profile_id");
+    expect(sql).toContain("new.shared_with_profile_id := null");
+    expect(sql).toContain("public.practice_opponents");
+    expect(sql).toContain("profile.player_num = new.opponent_player_num");
+    expect(sql).toContain("new.created_by is distinct from (select auth.uid())");
+    expect(sql).toContain("create policy \"read shared practice games\"");
+    expect(sql).toContain("create policy \"read shared practice game results\"");
+  });
+
+  it("allows both session participants to record and undo results without exposing creator-oriented scores", () => {
+    const sql = read("supabase-schema-section-108-shared-practice-sessions.sql");
+    expect(sql).toContain("shared_with_profile_id = (select auth.uid())");
+    expect(sql).toContain("v_is_shared_viewer := v_parent.created_by <> (select auth.uid())");
+    expect(sql).toContain("v_my_points := p_opponent_points");
+    expect(sql).toContain("v_winner := case when v_winner = 'me' then 'opponent' else 'me' end");
+    expect(sql).toContain("create or replace function public.undo_last_practice_game_result");
+    expect(sql).toContain("create or replace function public.finish_practice_game");
+    expect(sql).toContain("revoke all on function public.record_practice_game_result");
+    expect(sql).toContain("grant execute on function public.record_practice_game_result");
+  });
+
+  it("keeps discard and existing private practice sessions creator-owned", () => {
+    const sql = read("supabase-schema-section-108-shared-practice-sessions.sql");
+    expect(sql).not.toContain("create policy \"delete shared practice games\"");
+    expect(sql).toContain("new.shared_with_profile_id := null");
+    expect(sql).toContain("v_created_by is distinct from auth.uid()");
+    const db = read("src/db.js");
+    expect(db).toContain('.eq("created_by", profileId).select().single()');
+    expect(db).toContain('supabase.rpc("discard_practice_game"');
+  });
+
+  it("lists shared unfinished and completed sessions for the invited participant and reverses their perspective", () => {
+    const db = read("src/db.js");
+    const practice = read("src/Practice.jsx");
+    const history = read("src/practiceHistory.js");
+    expect(db).toContain('shared_with_profile_id.eq.${profileId}');
+    expect(db).toContain('.eq("shared_with_profile_id", profileId)');
+    expect(db).toContain("toLinkedPracticeGame(game");
+    expect(history).toContain("my_score: game.opponent_score");
+    expect(history).toContain("opponent_player_num: owner.player_num");
+    expect(practice).toContain("viewerIsSharedParticipant");
+    expect(practice).toContain('session.viewerPerspective === "shared" ? "linked" : "creator"');
+    expect(practice).toContain("await db.finishPracticeGame(session.gameId)");
+  });
+});
