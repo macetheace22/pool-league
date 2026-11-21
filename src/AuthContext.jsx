@@ -259,17 +259,6 @@ function RegisterScreen({ onBack }) {
     setLoading(true);
     const taken = await db.isUsernameTaken(username.trim());
     if (taken) { setLoading(false); setError("Username taken."); return; }
-    if (code.trim()) {
-      const nameCheck = await db.validatePlayerInviteName(code.trim(), firstName.trim(), lastName.trim());
-      if (nameCheck !== "OK") {
-        setLoading(false);
-        setError(nameCheck === "PLAYER_NAME_MISMATCH"
-          ? "The first and last name must match the IBA player record for this invite code. Check the roster name with your captain if it looks incorrect."
-          : nameCheck === "PLAYER_NOT_FOUND" ? "The player number on this invite code is not in the current IBA player list. Contact your captain or league manager."
-          : "That invite code is no longer valid. Verify it with your captain.");
-        return;
-      }
-    }
     const { error } = await supabase.auth.signUp({
       email: email.trim(), password,
       options: { data: { invite_code: code.trim(), first_name: firstName.trim(), last_name: lastName.trim(), username: username.trim(), phone_number: phone.trim() } },
@@ -278,7 +267,9 @@ function RegisterScreen({ onBack }) {
     if (error) {
       setError(error.message?.includes("PLAYER_ALREADY_CLAIMED")
         ? "This roster player number is already linked to another account. Ask your captain to verify that the roster entry is correct. If the existing account link is wrong, the league manager will need to resolve that exceptional conflict."
-        : error.message);
+        : code.trim() && error.message?.toLowerCase().includes("database error")
+          ? "Account creation failed. If you used a player invite code, verify that your first and last name match the IBA player record, then try again or ask your captain to check the roster name."
+          : error.message);
       return;
     }
     setError("");
