@@ -5,12 +5,12 @@ export function canOfferGladiatorMatch({ isPlayoff = false, sets = [], setIdx = 
   if (!isPlayoff || setIdx < 1 || setIdx >= 5) return false;
   if (homePoints != null && awayPoints != null && homePoints !== awayPoints) return false;
   const prior = sets.slice(0, setIdx);
-  if (!prior.length || prior.some(set => !set?.complete || set?.isGladiator)) return false;
+  if (!prior.length || prior.some(set => !set?.complete || set?.forfeited || set?.isGladiator)) return false;
   if (!prior.some(set => set?.playerHome && set?.playerAway)) return false;
   const later = sets.slice(setIdx + 1);
   if (later.some(set => set?.complete || set?.playerHome || set?.playerAway || (set?.racks?.length ?? 0) > 0)) return false;
   const current = sets[setIdx];
-  if (!current || current.complete || (current.racks ?? []).length > 0) return false;
+  if (!current || current.complete || current.playerHome || current.playerAway || (current.racks ?? []).length > 0) return false;
   if (!gladiatorPlayerChoices(sets, setIdx, "home").length || !gladiatorPlayerChoices(sets, setIdx, "away").length) return false;
   return true;
 }
