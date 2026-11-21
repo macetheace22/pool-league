@@ -77,10 +77,6 @@ export async function getProfile(userId) {
     captain_team_ids: captainTeamsError ? [] : (captainTeams ?? []).map(team => team.id),
   };
 }
-export async function validatePlayerInviteName(code, firstName, lastName) {
-  const { data, error } = await supabase.rpc("validate_player_invite_name", { p_code: code, p_first_name: firstName, p_last_name: lastName });
-  return error ? "ERROR" : data;
-}
 export async function updateOwnFullName(userId, firstName, lastName) {
   const { error } = await supabase.from("profiles").update({ first_name: firstName, last_name: lastName }).eq("id", userId);
   return error ? { ok: false, message: error.message } : { ok: true };
