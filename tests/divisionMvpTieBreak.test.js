@@ -79,6 +79,73 @@ describe("Division MVP Rule 5.5 tie-break audit", () => {
     expect(result[0].outcome).toBe("opponent-rating-average");
   });
 
+  it("treats NR ratings as unrated fixed targets when scoring head-to-head points", () => {
+    const result = buildDivisionMvpTieBreakAudit({
+      officialMvp,
+      schedule,
+      matches: [match([set(
+        { num: "11111", rating: "NR" },
+        { num: "22222", rating: 50 },
+        [[20, 10], [25, 10]],
+        "home",
+      )])],
+    });
+    expect(result[0].outcome).toBe("head-to-head-points");
+    expect(result[0].players.map(player => player.headToHeadPoints)).toEqual([145, 20]);
+    expect(result[0].winnerNum).toBe("11111");
+  });
+
+  it("resolves a three-player head-to-head tie group only when one player has uniquely highest points", () => {
+    const tiedMvp = officialMvp.map(player => ({ ...player, mvpRanking: 1200 }));
+    const threeSchedule = [
+      { date: "9/1/2026", pairings: [{ id: "ab", homeTeamId: "team-a", awayTeamId: "team-b" }] },
+      { date: "9/8/2026", pairings: [{ id: "bc", homeTeamId: "team-b", awayTeamId: "team-c" }] },
+      { date: "9/15/2026", pairings: [{ id: "ac", homeTeamId: "team-a", awayTeamId: "team-c" }] },
+    ];
+    const threeMatches = [
+      { team_home_id: "team-a", team_away_id: "team-b", state: { schedulePairingId: "ab", format: "open", sets: [set({ num: "11111", rating: 40 }, { num: "22222", rating: 35 }, [[20, 10], [25, 10]])] } },
+      { team_home_id: "team-b", team_away_id: "team-c", state: { schedulePairingId: "bc", format: "open", sets: [set({ num: "22222", rating: 40 }, { num: "33333", rating: 35 }, [[20, 10], [25, 10]])] } },
+      { team_home_id: "team-a", team_away_id: "team-c", state: { schedulePairingId: "ac", format: "open", sets: [set({ num: "11111", rating: 40 }, { num: "33333", rating: 35 }, [[20, 10], [25, 10]])] } },
+    ];
+    const result = buildDivisionMvpTieBreakAudit({ officialMvp: tiedMvp, schedule: threeSchedule, matches: threeMatches });
+    expect(result[0].outcome).toBe("head-to-head-points");
+    expect(result[0].winnerNum).toBe("11111");
+  });
+
+  it("resolves a three-player tie by opponent rating only when the highest average is at least five points above second place", () => {
+    const tiedMvp = officialMvp.map(player => ({ ...player, mvpRanking: 1200 }));
+    const threeSchedule = [{ date: "9/1/2026", pairings: [
+      { id: "a-x", homeTeamId: "team-a", awayTeamId: "x" },
+      { id: "b-y", homeTeamId: "team-b", awayTeamId: "y" },
+      { id: "c-z", homeTeamId: "team-c", awayTeamId: "z" },
+    ] }];
+    const threeMatches = [
+      { team_home_id: "team-a", team_away_id: "x", state: { schedulePairingId: "a-x", format: "open", sets: [set({ num: "11111", rating: 40 }, { num: "x", rating: 50 }, [[10, 10]])] } },
+      { team_home_id: "team-b", team_away_id: "y", state: { schedulePairingId: "b-y", format: "open", sets: [set({ num: "22222", rating: 40 }, { num: "y", rating: 45 }, [[10, 10]])] } },
+      { team_home_id: "team-c", team_away_id: "z", state: { schedulePairingId: "c-z", format: "open", sets: [set({ num: "33333", rating: 40 }, { num: "z", rating: 60 }, [[10, 10]])] } },
+    ];
+    const result = buildDivisionMvpTieBreakAudit({ officialMvp: tiedMvp, schedule: threeSchedule, matches: threeMatches });
+    expect(result[0].outcome).toBe("opponent-rating-average");
+    expect(result[0].winnerNum).toBe("33333");
+  });
+
+  it("fails closed when a multi-player tie remains unresolved by opponent averages", () => {
+    const tiedMvp = officialMvp.map(player => ({ ...player, mvpRanking: 1200 }));
+    const threeSchedule = [{ date: "9/1/2026", pairings: [
+      { id: "a-x", homeTeamId: "team-a", awayTeamId: "x" },
+      { id: "b-y", homeTeamId: "team-b", awayTeamId: "y" },
+      { id: "c-z", homeTeamId: "team-c", awayTeamId: "z" },
+    ] }];
+    const threeMatches = [
+      { team_home_id: "team-a", team_away_id: "x", state: { schedulePairingId: "a-x", format: "open", sets: [set({ num: "11111", rating: 40 }, { num: "x", rating: 50 }, [[10, 10]])] } },
+      { team_home_id: "team-b", team_away_id: "y", state: { schedulePairingId: "b-y", format: "open", sets: [set({ num: "22222", rating: 40 }, { num: "y", rating: 48 }, [[10, 10]])] } },
+      { team_home_id: "team-c", team_away_id: "z", state: { schedulePairingId: "c-z", format: "open", sets: [set({ num: "33333", rating: 40 }, { num: "z", rating: 46 }, [[10, 10]])] } },
+    ];
+    const result = buildDivisionMvpTieBreakAudit({ officialMvp: tiedMvp, schedule: threeSchedule, matches: threeMatches });
+    expect(result[0].outcome).toBe("multi-player-review-required");
+    expect(result[0].winnerNum).toBeNull();
+  });
+
   it("does not treat missing opponent ratings as zero or use playoff matches", () => {
     const result = buildDivisionMvpTieBreakAudit({
       officialMvp,
