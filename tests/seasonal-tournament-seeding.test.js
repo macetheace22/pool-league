@@ -48,7 +48,8 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     ];
     const plan = buildSeasonalByePlan("championship", teams);
     expect(plan.awardedTeamIds).toEqual(["a", "c", "b"]);
-    expect(plan.nonByeTeamIds).toEqual(["d"]);
+    // The third category is lower priority and the bye count is already filled.
+    expect(plan.nonByeTeamIds).toEqual(["d", "e"]);
     expect(plan.pendingTeamIds).toEqual([]);
     expect(plan.requiresReview).toBe(false);
   });
