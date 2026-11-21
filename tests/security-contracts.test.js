@@ -508,3 +508,46 @@ describe("IBA schedule TBD participant readback", () => {
     expect(listSchedule).toContain("awayTbdCode: p.away_tbd_code ?? null");
   });
 });
+
+
+describe("Section 101 practice opponent identity confirmation", () => {
+  it("keeps practice opponent link requests private and requires recipient confirmation", () => {
+    const sql = read("supabase-schema-section-101-practice-opponent-link-requests.sql");
+    expect(sql).toContain("create table if not exists public.practice_opponent_link_requests");
+    expect(sql).toContain("alter table public.practice_opponent_link_requests enable row level security");
+    expect(sql).toContain("revoke all on table public.practice_opponent_link_requests from public, anon, authenticated");
+    expect(sql).toContain("create unique index if not exists practice_opponent_link_requests_one_pending_per_opponent");
+    expect(sql).toContain("r.requested_by = (select auth.uid())");
+    expect(sql).toContain("r.target_profile_id = (select auth.uid())");
+    expect(sql).toContain("if v_request.target_profile_id <> (select auth.uid()) then");
+    expect(sql).toContain("set linked_profile_id = (select auth.uid())");
+    expect(sql).toContain("set status = 'accepted', responded_at = now()");
+    expect(sql).toContain("set status = 'declined', responded_at = now()");
+    expect(sql).toContain("set status = 'cancelled', responded_at = now()");
+    expect(sql).toContain("interval '30 days'");
+    for (const signature of [
+      "request_practice_opponent_link(uuid, uuid)",
+      "list_practice_opponent_link_requests()",
+      "respond_practice_opponent_link(uuid, boolean)",
+      "cancel_practice_opponent_link_request(uuid)",
+    ]) {
+      expect(sql).toContain(`revoke all on function public.${signature} from public, anon, authenticated`);
+      expect(sql).toContain(`grant execute on function public.${signature} to authenticated`);
+    }
+  });
+
+  it("uses request, response, and cancellation RPCs instead of direct opponent linking", () => {
+    const db = read("src/db.js");
+    const practice = read("src/Practice.jsx");
+    expect(db).toContain('supabase.rpc("request_practice_opponent_link"');
+    expect(db).toContain('supabase.rpc("list_practice_opponent_link_requests")');
+    expect(db).toContain('supabase.rpc("respond_practice_opponent_link"');
+    expect(db).toContain('supabase.rpc("cancel_practice_opponent_link_request"');
+    expect(db).not.toContain("export async function linkPracticeOpponent(");
+    expect(practice).toContain("They must confirm before your practice history is linked.");
+    expect(practice).toContain("Practice Identity Requests");
+    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
+    expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, false)");
+    expect(practice).toContain("db.cancelPracticeOpponentLinkRequest(request.request_id)");
+  });
+});
