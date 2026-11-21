@@ -36,6 +36,44 @@ describe("Rule 5.5 tie-break audit", () => {
     });
   });
 
+  it("uses the same next team below the entire tied group for each tied team's record", () => {
+    const teams = [
+      { teamId: "a", name: "A", position: 1, totalPoints: 100 },
+      { teamId: "b", name: "B", position: 2, totalPoints: 100 },
+      { teamId: "c", name: "C", position: 3, totalPoints: 90 },
+    ];
+    const rows = buildRule55TieBreakAudit({
+      officialStandings: teams,
+      schedule: [
+        { week: 1, date: "9/1/2026", pairings: [{ homeTeamId: "a", awayTeamId: "c" }] },
+        { week: 2, date: "9/8/2026", pairings: [{ homeTeamId: "b", awayTeamId: "c" }] },
+      ],
+      counterSnapshots: [
+        { team_id: "a", player_num: "a1", schedule_week_date: "2026-09-01", matches_played: 5, matches_won: 4 },
+        { team_id: "c", player_num: "c1", schedule_week_date: "2026-09-01", matches_played: 5, matches_won: 1 },
+        { team_id: "b", player_num: "b1", schedule_week_date: "2026-09-08", matches_played: 5, matches_won: 3 },
+        { team_id: "c", player_num: "c1", schedule_week_date: "2026-09-08", matches_played: 10, matches_won: 4 },
+      ],
+    });
+    expect(rows.find(row => row.teamId === "a").recordVsNext).toEqual({ wins: 1, losses: 0, draws: 0, matches: 1 });
+    expect(rows.find(row => row.teamId === "b").recordVsNext).toEqual({ wins: 0, losses: 0, draws: 1, matches: 1 });
+  });
+
+  it("shows head-to-head points as unavailable when tied teams never met", () => {
+    const rows = buildRule55TieBreakAudit({
+      officialStandings: baseTeams,
+      schedule: [{ week: 1, date: "9/1/2026", pairings: [{ homeTeamId: "a", awayTeamId: "c" }, { homeTeamId: "b", awayTeamId: "d" }] }],
+      standingsHistory: [
+        { team_id: "a", week_key: "2026-09-01", points_last_wk: 50 },
+        { team_id: "b", week_key: "2026-09-01", points_last_wk: 45 },
+        { team_id: "c", week_key: "2026-09-01", points_last_wk: 40 },
+        { team_id: "d", week_key: "2026-09-01", points_last_wk: 35 },
+      ],
+    });
+    const a = rows.find(row => row.teamId === "a");
+    expect(a.headToHeadPoints).toBeNull();
+  });
+
   it("sums each player's latest team-specific cumulative wins once", () => {
     const rows = buildRule55TieBreakAudit({
       officialStandings: baseTeams.slice(0, 2),
