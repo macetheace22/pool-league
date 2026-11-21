@@ -98,71 +98,8 @@ create trigger validate_profile_full_name
   for each row
   execute function public.validate_profile_full_name();
 
--- Registration calls this before auth.signUp so a mismatched player invite
--- gives a useful message before the auth trigger attempts profile creation.
-create or replace function public.validate_player_invite_name(
-  p_code text,
-  p_first_name text,
-  p_last_name text
-)
-returns text
-language plpgsql
-security definer
-set search_path = ''
-as $function$
-declare
-  v_player_num text;
-  v_iba_name text;
-  v_account_name_normalized text;
-  v_iba_name_normalized text;
-begin
-  select invite.player_num
-    into v_player_num
-  from public.invite_codes invite
-  where invite.code = upper(trim(coalesce(p_code, '')))
-    and invite.used_at is null
-    and invite.expires_at > now();
-
-  if not found then
-    return 'INVALID_CODE';
-  end if;
-
-  if v_player_num is null then
-    return 'OK';
-  end if;
-
-  select player.name
-    into v_iba_name
-  from public.players player
-  where player.num = v_player_num;
-
-  if v_iba_name is null then
-    return 'PLAYER_NOT_FOUND';
-  end if;
-
-  v_account_name_normalized := regexp_replace(
-    lower(concat_ws(' ', trim(coalesce(p_first_name, '')), trim(coalesce(p_last_name, '')))),
-    '[^[:alnum:]]',
-    '',
-    'g'
-  );
-  v_iba_name_normalized := regexp_replace(
-    lower(trim(v_iba_name)),
-    '[^[:alnum:]]',
-    '',
-    'g'
-  );
-
-  if v_account_name_normalized = '' or v_account_name_normalized is distinct from v_iba_name_normalized then
-    return 'PLAYER_NAME_MISMATCH';
-  end if;
-
-  return 'OK';
-end;
-$function$;
-
-revoke all on function public.validate_player_invite_name(text, text, text) from public;
-grant execute on function public.validate_player_invite_name(text, text, text) to anon, authenticated;
+-- The profile trigger below is the authoritative validator during signup
+-- and later invite redemption. No anonymous name-check RPC is exposed.
 
 -- A practice identity can only be linked when both participants have
 -- completed their account names. The existing mutual-confirmation RPC remains
@@ -178,13 +115,36 @@ declare
   v_owner_last text;
   v_target_first text;
   v_target_last text;
+  v_request_id uuid;
 begin
+  if tg_op = 'INSERT' then
+    if new.linked_profile_id is not null then
+      raise exception 'PRACTICE_LINK_CONFIRMATION_REQUIRED';
+    end if;
+    return new;
+  end if;
+
   if new.linked_profile_id is null or new.linked_profile_id is not distinct from old.linked_profile_id then
     return new;
   end if;
 
   if old.linked_profile_id is not null then
     raise exception 'PRACTICE_OPPONENT_ALREADY_LINKED';
+  end if;
+
+  -- Only the profile named as the recipient may confirm a pending request.
+  -- This prevents the row owner from bypassing the mutual-confirmation RPC.
+  select request.id into v_request_id
+  from public.practice_opponent_link_requests request
+  where request.opponent_id = new.id
+    and request.target_profile_id = (select auth.uid())
+    and request.link_profile_id = new.linked_profile_id
+    and request.status = 'pending'
+    and request.expires_at > now()
+  for update;
+
+  if v_request_id is null then
+    raise exception 'PRACTICE_LINK_CONFIRMATION_REQUIRED';
   end if;
 
   select profile.first_name, profile.last_name
@@ -204,6 +164,12 @@ begin
     raise exception 'PRACTICE_LINK_FULL_NAME_REQUIRED';
   end if;
 
+  -- Keep the request state consistent even if the recipient confirms through
+  -- an authorized direct row update rather than the app's response RPC.
+  update public.practice_opponent_link_requests
+  set status = 'accepted', responded_at = now()
+  where id = v_request_id;
+
   return new;
 end;
 $function$;
@@ -212,7 +178,7 @@ revoke all on function public.validate_practice_opponent_link_names() from publi
 
 drop trigger if exists validate_practice_opponent_link_names on public.practice_opponents;
 create trigger validate_practice_opponent_link_names
-  before update of linked_profile_id
+  before insert or update of linked_profile_id
   on public.practice_opponents
   for each row
   execute function public.validate_practice_opponent_link_names();
