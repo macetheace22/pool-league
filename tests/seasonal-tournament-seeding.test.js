@@ -90,7 +90,7 @@ describe("Section 5.4 seasonal tournament seeding", () => {
   });
   it("aggregates division qualifiers into season-wide Championship and Consolation fields", () => {
     const plans = buildSeasonalTournamentPlans([
-      { division: { id: "d1" }, seeding: {
+      { division: { id: "d1", num: 7 }, seeding: {
         championship: [{ teamId: "c1", seedCategory: "first_place_and_division_champion" }],
         consolation: [{ teamId: "x1" }],
       }, playoffMatches: [
@@ -105,5 +105,7 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     expect(plans.championship.teams.map(team => team.teamId)).toEqual(["c1", "c2"]);
     expect(plans.consolation.teams[0]).toMatchObject({ teamId: "x1", seedCategory: "consolation_champion_back_to_back_wins", receivedBye: false });
     expect(plans.championship.byePlan.qualifiedTeamCount).toBe(2);
+    expect(plans.championship.teams[0].divisionLabel).toBe("Division 7");
+    expect(plans.consolation.teams[0].divisionLabel).toBe("Division 7");
   });
 });
