@@ -357,9 +357,10 @@ export default function LiveEntryApp() {
         const marked = { ...match, archiving: true };
         await saveMatch(pairingId, marked);
         const { homePoints, awayPoints } = db.computeMatchPoints(marked);
+        const completedSets = marked.sets.filter(s => s.complete).length;
         const homeSets = marked.sets.filter(s => s.complete && s.winnerSlot === "home").length;
         const awaySets = marked.sets.filter(s => s.complete && s.winnerSlot === "away").length;
-        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff });
+        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff, completedSets });
         const winnerId = winnerSlot === "home" ? marked.teamHome?.id : winnerSlot === "away" ? marked.teamAway?.id : null;
 
         // Scheduled league matches use one database transaction for archive
