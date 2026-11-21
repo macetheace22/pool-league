@@ -720,6 +720,17 @@ describe("full-name player lookup and empty stats cards", () => {
     expect(admin).toContain("{p.name}{p.nickname ? ` \"${p.nickname}\"` : \"\"}");
   });
 
+  it("uses linked account full names in the People you've played before shortcuts", () => {
+    const practice = read("src/Practice.jsx");
+    const db = read("src/db.js");
+    const sql = read("supabase-schema-section-106-practice-opponent-shortcut-names.sql");
+    expect(db).toContain('supabase.rpc("list_my_practice_opponents_with_names")');
+    expect(practice).toContain("{o.display_name || o.name}");
+    expect(sql).toContain("public.list_my_practice_opponents_with_names()");
+    expect(sql).toContain("opponent.linked_profile_id = (select auth.uid())");
+    expect(sql).toContain("grant execute on function public.list_my_practice_opponents_with_names() to authenticated");
+  });
+
   it("does not render empty Track a Rack or unavailable Tournament Statistics cards", () => {
     const admin = read("src/AdminApp.jsx");
     expect(admin).not.toContain("No Track a Rack shots have been recorded yet for this play type.");
