@@ -235,6 +235,8 @@ begin
        select 1 from public.seasonal_tournament_matches
         where tournament_id = p_tournament_id and status in ('completed', 'in_progress')
      ) then 'in_progress' else 'confirmed' end,
+         champion_team_id = case when jsonb_array_length(p_entries) = 1
+           then (p_entries->0->>'team_id')::uuid else null end,
          review_required_at = null,
          review_reason = null,
          updated_at = now()
