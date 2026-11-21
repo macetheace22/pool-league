@@ -13,6 +13,7 @@ import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
 import { hasLaterStartedSet } from "./forfeitRules";
 import { liveSetDisposition } from "./liveSetDisposition";
+import { canEndPostseasonMatchEarly, resolveTeamMatchWinner } from "./playoffMatchRules";
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -355,9 +356,11 @@ export default function LiveEntryApp() {
       (async () => {
         const marked = { ...match, archiving: true };
         await saveMatch(pairingId, marked);
-        const homeSets = marked.sets.filter(s => s.winnerSlot === "home").length;
-        const awaySets = marked.sets.filter(s => s.winnerSlot === "away").length;
-        const winnerId = homeSets > awaySets ? marked.teamHome?.id : awaySets > homeSets ? marked.teamAway?.id : null;
+        const { homePoints, awayPoints } = db.computeMatchPoints(marked);
+        const homeSets = marked.sets.filter(s => s.complete && s.winnerSlot === "home").length;
+        const awaySets = marked.sets.filter(s => s.complete && s.winnerSlot === "away").length;
+        const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!marked.isPlayoff });
+        const winnerId = winnerSlot === "home" ? marked.teamHome?.id : winnerSlot === "away" ? marked.teamAway?.id : null;
 
         // Scheduled league matches use one database transaction for archive
         // plus playoff advancement. Recreational matches have no schedule
@@ -1066,6 +1069,9 @@ function ForfeitTableForm({ match, setIdx, used, defaultForfeitingSide, lockForf
 // ─── Live Screen (scoring) ────────────────────────────────────────────────────
 function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
   const completedCount = match.sets.filter((s) => s.complete).length;
+  const homeSets = match.sets.filter(s => s.complete && s.winnerSlot === "home").length;
+  const awaySets = match.sets.filter(s => s.complete && s.winnerSlot === "away").length;
+  const canEndEarly = canEndPostseasonMatchEarly({ isPlayoff: !!match.isPlayoff, homeSets, awaySets, completedCount, totalSets: match.sets.length });
   const [showScoresheet, setShowScoresheet] = useState(false);
   const scoresheetMatch = {
     venue: match.venue,
@@ -1080,6 +1086,16 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
   return (
     <div className="screen">
       <SetTabBar sets={match.sets} activeSet={activeSet} onSelect={setActiveSet} />
+      {canEndEarly && (
+        <button className="btn-secondary" style={{width:"100%",marginBottom:10,borderColor:"#5FCF9E",color:"#5FCF9E"}}
+          onClick={() => {
+            if (window.confirm("The postseason match has reached a 3-set majority. End the match now? Unplayed sets will remain unplayed and receive no positive rating bonus.")) {
+              onSave({ ...match, earlyFinish: true, phase: "confirm", confirmedHome: false, confirmedAway: false, submissionReady: false });
+            }
+          }}>
+          End Postseason Match (3-set majority)
+        </button>
+      )}
       <SetEntry
         key={activeSet}
         set={match.sets[activeSet]}
@@ -1406,9 +1422,11 @@ function ConfirmScreen({ match, onSave }) {
   const [noteHome, setNoteHome] = useState("");
   const [noteAway, setNoteAway] = useState("");
 
-  const homeSets = match.sets.filter((s) => s.winnerSlot === "home").length;
-  const awaySets = match.sets.filter((s) => s.winnerSlot === "away").length;
-  const matchWinner = homeSets > awaySets ? match.teamHome.name : awaySets > homeSets ? match.teamAway.name : "Tie";
+  const homeSets = match.sets.filter((s) => s.complete && s.winnerSlot === "home").length;
+  const awaySets = match.sets.filter((s) => s.complete && s.winnerSlot === "away").length;
+  const { homePoints, awayPoints } = db.computeMatchPoints(match);
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff });
+  const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   const confirmSide = (side) => {
     onSave({ ...match, [side === "home" ? "confirmedHome" : "confirmedAway"]: true });
