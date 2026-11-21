@@ -71,6 +71,38 @@ create trigger set_practice_game_shared_participant
 before insert on public.practice_games
 for each row execute function public.set_practice_game_shared_participant();
 
+create or replace function public.protect_practice_game_shared_participant()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  if new.created_by is distinct from old.created_by
+     or new.shared_with_profile_id is distinct from old.shared_with_profile_id then
+    raise exception 'Practice session ownership and sharing cannot be changed after creation'
+      using errcode = '42501';
+  end if;
+
+  if old.shared_with_profile_id is not null and (
+    new.practice_type is distinct from old.practice_type
+    or new.opponent_id is distinct from old.opponent_id
+    or new.opponent_player_num is distinct from old.opponent_player_num
+  ) then
+    raise exception 'The participants in a shared practice session cannot be changed'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$;
+
+revoke all on function public.protect_practice_game_shared_participant() from public, anon, authenticated;
+
+drop trigger if exists protect_practice_game_shared_participant on public.practice_games;
+create trigger protect_practice_game_shared_participant
+before update on public.practice_games
+for each row execute function public.protect_practice_game_shared_participant();
+
 drop policy if exists "read shared practice games" on public.practice_games;
 create policy "read shared practice games"
 on public.practice_games
