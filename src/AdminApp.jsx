@@ -3874,13 +3874,6 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
     <PasteImporter label="Import MVP Standings" hint="Plyr# ⇥ Player Name ⇥ Team# ⇥ Sets Won ⇥ Sets Lost ⇥ Points Scored ⇥ Total MVP Ranking Points — paste straight from the MVP Standings report"
       raw={raw} setRaw={setRaw} onParse={handleParse} parseErr={parseErr}
       onClear={()=>{setRaw("");setParsed([]);setParseErr("");}}
-      preHint={
-        <div className="field" style={{marginBottom:8}}>
-          <Label>MVP stats as of</Label>
-          <input className="input" type="date" value={weekDate} onChange={e=>setWeekDate(e.target.value)} />
-          <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Each week's import is kept — re-importing the same date updates that week, a new date adds a new week's snapshot.</div>
-        </div>
-      }
       preview={parsed.length>0 && <PreviewList rows={parsed.map(r=>{
         const audit = db.validateMvpImportRow(r);
         return {id:r.playerNum, name:r.playerName, sub:`${r.wins}W–${r.losses}L · ${r.pointsScored} pts · ${r.mvpRankingPoints} official ranking pts · ${audit.valid ? `${audit.inferredForfeitWins} formula-implied forfeit wins` : "FORMULA REVIEW"}`};
@@ -3890,6 +3883,20 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
           <Label>MVP stats as of</Label>
           <input className="input" type="date" value={weekDate} onChange={e=>setWeekDate(e.target.value)} />
           <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Each week's import is kept. IBA's published ranking and position remain authoritative.</div>
+        </div>
+        {parsed.length > 0 && (() => {
+          const audit = db.validateMvpImportRows(parsed);
+          return <div style={{fontSize:11,lineHeight:1.5,color:audit.invalidRows.length?"#F59E0B":"#5FCF9E",marginBottom:8}}>
+            <strong>Section 5.6 formula check:</strong> {audit.validCount}/{audit.total} rows reconcile; {audit.inferredForfeitWins} formula-implied forfeit wins.
+            {audit.invalidRows.length > 0 && <div style={{color:"#F59E0B",marginTop:4}}>{audit.invalidRows.map(row=>`${row.playerName}: ${row.issue}`).join(" ")} Official values will be preserved for review.</div>}
+          </div>;
+        })()}
+      </>}
+      preHint={<>
+        <div className="field" style={{marginBottom:8}}>
+          <Label>MVP stats as of</Label>
+          <input className="input" type="date" value={weekDate} onChange={e=>setWeekDate(e.target.value)} />
+          <div style={{fontSize:10.5,color:"#6A6A6A",marginTop:4}}>Each week's import is kept — re-importing the same date updates that week, a new date adds a new week's snapshot. IBA's published ranking and position remain authoritative.</div>
         </div>
         {parsed.length > 0 && (() => {
           const audit = db.validateMvpImportRows(parsed);
