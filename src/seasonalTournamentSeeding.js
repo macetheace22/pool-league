@@ -54,7 +54,6 @@ export function buildSeasonalByePlan(tournamentType, teams) {
     if (hasCompleteByeRank) {
       const sorted = [...group].sort((a, b) => Number(a.byeRank) - Number(b.byeRank));
       awarded.push(...sorted.slice(0, remaining).map(team => team.teamId));
-      pending.push(...sorted.slice(remaining).map(team => team.teamId));
     } else {
       pending.push(...group.map(team => team.teamId));
     }
