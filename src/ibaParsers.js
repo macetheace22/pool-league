@@ -679,4 +679,4 @@ function parseSingleColumnTeams(lines, registry, rosters, teams, needsRating, co
 }
 
 
-export { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster, parsePlayoffEligibilityRoster };
+export { extractIbaReportWeek, extractIbaReportPrintedOnDate, extractIbaReportWeeksByDivision, parseStandingsImport, parseMvpImport, parseLeagueRoster, parsePlayoffEligibilityRoster, parseIbaPlayoffBrackets };
