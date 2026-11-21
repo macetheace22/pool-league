@@ -1208,7 +1208,7 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
             const sets = match.sets.map(set => set === gladiatorSet ? {
               ...set, playerHome: null, playerAway: null, racks: [], winnerSlot: null, complete: false, isGladiator: false,
             } : set);
-            onSave({ ...match, sets, gladiatorMatch: false, gladiatorSetIndex: null, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, phase: "lineup" });
+            onSave({ ...match, sets, gladiatorMatch: false, gladiatorSetIndex: null, gladiatorNoAvailableHome: false, gladiatorNoAvailableAway: false, gladiatorPresenceSetIndex: null, gladiatorPresenceRevision: (match.gladiatorPresenceRevision ?? 0) + 1, phase: "lineup" });
           }}>
           Cancel Gladiator Setup
         </button>
@@ -1764,8 +1764,7 @@ function DoneScreen({ match, onReset }) {
 
   const { homePoints, awayPoints } = db.computeMatchPoints(match);
   const completedSets = match.sets.filter(set => set.complete).length;
-  const gladiatorSet = match.sets.find(set => set.isGladiator && set.complete) ?? null;
-  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets, gladiatorSet });
+  const winnerSlot = resolveTeamMatchWinner({ homePoints, awayPoints, homeSets, awaySets, isPlayoff: !!match.isPlayoff, completedSets });
   const matchWinner = winnerSlot === "home" ? match.teamHome.name : winnerSlot === "away" ? match.teamAway.name : "Tie";
 
   return (
