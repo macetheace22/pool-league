@@ -217,6 +217,9 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
   const [generatingClaimCodeFor, setGeneratingClaimCodeFor] = useState(null);
   const refreshLinkRequests = () => db.listPracticeOpponentLinkRequests().then(setLinkRequests);
   useEffect(() => { refreshLinkRequests(); }, [profile?.id]);
+  const actionableLinkRequests = linkRequests.filter(request =>
+    request.status === "pending" && new Date(request.expires_at).getTime() > Date.now()
+  );
 
   const redeemClaimCode = async () => {
     if (!claimCodeInput.trim()) return;
@@ -274,10 +277,10 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
           </div>
           {claimCodeMessage && <div className="success-msg" style={{marginTop:8}}>{claimCodeMessage}</div>}
         </div>
-        {linkRequests.length > 0 && (
+        {actionableLinkRequests.length > 0 && (
           <div className="card">
             <div className="card__title">Practice Identity Requests</div>
-            {linkRequests.map(request => {
+            {actionableLinkRequests.map(request => {
               const incoming = request.direction === "incoming";
               const pending = request.status === "pending";
               const expired = pending && new Date(request.expires_at).getTime() <= Date.now();
