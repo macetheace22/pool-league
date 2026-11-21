@@ -28,6 +28,14 @@ describe("IBA Rule 5.5 team match dead heats", () => {
     })).toBe("home");
   });
 
+
+  it("does not apply a Gladiator winner to a regular-season match", () => {
+    expect(resolveTeamMatchWinner({
+      homePoints: 450, awayPoints: 470, homeSets: 1, awaySets: 2, isPlayoff: false,
+      completedSets: 3, gladiatorSet: { isGladiator: true, complete: true, winnerSlot: "home" },
+    })).toBe("away");
+  });
+
   it("does not treat an unfinished Gladiator set as a match winner", () => {
     expect(resolveTeamMatchWinner({
       homePoints: 450, awayPoints: 470, homeSets: 1, awaySets: 2, isPlayoff: true,
