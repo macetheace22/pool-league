@@ -4210,8 +4210,8 @@ function AccountSettings({ profile, onProfileRefresh }) {
         ) : (
           <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>
             {profile.player_num
-              ? <>Your linked league player number is <strong style={{color:"#E0E0E0"}}>{profile.player_num}</strong>. To correct an existing link, ask your captain or league manager for a new player-specific invite code for the correct roster entry.</>
-              : "Your player number is linked through an invite code associated with your roster entry. Ask your captain or league manager for a player-specific code, then redeem it below."}
+              ? <>Your linked league player number is <strong style={{color:"#E0E0E0"}}>{profile.player_num}</strong>. This is your league-wide player identity, including when you play on multiple teams. If it is incorrect, ask your captain to verify the roster entry; a league manager can resolve an incorrect existing account link.</>
+              : "Already on an IBA roster? Ask your team captain for a player-specific invite code. Redeem it here to connect your account to your existing player number, roster membership, and league history. You can redeem it after creating your account—no need to register again."}
           </div>
         )}
       </div>
@@ -4288,9 +4288,9 @@ function AccountSettings({ profile, onProfileRefresh }) {
         <button className="btn-secondary" onClick={savePassword} disabled={!newPassword||!newPassword2}>Update Password</button>
       </div>
       <div className="card">
-        <div className="card__title">Redeem Invite Code</div>
+        <div className="card__title">Redeem Player Invite Code</div>
         <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.5}}>
-          Redeem a code from your league manager or captain. A player-specific code can link your roster entry, player number, and team membership.
+          If you already play in the league, enter the player-specific code from your team captain. It connects this account to your existing IBA player identity and roster membership. This works for existing accounts too; it does not create a new player record.
         </div>
         <div className="field"><input className="input input--code" value={claimCode} onChange={e=>setClaimCode(e.target.value)} placeholder="XXXXXX" autoCapitalize="characters"/></div>
         <button className="btn-secondary" onClick={redeemCode} disabled={!claimCode.trim()||claiming}>{claiming?"Checking…":"Redeem Code"}</button>
@@ -4453,6 +4453,9 @@ function ManageMyTeamPage({ teamId, profileId }) {
 
       <div className="card">
         <div className="card__title">Roster ({roster.length})</div>
+        <div style={{fontSize:10.5,color:"#777",lineHeight:1.5,marginBottom:8}}>
+          For a roster player who hasn't linked an account yet, generate a player-specific invite code and share it with them. They can redeem it during registration or later in Profile → Redeem Player Invite Code. The code connects their account to this existing player record; it does not add another roster player.
+        </div>
         {!rosterChangesAllowed && <div className="readonly-bar">Starting Week 6, only league managers can add or remove players. You can still generate invite codes for players already on this roster.</div>}
         {roster.length===0 && <div className="empty-state" style={{border:"none"}}>No players on this roster yet.</div>}
         <div className="team-select-list">
@@ -4461,7 +4464,7 @@ function ManageMyTeamPage({ teamId, profileId }) {
               <div className="list-row__body">
                 <div style={{display:"flex",flexDirection:"column",gap:1,flex:1}}>
                   <span className="list-row__name">{p.name}{p.nickname?` "${p.nickname}"`:""}</span>
-                  <span className="list-row__sub">{p.rating!=null ? `Rating ${p.rating}` : "Needs rating"}{p.hasAccount ? " · has an account" : ""}</span>
+                  <span className="list-row__sub">{p.rating!=null ? `Rating ${p.rating}` : "Needs rating"}{p.hasAccount ? " · account linked" : " · account not linked"}</span>
                 </div>
                 {!p.hasAccount && (
                   <button className="btn-icon-sm" onClick={()=>openCodeGen(p)} aria-label="Generate invite code"><Key size={13}/></button>
