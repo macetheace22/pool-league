@@ -102,6 +102,17 @@ describe("computeMvp", () => {
     expect(bob).toMatchObject({ losses: 1, mvpRanking: -200 });
   });
 
+  it.each(["open", "advanced", "masters"])("%s forfeit wins always receive 125 MVP points regardless of match forfeit score", (format) => {
+    const matches = [{
+      state: { format, sets: [{
+        complete: true, forfeited: true, forfeitedBy: "away", forfeitPoints: 75,
+        playerHome: { num: "1", name: "Alice" }, playerAway: { num: "2", name: "Bob" },
+      }] },
+    }];
+    const alice = computeMvp(matches, []).find(player => player.num === "1");
+    expect(alice).toMatchObject({ wins: 1, forfeitWins: 1, pointsScored: 125, mvpRanking: 125 });
+  });
+
   it("open unrated (NR) scoring uses the fixed target without margin-of-victory points", () => {
     const matches = [{
       state: {
