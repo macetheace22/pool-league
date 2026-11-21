@@ -93,6 +93,7 @@ export function buildRule55TieBreakAudit({
     const tiedIds = new Set(group.map(team => team.teamId));
     for (const team of group) {
       let headToHeadPoints = 0;
+      let headToHeadEncountered = false;
       let headToHeadComplete = true;
       let pointsLost = 0;
       let pointsLostComplete = true;
@@ -107,6 +108,7 @@ export function buildRule55TieBreakAudit({
           if (opponentPoints == null) pointsLostComplete = false;
           else pointsLost += Number(opponentPoints);
           if (tiedIds.has(opponentId)) {
+            headToHeadEncountered = true;
             const ownPoints = pointsByTeamDate.get(`${team.teamId}:${week.dateKey}`);
             if (ownPoints == null) headToHeadComplete = false;
             else headToHeadPoints += Number(ownPoints);
@@ -166,7 +168,8 @@ export function buildRule55TieBreakAudit({
         position: team.position,
         totalPoints: team.totalPoints,
         tiedWith: group.filter(other => other.teamId !== team.teamId).map(other => other.name),
-        headToHeadPoints: stat.headToHeadEncountered && headToHeadComplete ? headToHeadPoints : null,
+        headToHeadPoints: headToHeadEncountered && headToHeadComplete ? headToHeadPoints : null,
+        headToHeadStatus: !headToHeadEncountered ? "No regular-season head-to-head set found" : headToHeadComplete ? "Available" : "Incomplete head-to-head points data",
         setsWon: finalCounters?.won ?? null,
         pointsLost: pointsLostComplete ? pointsLost : null,
         recordVsNext,
