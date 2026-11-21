@@ -644,6 +644,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
           {page === "playoff-eligibility" && !viewingDiv && (
             <div className="empty-state">Select a season and division to view imported playoff eligibility.</div>
           )}
+          {page === "playoffs" && viewingSeason && (
+            <SeasonalTournamentReview key={viewingSeason.id} seasonId={viewingSeason.id} />
+          )}
           {page === "playoffs" && viewingDiv && (
             <PlayoffsTab key={viewingDiv.id} divisionId={viewingDiv.id} teams={viewTeams} />
           )}
@@ -5509,6 +5512,111 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
         </>
       )}
     </>
+  );
+}
+
+
+function SeasonalTournamentReview({ seasonId }) {
+  const [snapshot, setSnapshot] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const refresh = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await db.getSeasonalQualificationSnapshot(seasonId);
+      if (result?.error) throw new Error(result.error);
+      setSnapshot(result);
+    } catch (e) {
+      setError(e?.message || "Unable to load seasonal tournament qualification.");
+      setSnapshot(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { refresh(); }, [seasonId]);
+
+  if (loading) return <div className="card"><Loader /></div>;
+  if (error) return <div className="card"><SectionHeader title="Seasonal Tournament Review" /><ErrorMsg>{error}</ErrorMsg><button className="btn-secondary" onClick={refresh}>Retry</button></div>;
+  if (!snapshot) return null;
+
+  const renderTournament = (key, title, categoryLabels) => {
+    const tournament = snapshot.tournaments?.[key];
+    if (!tournament) return null;
+    const plan = tournament.byePlan;
+    const teams = tournament.teams ?? [];
+    const byCategory = categoryLabels.map(([category, label]) => ({
+      category, label, teams: teams.filter(team => team.seedCategory === category),
+    })).filter(group => group.teams.length);
+    const unresolved = new Set([...(plan.pendingTeamIds ?? []), ...(plan.unclassifiedTeamIds ?? [])]);
+    return (
+      <div className="card" key={key}>
+        <div className="card__title">{title}</div>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:12,margin:"8px 0"}}>
+          <span>Qualified: <strong>{plan.qualifiedTeamCount}</strong></span>
+          <span>Bracket size: <strong>{plan.bracketSize || "—"}</strong></span>
+          <span>Byes: <strong>{plan.byeCount}</strong></span>
+          <span>Awarded: <strong>{plan.awardedTeamIds.length}</strong></span>
+        </div>
+        {plan.requiresReview && (
+          <div style={{fontSize:12,color:"#F0B35A",marginBottom:8}}>
+            Manager review required: {plan.unresolvedByes} bye(s) remain unresolved, or one or more teams need verified seeding history.
+          </div>
+        )}
+        {!teams.length ? <div className="empty-state">No teams currently qualify.</div> : byCategory.map(group => (
+          <div key={group.category} style={{marginTop:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#9A9A9A",marginBottom:4}}>{group.label}</div>
+            {group.teams.map(team => {
+              const getsBye = plan.awardedTeamIds.includes(team.teamId);
+              const needsReview = unresolved.has(team.teamId);
+              return (
+                <div className="list-row" key={team.teamId}>
+                  <div className="list-row__body">
+                    <div className="list-row__name">{team.name || team.teamName || team.teamId}</div>
+                    <div className="list-row__sub">{team.divisionLabel || team.divisionId || "Division"} · Regular-season position {team.position ?? team.divisionFinishPosition ?? "—"}</div>
+                  </div>
+                  <div style={{fontSize:11,fontWeight:700,color:needsReview?"#F0B35A":getsBye?"#5FCF9E":"#9A9A9A"}}>
+                    {needsReview ? "Review" : getsBye ? "Bye" : "No bye"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{marginBottom:16}}>
+      <SectionHeader title="Seasonal Tournament Qualification & Seeding" />
+      <div style={{fontSize:12,color:"#9A9A9A",lineHeight:1.5,marginBottom:10}}>
+        Season-wide view across all divisions. Qualification uses official final IBA standings and recorded division playoff results. This preview does not create or modify tournament brackets.
+      </div>
+      {(snapshot.divisions ?? []).some(row => row.error) && (
+        <div className="card" style={{border:"1px solid #92400E"}}>
+          <div className="card__title">Some divisions need attention</div>
+          {(snapshot.divisions ?? []).filter(row => row.error).map(row => (
+            <div key={row.division.id} className="list-row">
+              <div className="list-row__body"><div className="list-row__name">Division {row.division.num ?? row.division.name}</div><div className="list-row__sub">{row.error}</div></div>
+            </div>
+          ))}
+        </div>
+      )}
+      {renderTournament("championship","Seasonal Championship",[
+        ["first_place_and_division_champion","Category 1 · First place and Division Champion"],
+        ["first_place_not_division_champion","Category 2 · First place, not Division Champion"],
+        ["below_first_division_champion","Category 3 · Below first, Division Champion"],
+      ])}
+      {renderTournament("consolation","Seasonal Consolation",[
+        ["consolation_champion_back_to_back_wins","Category 1 · Won with back-to-back wins"],
+        ["consolation_champion_after_bye","Category 2 · Won after receiving a bye"],
+        ["consolation_champion_history_unverified","History unverified"],
+        ["consolation_champion_pending_bracket_history","History pending"],
+      ])}
+      <button className="btn-secondary" onClick={refresh}>Refresh qualification</button>
+    </div>
   );
 }
 
