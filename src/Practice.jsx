@@ -266,7 +266,7 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
         <div className="card">
           <div className="card__title">Claim a Practice Identity</div>
           <div style={{fontSize:11,color:"#999",lineHeight:1.5,marginBottom:8}}>
-            If someone shared a claim code for a practice opponent that represents you, enter it here. The person who created that opponent entry must approve your request.
+            Enter a claim code to request linking your practice history. The owner must approve.
           </div>
           <div style={{display:"flex",gap:8}}>
             <input className="input input--code" value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
