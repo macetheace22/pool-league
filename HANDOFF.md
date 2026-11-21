@@ -32,6 +32,150 @@ from section 42 onward was built in this session:
 no decision made yet on whether to drop it. If yes, it's the same pattern as section 50
 (drop + recreate `mvp_adjustments_current`, since it's also a `select *` view).
 
+## Current Master Status — November 21, 2026
+
+This section consolidates the recent development conversations and is the current product/implementation status. It intentionally supplements rather than rewrites the older historical sections.
+
+### Recent merged product work
+
+#### PR #252 — Player-relative league Match History — MERGED
+- Player-facing league match history now presents matches from the player's perspective, including correct home/away interpretation.
+- Manager division-wide Match Lookup/History remains neutral and home/away oriented.
+- Perspective handling is implemented through the shared `src/leagueMatchPerspective.js` helper and covered by tests.
+- This distinction is intentional: player history answers "what happened to me/my team," while manager lookup answers "what happened in the match."
+
+#### PR #254 — Hide empty Track a Rack / Tournament Statistics placeholders — MERGED
+- Empty placeholder/stat sections that were not yet functional were removed from the relevant user-facing views.
+- Player Lookup search now gives a clearer prompt instead of presenting an unexplained empty state.
+
+#### PR #255 — Preserve full names for manually entered Practice opponents — MERGED
+- Manual Practice opponents retain their full first/last name rather than collapsing to an abbreviated representation.
+- This is part of the broader Practice identity/history work and is distinct from linked-account identity.
+
+#### PR #256 — Move Practice identity management into My Profile — MERGED
+- Practice claim-code redemption moved to **Profile → Identity & Connections**.
+- Incoming/outgoing Practice identity-request management moved there as well.
+- Practice retains opponent-specific claim-code generation/linking.
+- The redundant "Linked" label was removed from Practice opponent rows; rows remain selectable.
+- Section 107 added the authenticated `update_my_practice_opponent_name(uuid,text,text)` RPC for updating an unlinked manual opponent's first/last name and corresponding historical `practice_games.opponent_name`.
+- Section 107 was applied to the live Supabase project and its execute permissions were verified: authenticated allowed, anonymous denied.
+- Existing Practice identity/linking foundations from Sections 101–106 remain in force.
+
+#### PR #257 — Expandable Recent Activity — MERGED
+- Recent Activity is now a unified chronological feed containing both league matches and Practice sessions.
+- Four most recent items display by default; the feed can expand to ten and collapse back to four.
+- Away league matches use the player's correct perspective.
+- Practice activity identifies Skills & Drills, general Practice, and opponent-based Practice appropriately.
+- Practice activity navigates to Practice history; league activity navigates to Match Lookup/History.
+
+#### PR #258/#259 — Practice Game Type filtering in My Stats — MERGED
+- When **Practice** is selected in My Stats, a **Practice Game Type** multi-select appears.
+- Four game types are currently supported: 8-Ball, 9-Ball, 10-Ball, and Ultimate Pool.
+- All four are selected by default.
+- There is deliberately **no "All Games" option**.
+- Each game type can be toggled independently.
+- If all four are deselected, Practice results should be empty; the filter must not silently revert to all games.
+- League statistics are unaffected by this Practice-only filter.
+- Practice remains career-wide rather than league-season scoped.
+
+### Recent open UI fixes
+
+#### PR #260 — Match Practice Game Type filter size/style to Scope — OPEN
+- UI-only change.
+- Makes the Practice Game Type control use the same segmented-control sizing/style as Scope.
+- Does not change filtering behavior or data.
+- No SQL.
+
+#### PR #261 — Fix blank League Office resolution pages — OPEN
+Both League Office resolution routes were found to render as blank white pages:
+- **Team Dropout Resolution**
+- **Replacement Team Resolution**
+
+Root cause:
+- `shellCss` is a CSS string, but both components passed it through React's `style` prop, which expects a style object.
+- The render-time failure produced the blank page.
+
+Fix:
+- Both pages now use the same shell pattern as the other pages: `<div className="app"><style>{shellCss}</style>`.
+- No resolution business logic or SQL was changed.
+
+### League Office rule-resolution status
+
+The League Office now contains the manager-facing resolution framework for the rulebook scenarios around team dropout and replacement teams.
+
+**Team Dropout Resolution**
+- Manager reviews the affected team/season/division and the applicable dropout scenario.
+- Resolution is intended to preserve completed-match history while applying the selected remedy to the future schedule/standings treatment.
+- The workflow is separate from automatic schedule monitoring: detection/review does not itself silently rewrite schedule data.
+
+**Replacement Team Resolution**
+- Manager reviews and records the replacement-team remedy.
+- Resolution supports the rulebook treatment for replacement-team points/standings, makeup entitlement, and future schedule handling.
+- Completed matches remain historical records; future schedule treatment is handled through the approved resolution workflow.
+
+The next important validation step for these two pages is to confirm the corrected routes render and the resolution workflows operate normally after PR #261 is merged. Do not call them production-ready solely because the render fix is logically correct.
+
+### Schedule monitoring and approved schedule modification
+
+The recent schedule work has clarified the intended lifecycle:
+
+1. **Monitor/detect** schedule conditions.
+2. Evaluate **all divisions for each applicable night/day**, across the relevant IBA formats—not just one division.
+3. Determine whether the condition is at/before/after the relevant league week.
+4. Present detected changes to the manager for review.
+5. **Manager approves** the change.
+6. Apply the approved modification to the app's schedule data.
+7. Refresh/recalculate schedule-dependent views.
+
+Important:
+- The schedule import remains the source of schedule structure, including BYEs.
+- BYE handling/points should derive from imported schedule context rather than being invented by monitoring.
+- A season change is the lifecycle trigger for the monitoring process to begin evaluating the new season's schedule/divisions; monitoring state from the prior season must not be treated as the new season's state.
+- The monitoring layer should not silently modify schedule data. **Manager approval precedes schedule modification.**
+- The schedule-data modification after approval is the next major implementation step after the monitoring/approval work.
+
+### Stats and filtering direction
+
+The current stats architecture is deliberately shared rather than duplicated:
+- `PlayerStatsProfile` serves My Stats and Player Lookup.
+- `TeamStatsPanel` serves the captain's Team Stats and Team Lookup.
+- Practice game-type filtering is part of the Practice stats path and does not alter league calculations.
+- League match perspective is player-relative only where the user is looking at their own history; manager/division lookup remains neutral.
+- Existing advanced stats/Track a Rack data remains optional and does not affect confirmed match scoring.
+
+### Practice identity / history architecture
+
+The current design separates **account identity** from **manual opponent identity**:
+- Linked Practice opponents are account/player identities connected through the mutual-confirmation flow.
+- Unlinked manual opponents can retain a full name.
+- Claim-code redemption and identity-request management belong in Profile.
+- Practice retains the opponent-specific mechanism for initiating/linking an opponent.
+- Practice history can be shared appropriately for linked identities without changing the ownership/perspective rules for unrelated accounts.
+
+### Current validation/deployment rules
+
+- GitHub PRs remain the normal implementation path; do not bypass the PR workflow for routine changes.
+- Small, focused PRs are preferred.
+- GitHub Actions test/build status must be checked before treating a change as validated.
+- SQL migrations are manually applied in the Supabase SQL Editor unless explicitly authorized otherwise.
+- A merged PR is **not automatically equivalent to production deployment**.
+- Vercel deployment state must be checked separately; `READY` and the expected commit SHA are required before calling a change production-live.
+- The recent Vercel deployment for PR #259's merged `main` commit `fcbc0cc5a8f121752574afb77eb7a250cb03e1cb` was created successfully after earlier daily deployment-limit failures, but its initial state was `INITIALIZING`; do not assume it is READY without a fresh status check.
+- Do not deploy additional commits unless the user explicitly authorizes deployment.
+
+### Immediate known open items from the recent audit
+
+1. PR #260: visual alignment of Practice Game Type with Scope.
+2. PR #261: render fix for Team Dropout Resolution and Replacement Team Resolution.
+3. Verify the latest Vercel deployment status before treating PR #259 as production-live.
+4. Continue the approved schedule-modification implementation after the manager-approved monitoring flow.
+5. Continue the broader rulebook-to-app audit, preserving the distinction between already implemented behavior, manual process requirements, and genuinely missing application support.
+6. Keep this handoff synchronized when a major PR, migration, or architectural decision changes the current product contract.
+
+### Documentation discipline
+
+This master handoff is the authoritative **current-status overlay**. Older sections below are retained as historical context and should not be interpreted as current when they conflict with this section. In particular, older references to earlier PR numbers, migration sections, or "known gaps" may describe the state at the time they were written rather than today's state.
+
 ## What this is
 
 A league management + live match scoring app for an IBA pool league — Vite + React +
