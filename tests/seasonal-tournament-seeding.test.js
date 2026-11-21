@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSeasonalByePlan, buildSeasonalTournamentPlans, classifyChampionshipSeed, classifyConsolationSeed, deriveConsolationByeStatus } from "../src/seasonalTournamentSeeding";
+import { buildSeasonalByePlan, buildSeasonalTournamentBracket, buildSeasonalTournamentPlans, classifyChampionshipSeed, classifyConsolationSeed, deriveConsolationByeStatus } from "../src/seasonalTournamentSeeding";
 
 describe("Section 5.4 seasonal tournament seeding", () => {
   it("classifies the three Championship categories", () => {
