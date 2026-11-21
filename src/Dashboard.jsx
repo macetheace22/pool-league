@@ -37,6 +37,42 @@ function matchOpponentName(m) {
   return isHome ? m.team_away_name : m.team_home_name;
 }
 
+export function buildRecentActivity(teamOverviews, practiceGames) {
+  const leagueItems = (teamOverviews ?? []).flatMap(overview =>
+    (overview.myCompleted ?? []).map(match => {
+      const isHome = match.team_home_id === overview.team.id;
+      const myPoints = isHome ? match.team_home_points : match.team_away_points;
+      const opponentPoints = isHome ? match.team_away_points : match.team_home_points;
+      const opponent = isHome ? match.team_away_name : match.team_home_name;
+      const timestamp = match.confirmed_at || match.created_at || null;
+      return {
+        key: `league:${match.id}:${overview.team.id}`,
+        type: "league",
+        timestamp,
+        title: `${(teamOverviews ?? []).length > 1 ? `${overview.team.name} — ` : ""}vs ${opponent || "Opponent"}`,
+        dateLabel: match.week_date || (timestamp ? new Date(timestamp).toLocaleDateString() : "Date unavailable"),
+        resultLabel: match.is_makeup_pending ? "Makeup Pending"
+          : myPoints != null && opponentPoints != null ? `${myPoints} – ${opponentPoints}` : "Result unavailable",
+      };
+    })
+  );
+  const practiceItems = (practiceGames ?? []).map(game => {
+    const timestamp = game.played_at || game.completed_at || game.created_at || null;
+    return {
+      key: `practice:${game.id}`,
+      type: "practice",
+      timestamp,
+      title: game.practice_type === "skills_drills" ? "Skills & Drills" : `Practice vs ${game.opponent_name || "Opponent"}`,
+      dateLabel: timestamp ? new Date(timestamp).toLocaleDateString() : "Date unavailable",
+      resultLabel: game.winner === "me" ? "Won" : game.winner === "opponent" ? "Lost" : "Completed",
+    };
+  });
+  return [...leagueItems, ...practiceItems].sort((a, b) =>
+    (b.timestamp ? new Date(b.timestamp).getTime() : 0) -
+    (a.timestamp ? new Date(a.timestamp).getTime() : 0)
+  );
+}
+
 // ─── Home ───────────────────────────────────────────────────────────────────
 export function Home() {
   const { profile } = useAuth();
@@ -45,7 +81,8 @@ export function Home() {
   // independent of player roster membership.
   const [teamOverviews, setTeamOverviews] = useState(undefined);
   const [snapshotStats, setSnapshotStats] = useState(undefined); // undefined = loading/n-a, null = no player_num linked
-  const [recentPractice, setRecentPractice] = useState(undefined); // undefined = loading, null = none
+  const [recentPracticeGames, setRecentPracticeGames] = useState(undefined); // undefined = loading, [] = none
+  const [showAllRecentActivity, setShowAllRecentActivity] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -55,7 +92,8 @@ export function Home() {
 
   useEffect(() => {
     if (!profile?.id) return;
-    db.listMyPracticeGames(profile.id).then(games => setRecentPractice(games[0] ?? null)).catch(() => setRecentPractice(null));
+    setRecentPracticeGames(undefined);
+    db.listMyPracticeGames(profile.id).then(games => setRecentPracticeGames(games ?? [])).catch(() => setRecentPracticeGames([]));
   }, [profile?.id]);
 
   useEffect(() => {
@@ -91,9 +129,10 @@ export function Home() {
   }).filter(Boolean).sort((a, b) => a._date - b._date);
   const showTeamLabels = (teamOverviews ?? []).length > 1;
 
-  const recentMatch = teamOverviews ? db.mostRecentCompletedMatch(teamOverviews) : undefined;
+  const recentActivity = buildRecentActivity(teamOverviews ?? [], recentPracticeGames ?? []);
+  const visibleRecentActivity = showAllRecentActivity ? recentActivity.slice(0, 10) : recentActivity.slice(0, 4);
   const captainMakeups = listCaptainPendingMakeups(teamOverviews ?? [], getCaptainTeamIds(profile));
-  const homeLoading = !!profile && (teamOverviews === undefined || snapshotStats === undefined || recentPractice === undefined);
+  const homeLoading = !!profile && (teamOverviews === undefined || snapshotStats === undefined || recentPracticeGames === undefined);
 
   const areas = [
     { key: "stats", label: "My Stats", desc: "Your record & stats", icon: BarChart3, path: "/my-stats" },
@@ -171,25 +210,33 @@ export function Home() {
 
         {(getActiveTeamIds(profile).length > 0 || profile?.player_num) && (
           <DashCard icon={Calendar} title="Recent Activity">
-            {(recentMatch === undefined || recentPractice === undefined) && <Loader />}
-            {recentMatch === null && recentPractice === null && (
+            {recentActivity.length === 0 ? (
               <div className="dash-empty">No recent league or practice activity yet.</div>
-            )}
-            {recentMatch && (
-              <div className="match-row">
-                <div className="match-row__opponent">
-                  {showTeamLabels ? `${recentMatch._teamName} — ` : ""}vs {matchOpponentName(recentMatch)}
+            ) : (
+              <>
+                <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                  {visibleRecentActivity.map(item => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className="match-row recent-activity-row"
+                      onClick={() => navigate(item.type === "practice" ? "/practice?home=1#practice-sessions" : "/match-lookup")}
+                      aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match History: ${item.title}`}
+                    >
+                      <span style={{minWidth:0,flex:1,textAlign:"left"}}>
+                        <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
+                        <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
+                      </span>
+                      <ChevronRight size={14} color="#6A6A6A" />
+                    </button>
+                  ))}
                 </div>
-                <div className="match-row__meta"><Calendar size={10} /> {recentMatch.week_date || ""} · {matchResultLabel(recentMatch)}</div>
-              </div>
-            )}
-            {recentPractice && (
-              <div className="match-row">
-                <div className="match-row__opponent">Practice vs {recentPractice.opponent_name}</div>
-                <div className="match-row__meta">
-                  <Calendar size={10} /> {new Date(recentPractice.played_at).toLocaleDateString()} · {recentPractice.winner === "me" ? "Won" : recentPractice.winner === "opponent" ? "Lost" : "—"}
-                </div>
-              </div>
+                {recentActivity.length > 4 && (
+                  <button type="button" className="link-btn" style={{marginTop:8}} onClick={() => setShowAllRecentActivity(value => !value)}>
+                    {showAllRecentActivity ? "Show less" : `View all activity (${Math.min(recentActivity.length, 10)})`}
+                  </button>
+                )}
+              </>
             )}
           </DashCard>
         )}
@@ -696,6 +743,8 @@ export function TournamentsPlaceholder() {
 }
 
 export const dashboardCss = `
+.recent-activity-row{width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #252525;}.recent-activity-row:last-child{border-bottom:0;}.recent-activity-row:focus-visible{outline:2px solid #5FCF9E;outline-offset:2px;border-radius:5px;}
+
 .next-match-card{display:block;background:#0F2D1F;border:1.5px solid #1F6B4A;border-radius:14px;padding:16px;text-decoration:none;margin-bottom:4px;}
 .next-match-card__eyebrow{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#5FCF9E;margin-bottom:4px;}
 .next-match-card__opponent{font-family:'Archivo Black',sans-serif;font-size:18px;color:#FFF;margin-bottom:4px;}
