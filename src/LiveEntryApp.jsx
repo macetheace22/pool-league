@@ -260,7 +260,7 @@ export default function LiveEntryApp() {
       setMatch((local) => {
         if (!local) return remote;
         // Overwrite if remote has more racks OR more assigned players (covers draft updates too)
-        const countSig = (m) => m.sets.reduce((s, st) => s + st.racks.length + (st.playerHome?1:0) + (st.playerAway?1:0) + (st.complete?1:0), 0) + (m.coinFlipLoser?1:0);
+        const countSig = (m) => m.sets.reduce((s, st) => s + st.racks.length + (st.playerHome?1:0) + (st.playerAway?1:0) + (st.complete?1:0), 0) + (m.coinFlipLoser?1:0) + (m.gladiatorNoAvailableHome?1:0) + (m.gladiatorNoAvailableAway?1:0);
         return countSig(remote) > countSig(local) ? remote : local;
       });
     }, POLL_INTERVAL_MS);
@@ -918,7 +918,7 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
     );
   }
   if (gladiatorOpen) {
-    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onCancel={() => setGladiatorOpen(false)} />;
+    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onSave={onGladiator} onCancel={() => setGladiatorOpen(false)} />;
   }
 
   return (
@@ -973,11 +973,11 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGla
   );
 }
 
-function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel }) {
-  const [homeNoPlayer, setHomeNoPlayer] = useState(false);
-  const [awayNoPlayer, setAwayNoPlayer] = useState(false);
+function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel, onSave }) {
   const [homeNum, setHomeNum] = useState("");
   const [awayNum, setAwayNum] = useState("");
+  const homeNoPlayer = !!match.gladiatorNoAvailableHome;
+  const awayNoPlayer = !!match.gladiatorNoAvailableAway;
   const homeChoices = gladiatorPlayerChoices(match.sets, setIdx, "home").filter(player => !playoffIneligibleReason(match, player));
   const awayChoices = gladiatorPlayerChoices(match.sets, setIdx, "away").filter(player => !playoffIneligibleReason(match, player));
   const homePlayer = homeChoices.find(player => String(player.num) === homeNum);
@@ -998,11 +998,11 @@ function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel }) {
       <div className="card">
         <div className="card__title">Confirm no additional player is present</div>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:12}}>
-          <input type="checkbox" checked={homeNoPlayer} onChange={event => setHomeNoPlayer(event.target.checked)} />
+          <input type="checkbox" checked={homeNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableHome: event.target.checked })} />
           <span>{match.teamHome.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
         <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start"}}>
-          <input type="checkbox" checked={awayNoPlayer} onChange={event => setAwayNoPlayer(event.target.checked)} />
+          <input type="checkbox" checked={awayNoPlayer} onChange={event => onSave({ ...match, gladiatorNoAvailableAway: event.target.checked })} />
           <span>{match.teamAway.name} confirms it has no other player present to accept a forfeit.</span>
         </label>
       </div>
