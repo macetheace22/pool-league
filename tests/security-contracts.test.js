@@ -565,7 +565,7 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(sql).toContain("revoked_at timestamptz");
     expect(sql).toContain("revoke all on public.practice_opponent_claim_codes from public, anon, authenticated");
     expect(sql).toContain("grant select on public.practice_opponent_claim_codes to authenticated");
-    expect(sql).toContain("where c.code::text = trim(p_code)");
+    expect(sql).toContain("where c.code::text = lower(trim(p_code))");
     expect(sql).toContain("set redeemed_at = now()");
     expect(sql).toContain("values (\n    v_code.opponent_id, (select auth.uid()), v_owner, (select auth.uid())");
     expect(sql).toContain("v_request.link_profile_id");
