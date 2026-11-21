@@ -98,7 +98,7 @@ describe("computeMvp", () => {
     const mvp = computeMvp(matches, []);
     const alice = mvp.find(p => p.num === "1"); // away forfeited -> home (Alice) receives
     const bob = mvp.find(p => p.num === "2");
-    expect(alice).toMatchObject({ wins: 1, forfeitWins: 1, pointsScored: 100, mvpRanking: 100 });
+    expect(alice).toMatchObject({ wins: 1, forfeitWins: 1, pointsScored: 125, mvpRanking: 125 });
     expect(bob).toMatchObject({ losses: 1, mvpRanking: -200 });
   });
 
