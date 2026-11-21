@@ -933,6 +933,8 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
             myScore: viewerIsSharedParticipant ? (existing.opponent_score ?? 0) : (existing.my_score ?? 0),
             opponentScore: viewerIsSharedParticipant ? (existing.my_score ?? 0) : (existing.opponent_score ?? 0),
             viewerPerspective: viewerIsSharedParticipant ? "shared" : "creator",
+            opponentType: !viewerIsSharedParticipant && existing.shared_with_profile_id && existing.opponent_player_num ? "player" : current.opponentType,
+            opponentPlayerNum: current.viewerPerspective === "shared" ? current.opponentPlayerNum : (existing.opponent_player_num ?? current.opponentPlayerNum),
             gameLog: results.map(result => ({
               id: result.id, gameNumber: result.game_number,
               myPoints: result.my_points, oppPoints: result.opponent_points, winner: result.winner,
