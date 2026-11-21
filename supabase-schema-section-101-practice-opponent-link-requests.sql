@@ -190,12 +190,14 @@ declare
   v_opponent_id uuid;
   v_request public.practice_opponent_link_requests%rowtype;
   v_linked_profile uuid;
+  v_opponent_exists boolean := false;
 begin
   if (select auth.uid()) is null then
     return 'NOT_AUTHENTICATED';
   end if;
 
-  -- Lock the opponent first, matching the request-creation lock order.
+  -- Resolve the opponent, then lock it before locking the request. Request
+  -- creation uses the same opponent-first lock order.
   select r.opponent_id
     into v_opponent_id
   from public.practice_opponent_link_requests r
@@ -205,8 +207,8 @@ begin
     return 'NOT_FOUND';
   end if;
 
-  select o.linked_profile_id
-    into v_linked_profile
+  select o.linked_profile_id, true
+    into v_linked_profile, v_opponent_exists
   from public.practice_opponents o
   where o.id = v_opponent_id
   for update;
@@ -236,7 +238,7 @@ begin
     return 'EXPIRED';
   end if;
 
-  if not found or v_linked_profile is not null then
+  if not v_opponent_exists or v_linked_profile is not null then
     update public.practice_opponent_link_requests
     set status = 'cancelled', responded_at = now()
     where id = p_request_id;
@@ -251,6 +253,13 @@ begin
     set linked_profile_id = (select auth.uid())
     where id = v_opponent_id
       and linked_profile_id is null;
+
+    if not found then
+      update public.practice_opponent_link_requests
+      set status = 'cancelled', responded_at = now()
+      where id = p_request_id;
+      return 'OPPONENT_UNAVAILABLE';
+    end if;
 
     update public.practice_opponent_link_requests
     set status = 'accepted', responded_at = now()
