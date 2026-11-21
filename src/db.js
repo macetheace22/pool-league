@@ -4,6 +4,7 @@ import { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffE
 import { buildRosterSyncPlan } from "./rosterReconciliation";
 import { toLinkedPracticeGame } from "./practiceHistory";
 import { normalizeImportedPlayoffBracket } from "./ibaPlayoffBrackets";
+import { buildSeasonalQualificationSnapshot, buildSeasonalSeedingInputs } from "./seasonalQualification";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -496,6 +497,38 @@ export async function reconcileIbaPlayoffBrackets(divisionId, importedBrackets) 
   };
 }
 
+
+
+/**
+ * Derives seasonal Championship/Consolation qualification for a season from
+ * each division's authoritative final standings and completed playoff results.
+ * This is read-only: it never changes standings or playoff rows.
+ */
+export async function getSeasonalQualificationSnapshot(seasonId) {
+  const { data: divisions, error: divisionsError } = await supabase
+    .from("divisions")
+    .select("id, num, name, format, day")
+    .eq("season_id", seasonId)
+    .order("num");
+  if (divisionsError) return { error: divisionsError.message, divisions: [] };
+
+  const results = await Promise.all((divisions ?? []).map(async division => {
+    const [standings, playoffs] = await Promise.all([
+      computeFinalStandings(division.id),
+      listPlayoffBrackets(division.id),
+    ]);
+    if (standings?.error) return { division, error: standings.error };
+    const snapshot = buildSeasonalQualificationSnapshot(standings.standings, playoffs);
+    return {
+      division,
+      ...snapshot,
+      seeding: buildSeasonalSeedingInputs(snapshot),
+    };
+  }));
+
+  const error = results.find(row => row.error)?.error;
+  return { error: error ?? null, divisions: results };
+}
 export async function listPlayoffBrackets(divisionId) {
   const { data } = await supabase.from("playoff_matches").select("*, schedule_pairings(id)")
     .eq("division_id", divisionId).order("bracket_group").order("round").order("slot_num");
