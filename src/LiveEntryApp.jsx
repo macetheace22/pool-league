@@ -13,6 +13,7 @@ import { useActiveSession } from "./ActiveSessionContext";
 import { detectSetWinner } from "./setWinner";
 import { hasLaterStartedSet } from "./forfeitRules";
 import { liveSetDisposition } from "./liveSetDisposition";
+import { canOfferGladiatorMatch, createGladiatorSet, gladiatorPlayerChoices } from "./gladiatorMatch";
 import { resolveTeamMatchWinner } from "./playoffMatchRules";
 
 
@@ -846,6 +847,7 @@ function DraftScreen({ match, activeSet, setActiveSet, onSave }) {
         used={used}
         onAssign={assignPlayer}
         onForfeit={forfeitSet}
+        onGladiator={onSave}
       />
     </div>
   );
@@ -870,9 +872,11 @@ function DraftSetTabBar({ statuses, activeSet, onSelect }) {
   );
 }
 
-function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
+function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit, onGladiator }) {
   const set = match.sets[setIdx];
   const [forfeiting, setForfeiting] = useState(false);
+  const [gladiatorOpen, setGladiatorOpen] = useState(false);
+  const canGladiator = canOfferGladiatorMatch({ isPlayoff: !!match.isPlayoff, sets: match.sets, setIdx });
 
   if (status === "locked") {
     return <div className="empty-state">This table unlocks once an earlier set finishes.</div>;
@@ -911,6 +915,9 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
         lockedReceivingPlayer={alreadyAssignedSide ? opponentPlayer : null}
         onForfeit={onForfeit} onCancel={()=>setForfeiting(false)} />
     );
+  }
+  if (gladiatorOpen) {
+    return <GladiatorMatchForm match={match} setIdx={setIdx} onConfirm={onGladiator} onCancel={() => setGladiatorOpen(false)} />;
   }
 
   return (
@@ -955,6 +962,70 @@ function DraftSetEntry({ match, setIdx, status, used, onAssign, onForfeit }) {
       <button className="makeup-trigger-link" onClick={()=>setForfeiting(true)}>
         <AlertTriangle size={12}/> No eligible player for this table — forfeit it
       </button>
+      {canGladiator && (
+        <button className="btn-secondary" style={{width:"100%",marginTop:10,borderColor:"#B7791F",color:"#F6C66A"}}
+          onClick={() => setGladiatorOpen(true)}>
+          Gladiator Match — both teams have no additional player present
+        </button>
+      )}
+    </div>
+  );
+}
+
+function GladiatorMatchForm({ match, setIdx, onConfirm, onCancel }) {
+  const [homeNoPlayer, setHomeNoPlayer] = useState(false);
+  const [awayNoPlayer, setAwayNoPlayer] = useState(false);
+  const [homeNum, setHomeNum] = useState("");
+  const [awayNum, setAwayNum] = useState("");
+  const homeChoices = gladiatorPlayerChoices(match.sets, setIdx, "home");
+  const awayChoices = gladiatorPlayerChoices(match.sets, setIdx, "away");
+  const homePlayer = homeChoices.find(player => String(player.num) === homeNum);
+  const awayPlayer = awayChoices.find(player => String(player.num) === awayNum);
+  const ready = homeNoPlayer && awayNoPlayer && !!homePlayer && !!awayPlayer;
+  const submit = () => {
+    if (!ready) return;
+    const gladiatorSet = createGladiatorSet(match.sets[setIdx], setIdx, homePlayer, awayPlayer);
+    if (!gladiatorSet) return;
+    const sets = match.sets.map((set, index) => index === setIdx ? gladiatorSet : set);
+    onConfirm({ ...match, sets, gladiatorSetIndex: setIdx, gladiatorMatch: true, phase: "live", confirmedHome: false, confirmedAway: false });
+  };
+  return (
+    <div className="draft-step">
+      <div className="draft-step__banner" style={{background:"#2A1F00",color:"#F6C66A"}}>
+        <AlertTriangle size={13} style={{marginRight:5,verticalAlign:-2}}/> Gladiator Match · Sudden Death
+      </div>
+      <div className="card">
+        <div className="card__title">Confirm no additional player is present</div>
+        <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:12}}>
+          <input type="checkbox" checked={homeNoPlayer} onChange={event => setHomeNoPlayer(event.target.checked)} />
+          <span>{match.teamHome.name} confirms it has no other player present to accept a forfeit.</span>
+        </label>
+        <label className="checkbox-row" style={{display:"flex",gap:9,alignItems:"flex-start"}}>
+          <input type="checkbox" checked={awayNoPlayer} onChange={event => setAwayNoPlayer(event.target.checked)} />
+          <span>{match.teamAway.name} confirms it has no other player present to accept a forfeit.</span>
+        </label>
+      </div>
+      <div className="card">
+        <div className="card__title">{match.teamHome.name} — select a player who already played</div>
+        <select className="input input--select" value={homeNum} onChange={event => setHomeNum(event.target.value)}>
+          <option value="">Select previously played player…</option>
+          {homeChoices.map(player => <option key={player.num} value={player.num}>{player.name} ({player.rating})</option>)}
+        </select>
+      </div>
+      <div className="card">
+        <div className="card__title">{match.teamAway.name} — select a player who already played</div>
+        <select className="input input--select" value={awayNum} onChange={event => setAwayNum(event.target.value)}>
+          <option value="">Select previously played player…</option>
+          {awayChoices.map(player => <option key={player.num} value={player.num}>{player.name} ({player.rating})</option>)}
+        </select>
+      </div>
+      <div style={{fontSize:11,color:"#B7B7B7",lineHeight:1.5,marginBottom:10}}>
+        The selected repeat players will play this marked Gladiator set. It is scored normally. Once it is completed, the match proceeds to final confirmation; remaining sets stay unplayed and the positive rating bonus is suppressed.
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn-primary" disabled={!ready} onClick={submit} style={{flex:1}}>Start Gladiator Set</button>
+        <button className="btn-secondary" onClick={onCancel}>Back</button>
+      </div>
     </div>
   );
 }
@@ -1094,7 +1165,8 @@ function LiveScreen({ match, activeSet, setActiveSet, onSave, pairingId }) {
         onUpdateSet={(updatedSet) => {
           const newSets = match.sets.map((s, i) => (i === activeSet ? updatedSet : s));
           const allDone = newSets.every((s) => s.complete);
-          onSave({ ...match, sets: newSets, phase: allDone ? "confirm" : "live" });
+          const gladiatorDone = !!updatedSet.isGladiator && updatedSet.complete;
+          onSave({ ...match, sets: newSets, phase: allDone || gladiatorDone ? "confirm" : "live" });
         }}
       />
       {completedCount > 0 && <div className="completed-banner">{completedCount} of 5 sets complete</div>}
