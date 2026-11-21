@@ -2910,6 +2910,17 @@ export async function savePracticeGame(row) {
   const { data, error } = await supabase.from("practice_games").insert(row).select().single();
   return error ? null : data;
 }
+export async function listMyUnfinishedPracticeGames(profileId) {
+  if (!profileId) return [];
+  const { data, error } = await supabase.from("practice_games").select("*")
+    .eq("created_by", profileId)
+    .is("winner", null)
+    .is("completed_at", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function listMyPracticeGames(profileId) {
   const { data: linkedOpponents, error: opponentError } = await supabase.from("practice_opponents").select("id")
     .eq("linked_profile_id", profileId);
