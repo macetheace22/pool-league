@@ -166,7 +166,7 @@ export function buildRule55TieBreakAudit({
         position: team.position,
         totalPoints: team.totalPoints,
         tiedWith: group.filter(other => other.teamId !== team.teamId).map(other => other.name),
-        headToHeadPoints: headToHeadEncountered && headToHeadComplete ? headToHeadPoints : null,
+        headToHeadPoints: hasHeadToHead && headToHeadComplete ? headToHeadPoints : null,
         setsWon: finalCounters?.won ?? null,
         pointsLost: pointsLostComplete ? pointsLost : null,
         recordVsNext,
