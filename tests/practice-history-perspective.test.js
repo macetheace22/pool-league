@@ -5,7 +5,7 @@ describe("linked practice history perspective", () => {
   it("reverses the session result and identifies the original creator as the opponent", () => {
     const source = { id: "game-1", created_by: "owner-id", opponent_name: "Old guest label", my_score: 5, opponent_score: 3, winner: "me" };
     const linked = toLinkedPracticeGame(source, { display_name: "Owner Name", player_num: "12345" });
-    expect(linked).toMatchObject({ viewer_perspective: "linked", owner_profile_id: "owner-id", owner_display_name: "OwnerName", owner_player_num: "12345", opponent_name: "Owner Name", my_score: 3, opponent_score: 5, winner: "opponent" });
+    expect(linked).toMatchObject({ viewer_perspective: "linked", owner_profile_id: "owner-id", owner_display_name: "Owner Name", owner_player_num: "12345", opponent_name: "Owner Name", my_score: 3, opponent_score: 5, winner: "opponent" });
     expect(source).toEqual({ id: "game-1", created_by: "owner-id", opponent_name: "Old guest label", my_score: 5, opponent_score: 3, winner: "me" });
   });
   it("reverses individual game points and winner only for the linked viewer", () => {
