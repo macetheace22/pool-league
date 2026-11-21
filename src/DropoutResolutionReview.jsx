@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { PageHeader, AccessDenied, shellCss } from "./Shell";
+import { css } from "./AdminApp";
 import { supabase } from "./supabaseClient";
 import * as db from "./db";
 import { DROPOUT_REMEDIES, normalizeDropoutPreview, validateDropoutResolution } from "./dropoutResolution";
@@ -90,32 +91,44 @@ export default function DropoutResolutionReview() {
 
   if (profile?.role !== "manager") return <AccessDenied />;
   return (
-    <div className="app"><style>{shellCss}</style>
-      <PageHeader title="Team Dropout Resolution" subtitle="Rule 8.7 — record management's chosen remedy without rewriting match history" />
-      <div className="admin-card">
-        <div className="form-grid">
-          <label>Season<select value={seasonId} onChange={e => setSeasonId(e.target.value)}><option value="">Select…</option>{seasons.map(s => <option key={s.id} value={s.id}>{s.type} · {s.year}</option>)}</select></label>
-          <label>Division<select value={divisionId} onChange={e => setDivisionId(e.target.value)} disabled={!seasonId}><option value="">Select…</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.num} · {d.name} · {d.format} · {d.day}</option>)}</select></label>
-          <label>Dropout team<select value={teamId} onChange={e => setTeamId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{teams.map(t => <option key={t.id} value={t.id}>{t.team_num} · {t.name}</option>)}</select></label>
-          <label>Effective dropout date<input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} /></label>
+    <div className="app">
+      <style>{css}</style><style>{shellCss}</style>
+      <PageHeader title="Team Dropout Resolution" subtitle="Rule 8.7 — record management's chosen remedy without rewriting match history" backFallback="/league-office" />
+      <div className="tab-content">
+        <div className="card">
+          <div className="section-header"><div className="section-header__title">Record team dropout</div></div>
+          <div style={{fontSize:11.5,color:"#9A9A9A",lineHeight:1.45}}>Preview the affected history first. Completed matches remain unchanged; this workflow records the League Management decision.</div>
+          <div className="field"><span className="form-label">Season</span><select className="input input--select" value={seasonId} onChange={e => setSeasonId(e.target.value)}><option value="">Select…</option>{seasons.map(s => <option key={s.id} value={s.id}>{s.type} · {s.year}</option>)}</select></div>
+          <div className="field"><span className="form-label">Division</span><select className="input input--select" value={divisionId} onChange={e => setDivisionId(e.target.value)} disabled={!seasonId}><option value="">Select…</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.num} · {d.name} · {d.format} · {d.day}</option>)}</select></div>
+          <div className="field"><span className="form-label">Dropout team</span><select className="input input--select" value={teamId} onChange={e => setTeamId(e.target.value)} disabled={!divisionId}><option value="">Select…</option>{teams.map(t => <option key={t.id} value={t.id}>{t.team_num} · {t.name}</option>)}</select></div>
+          <div className="field"><span className="form-label">Effective dropout date</span><input className="input" type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} /></div>
+          <button className="btn-primary" onClick={getPreview} disabled={busy}>Preview affected records</button>
         </div>
-        <button className="btn btn-primary" onClick={getPreview} disabled={busy}>Preview affected records</button>
-        {preview && <div className="admin-card" style={{ marginTop: 16 }}>
-          <strong>Impact preview</strong>
-          <p>{preview.teamName}: {preview.completedMatchCount} completed match record(s), {preview.futureScheduleWeekCount} future schedule week(s).</p>
-          <p>Completed match history is preserved. The selected remedies are recorded as the management decision; later work will apply their standings/schedule effects.</p>
+        {preview && <div className="card">
+          <div className="card__title">Impact preview</div>
+          <div style={{fontSize:12.5,lineHeight:1.5}}>
+            <div>{preview.teamName}: {preview.completedMatchCount} completed match record(s), {preview.futureScheduleWeekCount} future schedule week(s).</div>
+            <div style={{marginTop:6}}>Completed match history is preserved. The selected remedies are recorded as the management decision; later work will apply their standings/schedule effects.</div>
+          </div>
         </div>}
-        <fieldset style={{ marginTop: 16 }}>
-          <legend>Management remedy</legend>
-          {DROPOUT_REMEDIES.map(r => <label key={r.value} style={{ display:"block", margin:"8px 0" }}><input type="checkbox" checked={remedies.includes(r.value)} onChange={e => setRemedies(v => e.target.checked ? [...v,r.value] : v.filter(x => x !== r.value))} /> {r.label}</label>)}
-        </fieldset>
-        <label style={{ display:"block", marginTop:16 }}>Management note<textarea rows="4" value={note} onChange={e => setNote(e.target.value)} /></label>
-        <button className="btn btn-success" onClick={applyResolution} disabled={busy || !preview}>Record dropout resolution</button>
-        {message && <p style={{ marginTop:12 }}>{message}</p>}
-      </div>
-      <div className="admin-card" style={{ marginTop:16 }}>
-        <h3>Resolution history</h3>
-        {!history.length ? <p>No dropout resolutions recorded for this division.</p> : history.map(h => <div key={h.id} style={{ borderTop:"1px solid #444", padding:"12px 0" }}><strong>{h.dropout_team_id}</strong> — {h.effective_date} — {h.status}<div>{(h.remedies ?? []).join(", ")}</div>{h.note && <div>{h.note}</div>}</div>)}
+        <div className="card">
+          <div className="card__title">Management remedy</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {DROPOUT_REMEDIES.map(r => <label key={r.value} style={{display:"flex",alignItems:"flex-start",gap:8,fontSize:12.5,color:"#E0E0E0"}}><input type="checkbox" checked={remedies.includes(r.value)} onChange={e => setRemedies(v => e.target.checked ? [...v,r.value] : v.filter(x => x !== r.value))} /> <span>{r.label}</span></label>)}
+          </div>
+          <div className="field"><span className="form-label">Management note</span><textarea className="input" rows="4" value={note} onChange={e => setNote(e.target.value)} /></div>
+          <button className="btn-primary" onClick={applyResolution} disabled={busy || !preview}>Record dropout resolution</button>
+          {message && <div className={message.includes("recorded") ? "success-msg" : "error-msg"}>{message}</div>}
+        </div>
+        <div className="card">
+          <div className="card__title">Resolution history</div>
+          {!history.length ? <div className="empty-state">No dropout resolutions recorded for this division.</div> : history.map(h => <div key={h.id} style={{borderTop:"1px solid #2A2A2A",padding:"12px 0",fontSize:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:8}}><strong>{h.dropout_team_id}</strong><span className="role-pill role-pill--sm">{h.status}</span></div>
+            <div style={{color:"#9A9A9A",marginTop:4}}>{h.effective_date}</div>
+            <div style={{marginTop:4}}>{(h.remedies ?? []).join(", ")}</div>
+            {h.note && <div style={{marginTop:4,color:"#9A9A9A"}}>{h.note}</div>}
+          </div>)}
+        </div>
       </div>
     </div>
   );
