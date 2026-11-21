@@ -113,13 +113,16 @@ export function buildSeasonalTournamentPlans(divisionSnapshots) {
   const consolationTeams = [];
   for (const row of divisionSnapshots ?? []) {
     const divisionId = row?.division?.id ?? null;
+    const divisionLabel = row?.division?.num != null
+      ? `Division ${row.division.num}`
+      : row?.division?.name ?? "Division";
     for (const team of row?.seeding?.championship ?? []) {
-      championshipTeams.push({ ...team, divisionId });
+      championshipTeams.push({ ...team, divisionId, divisionLabel });
     }
     for (const team of row?.seeding?.consolation ?? []) {
       const receivedBye = deriveConsolationByeStatus(team.teamId, row?.playoffMatches);
       const seedCategory = classifyConsolationSeed({ consolationChampion: true, receivedBye });
-      consolationTeams.push({ ...team, divisionId, receivedBye, seedCategory });
+      consolationTeams.push({ ...team, divisionId, divisionLabel, receivedBye, seedCategory });
     }
   }
   return {
