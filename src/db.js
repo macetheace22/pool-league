@@ -2757,7 +2757,10 @@ export async function getPlayerRating(playerNum) {
 // Previously-typed-in (no-login) opponents, most recently created first --
 // so a name doesn't have to be retyped every session.
 export async function listMyPracticeOpponents(profileId) {
-  const { data } = await supabase.from("practice_opponents").select("*").eq("created_by", profileId).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("practice_opponents").select("*")
+    .or(`created_by.eq.${profileId},linked_profile_id.eq.${profileId}`)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
   return data ?? [];
 }
 // Reuses an existing opponent with the same name (case-insensitive) instead
@@ -2880,12 +2883,32 @@ export async function savePracticeGame(row) {
   return error ? null : data;
 }
 export async function listMyPracticeGames(profileId) {
-  const { data, error } = await supabase.from("practice_games").select("*")
-    .eq("created_by", profileId)
-    .or("winner.not.is.null,completed_at.not.is.null")
-    .order("played_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  const { data: linkedOpponents, error: opponentError } = await supabase.from("practice_opponents").select("id")
+    .eq("linked_profile_id", profileId);
+  if (opponentError) throw opponentError;
+
+  const linkedOpponentIds = (linkedOpponents ?? []).map(o => o.id);
+  let query = supabase.from("practice_games").select("*")
+    .or("winner.not.is.null,completed_at.not.is.null");
+
+  const { data: ownGames, error: ownError } = await query.eq("created_by", profileId);
+  if (ownError) throw ownError;
+
+  let linkedGames = [];
+  if (linkedOpponentIds.length > 0) {
+    const { data, error } = await supabase.from("practice_games").select("*")
+      .in("opponent_id", linkedOpponentIds)
+      .or("winner.not.is.null,completed_at.not.is.null");
+    if (error) throw error;
+    linkedGames = data ?? [];
+  }
+
+  const byId = new Map();
+  [...(ownGames ?? []), ...linkedGames].forEach(game => byId.set(game.id, game));
+  return [...byId.values()].sort((a, b) =>
+    new Date(b.played_at ?? b.completed_at ?? 0).getTime() -
+    new Date(a.played_at ?? a.completed_at ?? 0).getTime()
+  );
 }
 
 // ─── Shot tracking ("Track a Rack") ─────────────────────────────────────────
