@@ -198,7 +198,7 @@ export default function ReplacementTeamResolution() {
   if (profile?.role !== "manager") return <AccessDenied />;
 
   return (
-    <div style={shellCss}>
+    <div className="app"><style>{shellCss}</style>
       <PageHeader title="Replacement Team Resolution" subtitle="Rule 8.8 — record replacement-team points and makeup entitlement" />
       <div className="admin-card">
         <div className="form-grid">
