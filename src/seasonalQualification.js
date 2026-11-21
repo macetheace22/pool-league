@@ -52,6 +52,8 @@ export function buildSeasonalQualificationSnapshot(standings, playoffMatches = [
     .filter(row => championshipIds.has(row.teamId))
     .map(row => ({
       teamId: row.teamId,
+      name: row.name ?? null,
+      teamNum: row.teamNum ?? row.team_num ?? null,
       position: row.position,
       qualified: true,
       reason: row.position === 1 && row.teamId === divisionChampion
