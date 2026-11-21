@@ -5676,7 +5676,7 @@ function SeasonalTournamentReview({ seasonId }) {
                     #{index+1} · {team.name || team.teamName || team.teamId} · {team.seedCategory.replaceAll("_"," ")}
                   </div>
                 ))}
-                <button className="btn-primary" style={{marginTop:12}} disabled={saving!=="" || teams.length===0 || unverified || !snapshot?.divisions?.every(row=>!row.error)} onClick={()=>reconcileTournament(type,saved)}>
+                <button className="btn-primary" style={{marginTop:12}} disabled={saving!=="" || teams.length===0 || unverified || plan?.requiresReview || !snapshot?.divisions?.every(row=>!row.error)} onClick={()=>reconcileTournament(type,saved)}>
                   {saving==="reconcile-"+type ? "Reconciling…" : "Approve & Reconcile Bracket"}
                 </button>
                 {(unverified || plan?.requiresReview || snapshot?.divisions?.some(row=>row.error)) && (
