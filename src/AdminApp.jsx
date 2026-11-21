@@ -3883,7 +3883,7 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
       }
       preview={parsed.length>0 && <PreviewList rows={parsed.map(r=>{
         const audit = db.validateMvpImportRow(r);
-        return {id:r.playerNum, name:r.playerName, sub:`${r.wins}W–${r.losses}L · ${r.pointsScored} pts · ${r.mvpRankingPoints} official ranking pts · ${audit.valid ? `${audit.inferredForfeitWins} inferred forfeit wins` : "FORMULA REVIEW"}`};
+        return {id:r.playerNum, name:r.playerName, sub:`${r.wins}W–${r.losses}L · ${r.pointsScored} pts · ${r.mvpRankingPoints} official ranking pts · ${audit.valid ? `${audit.inferredForfeitWins} formula-implied forfeit wins` : "FORMULA REVIEW"}`};
       })}/>}
       preHint={<>
         <div className="field" style={{marginBottom:8}}>
@@ -3894,7 +3894,7 @@ function SeedMvpImport({ divisionId, onImported, existingCount }) {
         {parsed.length > 0 && (() => {
           const audit = db.validateMvpImportRows(parsed);
           return <div style={{fontSize:11,lineHeight:1.5,color:audit.invalidRows.length?"#F59E0B":"#5FCF9E",marginBottom:8}}>
-            **Section 5.6 formula check:** {audit.validCount}/{audit.total} rows reconcile; {audit.inferredForfeitWins} forfeit wins inferred.
+            <strong>Section 5.6 formula check:</strong> {audit.validCount}/{audit.total} rows reconcile; {audit.inferredForfeitWins} formula-implied forfeit wins.
             {audit.invalidRows.length > 0 && <div style={{color:"#F59E0B",marginTop:4}}>{audit.invalidRows.map(row=>`${row.playerName}: ${row.issue}`).join(" ")} Official values will be preserved for review.</div>}
           </div>;
         })()}
