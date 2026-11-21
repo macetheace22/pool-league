@@ -5,6 +5,7 @@ import { buildRosterSyncPlan } from "./rosterReconciliation";
 import { toLinkedPracticeGame } from "./practiceHistory";
 import { normalizeImportedPlayoffBracket } from "./ibaPlayoffBrackets";
 import { buildSeasonalQualificationSnapshot, buildSeasonalSeedingInputs } from "./seasonalQualification";
+import { buildSeasonalTournamentPlans } from "./seasonalTournamentSeeding";
 export { eligibilityByPlayerNum, latestPlayoffEligibilityRows } from "./playoffEligibility";
 
 // Legacy compatibility helpers retained from the prior version.
@@ -510,7 +511,7 @@ export async function getSeasonalQualificationSnapshot(seasonId) {
     .select("id, num, name, format, day")
     .eq("season_id", seasonId)
     .order("num");
-  if (divisionsError) return { error: divisionsError.message, divisions: [] };
+  if (divisionsError) return { error: divisionsError.message, divisions: [], tournaments: null };
 
   const results = await Promise.all((divisions ?? []).map(async division => {
     const [standings, playoffs] = await Promise.all([
@@ -522,12 +523,13 @@ export async function getSeasonalQualificationSnapshot(seasonId) {
     return {
       division,
       ...snapshot,
+      playoffMatches: playoffs,
       seeding: buildSeasonalSeedingInputs(snapshot),
     };
   }));
 
   const error = results.find(row => row.error)?.error;
-  return { error: error ?? null, divisions: results };
+  return { error: error ?? null, divisions: results, tournaments: error ? null : buildSeasonalTournamentPlans(results) };
 }
 export async function listPlayoffBrackets(divisionId) {
   const { data } = await supabase.from("playoff_matches").select("*, schedule_pairings(id)")
