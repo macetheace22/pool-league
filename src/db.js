@@ -47,6 +47,12 @@ export async function claimInviteCode(code) {
   if (error?.message?.includes("PLAYER_NUMBER_ALREADY_LINKED")) {
     return { error: "Your account is already linked to a different player number. Ask your captain for the player-specific invite code for your correct roster entry. If your existing player-number link is incorrect, the league manager will need to resolve that exceptional conflict." };
   }
+  if (error?.message?.includes("PLAYER_NAME_MISMATCH")) {
+    return { error: "The first and last name on your profile do not match the IBA player record for this invite code. Update your profile name or ask your captain/league manager to correct an inaccurate roster name." };
+  }
+  if (error?.message?.includes("PROFILE_FULL_NAME_REQUIRED")) {
+    return { error: "Add your first and last name in Profile before redeeming a player invite code." };
+  }
   if (error) return { error: error.message };
   return { role: data?.[0]?.role, team_id: data?.[0]?.team_id };
 }
