@@ -146,6 +146,24 @@ begin
       );
   end if;
 
+  -- Recorded matches must retain their participants and bye shape exactly.
+  if exists (
+    select 1
+      from public.seasonal_tournament_matches saved
+      join jsonb_to_recordset(p_matches) as incoming(
+        match_key text, team_home_id uuid, team_away_id uuid, is_bye boolean
+      ) on incoming.match_key = saved.match_key
+     where saved.tournament_id = p_tournament_id
+       and saved.status in ('completed', 'in_progress')
+       and (
+         saved.team_home_id is distinct from incoming.team_home_id
+         or saved.team_away_id is distinct from incoming.team_away_id
+         or saved.is_bye is distinct from coalesce(incoming.is_bye, false)
+       )
+  ) then
+    raise exception 'RECORDED_MATCH_PARTICIPANTS_CHANGED';
+  end if;
+
   v_proposed := p_matches;
 
   -- Carry every completed/in-progress winner into its existing downstream slot.
@@ -213,7 +231,10 @@ begin
   get diagnostics v_updated = row_count;
 
   update public.seasonal_tournaments
-     set status = case when status = 'in_progress' then 'in_progress' else 'confirmed' end,
+     set status = case when exists (
+       select 1 from public.seasonal_tournament_matches
+        where tournament_id = p_tournament_id and status in ('completed', 'in_progress')
+     ) then 'in_progress' else 'confirmed' end,
          review_required_at = null,
          review_reason = null,
          updated_at = now()
