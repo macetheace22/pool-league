@@ -66,4 +66,44 @@ describe("Section 5.4 seasonal tournament seeding", () => {
     expect(plan.nonByeTeamIds).toEqual(["bye-winner"]);
     expect(plan.requiresReview).toBe(true);
   });
+
+  it("derives a back-to-back Consolation path from semifinal and final results", () => {
+    const matches = [
+      { bracket_type: "consolation", bracket_group: "consolation-a", round: "semifinal", winner_team_id: "champ" },
+      { bracket_type: "consolation", bracket_group: "consolation-a", round: "semifinal", winner_team_id: "other" },
+      { bracket_type: "consolation", bracket_group: "consolation-a", round: "final", winner_team_id: "champ" },
+    ];
+    expect(deriveConsolationByeStatus("champ", matches)).toBe(false);
+  });
+  it("derives a Consolation bye only when the champion is the recorded bye team", () => {
+    const matches = [
+      { bracket_type: "consolation", bracket_group: "consolation-a", round: "semifinal", is_bye_home: true, team_home_id: "champ", winner_team_id: "champ" },
+      { bracket_type: "consolation", bracket_group: "consolation-a", round: "semifinal", winner_team_id: "other" },
+      { bracket_type: "consolation", bracket_group: "consolation-a", round: "final", winner_team_id: "champ" },
+    ];
+    expect(deriveConsolationByeStatus("champ", matches)).toBe(true);
+  });
+  it("does not guess Consolation bye history when semifinal evidence is incomplete", () => {
+    expect(deriveConsolationByeStatus("champ", [
+      { bracket_type: "consolation", bracket_group: "consolation-a", round: "final", winner_team_id: "champ" },
+    ])).toBeNull();
+  });
+  it("aggregates division qualifiers into season-wide Championship and Consolation fields", () => {
+    const plans = buildSeasonalTournamentPlans([
+      { division: { id: "d1" }, seeding: {
+        championship: [{ teamId: "c1", seedCategory: "first_place_and_division_champion" }],
+        consolation: [{ teamId: "x1" }],
+      }, playoffMatches: [
+        { bracket_type: "consolation", bracket_group: "g1", round: "semifinal", winner_team_id: "x1" },
+        { bracket_type: "consolation", bracket_group: "g1", round: "final", winner_team_id: "x1" },
+      ] },
+      { division: { id: "d2" }, seeding: {
+        championship: [{ teamId: "c2", seedCategory: "first_place_not_division_champion" }],
+        consolation: [],
+      }, playoffMatches: [] },
+    ]);
+    expect(plans.championship.teams.map(team => team.teamId)).toEqual(["c1", "c2"]);
+    expect(plans.consolation.teams[0]).toMatchObject({ teamId: "x1", seedCategory: "consolation_champion_back_to_back_wins", receivedBye: false });
+    expect(plans.championship.byePlan.qualifiedTeamCount).toBe(2);
+  });
 });
