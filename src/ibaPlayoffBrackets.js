@@ -110,45 +110,58 @@ function parseBracketSection(lines, heading, divisionNum, bracketIndex) {
 }
 
 export function parseIbaPlayoffBrackets(raw) {
-  const allLines = String(raw || "")
-    .split(/\\r?\\n/)
-    .map(cleanLine)
-    .filter(Boolean);
-
-  const divisionNum = extractDivisionNum(allLines);
-  const headingIndexes = [];
-  allLines.forEach((line, index) => {
-    if (/\\b(?:Championship|Consolation)\\s+Play-?Offs?\\b/i.test(line)) {
-      headingIndexes.push(index);
-    }
-  });
-
-  if (!headingIndexes.length) {
-    return {
-      detected: false,
-      divisionNum,
-      brackets: [],
-      warnings: [],
-    };
-  }
+  const pages = String(raw || "")
+    .split(/\f|\n\s*PAGE\s+\d+\s*\n/ig)
+    .map(page => page.split(/\r?\n/).map(cleanLine).filter(Boolean))
+    .filter(page => page.length);
 
   const brackets = [];
-  headingIndexes.forEach((headingIndex, index) => {
-    const nextHeading = headingIndexes[index + 1] ?? allLines.length;
-    const heading = allLines[headingIndex];
-    const section = allLines.slice(headingIndex + 1, nextHeading);
-    const bracket = parseBracketSection(section, heading, divisionNum, index);
-    if (bracket.teams.length) brackets.push(bracket);
-  });
+  const warnings = [];
+  const divisionNum = extractDivisionNum(pages.flat());
+
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const lines = pages[pageIndex];
+    const headings = lines.filter(line => /\b(?:Championship|Consolation)\s+Play-?Offs?\b/i.test(line));
+    if (!headings.length) continue;
+
+    const heading = headings[0];
+    // PDF text extraction can place the heading after the teams because the
+    // original PDF is laid out in multiple columns. Parse the entire page,
+    // not only the text after the heading.
+    const bracket = parseBracketSection(lines, heading, divisionNum, brackets.length);
+    if (bracket.teams.length) {
+      bracket.pageIndex = pageIndex;
+      brackets.push(bracket);
+    } else {
+      warnings.push({
+        pageIndex,
+        reason: "A postseason bracket heading was found, but no seed/team entries could be read from that page.",
+      });
+    }
+  }
+
+  // Some text extractors remove form-feed/page boundaries. In that case,
+  // fall back to heading-delimited sections. This is intentionally only a
+  // fallback; the page-aware path above is preferred because the IBA bracket
+  // is a visual artifact.
+  if (!brackets.length) {
+    const allLines = String(raw || "").split(/\r?\n/).map(cleanLine).filter(Boolean);
+    const headingIndexes = [];
+    allLines.forEach((line, index) => {
+      if (/\b(?:Championship|Consolation)\s+Play-?Offs?\b/i.test(line)) headingIndexes.push(index);
+    });
+    headingIndexes.forEach((headingIndex, index) => {
+      const nextHeading = headingIndexes[index + 1] ?? allLines.length;
+      const bracket = parseBracketSection(allLines.slice(Math.max(0, headingIndex - 30), nextHeading), allLines[headingIndex], divisionNum, brackets.length);
+      if (bracket.teams.length) brackets.push(bracket);
+    });
+  }
 
   return {
-    detected: true,
+    detected: brackets.length > 0,
     divisionNum,
     brackets,
-    warnings: brackets.filter(bracket => bracket.parseError).map(bracket => ({
-      bracketGroup: bracket.bracketGroup,
-      reason: bracket.parseError,
-    })),
+    warnings,
   };
 }
 
