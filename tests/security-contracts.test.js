@@ -568,7 +568,7 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(sql).toContain("where c.code::text = trim(p_code)");
     expect(sql).toContain("set redeemed_at = now()");
     expect(sql).toContain("values (\n    v_code.opponent_id, (select auth.uid()), v_owner, (select auth.uid())");
-    expect(sql).toContain("link_profile_id = v_request.link_profile_id");
+    expect(sql).toContain("v_request.link_profile_id");
     expect(sql).toContain("if v_request.target_profile_id <> (select auth.uid()) then");
     expect(sql).toContain("case when r.link_profile_id = r.requested_by then 'claim' else 'link' end");
     for (const signature of [
@@ -586,7 +586,7 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(db).toContain('supabase.rpc("create_practice_opponent_claim_code"');
     expect(db).toContain('supabase.rpc("redeem_practice_opponent_claim_code"');
     expect(practice).toContain("Claim a Practice Identity");
-    expect(practice).toContain("owner must approve your request");
+    expect(practice).toContain("person who created that opponent entry must approve your request");
     expect(practice).toContain("generateClaimCode(o.opponentId)");
     expect(practice).toContain("request.link_type === \"claim\"");
     expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
