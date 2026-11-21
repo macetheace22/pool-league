@@ -266,10 +266,10 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
         <div className="card">
           <div className="card__title">Claim a Practice Identity</div>
           <div style={{fontSize:11,color:"#999",lineHeight:1.5,marginBottom:8}}>
-            If someone shared a claim code for a practice opponent that represents you, enter it here. The person who created that opponent entry must approve your request.
+            Enter a claim code to request linking your practice history. The owner must approve.
           </div>
           <div style={{display:"flex",gap:8}}>
-            <input className="input input--code" value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
+            <input className="input" style={{fontSize:14,letterSpacing:"normal",textAlign:"left",textTransform:"none"}} value={claimCodeInput} onChange={e=>setClaimCodeInput(e.target.value)} placeholder="Paste claim code" autoCapitalize="none" />
             <button className="btn-primary" onClick={redeemClaimCode} disabled={!claimCodeInput.trim()||claimCodeBusy}>{claimCodeBusy?"Checking…":"Submit"}</button>
           </div>
           {claimCodeMessage && <div className="success-msg" style={{marginTop:8}}>{claimCodeMessage}</div>}
@@ -356,9 +356,9 @@ function LandingStep({ profile, history, rawOpponents, onStart, onLinked }) {
                     {linkingKey === o.key && (
                       <LinkOpponentPanel opponentId={o.opponentId} onDone={() => { setLinkingKey(null); onLinked(); refreshLinkRequests(); }} onCancel={() => setLinkingKey(null)} />
                     )}
-                    {generatedClaimCodes[o.opponentId] && (
+                    {!linked && generatedClaimCodes[o.opponentId] && (
                       <div className="readonly-bar" style={{marginTop:5,display:"flex",flexDirection:"column",gap:6}}>
-                        <span>Share this one-time claim code with the person represented by this opponent entry. It expires in 7 days.</span>
+                        <span>Share this code with the player. Expires in 7 days.</span>
                         <strong style={{fontSize:13,letterSpacing:1.2,wordBreak:"break-all"}}>{generatedClaimCodes[o.opponentId]}</strong>
                         <button className="btn-secondary" onClick={() => navigator.clipboard?.writeText(generatedClaimCodes[o.opponentId])}>Copy Code</button>
                       </div>

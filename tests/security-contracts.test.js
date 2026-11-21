@@ -612,7 +612,7 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(db).toContain('supabase.rpc("create_practice_opponent_claim_code"');
     expect(db).toContain('supabase.rpc("redeem_practice_opponent_claim_code"');
     expect(practice).toContain("Claim a Practice Identity");
-    expect(practice).toContain("person who created that opponent entry must approve your request");
+    expect(practice).toContain("The owner must approve.");
     expect(practice).toContain("generateClaimCode(o.opponentId)");
     expect(practice).toContain("request.link_type === \"claim\"");
     expect(practice).toContain("db.respondPracticeOpponentLink(request.request_id, true)");
