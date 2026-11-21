@@ -681,6 +681,7 @@ describe("Section 105 account full names and identity validation", () => {
     expect(sql).toContain("public.list_practice_opponent_link_requests_with_names()");
     expect(practice).toContain("request.requester_full_name");
     expect(practice).toContain("request.target_full_name");
+    expect(practice).toContain("Both accounts must have first and last names saved in Profile");
     expect(practice).toContain("p.full_name");
     expect(practice).toContain("they must confirm before your practice history is linked.");
   });
