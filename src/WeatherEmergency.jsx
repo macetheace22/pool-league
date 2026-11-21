@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CloudRain } from "lucide-react";
 import { useAuth } from "./AuthContext";
-import { PageHeader, TabBar, shellCss, AccessDenied } from "./Shell";
+import { PageHeader, shellCss, AccessDenied } from "./Shell";
 import { css } from "./AdminApp";
 import * as db from "./db";
 
@@ -33,14 +33,22 @@ export default function WeatherEmergency() {
       if (active.length === 1) setSeasonId(active[0].id);
       setLoading(false);
     }).catch(e => {
-      if (!cancelled) { setError(e?.message ?? "Unable to load the active season."); setLoading(false); }
+      if (!cancelled) {
+        setError(e?.message ?? "Unable to load the active season.");
+        setLoading(false);
+      }
     });
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    if (!seasonId) { setHistory([]); return; }
-    db.listWeatherEmergencies(seasonId).then(setHistory).catch(e => setError(e?.message ?? "Unable to load weather declarations."));
+    if (!seasonId) {
+      setHistory([]);
+      return;
+    }
+    db.listWeatherEmergencies(seasonId)
+      .then(setHistory)
+      .catch(e => setError(e?.message ?? "Unable to load weather declarations."));
   }, [seasonId]);
 
   const declare = async () => {
@@ -50,18 +58,24 @@ export default function WeatherEmergency() {
       setError("Select the active season and scheduled match date.");
       return;
     }
+
     const [year, month, day] = scheduledDate.split("-");
     const usDate = `${Number(month)}/${Number(day)}/${year}`;
     if (history.some(row => row.scheduled_date === usDate)) {
       setError("A weather emergency has already been declared for that scheduled date.");
       return;
     }
-    if (!window.confirm(`Declare a league-wide weather emergency for ${usDate}? Every scheduled regular-season team match on that date will be marked for makeup.`)) return;
+
+    if (!window.confirm(
+      `Declare a league-wide weather emergency for ${usDate}? Every scheduled regular-season team match on that date will be marked for makeup.`
+    )) return;
 
     setSaving(true);
     try {
       const result = await db.declareWeatherEmergency(seasonId, usDate, note);
-      setMessage(`Weather emergency recorded. ${result.created_makeups ?? 0} match${result.created_makeups === 1 ? "" : "es"} marked for makeup.`);
+      setMessage(
+        `Weather emergency recorded. ${result.created_makeups ?? 0} match${result.created_makeups === 1 ? "" : "es"} marked for makeup.`
+      );
       setNote("");
       setScheduledDate("");
       setHistory(await db.listWeatherEmergencies(seasonId));
@@ -78,43 +92,79 @@ export default function WeatherEmergency() {
   return (
     <div className="app">
       <style>{css}</style><style>{shellCss}</style>
-      <PageHeader title="Weather Emergency" />
+      <PageHeader title="Weather Emergency" subtitle="Rule 8.6 — League Management declaration" backFallback="/league-office" />
       <div className="tab-content">
-        {loading ? <div>Loading…</div> : (
+        {loading ? <div className="empty-state">Loading weather emergencies…</div> : (
           <>
-            <div className="admin-card" style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <CloudRain size={20} />
-                <strong>Declare a league-wide weather emergency</strong>
+            <div className="card">
+              <div className="section-header">
+                <div className="section-header__title">
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <CloudRain size={20} />
+                    Declare weather emergency
+                  </span>
+                </div>
               </div>
-              <p style={{ marginTop: 0 }}>
-                Use this only when the League Office determines that an official weather emergency applies.
-                All scheduled regular-season team matches on the selected date will become makeup-pending.
-              </p>
-              <label>Active season</label>
-              <select value={seasonId} onChange={e => setSeasonId(e.target.value)} disabled={saving}>
-                <option value="">Select season…</option>
-                {activeSeasons.map(s => <option key={s.id} value={s.id}>{seasonLabel(s)}</option>)}
-              </select>
-              <label style={{ marginTop: 12 }}>Scheduled match date</label>
-              <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} disabled={saving} />
-              <label style={{ marginTop: 12 }}>League Office note (optional)</label>
-              <textarea value={note} onChange={e => setNote(e.target.value)} disabled={saving} rows={3} placeholder="Optional reason or weather-service reference" />
-              {error && <div style={{ marginTop: 12, color: "#9B1C1C" }}>{error}</div>}
-              {message && <div style={{ marginTop: 12, color: "#126B46" }}>{message}</div>}
-              <button className="btn-primary" style={{ marginTop: 14 }} onClick={declare} disabled={saving}>
+              <div style={{ fontSize: 11.5, color: "#9A9A9A", lineHeight: 1.45 }}>
+                Use this only when League Management determines that an official weather emergency applies.
+                All scheduled regular-season team matches on the selected date become makeup-pending.
+              </div>
+              <div className="field">
+                <span className="form-label">Active season</span>
+                <select
+                  className="input input--select"
+                  value={seasonId}
+                  onChange={e => setSeasonId(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="">Select season…</option>
+                  {activeSeasons.map(s => <option key={s.id} value={s.id}>{seasonLabel(s)}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <span className="form-label">Scheduled match date</span>
+                <input
+                  className="input"
+                  type="date"
+                  value={scheduledDate}
+                  onChange={e => setScheduledDate(e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+              <div className="field">
+                <span className="form-label">League Office note (optional)</span>
+                <textarea
+                  className="input"
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  disabled={saving}
+                  rows={3}
+                  placeholder="Optional reason or weather-service reference"
+                />
+              </div>
+              {error && <div className="error-msg">{error}</div>}
+              {message && <div className="success-msg">{message}</div>}
+              <button className="btn-primary" onClick={declare} disabled={saving}>
                 {saving ? "Recording…" : "Declare Weather Emergency"}
               </button>
             </div>
-            <div className="admin-card">
-              <strong>Recorded weather emergencies</strong>
-              {history.length === 0 ? <p>No weather emergencies have been recorded for this season.</p> : (
-                <div style={{ marginTop: 10 }}>
+
+            <div className="card">
+              <div className="card__title">Recorded weather emergencies</div>
+              {history.length === 0 ? (
+                <div className="empty-state">No weather emergencies have been recorded for this season.</div>
+              ) : (
+                <div>
                   {history.map(row => (
-                    <div key={row.id} style={{ padding: "10px 0", borderTop: "1px solid #ddd" }}>
-                      <strong>{row.scheduled_date}</strong>
-                      <div>Declared {row.declared_at ? new Date(row.declared_at).toLocaleString() : "—"}</div>
-                      {row.note && <div>{row.note}</div>}
+                    <div key={row.id} style={{ padding: "12px 0", borderTop: "1px solid #2A2A2A", fontSize: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <strong>{row.scheduled_date}</strong>
+                        <span className="role-pill role-pill--sm">Declared</span>
+                      </div>
+                      <div style={{ color: "#9A9A9A", marginTop: 4 }}>
+                        Declared {row.declared_at ? new Date(row.declared_at).toLocaleString() : "—"}
+                      </div>
+                      {row.note && <div style={{ marginTop: 4 }}>{row.note}</div>}
                     </div>
                   ))}
                 </div>
@@ -123,7 +173,6 @@ export default function WeatherEmergency() {
           </>
         )}
       </div>
-      <TabBar />
     </div>
   );
 }
