@@ -114,9 +114,9 @@ export default function Practice() {
       practiceType,
       scoringMethod: game.scoring_method ?? null,
       opponentType: practiceType === "opponent"
-        ? (game.opponent_player_num ? "player" : "manual")
+        ? (game.viewer_perspective === "linked" ? "player" : game.opponent_player_num ? "player" : "manual")
         : null,
-      opponentPlayerNum: game.opponent_player_num ?? null,
+      opponentPlayerNum: game.viewer_perspective === "linked" ? (game.owner_player_num ?? null) : (game.opponent_player_num ?? null),
       opponentId: game.opponent_id ?? null,
       opponentName: game.opponent_name ?? "",
       opponentRating: game.opponent_rating ?? null,
@@ -125,6 +125,7 @@ export default function Practice() {
       tableSizeFeet: game.table_size_feet ?? null,
       x: game.target_games ?? 5,
       myRating: game.my_rating ?? null,
+      viewerPerspective: game.viewer_perspective === "linked" ? "shared" : "creator",
       gameId: game.id,
       myScore: game.my_score ?? 0,
       opponentScore: game.opponent_score ?? 0,
@@ -325,7 +326,7 @@ function LandingStep({ profile, history, unfinishedGames, rawOpponents, onStart,
           <div className="card" style={{borderColor:"#1F6B4A",background:"#0F2D1F",marginBottom:14}}>
             <div className="card__title" style={{color:"#5FCF9E"}}>Practice Session in Progress</div>
             <div style={{fontSize:10.5,color:"#B7D2C6",marginTop:4}}>
-              Your unfinished practice session is saved. Resume it here or discard it permanently.
+              Your unfinished practice session is saved. Resume it here. The session creator can discard it.
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
               {(unfinishedGames ?? []).map(game => (
@@ -924,12 +925,16 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
           if (!existing) existing = await db.getPracticeGame(session.gameId, profile.id);
         }
         if (!existing) throw new Error("The practice game could not be created or recovered.");
-        const results = await db.listPracticeGameResults(session.gameId);
+        const viewerIsSharedParticipant = existing.created_by !== profile.id;
+        const results = await db.listPracticeGameResults(session.gameId, viewerIsSharedParticipant);
         if (!cancelled) {
           setSession(current => ({
             ...current,
-            myScore: existing.my_score ?? 0,
-            opponentScore: existing.opponent_score ?? 0,
+            myScore: viewerIsSharedParticipant ? (existing.opponent_score ?? 0) : (existing.my_score ?? 0),
+            opponentScore: viewerIsSharedParticipant ? (existing.my_score ?? 0) : (existing.opponent_score ?? 0),
+            viewerPerspective: viewerIsSharedParticipant ? "shared" : "creator",
+            opponentType: !viewerIsSharedParticipant && existing.shared_with_profile_id && existing.opponent_player_num ? "player" : current.opponentType,
+            opponentPlayerNum: current.viewerPerspective === "shared" ? current.opponentPlayerNum : (existing.opponent_player_num ?? current.opponentPlayerNum),
             gameLog: results.map(result => ({
               id: result.id, gameNumber: result.game_number,
               myPoints: result.my_points, oppPoints: result.opponent_points, winner: result.winner,
@@ -980,6 +985,9 @@ function PlayStep({ profile, session, setSession, onDone, onBack, onDiscard }) {
         game_type: session.gameType,
         opponent_player_num: session.opponentPlayerNum ?? null,
         opponent_name: session.opponentName,
+        opponent_player_num: session.opponentPlayerNum ?? null,
+        viewer_perspective: session.viewerPerspective === "shared" ? "linked" : "creator",
+        owner_player_num: session.viewerPerspective === "shared" ? session.opponentPlayerNum ?? null : null,
         my_score: myScore,
         opponent_score: oppScore,
         played_at: new Date().toISOString(),
@@ -1144,7 +1152,9 @@ function DoneStep({ profile, session, onSaved }) {
     setError("");
     try {
       const saved = session.gameId
-        ? await db.updatePracticeGame(session.gameId, profile.id, practiceGameRow(profile, session))
+        ? (session.practiceType === "opponent"
+          ? await db.finishPracticeGame(session.gameId)
+          : await db.updatePracticeGame(session.gameId, profile.id, practiceGameRow(profile, session)))
         : null;
       if (saved) {
         onSaved();

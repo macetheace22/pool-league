@@ -3111,7 +3111,7 @@ export async function createPracticeGame(row) {
 export async function getPracticeGame(id, profileId) {
   if (!id || !profileId) return null;
   const { data, error } = await supabase.from("practice_games").select("*")
-    .eq("id", id).eq("created_by", profileId).maybeSingle();
+    .eq("id", id).maybeSingle();
   return error ? null : data;
 }
 export async function updatePracticeGame(id, profileId, row) {
@@ -3122,12 +3122,18 @@ export async function updatePracticeGame(id, profileId, row) {
 }
 
  // Durable game/rack ledger. RPCs lock the parent and update totals atomically.
-export async function listPracticeGameResults(practiceGameId) {
+export async function listPracticeGameResults(practiceGameId, viewerIsSharedParticipant = false) {
   if (!practiceGameId) return [];
   const { data, error } = await supabase.from("practice_game_results").select("*")
     .eq("practice_game_id", practiceGameId).order("game_number", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  const rows = data ?? [];
+  return viewerIsSharedParticipant ? rows.map(row => ({
+    ...row,
+    my_points: row.opponent_points,
+    opponent_points: row.my_points,
+    winner: row.winner === "me" ? "opponent" : row.winner === "opponent" ? "me" : row.winner,
+  })) : rows;
 }
 export async function recordPracticeGameResult({ practiceGameId, myPoints = null, opponentPoints = null, winner }) {
   if (!practiceGameId || !winner) throw new Error("A practice game and winner are required.");
@@ -3169,12 +3175,24 @@ export async function savePracticeGame(row) {
 export async function listMyUnfinishedPracticeGames(profileId) {
   if (!profileId) return [];
   const { data, error } = await supabase.from("practice_games").select("*")
-    .eq("created_by", profileId)
+    .or(`created_by.eq.${profileId},shared_with_profile_id.eq.${profileId}`)
     .is("winner", null)
     .is("completed_at", null)
     .order("played_at", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+  const sharedGames = (data ?? []).filter(game => game.shared_with_profile_id === profileId && game.created_by !== profileId);
+  let ownerByGameId = new Map();
+  if (sharedGames.length > 0) {
+    const { data: owners, error: ownerError } = await supabase.rpc(
+      "list_linked_practice_game_owners",
+      { p_practice_game_ids: sharedGames.map(game => game.id) },
+    );
+    if (ownerError) throw ownerError;
+    ownerByGameId = new Map((owners ?? []).map(owner => [owner.practice_game_id, owner]));
+  }
+  return (data ?? []).map(game => game.shared_with_profile_id === profileId && game.created_by !== profileId
+    ? toLinkedPracticeGame(game, ownerByGameId.get(game.id) ?? {})
+    : { ...game, viewer_perspective: "creator" });
 }
 
 export async function listMyPracticeGames(profileId) {
@@ -3224,9 +3242,27 @@ export async function listMyPracticeGames(profileId) {
     });
   }
 
+  const { data: sharedGames, error: sharedError } = await supabase.from("practice_games").select("*")
+    .eq("shared_with_profile_id", profileId)
+    .or("winner.not.is.null,completed_at.not.is.null");
+  if (sharedError) throw sharedError;
+  let sharedGamesWithOwners = sharedGames ?? [];
+  if (sharedGamesWithOwners.length > 0) {
+    const { data: owners, error: ownerError } = await supabase.rpc(
+      "list_linked_practice_game_owners",
+      { p_practice_game_ids: sharedGamesWithOwners.map(game => game.id) },
+    );
+    if (ownerError) throw ownerError;
+    const ownerByGameId = new Map((owners ?? []).map(owner => [owner.practice_game_id, owner]));
+    sharedGamesWithOwners = sharedGamesWithOwners.map(game =>
+      toLinkedPracticeGame(game, ownerByGameId.get(game.id) ?? {}),
+    );
+  }
+
   const byId = new Map();
   ownGamesWithLinkedNames.forEach(game => byId.set(game.id, { ...game, viewer_perspective: "creator" }));
   linkedGamesWithOwners.forEach(game => byId.set(game.id, game));
+  sharedGamesWithOwners.forEach(game => byId.set(game.id, game));
   return [...byId.values()].sort((a, b) =>
     new Date(b.played_at ?? b.completed_at ?? 0).getTime() -
     new Date(a.played_at ?? a.completed_at ?? 0).getTime()
