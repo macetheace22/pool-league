@@ -30,8 +30,8 @@ create table if not exists public.manager_impersonation_pending_sessions (
   created_at timestamptz not null default now()
 );
 
-create index if not exists manager_impersonation_pending_target_idx
-  on public.manager_impersonation_pending_sessions (target_profile_id, created_at desc)
+create unique index if not exists manager_impersonation_pending_target_idx
+  on public.manager_impersonation_pending_sessions (target_profile_id)
   where consumed_at is null;
 
 create table if not exists public.manager_impersonation_sessions (
