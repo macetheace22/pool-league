@@ -16,7 +16,6 @@ Deno.serve(async (req) => {
     headers: { ...corsHeadersFor(origin), "Content-Type": "application/json" },
   });
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeadersFor(origin) });
-  if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) return respond({ error: "Origin is not allowed" }, 403);
   if (req.method !== "POST") return respond({ error: "Method not allowed" }, 405);
 
   const authorization = req.headers.get("Authorization");
