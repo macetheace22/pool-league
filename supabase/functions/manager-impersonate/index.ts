@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
   if (targetError || !target || !target.is_active) return respond({ error: "Target account is unavailable" }, 404);
 
   const { data: targetAuth, error: targetAuthError } = await admin.auth.admin.getUserById(targetUserId);
-  const email = targetAuth.user?.email;
+  const email = targetAuth?.user?.email;
   if (targetAuthError || !email) return respond({ error: "Target account has no sign-in email" }, 409);
 
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
