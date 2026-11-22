@@ -20,7 +20,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export const managerAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storageKey: 'iba-manager-impersonation-auth',
-    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
