@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
   const [impersonationMode, setImpersonationMode] = useState(null);
 
   const clearManagerBackup = async () => {
-    await managerAuthClient.auth.signOut();
+    await managerAuthClient.auth.signOut({ scope: "local" });
     sessionStorage.removeItem(managerProfileStorageKey);
   };
 
@@ -145,7 +145,7 @@ export function AuthProvider({ children }) {
         if (isImpersonation) {
           const { data: managerData } = await managerAuthClient.auth.getSession();
           if (!managerData.session || managerData.session.user.id !== claims.manager_impersonator_id) {
-            await supabase.auth.signOut();
+            await supabase.auth.signOut({ scope: "local" });
             await clearManagerBackup();
             if (active) setSession(null);
           } else {
