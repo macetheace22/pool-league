@@ -14,7 +14,7 @@ create index if not exists manager_impersonation_events_manager_created_idx
   on public.manager_impersonation_events (manager_profile_id, created_at desc);
 
 alter table public.manager_impersonation_events enable row level security;
-revoke all on table public.manager_impersonation_events from anon, authenticated;
-grant all on table public.manager_impersonation_events to service_role;
+revoke all on public.manager_impersonation_events from public, anon, authenticated;
+grant all on public.manager_impersonation_events to service_role;
 
 commit;
