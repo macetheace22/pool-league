@@ -224,7 +224,7 @@ $$;
 drop event trigger if exists manager_impersonation_attach_guard;
 create event trigger manager_impersonation_attach_guard
   on ddl_command_end
-  when tag in ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
+  when tag in ('CREATE TABLE')
   execute function public.attach_manager_impersonation_guard_to_new_tables();
 
 commit;
