@@ -1084,3 +1084,20 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(admin).toContain('deactivateUser(u.id)');
   });
 });
+
+
+describe("manager access account card layout and start feedback", () => {
+  it("places the role beside the account name and separates preview from management actions", () => {
+    const admin = read("src/AdminApp.jsx");
+    expect(admin).toContain("user-account-row__name-line");
+    expect(admin).toContain("user-account-row__role-line");
+    expect(admin).toContain("user-account-row__impersonation-actions");
+    expect(admin).toContain("user-account-row__management-actions");
+    expect(admin).toContain("min-width:116px");
+  });
+  it("does not silently reject a start because managerProfile is stale", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).not.toContain("previewProfile || managerProfile || profile?.role !== \"manager\"");
+    expect(auth).toContain("Your manager session is not ready.");
+  });
+});
