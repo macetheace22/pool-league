@@ -7324,9 +7324,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .bracket-row__seed{font-family:'JetBrains Mono',monospace;font-size:10px;color:#5A5A5A;margin-right:3px;}
 .bracket-divider{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#5A5A5A;margin:8px 0 2px;}
 .bracket-champion{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;background:#0F2D1F;border-radius:8px;font-size:12px;font-weight:700;color:#5FCF9E;}
-.user-account-row{display:flex;flex-direction:column;align-items:stretch;width:100%;min-width:0;box-sizing:border-box;margin-bottom:10px;padding:12px;border:1px solid #2E2E2E;border-radius:10px;background:#1C1C1C;gap:10px;}
-.user-account-row:not(.user-account-row--editing) .list-row__body{width:100%;min-width:0;padding:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
-.user-account-row:not(.user-account-row--editing) .list-row__actions{width:100%;margin:0;padding:0;display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:wrap;}
+.user-account-row{display:flex;flex-direction:row;align-items:center;width:100%;min-width:0;box-sizing:border-box;margin-bottom:8px;padding:9px 10px;border:1px solid #2E2E2E;border-radius:10px;background:#1C1C1C;gap:10px;}
+.user-account-row:not(.user-account-row--editing) .list-row__body{flex:1 1 auto;width:auto;min-width:0;padding:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions{flex:0 0 auto;width:auto;max-width:56%;margin:0;padding:0;display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:nowrap;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-sm{flex:0 1 auto;min-width:0;white-space:nowrap;padding:6px 7px;font-size:10px;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-icon{flex:0 0 30px;margin-left:2px;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-icon:first-of-type{margin-left:8px;}
+@media(max-width:430px){.user-account-row{gap:7px;padding:8px}.user-account-row:not(.user-account-row--editing) .list-row__actions{max-width:58%;gap:3px}.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-sm{font-size:9px;padding:5px 5px}.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-icon{flex-basis:26px;min-width:26px;height:28px}}
 .user-account-row{padding:9px 10px;gap:8px;border-radius:10px;align-items:center;}
 .user-account-row:not(.user-account-row--editing) .list-row__body{gap:2px!important;min-width:0;}
 .user-account-row:not(.user-account-row--editing) .list-row__name{font-size:12.5px;line-height:1.25;}
