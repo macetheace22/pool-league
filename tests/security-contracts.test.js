@@ -933,7 +933,8 @@ describe("Section 108 shared Practice sessions", () => {
     expect(sql).toContain("add column if not exists shared_with_profile_id");
     expect(sql).toContain("new.shared_with_profile_id := null");
     expect(sql).toContain("public.practice_opponents");
-    expect(sql).toContain("profile.player_num = new.opponent_player_num");
+    expect(sql).toContain("join public.profiles profile on profile.id = opponent.linked_profile_id");
+    expect(sql).not.toContain("profile.player_num = new.opponent_player_num");
     expect(sql).toContain("new.created_by is distinct from (select auth.uid())");
     expect(sql).toContain("create policy \"read shared practice games\"");
     expect(sql).toContain("create policy \"read shared practice game results\"");
@@ -974,5 +975,15 @@ describe("Section 108 shared Practice sessions", () => {
     expect(practice).toContain("viewerIsSharedParticipant");
     expect(practice).toContain('session.viewerPerspective === "shared" ? "linked" : "creator"');
     expect(practice).toContain("await db.finishPracticeGame(session.gameId)");
+  });
+
+  it("backfills only unfinished sessions with an already confirmed opponent identity", () => {
+    const sql = read("supabase-schema-section-109-backfill-confirmed-unfinished-practice-sharing.sql");
+    expect(sql).toContain("game.shared_with_profile_id is null");
+    expect(sql).toContain("game.completed_at is null");
+    expect(sql).toContain("game.winner is null");
+    expect(sql).toContain("game.opponent_id = opponent.id");
+    expect(sql).toContain("opponent.linked_profile_id is not null");
+    expect(sql).toContain("game.created_by = opponent.created_by");
   });
 });
