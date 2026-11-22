@@ -68,7 +68,7 @@ create or replace function public.protect_practice_game_shared_participant()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $$
 begin
   if new.created_by is distinct from old.created_by
      or new.shared_with_profile_id is distinct from old.shared_with_profile_id then
@@ -87,7 +87,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.protect_practice_game_shared_participant() from public, anon, authenticated;
 
