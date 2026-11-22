@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, ChevronRight, Check, AlertCircle } from "lucide-react";
 import { supabase, managerAuthClient } from "./supabaseClient";
@@ -34,6 +34,24 @@ export function AuthProvider({ children }) {
   const [previewProfile, setPreviewProfile] = useState(null);
   const [managerProfile, setManagerProfile] = useState(null);
   const [impersonationMode, setImpersonationMode] = useState(null);
+  const [impersonationDialog, setImpersonationDialog] = useState(null);
+  const dialogResolver = useRef(null);
+
+  const showImpersonationAlert = (message) => {
+    setImpersonationDialog({ type: "alert", message });
+  };
+
+  const showImpersonationConfirm = (message) => new Promise((resolve) => {
+    dialogResolver.current = resolve;
+    setImpersonationDialog({ type: "confirm", message });
+  });
+
+  const closeImpersonationDialog = (confirmed = false) => {
+    const resolve = dialogResolver.current;
+    dialogResolver.current = null;
+    setImpersonationDialog(null);
+    if (resolve) resolve(confirmed);
+  };
 
   const clearManagerBackup = async () => {
     await managerAuthClient.auth.signOut({ scope: "local" });
@@ -43,7 +61,7 @@ export function AuthProvider({ children }) {
   const restoreManagerSession = async ({ goToAccess = true } = {}) => {
     const { data: backupData, error: backupError } = await managerAuthClient.auth.getSession();
     if (backupError || !backupData.session) {
-      window.alert("The original manager session is unavailable. Sign out and sign back in to continue.");
+      showImpersonationAlert("The original manager session is unavailable. Sign out and sign back in to continue.");
       return false;
     }
     const { error } = await supabase.auth.setSession({
@@ -51,7 +69,7 @@ export function AuthProvider({ children }) {
       refresh_token: backupData.session.refresh_token,
     });
     if (error) {
-      window.alert("Could not restore the manager session. " + error.message);
+      showImpersonationAlert("Could not restore the manager session. " + error.message);
       return false;
     }
     await clearManagerBackup();
@@ -69,7 +87,7 @@ export function AuthProvider({ children }) {
 
     const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
       targetProfile.username || "this user";
-    const confirmed = window.confirm(
+    const confirmed = await showImpersonationConfirm(
       mode === "read_only"
         ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
         : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
@@ -113,7 +131,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       await restoreManagerSession({ goToAccess: false }).catch(() => {});
       console.error("Unable to start manager impersonation:", error);
-      window.alert(error?.message || "Unable to start impersonation.");
+      showImpersonationAlert(error?.message || "Unable to start impersonation.");
       return false;
     }
   };
@@ -124,7 +142,7 @@ export function AuthProvider({ children }) {
     });
     const restored = await restoreManagerSession();
     if (restored && auditError) {
-      window.alert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+      showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
     }
     return restored;
   };
@@ -260,6 +278,20 @@ export function AuthProvider({ children }) {
       <div className={previewProfile ? "mimic-preview-mode" : undefined}>
         {children}
       </div>
+
+      {impersonationDialog && (
+        <div role="presentation" onClick={() => closeImpersonationDialog(false)} style={{position:"fixed",inset:0,zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(0,0,0,.72)"}}>
+          <div role="dialog" aria-modal="true" aria-labelledby="impersonation-dialog-title" onClick={event => event.stopPropagation()} style={{width:"100%",maxWidth:420,padding:22,borderRadius:16,background:"#202522",border:"1px solid #3B5548",boxShadow:"0 18px 60px rgba(0,0,0,.55)",color:"#F5F7F5"}}>
+            <div id="impersonation-dialog-title" style={{fontSize:17,fontWeight:800,marginBottom:12}}>{impersonationDialog.type === "confirm" ? "Confirm impersonation" : "Impersonation notice"}</div>
+            <div style={{fontSize:14,lineHeight:1.55,color:"#D1D8D3",whiteSpace:"pre-wrap"}}>{impersonationDialog.message}</div>
+            <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:22}}>
+              {impersonationDialog.type === "confirm" && <button type="button" onClick={() => closeImpersonationDialog(false)} style={{border:"1px solid #52645A",borderRadius:9,padding:"10px 16px",background:"transparent",color:"#E2E8E3",fontWeight:700}}>Cancel</button>}
+              <button type="button" onClick={() => closeImpersonationDialog(impersonationDialog.type === "confirm")} style={{border:0,borderRadius:9,padding:"10px 18px",background:"#5FCF9E",color:"#092218",fontWeight:800}}>{impersonationDialog.type === "confirm" ? "Continue" : "OK"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewProfile && (
         <div style={{position:"fixed",zIndex:2000,top:"calc(66px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:impersonationMode === "read_only" ? "#17324D" : "#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
           <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>
