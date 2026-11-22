@@ -5277,7 +5277,7 @@ function PlayerTransferRequestsTab() {
 }
 
 function AccountsTab({ currentUserId, subTab, onCounts }) {
-  const { startMimic } = useAuth();
+  const { startMimic, isMimicking } = useAuth();
   const [users, setUsers]       = useState([]);
   const [codes, setCodes]       = useState([]);
   const [allTeams, setAllTeams] = useState([]);
@@ -5419,14 +5419,14 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                       <button
                         className="btn-sm"
                         onClick={() => startMimic(u, "read_only")}
-                        disabled={isMe || !u.is_active}
+                        disabled={isMimicking || isMe || !u.is_active}
                         title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`}
                         aria-label={`View ${displayName} in read-only mode`}
                       ><Eye size={13}/> View only</button>
                       <button
                         className="btn-sm"
                         onClick={() => startMimic(u, "update")}
-                        disabled={isMe || !u.is_active}
+                        disabled={isMimicking || isMe || !u.is_active}
                         title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View and make changes as ${displayName}`}
                         aria-label={`View and update as ${displayName}`}
                       ><Edit2 size={13}/> View & update</button>
