@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
 
   const clearManagerBackup = async () => {
     await managerAuthClient.auth.signOut({ scope: "local" });
-    sessionStorage.removeItem(managerProfileStorageKey);
+    localStorage.removeItem(managerProfileStorageKey);
   };
 
   const restoreManagerSession = async ({ goToAccess = true } = {}) => {
@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
         refresh_token: sessionData.session.refresh_token,
       });
       if (backupError) throw backupError;
-      sessionStorage.setItem(managerProfileStorageKey, JSON.stringify(profile));
+      localStorage.setItem(managerProfileStorageKey, JSON.stringify(profile));
 
       const { data, error } = await supabase.functions.invoke("manager-impersonate", {
         body: { targetUserId: targetProfile.id, mode },
@@ -150,7 +150,7 @@ export function AuthProvider({ children }) {
             if (active) setSession(null);
           } else {
             let savedManagerProfile = null;
-            try { savedManagerProfile = JSON.parse(sessionStorage.getItem(managerProfileStorageKey) || "null"); } catch {}
+            try { savedManagerProfile = JSON.parse(localStorage.getItem(managerProfileStorageKey) || "null"); } catch {}
             if (active) {
               setManagerProfile(savedManagerProfile);
               setImpersonationMode(claims.manager_impersonation_mode);
