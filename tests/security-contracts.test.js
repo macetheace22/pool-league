@@ -986,20 +986,33 @@ describe("Section 108 shared Practice sessions", () => {
     expect(sql).toContain("opponent.linked_profile_id is not null");
     expect(sql).toContain("game.created_by = opponent.created_by");
   });
-  it("keeps manager impersonation server-authorized and records an audit event", () => {
+  it("keeps manager impersonation server-authorized, mode-aware, and audited", () => {
     const auth = read("src/AuthContext.jsx");
+    const client = read("src/supabaseClient.js");
+    const admin = read("src/AdminApp.jsx");
     const fn = read("supabase/functions/manager-impersonate/index.ts");
     const sql = read("supabase-schema-section-110-manager-impersonation-audit.sql");
-    expect(auth).toContain('supabase.functions.invoke("manager-impersonate"');
-    expect(auth).toContain('supabase.auth.verifyOtp({ token_hash: data.token_hash, type: "magiclink" })');
-    expect(auth).toContain('supabase.auth.setSession({ access_token: backup.session.access_token, refresh_token: backup.session.refresh_token })');
+    expect(auth).toContain('body: { targetUserId: targetProfile.id, mode }');
+    expect(auth).toContain('supabase.auth.verifyOtp({');
+    expect(auth).toContain('claims.manager_impersonation_mode !== mode');
+    expect(auth).toContain('body: { action: "end" }');
+    expect(client).toContain('storageKey: \'iba-manager-impersonation-auth\'');
+    expect(admin).toContain('startMimic(u, "read_only")');
+    expect(admin).toContain('startMimic(u, "update")');
     expect(fn).toContain('manager.role !== "manager"');
     expect(fn).toContain('target.is_active');
     expect(fn).toContain('admin.auth.admin.generateLink');
-    expect(fn).toContain('manager_impersonation_events');
+    expect(fn).toContain('manager_impersonation_pending_sessions');
+    expect(fn).toContain('manager_impersonation_sessions');
+    expect(fn).toContain('getClaims(token)');
+    expect(fn).toContain('event_type: "ended"');
     expect(fn).not.toContain('SUPABASE_SERVICE_ROLE_KEY", token');
     expect(sql).toContain("alter table public.manager_impersonation_events enable row level security");
-    expect(sql).toContain("revoke all on table public.manager_impersonation_events from anon, authenticated");
+    expect(sql).toContain("revoke all on public.manager_impersonation_events from public, anon, authenticated");
+    expect(sql).toContain("manager_impersonation_access_token_hook");
+    expect(sql).toContain("prevent_read_only_impersonation_writes");
+    expect(sql).toContain("manager_impersonation_read_only_guard before insert or update or delete");
+    expect(sql).toContain("create event trigger manager_impersonation_attach_guard");
   });
 
 });
