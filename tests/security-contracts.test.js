@@ -1017,8 +1017,8 @@ describe("Section 108 shared Practice sessions", () => {
     expect(sql).toContain("prevent_read_only_impersonation_writes");
     expect(sql).toContain("manager_impersonation_read_only_guard before insert or update or delete");
     expect(sql).toContain("create event trigger manager_impersonation_attach_guard");
-    expect((sql.match(/\\$\\$/g) || []).length % 2).toBe(0);
-    expect(sql).not.toContain("\\n$;\\n");
+    expect((sql.match(/\$\$/g) || []).length % 2).toBe(0);
+    expect(sql).not.toContain("\n$;\n");
   });
 
 });
