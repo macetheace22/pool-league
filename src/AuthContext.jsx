@@ -149,15 +149,6 @@ export function AuthProvider({ children }) {
       isMimicking: !!previewProfile, startMimic, stopMimic, logout, refreshProfile,
     }}>
       <div className={previewProfile ? "mimic-preview-mode" : undefined}>
-        {previewProfile && <style>{`
-          .mimic-preview-mode button { pointer-events: none !important; opacity: .5 !important; }
-          .mimic-preview-mode .page-header button,
-          .mimic-preview-mode .tab-bar-nav button,
-          .mimic-preview-mode .drawer button { pointer-events: auto !important; opacity: 1 !important; }
-          .mimic-preview-mode input,
-          .mimic-preview-mode select,
-          .mimic-preview-mode textarea { pointer-events: none !important; opacity: .65 !important; }
-        `}</style>}
         {children}
       </div>
       {previewProfile && (
