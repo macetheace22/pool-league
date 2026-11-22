@@ -245,7 +245,7 @@ begin
     end if;
   end loop;
 end;
-$;
+$$;
 
 revoke all on function public.attach_manager_impersonation_guard_to_new_tables() from public, anon, authenticated;
 
