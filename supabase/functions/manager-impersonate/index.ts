@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const allowedOrigins = (Deno.env.get("APP_ORIGINS") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
 
 const corsHeadersFor = (origin: string | null) => ({
-  ...(origin && allowedOrigins.includes(origin) ? { "Access-Control-Allow-Origin": origin, "Vary": "Origin" } : {}),
+  "Access-Control-Allow-Origin": origin && allowedOrigins.includes(origin) ? origin : "*",
+  ...(origin && allowedOrigins.includes(origin) ? { "Vary": "Origin" } : {}),
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 });
@@ -14,8 +15,8 @@ Deno.serve(async (req) => {
     status,
     headers: { ...corsHeadersFor(origin), "Content-Type": "application/json" },
   });
-  if (!origin || !allowedOrigins.includes(origin)) return respond({ error: "Origin is not allowed" }, 403);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeadersFor(origin) });
+  if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) return respond({ error: "Origin is not allowed" }, 403);
   if (req.method !== "POST") return respond({ error: "Method not allowed" }, 405);
 
   const authorization = req.headers.get("Authorization");

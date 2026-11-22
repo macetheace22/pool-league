@@ -1008,7 +1008,12 @@ describe("Section 108 shared Practice sessions", () => {
     expect(fn).toContain('pendingError?.code === "23505"');
     expect(fn).toContain('manager_impersonation_sessions');
     expect(fn).toContain('getClaims(token)');
+    expect(fn).toContain('if (req.method === "OPTIONS")');
+    expect(fn).toContain('"Access-Control-Allow-Methods": "POST, OPTIONS"');
+    expect(fn).toContain('if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin))');
     expect(fn).toContain('event_type: "ended"');
+    expect(admin).toContain('user-account-row');
+    expect(admin).toContain('user-account-row--editing');
     expect(fn).not.toContain('SUPABASE_SERVICE_ROLE_KEY", token');
     expect(sql).toContain("alter table public.manager_impersonation_events enable row level security");
     expect(sql).toContain("revoke all on public.manager_impersonation_events from public, anon, authenticated");
