@@ -96,6 +96,18 @@ begin
     if v_session.ended_at is not null or v_session.expires_at <= now() then
       raise exception 'This manager impersonation session has ended or expired';
     end if;
+    if not exists (
+      select 1 from public.profiles
+       where id = v_session.manager_profile_id
+         and role = 'manager'
+         and is_active
+    ) or not exists (
+      select 1 from public.profiles
+       where id = v_session.target_profile_id
+         and is_active
+    ) then
+      raise exception 'The manager or target account is no longer active for impersonation';
+    end if;
   else
     -- Only the server-issued, one-time magic-link flow may create a session.
     if event ->> 'authentication_method' is distinct from 'magiclink' then
@@ -120,6 +132,19 @@ begin
 
     if not found then
       return jsonb_build_object('claims', v_claims);
+    end if;
+
+    if not exists (
+      select 1 from public.profiles
+       where id = v_pending.manager_profile_id
+         and role = 'manager'
+         and is_active
+    ) or not exists (
+      select 1 from public.profiles
+       where id = v_pending.target_profile_id
+         and is_active
+    ) then
+      raise exception 'The manager or target account is no longer active for impersonation';
     end if;
 
     insert into public.manager_impersonation_sessions (
@@ -220,7 +245,9 @@ begin
     end if;
   end loop;
 end;
-$$;
+$;
+
+revoke all on function public.attach_manager_impersonation_guard_to_new_tables() from public, anon, authenticated;
 
 drop event trigger if exists manager_impersonation_attach_guard;
 create event trigger manager_impersonation_attach_guard
