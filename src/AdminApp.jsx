@@ -5399,13 +5399,22 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                 ) : (
                   <>
                     <div className="list-row__body" style={{flexDirection:"column",alignItems:"flex-start",gap:3, opacity: u.is_active?1:0.5}}>
-                      <div style={{display:"flex",alignItems:"center",gap:7}}>
-                        <span className="list-row__name">{displayName}</span>
-                        {isMe && <span className="you-badge">you</span>}
-                        {!u.is_active && <span className="you-badge" style={{background:"#1A0E0E",color:"#F87171"}}>deactivated</span>}
-                        {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
+                      <div className="user-account-row__identity">
+                        <div className="user-account-row__name-line">
+                          <span className="list-row__name">{displayName}</span>
+                          {isMe && <span className="you-badge">you</span>}
+                          {!u.is_active && <span className="you-badge" style={{background:"#1A0E0E",color:"#F87171"}}>deactivated</span>}
+                          {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
+                        </div>
+                        <div className="user-account-row__details">
+                          {u.email && <span className="list-row__sub">{u.email}</span>}
+                          {u.phone_number && <span className="list-row__sub">{u.phone_number}</span>}
+                          {(() => { const seen = formatLastSeen(lastSignIns[u.id]); return (
+                            <span className="list-row__sub" style={seen.warn ? {color:"#F59E0B"} : undefined}>Last seen: {seen.text}</span>
+                          ); })()}
+                        </div>
                       </div>
-                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <div className="user-account-row__role-line">
                         <RolePill role={u.role} small neutralText/>
                         {team && <span className="user-team-label">{team.name}</span>}
                       </div>
@@ -5415,44 +5424,19 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                         <span className="list-row__sub" style={seen.warn ? {color:"#F59E0B"} : undefined}>Last seen: {seen.text}</span>
                       ); })()}
                     </div>
-                    <div className="list-row__actions">
-                      <button
-                        className="btn-sm"
-                        onClick={() => startMimic(u, "read_only")}
-                        disabled={isMimicking || isMe || !u.is_active}
-                        title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`}
-                        aria-label={`View ${displayName} in read-only mode`}
-                      ><Eye size={13}/> View only</button>
-                      <button
-                        className="btn-sm"
-                        onClick={() => startMimic(u, "update")}
-                        disabled={isMimicking || isMe || !u.is_active}
-                        title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View and make changes as ${displayName}`}
-                        aria-label={`View and update as ${displayName}`}
-                      ><Edit2 size={13}/> View & update</button>
-                      <button
-                        className="btn-icon"
-                        onClick={()=>!isMe && startEditRole(u)}
-                        disabled={isMe}
-                        title={isMe ? "You can't change your own role" : "Change role"}
-                        aria-label={isMe ? "Change role unavailable for your own account" : `Change role for ${u.username}`}
-                      ><Edit2 size={13}/></button>
-                      {u.is_active ? (
-                        <button
-                          className="btn-icon btn-icon--danger"
-                          onClick={()=>!isMe && deactivateUser(u.id)}
-                          disabled={isMe}
-                          title={isMe ? "You can't deactivate your own account" : "Deactivate account"}
-                          aria-label={isMe ? "Deactivation unavailable for your own account" : `Deactivate ${u.username}`}
-                        ><Trash2 size={13}/></button>
-                      ) : (
-                        <button
-                          className="btn-icon btn-icon--confirm"
-                          onClick={()=>reactivateUser(u.id)}
-                          title="Reactivate account"
-                          aria-label={`Reactivate ${u.username}`}
-                        ><Check size={13}/></button>
-                      )}
+                    <div className="list-row__actions user-account-row__actions">
+                      <div className="user-account-row__impersonation-actions">
+                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "read_only"); }} disabled={isMimicking || isMe || !u.is_active} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`} aria-label={`View ${displayName} in read-only mode`}><Eye size={13}/> View only</button>
+                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "update"); }} disabled={isMimicking || isMe || !u.is_active} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View and make changes as ${displayName}`} aria-label={`View and update as ${displayName}`}><Edit2 size={13}/> View & update</button>
+                      </div>
+                      <div className="user-account-row__management-actions">
+                        <button type="button" className="btn-icon" onClick={()=>!isMe && startEditRole(u)} disabled={isMe} title={isMe ? "You can't change your own role" : "Change role"} aria-label={isMe ? "Change role unavailable for your own account" : `Change role for ${u.username}`}><Edit2 size={13}/></button>
+                        {u.is_active ? (
+                          <button type="button" className="btn-icon btn-icon--danger" onClick={()=>!isMe && deactivateUser(u.id)} disabled={isMe} title={isMe ? "You can't deactivate your own account" : "Deactivate account"} aria-label={isMe ? "Deactivation unavailable for your own account" : `Deactivate ${u.username}`}><Trash2 size={13}/></button>
+                        ) : (
+                          <button type="button" className="btn-icon btn-icon--confirm" onClick={()=>reactivateUser(u.id)} title="Reactivate account" aria-label={`Reactivate ${u.username}`}><Check size={13}/></button>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -7502,3 +7486,19 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
   .player-rating-badge { background: #EEEEEE !important; }
 }
 `;
+
+/* Account cards: clear identity, role, and action hierarchy */
+.user-account-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:6px;padding:9px 10px!important;}
+.user-account-row:not(.user-account-row--editing) .list-row__body{display:contents!important;}
+.user-account-row__identity{grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.user-account-row__name-line{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;}
+.user-account-row__name-line .list-row__name{font-size:12.5px;line-height:1.2;}
+.user-account-row__role-line{grid-column:2;grid-row:1;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:3px;min-width:76px;}
+.user-account-row__details{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.user-account-row__details .list-row__sub{font-size:9.5px;line-height:1.25;overflow-wrap:anywhere;}
+.user-account-row__actions{grid-column:1 / -1;grid-row:2;width:100%;max-width:none!important;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;margin:0;padding:0;}
+.user-account-row__impersonation-actions{display:flex;flex:1 1 auto;min-width:0;gap:6px;}
+.user-account-row__mode-btn{flex:1 1 0;min-width:116px;min-height:32px;padding:6px 9px;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;font-size:10.5px;}
+.user-account-row__management-actions{display:flex;flex:0 0 auto;align-items:center;gap:5px;}
+.user-account-row__management-actions .btn-icon{width:30px;height:29px;}
+@media(max-width:390px){.user-account-row{column-gap:6px;padding:8px!important}.user-account-row__role-line{min-width:68px}.user-account-row__mode-btn{min-width:0;padding:6px 6px;font-size:9.5px}.user-account-row__impersonation-actions{gap:4px}.user-account-row__management-actions .btn-icon{width:27px;height:27px}}
