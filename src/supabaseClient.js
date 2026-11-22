@@ -15,7 +15,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 
-// A separate SDK-managed, tab-scoped auth store preserves the manager session
+// A separate SDK-managed, separate SDK-managed auth store shared across app tabs preserves the manager session
 // while the primary client temporarily authenticates as the selected account.
 export const managerAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
