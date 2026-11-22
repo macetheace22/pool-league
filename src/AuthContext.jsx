@@ -63,8 +63,9 @@ export function AuthProvider({ children }) {
   };
 
   const startMimic = async (targetProfile, mode = "read_only") => {
-    if (profile?.role !== "manager" || !targetProfile?.id || targetProfile.id === profile.id ||
-        !targetProfile.is_active || !["read_only", "update"].includes(mode)) return false;
+    if (previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
+        targetProfile.id === profile.id || !targetProfile.is_active ||
+        !["read_only", "update"].includes(mode)) return false;
 
     const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
       targetProfile.username || "this user";
