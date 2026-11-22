@@ -992,7 +992,8 @@ describe("Section 108 shared Practice sessions", () => {
     const admin = read("src/AdminApp.jsx");
     const fn = read("supabase/functions/manager-impersonate/index.ts");
     const sql = read("supabase-schema-section-110-manager-impersonation-audit.sql");
-    expect(auth).toContain('if (impersonationTransitionRef.current || previewProfile || managerProfile || profile?.role !== "manager"');
+    expect(auth).toContain('if (impersonationTransitionRef.current || previewProfile) return false;');
+    expect(auth).toContain('Your manager session is not ready.');
     expect(auth).toContain('body: { targetUserId: targetProfile.id, mode }');
     expect(auth).toContain('supabase.auth.verifyOtp({');
     expect(auth).toContain('claims.manager_impersonation_mode !== mode');
