@@ -36,6 +36,8 @@ export function AuthProvider({ children }) {
   const [impersonationMode, setImpersonationMode] = useState(null);
   const [impersonationDialog, setImpersonationDialog] = useState(null);
   const dialogResolver = useRef(null);
+  const impersonationTransitionRef = useRef(false);
+  const authEventVersionRef = useRef(0);
 
   const showImpersonationAlert = (message) => {
     setImpersonationDialog({ type: "alert", message });
@@ -72,6 +74,11 @@ export function AuthProvider({ children }) {
       showImpersonationAlert("Could not restore the manager session. " + error.message);
       return false;
     }
+    const { data: restoredData, error: restoredError } = await supabase.auth.getSession();
+    if (restoredError || restoredData.session?.user?.id !== backupData.session.user.id) {
+      showImpersonationAlert("The manager session could not be verified after restoration. The backup has been retained; please try Exit again.");
+      return false;
+    }
     await clearManagerBackup();
     setPreviewProfile(null);
     setManagerProfile(null);
@@ -81,23 +88,29 @@ export function AuthProvider({ children }) {
   };
 
   const startMimic = async (targetProfile, mode = "read_only") => {
-    if (previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
+    if (impersonationTransitionRef.current || previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
         targetProfile.id === profile.id || !targetProfile.is_active ||
         !["read_only", "update"].includes(mode)) return false;
 
-    const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
-      targetProfile.username || "this user";
-    const confirmed = await showImpersonationConfirm(
-      mode === "read_only"
-        ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
-        : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
-    );
-    if (!confirmed) return false;
-
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session) return false;
-
+    impersonationTransitionRef.current = true;
     try {
+      const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
+        targetProfile.username || "this user";
+      const confirmed = await showImpersonationConfirm(
+        mode === "read_only"
+          ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
+          : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
+      );
+      if (!confirmed) return false;
+
+      let { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        const refreshed = await supabase.auth.refreshSession();
+        sessionData = refreshed.data;
+        sessionError = refreshed.error;
+      }
+      if (sessionError || !sessionData?.session) throw sessionError || new Error("Your manager session is unavailable. Sign in again and retry.");
+
       const { error: backupError } = await managerAuthClient.auth.setSession({
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
@@ -133,18 +146,26 @@ export function AuthProvider({ children }) {
       console.error("Unable to start manager impersonation:", error);
       showImpersonationAlert(error?.message || "Unable to start impersonation.");
       return false;
+    } finally {
+      impersonationTransitionRef.current = false;
     }
   };
 
   const stopMimic = async () => {
-    const { error: auditError } = await supabase.functions.invoke("manager-impersonate", {
-      body: { action: "end" },
-    });
-    const restored = await restoreManagerSession();
-    if (restored && auditError) {
-      showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+    if (impersonationTransitionRef.current) return false;
+    impersonationTransitionRef.current = true;
+    try {
+      const { error: auditError } = await supabase.functions.invoke("manager-impersonate", {
+        body: { action: "end" },
+      });
+      const restored = await restoreManagerSession();
+      if (restored && auditError) {
+        showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+      }
+      return restored;
+    } finally {
+      impersonationTransitionRef.current = false;
     }
-    return restored;
   };
 
   useEffect(() => {
@@ -181,19 +202,17 @@ export function AuthProvider({ children }) {
             }
           }
         } else {
-          await clearManagerBackup();
           const p = await db.getProfile(currentSession.user.id);
           if (active) setProfile(p);
         }
       } else {
-        await clearManagerBackup();
         if (active) setProfile(null);
       }
       if (active) setAuthLoading(false);
     };
 
     initialize();
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       if (!active) return;
       setSession(sess);
       if (!sess) {
@@ -203,21 +222,24 @@ export function AuthProvider({ children }) {
         setProfile(null);
         return;
       }
+      const eventVersion = ++authEventVersionRef.current;
       const claims = decodeJwtClaims(sess.access_token || "");
       const isImpersonation = typeof claims.manager_impersonator_id === "string" &&
         typeof claims.manager_impersonation_session_id === "string" &&
         ["read_only", "update"].includes(claims.manager_impersonation_mode);
-      const p = await db.getProfile(sess.user.id);
-      if (!active) return;
-      setProfile(p);
-      if (isImpersonation) {
-        setPreviewProfile(p);
-        setImpersonationMode(claims.manager_impersonation_mode);
-      } else {
-        setPreviewProfile(null);
-        setManagerProfile(null);
-        setImpersonationMode(null);
-      }
+      Promise.resolve().then(async () => {
+        const p = await db.getProfile(sess.user.id);
+        if (!active || eventVersion !== authEventVersionRef.current) return;
+        setProfile(p);
+        if (isImpersonation) {
+          setPreviewProfile(p);
+          setImpersonationMode(claims.manager_impersonation_mode);
+        } else {
+          setPreviewProfile(null);
+          setManagerProfile(null);
+          setImpersonationMode(null);
+        }
+      }).catch(error => console.error("Unable to refresh profile after auth change:", error));
     });
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
@@ -280,24 +302,24 @@ export function AuthProvider({ children }) {
       </div>
 
       {impersonationDialog && (
-        <div role="presentation" onClick={() => closeImpersonationDialog(false)} style={{position:"fixed",inset:0,zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,background:"rgba(0,0,0,.72)"}}>
-          <div role="dialog" aria-modal="true" aria-labelledby="impersonation-dialog-title" onClick={event => event.stopPropagation()} style={{width:"100%",maxWidth:420,padding:22,borderRadius:16,background:"#202522",border:"1px solid #3B5548",boxShadow:"0 18px 60px rgba(0,0,0,.55)",color:"#F5F7F5"}}>
-            <div id="impersonation-dialog-title" style={{fontSize:17,fontWeight:800,marginBottom:12}}>{impersonationDialog.type === "confirm" ? "Confirm impersonation" : "Impersonation notice"}</div>
-            <div style={{fontSize:14,lineHeight:1.55,color:"#D1D8D3",whiteSpace:"pre-wrap"}}>{impersonationDialog.message}</div>
-            <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:22}}>
-              {impersonationDialog.type === "confirm" && <button type="button" onClick={() => closeImpersonationDialog(false)} style={{border:"1px solid #52645A",borderRadius:9,padding:"10px 16px",background:"transparent",color:"#E2E8E3",fontWeight:700}}>Cancel</button>}
-              <button type="button" onClick={() => closeImpersonationDialog(impersonationDialog.type === "confirm")} style={{border:0,borderRadius:9,padding:"10px 18px",background:"#5FCF9E",color:"#092218",fontWeight:800}}>{impersonationDialog.type === "confirm" ? "Continue" : "OK"}</button>
+        <div className="impersonation-overlay" role="presentation" onClick={() => closeImpersonationDialog(false)}>
+          <div className="impersonation-dialog" role="dialog" aria-modal="true" aria-labelledby="impersonation-dialog-title" onClick={event => event.stopPropagation()}>
+            <div id="impersonation-dialog-title" className="impersonation-dialog__title">{impersonationDialog.type === "confirm" ? "Confirm impersonation" : "Impersonation notice"}</div>
+            <div className="impersonation-dialog__message">{impersonationDialog.message}</div>
+            <div className="impersonation-dialog__actions">
+              {impersonationDialog.type === "confirm" && <button type="button" onClick={() => closeImpersonationDialog(false)} className="btn-sm">Cancel</button>}
+              <button type="button" onClick={() => closeImpersonationDialog(impersonationDialog.type === "confirm")} className="btn-primary">{impersonationDialog.type === "confirm" ? "Continue" : "OK"}</button>
             </div>
           </div>
         </div>
       )}
 
       {previewProfile && (
-        <div style={{position:"fixed",zIndex:2000,top:"calc(66px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:impersonationMode === "read_only" ? "#17324D" : "#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
-          <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>
+        <div className={`impersonation-banner impersonation-banner--${impersonationMode === "read_only" ? "readonly" : "update"}`}>
+          <span className="impersonation-banner__copy">
             {impersonationMode === "read_only" ? "READ ONLY" : "VIEW & UPDATE"} · {previewProfile.first_name || previewProfile.username} · {impersonationMode === "read_only" ? "Database writes are blocked" : "Changes affect this account"}
           </span>
-          <button type="button" onClick={stopMimic} style={{border:0,borderRadius:8,padding:"8px 11px",background:"#F2C14E",color:"#241A05",fontSize:12,fontWeight:800,whiteSpace:"nowrap",cursor:"pointer"}}>Exit</button>
+          <button type="button" className="btn-sm impersonation-banner__exit" onClick={stopMimic}>Exit</button>
         </div>
       )}
     </AuthContext.Provider>
@@ -568,4 +590,16 @@ html,body{width:100%;overflow-x:hidden;}
 .btn-secondary{width:100%;background:transparent;color:#E0E0E0;font-family:'Archivo',sans-serif;font-size:13px;font-weight:600;padding:11px;border-radius:10px;border:1.5px solid #3A3A3A;cursor:pointer;}
 .btn-ghost{background:none;border:none;font-family:'Archivo',sans-serif;font-size:12px;font-weight:600;color:#5FCF9E;cursor:pointer;padding:4px 0;}
 .error-msg{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#F87171;font-weight:600;}
+
+.impersonation-overlay{position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.76);}
+.impersonation-dialog{width:100%;max-width:420px;padding:18px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.55);color:#FFF;font-family:'Archivo',sans-serif;}
+.impersonation-dialog__title{font-family:'Archivo Black',sans-serif;font-size:16px;line-height:1.25;margin-bottom:10px;color:#FFF;}
+.impersonation-dialog__message{font-size:12.5px;line-height:1.55;color:#B8B8B8;white-space:pre-wrap;}
+.impersonation-dialog__actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:18px;}
+.impersonation-banner{position:fixed;z-index:2000;top:calc(66px + env(safe-area-inset-top, 0px));left:10px;right:10px;max-width:460px;margin:0 auto;padding:8px 10px;border:1px solid #2E2E2E;border-left:3px solid #5FCF9E;border-radius:10px;background:#141414;box-shadow:0 5px 20px rgba(0,0,0,.35);display:flex;align-items:center;gap:9px;color:#FFF;font-family:'Archivo',sans-serif;}
+.impersonation-banner--readonly{border-left-color:#6FA8DC;}
+.impersonation-banner--update{border-left-color:#F2C14E;}
+.impersonation-banner__copy{flex:1;min-width:0;font-size:11px;line-height:1.4;font-weight:700;color:#E0E0E0;}
+.impersonation-banner__exit{flex:0 0 auto;min-width:54px;justify-content:center;}
+@media(max-width:380px){.impersonation-banner{left:7px;right:7px;padding:7px 8px;gap:6px}.impersonation-banner__copy{font-size:10px}}
 `;
