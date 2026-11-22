@@ -5363,6 +5363,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
       {subTab==="users" && (
         <div style={{display:"flex",flexDirection:"column",gap:10,overflow: editRoleId ? "visible" : "visible", background:"transparent", border:"none"}}>
           {users.map(u => {
+            const displayName = [u.first_name, u.last_name].map(value => (value ?? "").trim()).filter(Boolean).join(" ") || u.username || "Unnamed account";
             const team = u.team_id ? allTeams.find(t=>t.id===u.team_id) : null;
             const isMe = u.id===currentUserId;
             const editing = editRoleId===u.id;
@@ -5371,7 +5372,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                 {editing ? (
                   <div style={{display:"flex",flexDirection:"column",gap:8,width:"100%"}}>
                     <div style={{display:"flex",alignItems:"center",gap:7}}>
-                      <span className="list-row__name">{u.username}</span>
+                      <span className="list-row__name">{displayName}</span>
                     </div>
                     <SearchableOptionSelect
                       options={[
@@ -5399,7 +5400,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                   <>
                     <div className="list-row__body" style={{flexDirection:"column",alignItems:"flex-start",gap:3, opacity: u.is_active?1:0.5}}>
                       <div style={{display:"flex",alignItems:"center",gap:7}}>
-                        <span className="list-row__name">{u.username}</span>
+                        <span className="list-row__name">{displayName}</span>
                         {isMe && <span className="you-badge">you</span>}
                         {!u.is_active && <span className="you-badge" style={{background:"#1A0E0E",color:"#F87171"}}>deactivated</span>}
                         {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
@@ -5419,8 +5420,8 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                         className="btn-sm"
                         onClick={() => startMimic(u)}
                         disabled={isMe || !u.is_active}
-                        title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `Preview the app as ${u.username}`}
-                        aria-label={`View the app as ${u.username}`}
+                        title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `Preview the app as ${displayName}`}
+                        aria-label={`View the app as ${displayName}`}
                       ><Eye size={13}/> View as</button>
                       <button
                         className="btn-icon"
