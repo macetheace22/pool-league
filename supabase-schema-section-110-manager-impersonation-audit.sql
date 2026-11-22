@@ -205,7 +205,8 @@ declare
   v_command record;
 begin
   for v_command in select * from pg_event_trigger_ddl_commands() loop
-    if v_command.object_type = 'table'
+    if v_command.command_tag in ('CREATE TABLE', 'CREATE ' || 'TABLE AS')
+       and v_command.object_type = 'table'
        and v_command.schema_name = 'public'
        and v_command.objid is not null then
       execute format(
@@ -224,7 +225,6 @@ $$;
 drop event trigger if exists manager_impersonation_attach_guard;
 create event trigger manager_impersonation_attach_guard
   on ddl_command_end
-  when tag in ('CREATE TABLE')
   execute function public.attach_manager_impersonation_guard_to_new_tables();
 
 commit;
