@@ -88,9 +88,16 @@ export function AuthProvider({ children }) {
   };
 
   const startMimic = async (targetProfile, mode = "read_only") => {
-    if (impersonationTransitionRef.current || previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
-        targetProfile.id === profile.id || !targetProfile.is_active ||
-        !["read_only", "update"].includes(mode)) return false;
+    if (impersonationTransitionRef.current || previewProfile) return false;
+    if (profile?.role !== "manager") {
+      showImpersonationAlert("Your manager session is not ready. Refresh Manage App Access and try again; if it continues, sign out and back in.");
+      return false;
+    }
+    if (!targetProfile?.id || targetProfile.id === profile.id || !targetProfile.is_active ||
+        !["read_only", "update"].includes(mode)) {
+      showImpersonationAlert("This account cannot be opened in impersonation mode. Refresh the account list and try again.");
+      return false;
+    }
 
     impersonationTransitionRef.current = true;
     try {
