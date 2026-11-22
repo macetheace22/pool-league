@@ -102,12 +102,24 @@ Deno.serve(async (req) => {
   const tokenHash = linkData?.properties?.hashed_token;
   if (linkError || !tokenHash) return respond({ error: "Could not create a temporary target session" }, 500);
 
+  const pendingNow = new Date().toISOString();
+  const { error: stalePendingError } = await admin
+    .from("manager_impersonation_pending_sessions")
+    .delete()
+    .eq("target_profile_id", target.id)
+    .is("consumed_at", null)
+    .lt("expires_at", pendingNow);
+  if (stalePendingError) return respond({ error: "Could not clear an expired impersonation request" }, 500);
+
   const { error: pendingError } = await admin.from("manager_impersonation_pending_sessions").insert({
     manager_profile_id: manager.id,
     target_profile_id: target.id,
     mode,
     expires_at: new Date(Date.now() + 60_000).toISOString(),
   });
+  if (pendingError?.code === "23505") {
+    return respond({ error: "An impersonation session for this account is already being started. Wait a moment and try again." }, 409);
+  }
   if (pendingError) return respond({ error: "Could not prepare the protected impersonation session" }, 500);
 
   return respond({ token_hash: tokenHash, mode });
