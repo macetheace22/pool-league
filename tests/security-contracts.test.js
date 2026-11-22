@@ -986,4 +986,20 @@ describe("Section 108 shared Practice sessions", () => {
     expect(sql).toContain("opponent.linked_profile_id is not null");
     expect(sql).toContain("game.created_by = opponent.created_by");
   });
+  it("keeps manager impersonation server-authorized and records an audit event", () => {
+    const auth = read("src/AuthContext.jsx");
+    const fn = read("supabase/functions/manager-impersonate/index.ts");
+    const sql = read("supabase-schema-section-110-manager-impersonation-audit.sql");
+    expect(auth).toContain('supabase.functions.invoke("manager-impersonate"');
+    expect(auth).toContain('supabase.auth.verifyOtp({ token_hash: data.token_hash, type: "magiclink" })');
+    expect(auth).toContain('supabase.auth.setSession({ access_token: backup.session.access_token, refresh_token: backup.session.refresh_token })');
+    expect(fn).toContain('manager.role !== "manager"');
+    expect(fn).toContain('target.is_active');
+    expect(fn).toContain('admin.auth.admin.generateLink');
+    expect(fn).toContain('manager_impersonation_events');
+    expect(fn).not.toContain('SUPABASE_SERVICE_ROLE_KEY", token');
+    expect(sql).toContain("alter table public.manager_impersonation_events enable row level security");
+    expect(sql).toContain("revoke all on table public.manager_impersonation_events from anon, authenticated");
+  });
+
 });
