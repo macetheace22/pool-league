@@ -36,13 +36,49 @@ Deno.serve(async (req) => {
   });
 
   const { data: authData, error: authError } = await userClient.auth.getUser(token);
-  if (authError || !authData.user) return respond({ error: "Invalid manager session" }, 401);
+  if (authError || !authData.user) return respond({ error: "Invalid session" }, 401);
 
-  let body: { targetUserId?: string };
+  let body: { action?: string; targetUserId?: string; mode?: "read_only" | "update" };
   try { body = await req.json(); } catch { return respond({ error: "Invalid request body" }, 400); }
+
+  if (body.action === "end") {
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    const claims = claimsData?.claims as Record<string, unknown> | undefined;
+    const managerId = claims?.manager_impersonator_id;
+    const sessionId = claims?.manager_impersonation_session_id;
+    const authSessionId = claims?.session_id;
+    if (claimsError || !claims || typeof managerId !== "string" || typeof sessionId !== "string" || typeof authSessionId !== "string") {
+      return respond({ error: "This session is not an active manager impersonation" }, 403);
+    }
+
+    const { data: endedSession, error: endError } = await admin
+      .from("manager_impersonation_sessions")
+      .update({ ended_at: new Date().toISOString() })
+      .eq("id", sessionId)
+      .eq("auth_session_id", authSessionId)
+      .eq("manager_profile_id", managerId)
+      .eq("target_profile_id", authData.user.id)
+      .is("ended_at", null)
+      .select("id, mode")
+      .maybeSingle();
+    if (endError || !endedSession) return respond({ error: "The impersonation session is already ended or unavailable" }, 409);
+
+    const { error: auditError } = await admin.from("manager_impersonation_events").insert({
+      manager_profile_id: managerId,
+      target_profile_id: authData.user.id,
+      impersonation_session_id: sessionId,
+      mode: endedSession.mode,
+      event_type: "ended",
+    });
+    if (auditError) return respond({ error: "The session ended, but its exit event could not be recorded" }, 500);
+    return respond({ ended: true });
+  }
+
   const targetUserId = body.targetUserId;
-  if (!targetUserId || typeof targetUserId !== "string" || targetUserId === authData.user.id) {
-    return respond({ error: "A different target account is required" }, 400);
+  const mode = body.mode;
+  if (!targetUserId || typeof targetUserId !== "string" || targetUserId === authData.user.id ||
+      (mode !== "read_only" && mode !== "update")) {
+    return respond({ error: "A different target account and a valid impersonation mode are required" }, 400);
   }
 
   const { data: manager, error: managerError } = await admin
@@ -66,12 +102,13 @@ Deno.serve(async (req) => {
   const tokenHash = linkData?.properties?.hashed_token;
   if (linkError || !tokenHash) return respond({ error: "Could not create a temporary target session" }, 500);
 
-  const { error: auditError } = await admin.from("manager_impersonation_events").insert({
+  const { error: pendingError } = await admin.from("manager_impersonation_pending_sessions").insert({
     manager_profile_id: manager.id,
     target_profile_id: target.id,
-    event_type: "started",
+    mode,
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
   });
-  if (auditError) return respond({ error: "Could not record the impersonation event" }, 500);
+  if (pendingError) return respond({ error: "Could not prepare the protected impersonation session" }, 500);
 
-  return respond({ token_hash: tokenHash });
+  return respond({ token_hash: tokenHash, mode });
 });
