@@ -31,20 +31,13 @@ begin
     return new;
   end if;
 
-  if new.opponent_player_num is not null then
-    select profile.id, profile.player_num
-      into v_opponent_profile_id, v_opponent_player_num
-    from public.profiles profile
-    where profile.player_num = new.opponent_player_num
-      and profile.is_active = true
-      and profile.id <> new.created_by
-    order by profile.created_at
-    limit 1;
-  elsif new.opponent_id is not null then
+  -- Sharing requires the existing mutually confirmed identity link.
+  -- A matching player number alone is not proof of mutual confirmation.
+  if new.opponent_id is not null then
     select opponent.linked_profile_id, profile.player_num
       into v_opponent_profile_id, v_opponent_player_num
     from public.practice_opponents opponent
-    left join public.profiles profile on profile.id = opponent.linked_profile_id
+    join public.profiles profile on profile.id = opponent.linked_profile_id
     where opponent.id = new.opponent_id
       and opponent.created_by = new.created_by
       and opponent.linked_profile_id is not null
