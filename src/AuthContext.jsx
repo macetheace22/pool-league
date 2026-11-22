@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, ChevronRight, Check, AlertCircle } from "lucide-react";
-import { supabase } from "./supabaseClient";
+import { supabase, managerAuthClient } from "./supabaseClient";
 import * as db from "./db";
 
 const ROLES = {
@@ -15,55 +15,214 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+const managerProfileStorageKey = "iba-manager-impersonation-profile";
+
+function decodeJwtClaims(token) {
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(payload));
+  } catch {
+    return {};
+  }
+}
+
 export function AuthProvider({ children }) {
   const navigate = useNavigate();
   const [authLoading, setAuthLoading] = useState(true);
-  const [session, setSession]         = useState(null);
-  const [profile, setProfile]         = useState(null);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [previewProfile, setPreviewProfile] = useState(null);
-  const startMimic = (targetProfile) => {
-    if (profile?.role !== "manager" || !targetProfile?.id || targetProfile.id === profile.id || !targetProfile.is_active) return false;
-    setPreviewProfile({ ...targetProfile });
-    navigate("/");
+  const [managerProfile, setManagerProfile] = useState(null);
+  const [impersonationMode, setImpersonationMode] = useState(null);
+
+  const clearManagerBackup = async () => {
+    await managerAuthClient.auth.signOut({ scope: "local" });
+    localStorage.removeItem(managerProfileStorageKey);
+  };
+
+  const restoreManagerSession = async ({ goToAccess = true } = {}) => {
+    const { data: backupData, error: backupError } = await managerAuthClient.auth.getSession();
+    if (backupError || !backupData.session) {
+      window.alert("The original manager session is unavailable. Sign out and sign back in to continue.");
+      return false;
+    }
+    const { error } = await supabase.auth.setSession({
+      access_token: backupData.session.access_token,
+      refresh_token: backupData.session.refresh_token,
+    });
+    if (error) {
+      window.alert("Could not restore the manager session. " + error.message);
+      return false;
+    }
+    await clearManagerBackup();
+    setPreviewProfile(null);
+    setManagerProfile(null);
+    setImpersonationMode(null);
+    if (goToAccess) navigate("/access");
     return true;
   };
-  const stopMimic = () => {
-    setPreviewProfile(null);
-    navigate("/access");
+
+  const startMimic = async (targetProfile, mode = "read_only") => {
+    if (previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
+        targetProfile.id === profile.id || !targetProfile.is_active ||
+        !["read_only", "update"].includes(mode)) return false;
+
+    const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
+      targetProfile.username || "this user";
+    const confirmed = window.confirm(
+      mode === "read_only"
+        ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
+        : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
+    );
+    if (!confirmed) return false;
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) return false;
+
+    try {
+      const { error: backupError } = await managerAuthClient.auth.setSession({
+        access_token: sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token,
+      });
+      if (backupError) throw backupError;
+      localStorage.setItem(managerProfileStorageKey, JSON.stringify(profile));
+
+      const { data, error } = await supabase.functions.invoke("manager-impersonate", {
+        body: { targetUserId: targetProfile.id, mode },
+      });
+      if (error || !data?.token_hash) throw error || new Error("The impersonation service did not return a sign-in token.");
+
+      const { data: targetSessionData, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: data.token_hash,
+        type: "magiclink",
+      });
+      if (verifyError) throw verifyError;
+
+      const claims = decodeJwtClaims(targetSessionData?.session?.access_token || "");
+      if (claims.manager_impersonator_id !== sessionData.session.user.id ||
+          claims.manager_impersonation_mode !== mode ||
+          !claims.manager_impersonation_session_id) {
+        throw new Error("The protected impersonation claims were not issued. Confirm the Supabase Auth access-token hook is enabled before trying again.");
+      }
+
+      setManagerProfile(profile);
+      setPreviewProfile({ ...targetProfile });
+      setImpersonationMode(mode);
+      navigate("/");
+      return true;
+    } catch (error) {
+      await restoreManagerSession({ goToAccess: false }).catch(() => {});
+      console.error("Unable to start manager impersonation:", error);
+      window.alert(error?.message || "Unable to start impersonation.");
+      return false;
+    }
+  };
+
+  const stopMimic = async () => {
+    const { error: auditError } = await supabase.functions.invoke("manager-impersonate", {
+      body: { action: "end" },
+    });
+    const restored = await restoreManagerSession();
+    if (restored && auditError) {
+      window.alert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+    }
+    return restored;
   };
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(async ({ data }) => {
+    const initialize = async () => {
+      const { data } = await supabase.auth.getSession();
       if (!active) return;
-      setSession(data.session);
-      if (data.session) {
-        const p = await db.getProfile(data.session.user.id);
-        if (active) setProfile(p);
+      const currentSession = data.session;
+      setSession(currentSession);
+
+      if (currentSession) {
+        const claims = decodeJwtClaims(currentSession.access_token || "");
+        const isImpersonation = typeof claims.manager_impersonator_id === "string" &&
+          typeof claims.manager_impersonation_session_id === "string" &&
+          ["read_only", "update"].includes(claims.manager_impersonation_mode);
+
+        if (isImpersonation) {
+          const { data: managerData } = await managerAuthClient.auth.getSession();
+          if (!managerData.session || managerData.session.user.id !== claims.manager_impersonator_id) {
+            await supabase.auth.signOut({ scope: "local" });
+            await clearManagerBackup();
+            if (active) setSession(null);
+          } else {
+            let savedManagerProfile = null;
+            try { savedManagerProfile = JSON.parse(localStorage.getItem(managerProfileStorageKey) || "null"); } catch {}
+            if (active) {
+              setManagerProfile(savedManagerProfile);
+              setImpersonationMode(claims.manager_impersonation_mode);
+            }
+            const targetProfile = await db.getProfile(currentSession.user.id);
+            if (active) {
+              setProfile(targetProfile);
+              setPreviewProfile(targetProfile);
+            }
+          }
+        } else {
+          await clearManagerBackup();
+          const p = await db.getProfile(currentSession.user.id);
+          if (active) setProfile(p);
+        }
+      } else {
+        await clearManagerBackup();
+        if (active) setProfile(null);
       }
       if (active) setAuthLoading(false);
-    });
+    };
+
+    initialize();
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+      if (!active) return;
       setSession(sess);
-      setProfile(currentProfile => {
-        if (!sess || (currentProfile?.id && sess.user.id !== currentProfile.id)) setPreviewProfile(null);
-        return currentProfile;
-      });
-      if (sess) {
-        const p = await db.getProfile(sess.user.id);
-        setProfile(p);
-      } else {
+      if (!sess) {
+        setPreviewProfile(null);
+        setManagerProfile(null);
+        setImpersonationMode(null);
         setProfile(null);
+        return;
+      }
+      const claims = decodeJwtClaims(sess.access_token || "");
+      const isImpersonation = typeof claims.manager_impersonator_id === "string" &&
+        typeof claims.manager_impersonation_session_id === "string" &&
+        ["read_only", "update"].includes(claims.manager_impersonation_mode);
+      const p = await db.getProfile(sess.user.id);
+      if (!active) return;
+      setProfile(p);
+      if (isImpersonation) {
+        setPreviewProfile(p);
+        setImpersonationMode(claims.manager_impersonation_mode);
+      } else {
+        setPreviewProfile(null);
+        setManagerProfile(null);
+        setImpersonationMode(null);
       }
     });
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
 
   const logout = async () => {
+    if (previewProfile) {
+      await supabase.functions.invoke("manager-impersonate", { body: { action: "end" } });
+      const { data: backupData } = await managerAuthClient.auth.getSession();
+      if (backupData.session) {
+        await supabase.auth.setSession({
+          access_token: backupData.session.access_token,
+          refresh_token: backupData.session.refresh_token,
+        });
+      }
+    }
+    await clearManagerBackup();
     setPreviewProfile(null);
+    setManagerProfile(null);
+    setImpersonationMode(null);
     await supabase.auth.signOut();
     navigate("/");
   };
+
   const refreshProfile = async () => {
     if (!session) return;
     const p = await db.getProfile(session.user.id);
@@ -92,28 +251,21 @@ export function AuthProvider({ children }) {
     return <div className="iba-auth"><style>{css}</style><div className="auth-empty">Your account has been deactivated. Contact your league manager.</div></div>;
   }
 
-  const effectiveProfile = previewProfile ?? profile;
+  const effectiveProfile = profile;
   return (
     <AuthContext.Provider value={{
-      session, profile: effectiveProfile, realProfile: profile, previewProfile,
-      isMimicking: !!previewProfile, startMimic, stopMimic, logout, refreshProfile,
+      session, profile: effectiveProfile, realProfile: managerProfile ?? profile, previewProfile,
+      isMimicking: !!previewProfile, impersonationMode, startMimic, stopMimic, logout, refreshProfile,
     }}>
       <div className={previewProfile ? "mimic-preview-mode" : undefined}>
-        {previewProfile && <style>{`
-          .mimic-preview-mode button { pointer-events: none !important; opacity: .5 !important; }
-          .mimic-preview-mode .page-header button,
-          .mimic-preview-mode .tab-bar-nav button,
-          .mimic-preview-mode .drawer button { pointer-events: auto !important; opacity: 1 !important; }
-          .mimic-preview-mode input,
-          .mimic-preview-mode select,
-          .mimic-preview-mode textarea { pointer-events: none !important; opacity: .65 !important; }
-        `}</style>}
         {children}
       </div>
       {previewProfile && (
-        <div style={{position:"fixed",zIndex:2000,top:"calc(66px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:"#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
-          <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>Previewing {previewProfile.username} · UI preview only · Database access remains your manager account</span>
-          <button type="button" onClick={stopMimic} style={{border:0,borderRadius:8,padding:"8px 11px",background:"#F2C14E",color:"#241A05",fontSize:12,fontWeight:800,whiteSpace:"nowrap",cursor:"pointer"}}>Stop Mimicking</button>
+        <div style={{position:"fixed",zIndex:2000,top:"calc(66px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:impersonationMode === "read_only" ? "#17324D" : "#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
+          <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>
+            {impersonationMode === "read_only" ? "READ ONLY" : "VIEW & UPDATE"} · {previewProfile.first_name || previewProfile.username} · {impersonationMode === "read_only" ? "Database writes are blocked" : "Changes affect this account"}
+          </span>
+          <button type="button" onClick={stopMimic} style={{border:0,borderRadius:8,padding:"8px 11px",background:"#F2C14E",color:"#241A05",fontSize:12,fontWeight:800,whiteSpace:"nowrap",cursor:"pointer"}}>Exit</button>
         </div>
       )}
     </AuthContext.Provider>

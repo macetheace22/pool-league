@@ -13,3 +13,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+
+// A separate SDK-managed, separate SDK-managed auth store shared across app tabs preserves the manager session
+// while the primary client temporarily authenticates as the selected account.
+export const managerAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storageKey: 'iba-manager-impersonation-auth',
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  },
+});
