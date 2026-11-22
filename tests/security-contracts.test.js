@@ -955,6 +955,8 @@ describe("Section 108 shared Practice sessions", () => {
     const sql = read("supabase-schema-section-108-shared-practice-sessions.sql");
     expect(sql).not.toContain("create policy \"delete shared practice games\"");
     expect(sql).toContain("new.shared_with_profile_id := null");
+    expect(sql).toContain("protect_practice_game_shared_participant");
+    expect(sql).toContain("Practice session ownership and sharing cannot be changed after creation");
     expect(sql).toContain("v_created_by is distinct from auth.uid()");
     const db = read("src/db.js");
     expect(db).toContain('.eq("created_by", profileId).select().single()');
