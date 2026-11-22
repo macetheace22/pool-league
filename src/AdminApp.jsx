@@ -7324,11 +7324,19 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .bracket-row__seed{font-family:'JetBrains Mono',monospace;font-size:10px;color:#5A5A5A;margin-right:3px;}
 .bracket-divider{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#5A5A5A;margin:8px 0 2px;}
 .bracket-champion{display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;background:#0F2D1F;border-radius:8px;font-size:12px;font-weight:700;color:#5FCF9E;}
-.user-account-row{display:flex;width:100%;min-width:0;box-sizing:border-box;}
-.user-account-row:not(.user-account-row--editing){gap:8px;}
-.user-account-row:not(.user-account-row--editing) .list-row__body{flex:1 1 auto;min-width:0;padding:4px 8px;}
-.user-account-row:not(.user-account-row--editing) .list-row__actions{margin-left:auto;flex:0 0 auto;align-self:center;padding:0 2px 0 8px;}
-.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-icon{flex:0 0 auto;}
+.user-account-row{display:flex;flex-direction:column;align-items:stretch;width:100%;min-width:0;box-sizing:border-box;margin-bottom:10px;padding:12px;border:1px solid #2E2E2E;border-radius:10px;background:#1C1C1C;gap:10px;}
+.user-account-row:not(.user-account-row--editing) .list-row__body{width:100%;min-width:0;padding:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions{width:100%;margin:0;padding:0;display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:wrap;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-sm{flex:1 1 140px;min-width:0;justify-content:center;}
+.user-account-row:not(.user-account-row--editing) .list-row__actions .btn-icon{flex:0 0 34px;}
+.user-account-row--editing{gap:8px;}
+@media(max-width:520px){
+  .user-account-row:not(.user-account-row--editing) .list-row__actions .btn-sm{flex:1 1 calc(50% - 3px);}
+}
+@media(min-width:521px){
+  .user-account-row:not(.user-account-row--editing) .list-row__actions{flex-wrap:nowrap;}
+  .user-account-row:not(.user-account-row--editing) .list-row__actions .btn-sm{flex:0 0 auto;}
+}
 .user-team-label{font-size:10px;color:#9A9A9A;font-weight:600;}
 .you-badge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;background:#2A1F00;color:#F59E0B;padding:2px 6px;border-radius:20px;}
 .save-flash{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#5FCF9E;padding:6px 10px;}
