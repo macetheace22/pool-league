@@ -21,15 +21,49 @@ export function AuthProvider({ children }) {
   const [session, setSession]         = useState(null);
   const [profile, setProfile]         = useState(null);
   const [previewProfile, setPreviewProfile] = useState(null);
-  const startMimic = (targetProfile) => {
+  const [managerProfile, setManagerProfile] = useState(null);
+  const impersonationKey = "iba-manager-impersonation-v1";
+  const startMimic = async (targetProfile) => {
     if (profile?.role !== "manager" || !targetProfile?.id || targetProfile.id === profile.id || !targetProfile.is_active) return false;
-    setPreviewProfile({ ...targetProfile });
-    navigate("/");
-    return true;
+    const confirmed = window.confirm(`Start an audited session as ${[targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") || targetProfile.username || "this user"}? Actions you take may change this account's data.`);
+    if (!confirmed) return false;
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) return false;
+    const backup = { session: sessionData.session, managerProfile: profile, targetProfile };
+    try {
+      sessionStorage.setItem(impersonationKey, JSON.stringify(backup));
+      const { data, error } = await supabase.functions.invoke("manager-impersonate", { body: { targetUserId: targetProfile.id } });
+      if (error || !data?.token_hash) throw error || new Error("The impersonation service did not return a sign-in token.");
+      const { error: verifyError } = await supabase.auth.verifyOtp({ token_hash: data.token_hash, type: "magiclink" });
+      if (verifyError) throw verifyError;
+      setManagerProfile(profile);
+      setPreviewProfile({ ...targetProfile });
+      navigate("/");
+      return true;
+    } catch (error) {
+      sessionStorage.removeItem(impersonationKey);
+      console.error("Unable to start manager impersonation:", error);
+      window.alert(error?.message || "Unable to start impersonation.");
+      return false;
+    }
   };
-  const stopMimic = () => {
+  const stopMimic = async () => {
+    let backup;
+    try { backup = JSON.parse(sessionStorage.getItem(impersonationKey) || "null"); } catch { backup = null; }
+    if (!backup?.session?.access_token || !backup?.session?.refresh_token) {
+      window.alert("The original manager session could not be restored. Sign out and sign back in to continue.");
+      return false;
+    }
+    const { error } = await supabase.auth.setSession({ access_token: backup.session.access_token, refresh_token: backup.session.refresh_token });
+    if (error) {
+      window.alert("Could not restore the manager session. " + error.message);
+      return false;
+    }
+    sessionStorage.removeItem(impersonationKey);
     setPreviewProfile(null);
+    setManagerProfile(null);
     navigate("/access");
+    return true;
   };
 
   useEffect(() => {
@@ -37,6 +71,14 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
+      let backup = null;
+      try { backup = JSON.parse(sessionStorage.getItem(impersonationKey) || "null"); } catch { backup = null; }
+      if (backup?.managerProfile && backup?.targetProfile && data.session?.user?.id === backup.targetProfile.id) {
+        setManagerProfile(backup.managerProfile);
+        setPreviewProfile(backup.targetProfile);
+      } else if (backup) {
+        sessionStorage.removeItem(impersonationKey);
+      }
       if (data.session) {
         const p = await db.getProfile(data.session.user.id);
         if (active) setProfile(p);
@@ -45,10 +87,11 @@ export function AuthProvider({ children }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
       setSession(sess);
-      setProfile(currentProfile => {
-        if (!sess || (currentProfile?.id && sess.user.id !== currentProfile.id)) setPreviewProfile(null);
-        return currentProfile;
-      });
+      if (!sess) {
+        setPreviewProfile(null);
+        setManagerProfile(null);
+        sessionStorage.removeItem(impersonationKey);
+      }
       if (sess) {
         const p = await db.getProfile(sess.user.id);
         setProfile(p);
@@ -60,7 +103,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = async () => {
+    let backup;
+    try { backup = JSON.parse(sessionStorage.getItem(impersonationKey) || "null"); } catch { backup = null; }
+    if (backup?.session?.access_token && backup?.session?.refresh_token) {
+      await supabase.auth.setSession({ access_token: backup.session.access_token, refresh_token: backup.session.refresh_token });
+    }
+    sessionStorage.removeItem(impersonationKey);
     setPreviewProfile(null);
+    setManagerProfile(null);
     await supabase.auth.signOut();
     navigate("/");
   };
@@ -92,10 +142,10 @@ export function AuthProvider({ children }) {
     return <div className="iba-auth"><style>{css}</style><div className="auth-empty">Your account has been deactivated. Contact your league manager.</div></div>;
   }
 
-  const effectiveProfile = previewProfile ?? profile;
+  const effectiveProfile = profile;
   return (
     <AuthContext.Provider value={{
-      session, profile: effectiveProfile, realProfile: profile, previewProfile,
+      session, profile: effectiveProfile, realProfile: managerProfile ?? profile, previewProfile,
       isMimicking: !!previewProfile, startMimic, stopMimic, logout, refreshProfile,
     }}>
       <div className={previewProfile ? "mimic-preview-mode" : undefined}>
@@ -112,8 +162,8 @@ export function AuthProvider({ children }) {
       </div>
       {previewProfile && (
         <div style={{position:"fixed",zIndex:2000,top:"calc(66px + env(safe-area-inset-top, 0px))",left:10,right:10,maxWidth:720,margin:"0 auto",padding:"9px 12px",borderRadius:12,background:"#3B2B0B",border:"1px solid #B7791F",boxShadow:"0 5px 20px rgba(0,0,0,.35)",display:"flex",alignItems:"center",gap:10,color:"#FFF4D6"}}>
-          <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>Previewing {previewProfile.username} · UI preview only · Database access remains your manager account</span>
-          <button type="button" onClick={stopMimic} style={{border:0,borderRadius:8,padding:"8px 11px",background:"#F2C14E",color:"#241A05",fontSize:12,fontWeight:800,whiteSpace:"nowrap",cursor:"pointer"}}>Stop Mimicking</button>
+          <span style={{fontSize:12,fontWeight:800,flex:1,minWidth:0}}>Impersonating {previewProfile.first_name || previewProfile.username} · Supabase identity is this user · Actions affect this account</span>
+          <button type="button" onClick={stopMimic} style={{border:0,borderRadius:8,padding:"8px 11px",background:"#F2C14E",color:"#241A05",fontSize:12,fontWeight:800,whiteSpace:"nowrap",cursor:"pointer"}}>Exit Impersonation</button>
         </div>
       )}
     </AuthContext.Provider>
