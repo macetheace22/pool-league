@@ -330,7 +330,7 @@ function LandingStep({ profile, history, unfinishedGames, rawOpponents, onStart,
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
               {(unfinishedGames ?? []).map(game => (
-                <div key={game.id} className="readonly-bar" style={{display:"flex",flexDirection:"column",gap:7}}>
+                <div key={game.id} className="readonly-bar" style={{display:"flex",flexDirection:"column",gap:7,background:"#1C1C1C",border:"1px solid #2E2E2E",borderRadius:10,padding:12}}>
                   <div style={{fontSize:12,fontWeight:800}}>
                     {game.practice_type === "skills_drills" ? "Skills & Drills" : `vs ${game.opponent_name || "Opponent"}`}
                   </div>
