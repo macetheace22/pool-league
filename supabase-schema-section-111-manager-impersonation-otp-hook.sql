@@ -52,7 +52,7 @@ begin
   else
     -- Only the server-issued, one-time magic-link/OTP verification flow may create a session.
     -- The pending row remains target-specific, short-lived, and single-use.
-    if event ->> 'authentication_method' not in ('magiclink', 'otp') then
+    if coalesce(event ->> 'authentication_method', '') not in ('magiclink', 'otp') then
       return jsonb_build_object('claims', v_claims);
     end if;
 
