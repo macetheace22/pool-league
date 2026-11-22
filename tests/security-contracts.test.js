@@ -1027,3 +1027,25 @@ describe("Section 108 shared Practice sessions", () => {
   });
 
 });
+
+describe("Section 111 manager impersonation OTP hook", () => {
+  it("accepts Supabase OTP verification only when a matching one-time pending impersonation exists", () => {
+    const sql = read("supabase-schema-section-111-manager-impersonation-otp-hook.sql");
+    expect(sql).toContain("event ->> 'authentication_method' not in ('magiclink', 'otp')");
+    expect(sql).toContain("target_profile_id = v_user_id");
+    expect(sql).toContain("consumed_at is null");
+    expect(sql).toContain("expires_at > now()");
+    expect(sql).toContain("for update skip locked");
+    expect(sql).toContain("set consumed_at = now()");
+    expect(sql).toContain("manager_impersonation_sessions");
+    expect(sql).toContain("manager_impersonation_events");
+  });
+
+  it("uses in-app confirmation and notice dialogs for manager impersonation", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).toContain("showImpersonationConfirm");
+    expect(auth).toContain('role="dialog"');
+    expect(auth).not.toContain("window.alert(");
+    expect(auth).not.toContain("window.confirm(");
+  });
+});
