@@ -1003,6 +1003,7 @@ describe("Section 108 shared Practice sessions", () => {
     expect(fn).toContain('target.is_active');
     expect(fn).toContain('admin.auth.admin.generateLink');
     expect(fn).toContain('manager_impersonation_pending_sessions');
+    expect(fn).toContain('pendingError?.code === "23505"');
     expect(fn).toContain('manager_impersonation_sessions');
     expect(fn).toContain('getClaims(token)');
     expect(fn).toContain('event_type: "ended"');
@@ -1010,6 +1011,7 @@ describe("Section 108 shared Practice sessions", () => {
     expect(sql).toContain("alter table public.manager_impersonation_events enable row level security");
     expect(sql).toContain("revoke all on public.manager_impersonation_events from public, anon, authenticated");
     expect(sql).toContain("manager_impersonation_access_token_hook");
+    expect(sql).toContain("create unique index if not exists manager_impersonation_pending_target_idx");
     expect(sql).toContain("prevent_read_only_impersonation_writes");
     expect(sql).toContain("manager_impersonation_read_only_guard before insert or update or delete");
     expect(sql).toContain("create event trigger manager_impersonation_attach_guard");
