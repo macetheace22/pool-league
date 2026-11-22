@@ -5418,15 +5418,10 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                         <RolePill role={u.role} small neutralText/>
                         {team && <span className="user-team-label">{team.name}</span>}
                       </div>
-                      {u.email && <span className="list-row__sub">{u.email}</span>}
-                      {u.phone_number && <span className="list-row__sub">{u.phone_number}</span>}
-                      {(() => { const seen = formatLastSeen(lastSignIns[u.id]); return (
-                        <span className="list-row__sub" style={seen.warn ? {color:"#F59E0B"} : undefined}>Last seen: {seen.text}</span>
-                      ); })()}
                     </div>
                     <div className="list-row__actions user-account-row__actions">
                       <div className="user-account-row__impersonation-actions">
-                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "read_only"); }} disabled={isMimicking || isMe || !u.is_active} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`} aria-label={`View ${displayName} in read-only mode`}><Eye size={13}/> View only</button>
+                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "read_only"); }} disabled={isMimicking} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`} aria-label={`View ${displayName} in read-only mode`}><Eye size={13}/> View only</button>
                         <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "update"); }} disabled={isMimicking || isMe || !u.is_active} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View and make changes as ${displayName}`} aria-label={`View and update as ${displayName}`}><Edit2 size={13}/> View & update</button>
                       </div>
                       <div className="user-account-row__management-actions">
