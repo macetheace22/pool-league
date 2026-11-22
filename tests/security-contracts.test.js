@@ -992,6 +992,7 @@ describe("Section 108 shared Practice sessions", () => {
     const admin = read("src/AdminApp.jsx");
     const fn = read("supabase/functions/manager-impersonate/index.ts");
     const sql = read("supabase-schema-section-110-manager-impersonation-audit.sql");
+    expect(auth).toContain('if (previewProfile || managerProfile || profile?.role !== "manager"');
     expect(auth).toContain('body: { targetUserId: targetProfile.id, mode }');
     expect(auth).toContain('supabase.auth.verifyOtp({');
     expect(auth).toContain('claims.manager_impersonation_mode !== mode');
@@ -999,6 +1000,7 @@ describe("Section 108 shared Practice sessions", () => {
     expect(client).toContain('storageKey: \'iba-manager-impersonation-auth\'');
     expect(admin).toContain('startMimic(u, "read_only")');
     expect(admin).toContain('startMimic(u, "update")');
+    expect(admin).toContain('disabled={isMimicking || isMe || !u.is_active}');
     expect(fn).toContain('manager.role !== "manager"');
     expect(fn).toContain('target.is_active');
     expect(fn).toContain('admin.auth.admin.generateLink');
