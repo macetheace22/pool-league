@@ -1049,3 +1049,38 @@ describe("Section 111 manager impersonation OTP hook", () => {
     expect(auth).not.toContain("window.confirm(");
   });
 });
+
+
+describe("manager impersonation session handoff and presentation", () => {
+  it("serializes start and exit transitions and verifies the manager session before clearing its backup", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).toContain("impersonationTransitionRef.current");
+    expect(auth).toContain("await supabase.auth.refreshSession()");
+    expect(auth).toContain("restoredData.session?.user?.id !== backupData.session.user.id");
+    expect(auth).toContain("await clearManagerBackup();");
+  });
+
+  it("does not await Supabase profile queries inside the auth state callback", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).toContain("onAuthStateChange((_event, sess) =>");
+    expect(auth).not.toContain("onAuthStateChange(async");
+    expect(auth).toContain("authEventVersionRef.current");
+  });
+
+  it("uses app-styled dialogs and an app-consistent impersonation banner", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).toContain("impersonation-dialog");
+    expect(auth).toContain("impersonation-banner");
+    expect(auth).toContain("impersonation-banner--readonly");
+    expect(auth).toContain("impersonation-banner--update");
+    expect(auth).not.toContain('background:"#202522"');
+  });
+
+  it("keeps manager account cards compact without removing account actions", () => {
+    const admin = read("src/AdminApp.jsx");
+    expect(admin).toContain(".user-account-row{padding:9px 10px;");
+    expect(admin).toContain('startMimic(u, "read_only")');
+    expect(admin).toContain('startMimic(u, "update")');
+    expect(admin).toContain('deactivateUser(u.id)');
+  });
+});
