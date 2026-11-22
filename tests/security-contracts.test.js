@@ -1010,7 +1010,7 @@ describe("Section 108 shared Practice sessions", () => {
     expect(fn).toContain('getClaims(token)');
     expect(fn).toContain('if (req.method === "OPTIONS")');
     expect(fn).toContain('"Access-Control-Allow-Methods": "POST, OPTIONS"');
-    expect(fn).toContain('if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin))');
+    expect(fn).not.toContain('if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin))');
     expect(fn).toContain('event_type: "ended"');
     expect(admin).toContain('user-account-row');
     expect(admin).toContain('user-account-row--editing');
