@@ -7485,9 +7485,23 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
   .card, .card__title, .list-row__name, .list-row__sub, .list-row__id, * { color: #111111 !important; }
   .player-rating-badge { background: #EEEEEE !important; }
 }
-`;
-
 /* Account cards: clear identity, role, and action hierarchy */
+.user-account-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:6px;padding:9px 10px!important;}
+.user-account-row:not(.user-account-row--editing) .list-row__body{display:contents!important;}
+.user-account-row__identity{grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.user-account-row__name-line{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;}
+.user-account-row__name-line .list-row__name{font-size:12.5px;line-height:1.2;}
+.user-account-row__role-line{grid-column:2;grid-row:1;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:3px;min-width:76px;}
+.user-account-row__details{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.user-account-row__details .list-row__sub{font-size:9.5px;line-height:1.25;overflow-wrap:anywhere;}
+.user-account-row__actions{grid-column:1 / -1;grid-row:2;width:100%;max-width:none!important;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;margin:0;padding:0;}
+.user-account-row__impersonation-actions{display:flex;flex:1 1 auto;min-width:0;gap:6px;}
+.user-account-row__mode-btn{flex:1 1 0;min-width:116px;min-height:32px;padding:6px 9px;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;font-size:10.5px;}
+.user-account-row__management-actions{display:flex;flex:0 0 auto;align-items:center;gap:5px;}
+.user-account-row__management-actions .btn-icon{width:30px;height:29px;}
+@media(max-width:390px){.user-account-row{column-gap:6px;padding:8px!important}.user-account-row__role-line{min-width:68px}.user-account-row__mode-btn{min-width:0;padding:6px 6px;font-size:9.5px}.user-account-row__impersonation-actions{gap:4px}.user-account-row__management-actions .btn-icon{width:27px;height:27px}}
+
+`;
 .user-account-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:6px;padding:9px 10px!important;}
 .user-account-row:not(.user-account-row--editing) .list-row__body{display:contents!important;}
 .user-account-row__identity{grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
