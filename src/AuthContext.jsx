@@ -227,19 +227,23 @@ export function AuthProvider({ children }) {
       const isImpersonation = typeof claims.manager_impersonator_id === "string" &&
         typeof claims.manager_impersonation_session_id === "string" &&
         ["read_only", "update"].includes(claims.manager_impersonation_mode);
-      Promise.resolve().then(async () => {
-        const p = await db.getProfile(sess.user.id);
-        if (!active || eventVersion !== authEventVersionRef.current) return;
-        setProfile(p);
-        if (isImpersonation) {
-          setPreviewProfile(p);
-          setImpersonationMode(claims.manager_impersonation_mode);
-        } else {
-          setPreviewProfile(null);
-          setManagerProfile(null);
-          setImpersonationMode(null);
+      setTimeout(async () => {
+        try {
+          const p = await db.getProfile(sess.user.id);
+          if (!active || eventVersion !== authEventVersionRef.current) return;
+          setProfile(p);
+          if (isImpersonation) {
+            setPreviewProfile(p);
+            setImpersonationMode(claims.manager_impersonation_mode);
+          } else {
+            setPreviewProfile(null);
+            setManagerProfile(null);
+            setImpersonationMode(null);
+          }
+        } catch (error) {
+          console.error("Unable to refresh profile after auth change:", error);
         }
-      }).catch(error => console.error("Unable to refresh profile after auth change:", error));
+      }, 0);
     });
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
