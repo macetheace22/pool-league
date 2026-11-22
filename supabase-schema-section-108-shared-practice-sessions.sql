@@ -24,27 +24,19 @@ begin
       using errcode = '42501';
   end if;
 
-  -- Never trust a client-supplied participant id.
+  -- Sharing requires the existing mutually confirmed identity link.
+  -- A matching player number alone is not proof of mutual confirmation.
   new.shared_with_profile_id := null;
 
   if new.practice_type <> 'opponent' then
     return new;
   end if;
 
-  if new.opponent_player_num is not null then
-    select profile.id, profile.player_num
-      into v_opponent_profile_id, v_opponent_player_num
-    from public.profiles profile
-    where profile.player_num = new.opponent_player_num
-      and profile.is_active = true
-      and profile.id <> new.created_by
-    order by profile.created_at
-    limit 1;
-  elsif new.opponent_id is not null then
+  if new.opponent_id is not null then
     select opponent.linked_profile_id, profile.player_num
       into v_opponent_profile_id, v_opponent_player_num
     from public.practice_opponents opponent
-    left join public.profiles profile on profile.id = opponent.linked_profile_id
+    join public.profiles profile on profile.id = opponent.linked_profile_id
     where opponent.id = new.opponent_id
       and opponent.created_by = new.created_by
       and opponent.linked_profile_id is not null
@@ -53,8 +45,6 @@ begin
 
   if v_opponent_profile_id is not null then
     new.shared_with_profile_id := v_opponent_profile_id;
-    -- Keep Track a Rack's player-number authorization aligned for a linked
-    -- manually-entered opponent as well as a roster-selected opponent.
     if new.opponent_player_num is null then
       new.opponent_player_num := v_opponent_player_num;
     end if;
@@ -75,7 +65,7 @@ create or replace function public.protect_practice_game_shared_participant()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $$
 begin
   if new.created_by is distinct from old.created_by
      or new.shared_with_profile_id is distinct from old.shared_with_profile_id then
@@ -94,7 +84,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.protect_practice_game_shared_participant() from public, anon, authenticated;
 
