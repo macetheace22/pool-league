@@ -136,7 +136,16 @@ export function AuthProvider({ children }) {
       });
       if (verifyError) throw verifyError;
 
-      const claims = decodeJwtClaims(targetSessionData?.session?.access_token || "");
+      if (!targetSessionData?.session?.access_token || !targetSessionData?.session?.refresh_token) {
+        throw new Error("The impersonation service returned an incomplete target session.");
+      }
+      const { error: targetSetSessionError } = await supabase.auth.setSession({
+        access_token: targetSessionData.session.access_token,
+        refresh_token: targetSessionData.session.refresh_token,
+      });
+      if (targetSetSessionError) throw targetSetSessionError;
+
+      const claims = decodeJwtClaims(targetSessionData.session.access_token);
       if (claims.manager_impersonator_id !== sessionData.session.user.id ||
           claims.manager_impersonation_mode !== mode ||
           !claims.manager_impersonation_session_id) {
