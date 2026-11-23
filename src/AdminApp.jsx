@@ -5402,7 +5402,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                       <div className="user-account-row__identity">
                         <div className="user-account-row__name-line">
                           <span className="list-row__name">{displayName}</span>
-                          {isMe && <span className="you-badge">you</span>}
+                          
                           {!u.is_active && <span className="you-badge" style={{background:"#1A0E0E",color:"#F87171"}}>deactivated</span>}
                           {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
                         </div>
@@ -5419,7 +5419,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                         {team && <span className="user-team-label">{team.name}</span>}
                       </div>
                     </div>
-                    <div className="list-row__actions user-account-row__actions">
+                    {!isMe && <div className="list-row__actions user-account-row__actions">
                       <div className="user-account-row__impersonation-actions">
                         <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "read_only"); }} disabled={isMimicking} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`} aria-label={`View ${displayName} in read-only mode`}><Eye size={13}/> View only</button>
                         <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "update"); }} disabled={isMimicking || isMe || !u.is_active} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View and make changes as ${displayName}`} aria-label={`View and update as ${displayName}`}><Edit2 size={13}/> View & update</button>
@@ -5432,7 +5432,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                           <button type="button" className="btn-icon btn-icon--confirm" onClick={()=>reactivateUser(u.id)} title="Reactivate account" aria-label={`Reactivate ${u.username}`}><Check size={13}/></button>
                         )}
                       </div>
-                    </div>
+                    </div>}
                   </>
                 )}
               </div>
