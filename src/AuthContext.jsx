@@ -139,12 +139,11 @@ export function AuthProvider({ children }) {
       if (!targetSessionData?.session?.access_token || !targetSessionData?.session?.refresh_token) {
         throw new Error("The impersonation service returned an incomplete target session.");
       }
-      const { error: targetSetSessionError } = await supabase.auth.setSession({
-        access_token: targetSessionData.session.access_token,
-        refresh_token: targetSessionData.session.refresh_token,
-      });
-      if (targetSetSessionError) throw targetSetSessionError;
 
+      // verifyOtp establishes the target session on this Supabase client.
+      // Do not call setSession again: that creates a second auth-state transition
+      // immediately after OTP verification and races the app's profile/bootstrap
+      // listener.
       const claims = decodeJwtClaims(targetSessionData.session.access_token);
       if (claims.manager_impersonator_id !== sessionData.session.user.id ||
           claims.manager_impersonation_mode !== mode ||
@@ -156,9 +155,7 @@ export function AuthProvider({ children }) {
       setPreviewProfile({ ...targetProfile });
       setImpersonationMode(mode);
 
-      // The target session is installed in Supabase Auth. Force a clean app bootstrap
-      // so the existing initialization path establishes the target UI deterministically.
-      window.location.assign("/");
+      navigate("/");
       return true;
     } catch (error) {
       await restoreManagerSession({ goToAccess: false }).catch(() => {});
