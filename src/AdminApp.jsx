@@ -5297,6 +5297,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
 
   const [roleSaving, setRoleSaving] = useState(false);
   const [roleErr, setRoleErr]       = useState("");
+  const [selectedProfileId, setSelectedProfileId] = useState(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -5398,7 +5399,8 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                   </div>
                 ) : (
                   <>
-                    <div className="list-row__body" style={{flexDirection:"column",alignItems:"flex-start",gap:3, opacity: u.is_active?1:0.5}}>
+                    <button type="button" className="user-account-row__profile-hit" onClick={() => setSelectedProfileId(u.id)} aria-label={"Open profile for " + displayName}>
+                                          <div className="list-row__body" style={{flexDirection:"column",alignItems:"flex-start",gap:3, opacity: u.is_active?1:0.5}}>
                       <div className="user-account-row__identity">
                         <div className="user-account-row__name-line">
                           <span className="list-row__name">{displayName}</span>
@@ -5406,19 +5408,14 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                           {!u.is_active && <span className="you-badge" style={{background:"#1A0E0E",color:"#F87171"}}>deactivated</span>}
                           {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
                         </div>
-                        <div className="user-account-row__details">
-                          {u.email && <span className="list-row__sub">{u.email}</span>}
-                          {u.phone_number && <span className="list-row__sub">{u.phone_number}</span>}
-                          {(() => { const seen = formatLastSeen(lastSignIns[u.id]); return (
-                            <span className="list-row__sub" style={seen.warn ? {color:"#F59E0B"} : undefined}>Last seen: {seen.text}</span>
-                          ); })()}
-                        </div>
+
                       </div>
                       <div className="user-account-row__role-line">
                         <RolePill role={u.role} small neutralText/>
                         {team && <span className="user-team-label">{team.name}</span>}
                       </div>
-                    </div>
+                      </div>
+                    </button>
                     <div className="list-row__actions user-account-row__actions">
                       {!isMe && <div className="user-account-row__impersonation-actions">
                         <button type="button" className="btn-sm user-account-row__mode-btn" onClick={() => { void startMimic(u, "read_only"); }} disabled={isMimicking} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`} aria-label={`View ${displayName} in read-only mode`}><Eye size={13}/> View only</button>
@@ -5439,6 +5436,28 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             );
           })}
         </div>
+        {selectedProfileId && (() => {
+          const selected = users.find(x => x.id === selectedProfileId);
+          if (!selected) return null;
+          const selectedTeam = selected.team_id ? allTeams.find(t => t.id === selected.team_id) : null;
+          return (
+            <div className="card" style={{marginTop:10}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+                <div>
+                  <div className="card__title" style={{marginBottom:3}}>{[selected.first_name, selected.last_name].filter(Boolean).join(" ") || selected.username}</div>
+                  <div className="list-row__sub">{selected.username || "No username"} · {selected.role === "manager" ? "League Manager" : selected.role === "captain" ? "Team Captain" : "Player"}</div>
+                </div>
+                <button type="button" className="btn-icon" onClick={() => setSelectedProfileId(null)} aria-label="Close profile">×</button>
+              </div>
+              <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:5}}>
+                {selectedTeam && <div className="list-row__sub">Team: {selectedTeam.name}</div>}
+                {selected.phone_number && <div className="list-row__sub">Phone: {selected.phone_number}</div>}
+                <div className="list-row__sub">Status: {selected.is_active ? "Active" : "Deactivated"}</div>
+                {selected.is_claimed === false && <div className="list-row__sub">Account has not completed role setup.</div>}
+              </div>
+            </div>
+          );
+        })()}
       )}
       {subTab==="codes" && (
         <>
@@ -7483,7 +7502,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 /* Account cards: clear identity, role, and action hierarchy */
 .user-account-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;column-gap:10px;row-gap:6px;padding:9px 10px!important;}
 .user-account-row:not(.user-account-row--editing) .list-row__body{display:contents!important;}
-.user-account-row__identity{grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.user-account-row__profile-hit{grid-column:1 / -1;grid-row:1;width:100%;padding:0;margin:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;}\n.user-account-row__profile-hit:hover{background:rgba(255,255,255,0.02);}\n.user-account-row__profile-hit:focus-visible{outline:1px solid #5FCF9E;outline-offset:2px;}\n.user-account-row__identity{grid-column:1;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
 .user-account-row__name-line{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;}
 .user-account-row__name-line .list-row__name{font-size:12.5px;line-height:1.2;}
 .user-account-row__role-line{grid-column:2;grid-row:1;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:3px;min-width:76px;}
