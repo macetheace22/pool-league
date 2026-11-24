@@ -5359,6 +5359,9 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
     `${t.name} ${t.context ?? ""}`.toLowerCase().includes(inviteTeamSearch.trim().toLowerCase())
   );
 
+  const selectedProfile = selectedProfileId ? users.find(x => x.id === selectedProfileId) : null;
+  const selectedProfileTeam = selectedProfile?.team_id ? allTeams.find(t => t.id === selectedProfile.team_id) : null;
+
   return (
     <>
       {subTab==="users" && (
@@ -5436,28 +5439,23 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             );
           })}
         </div>
-        {selectedProfileId ? (() => {
-          const selected = users.find(x => x.id === selectedProfileId);
-          if (!selected) return null;
-          const selectedTeam = selected.team_id ? allTeams.find(t => t.id === selected.team_id) : null;
-          return (
-            <div className="card" style={{marginTop:10}}>
-              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
-                <div>
-                  <div className="card__title" style={{marginBottom:3}}>{[selected.first_name, selected.last_name].filter(Boolean).join(" ") || selected.username}</div>
-                  <div className="list-row__sub">{selected.username || "No username"} · {selected.role === "manager" ? "League Manager" : selected.role === "captain" ? "Team Captain" : "Player"}</div>
-                </div>
-                <button type="button" className="btn-icon" onClick={() => setSelectedProfileId(null)} aria-label="Close profile">×</button>
+        {selectedProfile && (
+          <div className="card" style={{marginTop:10}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
+              <div>
+                <div className="card__title" style={{marginBottom:3}}>{[selectedProfile.first_name, selectedProfile.last_name].filter(Boolean).join(" ") || selectedProfile.username}</div>
+                <div className="list-row__sub">{selectedProfile.username || "No username"} · {selectedProfile.role === "manager" ? "League Manager" : selectedProfile.role === "captain" ? "Team Captain" : "Player"}</div>
               </div>
-              <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:5}}>
-                {selectedTeam && <div className="list-row__sub">Team: {selectedTeam.name}</div>}
-                {selected.phone_number && <div className="list-row__sub">Phone: {selected.phone_number}</div>}
-                <div className="list-row__sub">Status: {selected.is_active ? "Active" : "Deactivated"}</div>
-                {selected.is_claimed === false && <div className="list-row__sub">Account has not completed role setup.</div>}
-              </div>
+              <button type="button" className="btn-icon" onClick={() => setSelectedProfileId(null)} aria-label="Close profile">×</button>
             </div>
-          );
-        })() : null}
+            <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:5}}>
+              {selectedProfileTeam && <div className="list-row__sub">Team: {selectedProfileTeam.name}</div>}
+              {selectedProfile.phone_number && <div className="list-row__sub">Phone: {selectedProfile.phone_number}</div>}
+              <div className="list-row__sub">Status: {selectedProfile.is_active ? "Active" : "Deactivated"}</div>
+              {selectedProfile.is_claimed === false && <div className="list-row__sub">Account has not completed role setup.</div>}
+            </div>
+          </div>
+        )}
       {subTab==="codes" && (
         <>
           <div className="card">
