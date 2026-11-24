@@ -1064,7 +1064,7 @@ describe("manager impersonation session handoff and presentation", () => {
   it("does not replace the OTP-established target session before navigation", () => {
     const auth = read("src/AuthContext.jsx");
     const verifyStart = auth.indexOf("supabase.auth.verifyOtp({");
-    const navigateIndex = auth.indexOf("navigate("/");", verifyStart);
+    const navigateIndex = auth.indexOf('navigate("/")', verifyStart);
     expect(verifyStart).toBeGreaterThan(-1);
     expect(navigateIndex).toBeGreaterThan(verifyStart);
     const verifyBlock = auth.slice(verifyStart, navigateIndex);
