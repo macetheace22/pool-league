@@ -1061,6 +1061,17 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(auth).toContain("await clearManagerBackup();");
   });
 
+  it("does not replace the OTP-established target session before navigation", () => {
+    const auth = read("src/AuthContext.jsx");
+    const verifyStart = auth.indexOf("supabase.auth.verifyOtp({");
+    const navigateIndex = auth.indexOf("navigate("/");", verifyStart);
+    expect(verifyStart).toBeGreaterThan(-1);
+    expect(navigateIndex).toBeGreaterThan(verifyStart);
+    const verifyBlock = auth.slice(verifyStart, navigateIndex);
+    expect(verifyBlock).not.toContain("supabase.auth.setSession");
+    expect(verifyBlock).not.toContain("window.location.assign");
+  });
+
   it("does not await Supabase profile queries inside the auth state callback", () => {
     const auth = read("src/AuthContext.jsx");
     expect(auth).toContain("onAuthStateChange((_event, sess) =>");
