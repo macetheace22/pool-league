@@ -1101,7 +1101,10 @@ describe("manager access account card layout and start feedback", () => {
     const admin = read("src/AdminApp.jsx");
     expect(admin).toContain("user-account-row__name-line");
     expect(admin).toContain("user-account-row__role-line");
-    expect(admin).toContain("user-account-row__impersonation-actions");
+    expect(admin).not.toContain("user-account-row__impersonation-actions");
+    expect(admin).toContain('className="list-row__actions user-account-row__actions"');
+    expect(admin).toContain('onClick={() => { void startMimic(u, "read_only"); }}');
+    expect(admin).toContain('onClick={() => { void startMimic(u, "update"); }}');
     expect(admin).toContain("user-account-row__management-actions");
     expect(admin).toContain("min-width:116px");
   });
