@@ -5436,7 +5436,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             );
           })}
         </div>
-        {selectedProfileId && (() => {
+        {selectedProfileId ? (() => {
           const selected = users.find(x => x.id === selectedProfileId);
           if (!selected) return null;
           const selectedTeam = selected.team_id ? allTeams.find(t => t.id === selected.team_id) : null;
@@ -5457,8 +5457,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
               </div>
             </div>
           );
-        })()}
-      )}
+        })() : null}
       {subTab==="codes" && (
         <>
           <div className="card">
