@@ -155,7 +155,10 @@ export function AuthProvider({ children }) {
       setManagerProfile(profile);
       setPreviewProfile({ ...targetProfile });
       setImpersonationMode(mode);
-      navigate("/");
+
+      // The target session is installed in Supabase Auth. Force a clean app bootstrap
+      // so the existing initialization path establishes the target UI deterministically.
+      window.location.assign("/");
       return true;
     } catch (error) {
       await restoreManagerSession({ goToAccess: false }).catch(() => {});
