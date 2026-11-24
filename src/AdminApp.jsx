@@ -5439,6 +5439,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             );
           })}
         </div>
+        )}
         {selectedProfile && (
           <div className="card" style={{marginTop:10}}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10}}>
@@ -5456,7 +5457,6 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             </div>
           </div>
         )}
-      )}
       {subTab==="codes" && (
         <>
           <div className="card">
