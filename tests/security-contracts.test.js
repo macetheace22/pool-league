@@ -297,8 +297,7 @@ describe("Section 8.1 roster history preservation", () => {
   });
 });
 
-describe("Section 8.1 import retains official roster and player history", () => {
-  it("uses the shared reconciliation RPC and does not remove unchanged roster rows", () => {
+describe("Section 8.1 import retains official roster and player history", () => {  it("uses the shared reconciliation RPC and does not remove unchanged roster rows", () => {
     const db = read("src/db.js");
     const sql = read("supabase-schema-section-85-authoritative-roster-import.sql");
     expect(db).toContain('supabase.rpc("sync_imported_team_rosters"');
@@ -597,8 +596,7 @@ describe("Section 102 practice opponent claim codes", () => {
     expect(sql).toContain("values (\n    v_code.opponent_id, (select auth.uid()), v_owner, (select auth.uid())");
     expect(sql).toContain("v_request.link_profile_id");
     expect(sql).toContain("if v_request.target_profile_id <> (select auth.uid()) then");
-    expect(sql).toContain("case when r.link_profile_id = r.requested_by then 'claim' else 'link' end");
-    for (const signature of [
+    expect(sql).toContain("case when r.link_profile_id = r.requested_by then 'claim' else 'link' end");    for (const signature of [
       "create_practice_opponent_claim_code(uuid)",
       "redeem_practice_opponent_claim_code(text)",
     ]) {
@@ -897,8 +895,7 @@ describe("Section 104 manager-approved seasonal tournament reconciliation", () =
     expect(sql).toContain("RECORDED_MATCH_PARTICIPANTS_CHANGED");
     expect(sql).toContain("QUALIFIED_ENTRIES_CHANGED_AFTER_RESULTS_RECORDED");
     expect(sql).toContain("RECORDED_WINNER_CONFLICTS_WITH_PROPOSED_BRACKET");
-    expect(sql).toContain("saved.status not in ('completed', 'in_progress')");
-    expect(sql).toContain("review_required_at = null");
+    expect(sql).toContain("saved.status not in ('completed', 'in_progress')");    expect(sql).toContain("review_required_at = null");
   });
 
   it("uses a transactional RPC and an explicit manager approval in the admin review", () => {
@@ -992,8 +989,9 @@ describe("Section 108 shared Practice sessions", () => {
     const admin = read("src/AdminApp.jsx");
     const fn = read("supabase/functions/manager-impersonate/index.ts");
     const sql = read("supabase-schema-section-110-manager-impersonation-audit.sql");
-    expect(auth).toContain('if (impersonationTransitionRef.current || previewProfile) return false;');
-    expect(auth).toContain('Your manager session is not ready.');
+    expect(auth).toContain('supabase.auth.verifyOtp({');
+    expect(auth).toContain('claims.manager_impersonation_mode !== mode');
+    expect(auth).toContain('body: { targetUserId: targetProfile.id, mode }');
     expect(auth).toContain('body: { targetUserId: targetProfile.id, mode }');
     expect(auth).toContain('supabase.auth.verifyOtp({');
     expect(auth).toContain('claims.manager_impersonation_mode !== mode');
@@ -1053,11 +1051,11 @@ describe("Section 111 manager impersonation OTP hook", () => {
 
 
 describe("manager impersonation session handoff and presentation", () => {
-  it("serializes start and exit transitions and verifies the manager session before clearing its backup", () => {
+  it("restores the original manager session without the post-PR297 transition machinery", () => {
     const auth = read("src/AuthContext.jsx");
-    expect(auth).toContain("impersonationTransitionRef.current");
-    expect(auth).toContain("await supabase.auth.refreshSession()");
-    expect(auth).toContain("restoredData.session?.user?.id !== backupData.session.user.id");
+    expect(auth).not.toContain("impersonationTransitionRef.current");
+    expect(auth).not.toContain("await supabase.auth.refreshSession()");
+    expect(auth).not.toContain("restoredData.session?.user?.id !== backupData.session.user.id");
     expect(auth).toContain("await clearManagerBackup();");
   });
 
@@ -1072,11 +1070,11 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(verifyBlock).not.toContain("window.location.assign");
   });
 
-  it("does not await Supabase profile queries inside the auth state callback", () => {
+  it("keeps the auth state callback synchronous and does not use the removed event-version race machinery", () => {
     const auth = read("src/AuthContext.jsx");
     expect(auth).toContain("onAuthStateChange((_event, sess) =>");
     expect(auth).not.toContain("onAuthStateChange(async");
-    expect(auth).toContain("authEventVersionRef.current");
+    expect(auth).not.toContain("authEventVersionRef.current");
   });
 
   it("uses app-styled dialogs and an app-consistent impersonation banner", () => {
@@ -1107,9 +1105,10 @@ describe("manager access account card layout and start feedback", () => {
     expect(admin).toContain("user-account-row__management-actions");
     expect(admin).toContain("min-width:116px");
   });
-  it("does not silently reject a start because managerProfile is stale", () => {
+  it("retains the original manager impersonation guard before starting a transition", () => {
     const auth = read("src/AuthContext.jsx");
-    expect(auth).not.toContain("previewProfile || managerProfile || profile?.role !== \"manager\"");
-    expect(auth).toContain("Your manager session is not ready.");
+    expect(auth).toContain("previewProfile || managerProfile || profile?.role !== \"manager\"");
+    expect(auth).toContain("targetProfile.id === profile.id");
+    expect(auth).toContain('!["read_only", "update"].includes(mode)');
   });
 });
