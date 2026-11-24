@@ -5456,6 +5456,7 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
             </div>
           </div>
         )}
+      )}
       {subTab==="codes" && (
         <>
           <div className="card">
