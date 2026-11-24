@@ -36,8 +36,6 @@ export function AuthProvider({ children }) {
   const [impersonationMode, setImpersonationMode] = useState(null);
   const [impersonationDialog, setImpersonationDialog] = useState(null);
   const dialogResolver = useRef(null);
-  const impersonationTransitionRef = useRef(false);
-  const authEventVersionRef = useRef(0);
 
   const showImpersonationAlert = (message) => {
     setImpersonationDialog({ type: "alert", message });
@@ -74,11 +72,6 @@ export function AuthProvider({ children }) {
       showImpersonationAlert("Could not restore the manager session. " + error.message);
       return false;
     }
-    const { data: restoredData, error: restoredError } = await supabase.auth.getSession();
-    if (restoredError || restoredData.session?.user?.id !== backupData.session.user.id) {
-      showImpersonationAlert("The manager session could not be verified after restoration. The backup has been retained; please try Exit again.");
-      return false;
-    }
     await clearManagerBackup();
     setPreviewProfile(null);
     setManagerProfile(null);
@@ -88,36 +81,23 @@ export function AuthProvider({ children }) {
   };
 
   const startMimic = async (targetProfile, mode = "read_only") => {
-    if (impersonationTransitionRef.current || previewProfile) return false;
-    if (profile?.role !== "manager") {
-      showImpersonationAlert("Your manager session is not ready. Refresh Manage App Access and try again; if it continues, sign out and back in.");
-      return false;
-    }
-    if (!targetProfile?.id || targetProfile.id === profile.id || !targetProfile.is_active ||
-        !["read_only", "update"].includes(mode)) {
-      showImpersonationAlert("This account cannot be opened in impersonation mode. Refresh the account list and try again.");
-      return false;
-    }
+    if (previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
+        targetProfile.id === profile.id || !targetProfile.is_active ||
+        !["read_only", "update"].includes(mode)) return false;
 
-    impersonationTransitionRef.current = true;
+    const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
+      targetProfile.username || "this user";
+    const confirmed = await showImpersonationConfirm(
+      mode === "read_only"
+        ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
+        : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
+    );
+    if (!confirmed) return false;
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) return false;
+
     try {
-      const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
-        targetProfile.username || "this user";
-      const confirmed = await showImpersonationConfirm(
-        mode === "read_only"
-          ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
-          : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
-      );
-      if (!confirmed) return false;
-
-      let { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session) {
-        const refreshed = await supabase.auth.refreshSession();
-        sessionData = refreshed.data;
-        sessionError = refreshed.error;
-      }
-      if (sessionError || !sessionData?.session) throw sessionError || new Error("Your manager session is unavailable. Sign in again and retry.");
-
       const { error: backupError } = await managerAuthClient.auth.setSession({
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
@@ -136,15 +116,7 @@ export function AuthProvider({ children }) {
       });
       if (verifyError) throw verifyError;
 
-      if (!targetSessionData?.session?.access_token || !targetSessionData?.session?.refresh_token) {
-        throw new Error("The impersonation service returned an incomplete target session.");
-      }
-
-      // verifyOtp establishes the target session on this Supabase client.
-      // Do not call setSession again: that creates a second auth-state transition
-      // immediately after OTP verification and races the app's profile/bootstrap
-      // listener.
-      const claims = decodeJwtClaims(targetSessionData.session.access_token);
+      const claims = decodeJwtClaims(targetSessionData?.session?.access_token || "");
       if (claims.manager_impersonator_id !== sessionData.session.user.id ||
           claims.manager_impersonation_mode !== mode ||
           !claims.manager_impersonation_session_id) {
@@ -154,7 +126,6 @@ export function AuthProvider({ children }) {
       setManagerProfile(profile);
       setPreviewProfile({ ...targetProfile });
       setImpersonationMode(mode);
-
       navigate("/");
       return true;
     } catch (error) {
@@ -162,26 +133,18 @@ export function AuthProvider({ children }) {
       console.error("Unable to start manager impersonation:", error);
       showImpersonationAlert(error?.message || "Unable to start impersonation.");
       return false;
-    } finally {
-      impersonationTransitionRef.current = false;
     }
   };
 
   const stopMimic = async () => {
-    if (impersonationTransitionRef.current) return false;
-    impersonationTransitionRef.current = true;
-    try {
-      const { error: auditError } = await supabase.functions.invoke("manager-impersonate", {
-        body: { action: "end" },
-      });
-      const restored = await restoreManagerSession();
-      if (restored && auditError) {
-        showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
-      }
-      return restored;
-    } finally {
-      impersonationTransitionRef.current = false;
+    const { error: auditError } = await supabase.functions.invoke("manager-impersonate", {
+      body: { action: "end" },
+    });
+    const restored = await restoreManagerSession();
+    if (restored && auditError) {
+      showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
     }
+    return restored;
   };
 
   useEffect(() => {
@@ -218,17 +181,19 @@ export function AuthProvider({ children }) {
             }
           }
         } else {
+          await clearManagerBackup();
           const p = await db.getProfile(currentSession.user.id);
           if (active) setProfile(p);
         }
       } else {
+        await clearManagerBackup();
         if (active) setProfile(null);
       }
       if (active) setAuthLoading(false);
     };
 
     initialize();
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
       if (!active) return;
       setSession(sess);
       if (!sess) {
@@ -238,28 +203,21 @@ export function AuthProvider({ children }) {
         setProfile(null);
         return;
       }
-      const eventVersion = ++authEventVersionRef.current;
       const claims = decodeJwtClaims(sess.access_token || "");
       const isImpersonation = typeof claims.manager_impersonator_id === "string" &&
         typeof claims.manager_impersonation_session_id === "string" &&
         ["read_only", "update"].includes(claims.manager_impersonation_mode);
-      setTimeout(async () => {
-        try {
-          const p = await db.getProfile(sess.user.id);
-          if (!active || eventVersion !== authEventVersionRef.current) return;
-          setProfile(p);
-          if (isImpersonation) {
-            setPreviewProfile(p);
-            setImpersonationMode(claims.manager_impersonation_mode);
-          } else {
-            setPreviewProfile(null);
-            setManagerProfile(null);
-            setImpersonationMode(null);
-          }
-        } catch (error) {
-          console.error("Unable to refresh profile after auth change:", error);
-        }
-      }, 0);
+      const p = await db.getProfile(sess.user.id);
+      if (!active) return;
+      setProfile(p);
+      if (isImpersonation) {
+        setPreviewProfile(p);
+        setImpersonationMode(claims.manager_impersonation_mode);
+      } else {
+        setPreviewProfile(null);
+        setManagerProfile(null);
+        setImpersonationMode(null);
+      }
     });
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
