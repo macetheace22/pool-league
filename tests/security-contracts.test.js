@@ -1103,8 +1103,8 @@ describe("manager impersonation session handoff and presentation", () => {
   it("keeps manager account cards compact without removing account actions", () => {
     const admin = read("src/AdminApp.jsx");
     expect(admin).toContain(".user-account-row{display:grid;grid-template-columns:minmax(0,1fr) auto;");
-    expect(admin).toContain('startMimic(u, "read_only")');
-    expect(admin).toContain('startMimic(u, "update")');
+    expect(admin).toContain('handleImpersonationClick(u, "read_only")');
+    expect(admin).toContain('handleImpersonationClick(u, "update")');
     expect(admin).toContain('deactivateUser(u.id)');
   });
 });
