@@ -1069,7 +1069,7 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(auth).toContain("const impersonationTransitionRef = useRef(false);");
     expect(auth).toContain("impersonationTransitionRef.current = true;");
     expect(auth).toContain("await supabase.auth.refreshSession()");
-    expect(auth).toContain("restoredData.session?.user?.id !== backupData.session.user.id");
+    expect(auth).toContain("restoredData.session?.user?.id !== backupSession.user.id");
     expect(auth).toContain("await clearManagerBackup();");
     expect(auth).toContain("if (impersonationTransitionRef.current) return false;");
   });
