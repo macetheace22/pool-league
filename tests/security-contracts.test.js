@@ -1064,12 +1064,14 @@ describe("manager impersonation session handoff and presentation", () => {
   });
 
 
-  it("restores the original manager session without the post-PR297 transition machinery", () => {
+  it("serializes impersonation start and exit and recovers a missing manager session", () => {
     const auth = read("src/AuthContext.jsx");
-    expect(auth).not.toContain("impersonationTransitionRef.current");
-    expect(auth).not.toContain("await supabase.auth.refreshSession()");
-    expect(auth).not.toContain("restoredData.session?.user?.id !== backupData.session.user.id");
+    expect(auth).toContain("const impersonationTransitionRef = useRef(false);");
+    expect(auth).toContain("impersonationTransitionRef.current = true;");
+    expect(auth).toContain("await supabase.auth.refreshSession()");
+    expect(auth).toContain("restoredData.session?.user?.id !== backupData.session.user.id");
     expect(auth).toContain("await clearManagerBackup();");
+    expect(auth).toContain("if (impersonationTransitionRef.current) return false;");
   });
 
   it("does not replace the OTP-established target session before navigation", () => {
