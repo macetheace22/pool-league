@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
   const [impersonationMode, setImpersonationMode] = useState(null);
   const [impersonationDialog, setImpersonationDialog] = useState(null);
   const dialogResolver = useRef(null);
+  const authEventVersionRef = useRef(0);
 
   const showImpersonationAlert = (message) => {
     setImpersonationDialog({ type: "alert", message });
@@ -193,7 +194,7 @@ export function AuthProvider({ children }) {
     };
 
     initialize();
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       if (!active) return;
       setSession(sess);
       if (!sess) {
@@ -203,21 +204,33 @@ export function AuthProvider({ children }) {
         setProfile(null);
         return;
       }
+
+      // Auth transitions can arrive back-to-back during impersonation start/exit.
+      // Profile lookup is asynchronous, so an older event can otherwise finish
+      // after the newer manager event and incorrectly restore previewProfile.
+      const eventVersion = ++authEventVersionRef.current;
       const claims = decodeJwtClaims(sess.access_token || "");
       const isImpersonation = typeof claims.manager_impersonator_id === "string" &&
         typeof claims.manager_impersonation_session_id === "string" &&
         ["read_only", "update"].includes(claims.manager_impersonation_mode);
-      const p = await db.getProfile(sess.user.id);
-      if (!active) return;
-      setProfile(p);
-      if (isImpersonation) {
-        setPreviewProfile(p);
-        setImpersonationMode(claims.manager_impersonation_mode);
-      } else {
-        setPreviewProfile(null);
-        setManagerProfile(null);
-        setImpersonationMode(null);
-      }
+
+      setTimeout(async () => {
+        try {
+          const p = await db.getProfile(sess.user.id);
+          if (!active || eventVersion !== authEventVersionRef.current) return;
+          setProfile(p);
+          if (isImpersonation) {
+            setPreviewProfile(p);
+            setImpersonationMode(claims.manager_impersonation_mode);
+          } else {
+            setPreviewProfile(null);
+            setManagerProfile(null);
+            setImpersonationMode(null);
+          }
+        } catch (error) {
+          console.error("Unable to refresh profile after auth change:", error);
+        }
+      }, 0);
     });
     return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
