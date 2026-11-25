@@ -131,6 +131,13 @@ export function AuthProvider({ children }) {
       }
       if (sessionError || !sessionData?.session) throw sessionError || new Error("Your manager session is unavailable. Sign in again and retry.");
       stage = "saving the manager-session backup";
+      const hasManagerAccessToken = Boolean(sessionData.session.access_token);
+      const hasManagerRefreshToken = Boolean(sessionData.session.refresh_token);
+      if (!hasManagerAccessToken || !hasManagerRefreshToken) {
+        throw new Error(
+          `The manager session is incomplete (access token present: ${hasManagerAccessToken}; refresh token present: ${hasManagerRefreshToken}; expires_at: ${sessionData.session.expires_at ?? "not provided"}). Sign out and sign back in before retrying.`
+        );
+      }
       const { error: backupError } = await managerAuthClient.auth.setSession({
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
