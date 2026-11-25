@@ -997,8 +997,8 @@ describe("Section 108 shared Practice sessions", () => {
     expect(auth).toContain('claims.manager_impersonation_mode !== mode');
     expect(auth).toContain('body: { action: "end" }');
     expect(client).toContain('storageKey: \'iba-manager-impersonation-auth\'');
-    expect(admin).toContain('startMimic(u, "read_only")');
-    expect(admin).toContain('startMimic(u, "update")');
+    expect(admin).toContain('handleImpersonationClick(u, "read_only")');
+    expect(admin).toContain('handleImpersonationClick(u, "update")');
     expect(admin).toContain('disabled={isMimicking || isMe || !u.is_active}');
     expect(fn).toContain('manager.role !== "manager"');
     expect(fn).toContain('target.is_active');
@@ -1103,8 +1103,8 @@ describe("manager impersonation session handoff and presentation", () => {
   it("keeps manager account cards compact without removing account actions", () => {
     const admin = read("src/AdminApp.jsx");
     expect(admin).toContain(".user-account-row{display:grid;grid-template-columns:minmax(0,1fr) auto;");
-    expect(admin).toContain('startMimic(u, "read_only")');
-    expect(admin).toContain('startMimic(u, "update")');
+    expect(admin).toContain('handleImpersonationClick(u, "read_only")');
+    expect(admin).toContain('handleImpersonationClick(u, "update")');
     expect(admin).toContain('deactivateUser(u.id)');
   });
 });
@@ -1117,8 +1117,11 @@ describe("manager access account card layout and start feedback", () => {
     expect(admin).toContain("user-account-row__role-line");
     expect(admin).not.toContain("user-account-row__impersonation-actions");
     expect(admin).toContain('className="list-row__actions user-account-row__actions"');
-    expect(admin).toContain('onClick={(event) => { event.preventDefault(); event.stopPropagation(); void startMimic(u, "read_only"); }}');
-    expect(admin).toContain('onClick={(event) => { event.preventDefault(); event.stopPropagation(); void startMimic(u, "update"); }}');
+    expect(admin).toContain('onClick={(event) => { event.preventDefault(); event.stopPropagation(); void handleImpersonationClick(u, "read_only"); }}');
+    expect(admin).toContain('onClick={(event) => { event.preventDefault(); event.stopPropagation(); void handleImpersonationClick(u, "update"); }}');
+    expect(admin).toContain("Impersonation diagnostic: isMimicking=");
+    expect(admin).toContain("preview buttons disabled=");
+    expect(admin).toContain("const handleImpersonationClick = async (targetProfile, mode) =>");
     expect(admin).toContain("user-account-row__management-actions");
     expect(admin).toContain("min-width:116px");
   });

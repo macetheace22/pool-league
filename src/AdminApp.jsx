@@ -5378,9 +5378,10 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
     <>
       {subTab==="users" && (
         <div style={{display:"flex",flexDirection:"column",gap:10,overflow: editRoleId ? "visible" : "visible", background:"transparent", border:"none"}}>
-          {impersonationClickStatus && (
-            <div role="status" aria-live="polite" className="readonly-bar" style={{marginBottom:0}}>{impersonationClickStatus}</div>
-          )}
+          <div role="status" aria-live="polite" className="readonly-bar" style={{marginBottom:0}}>
+            Impersonation diagnostic: isMimicking={String(isMimicking)} · preview buttons disabled={String(isMimicking)}
+            {impersonationClickStatus ? ` · ${impersonationClickStatus}` : ""}
+          </div>
           {users.map(u => {
             const displayName = [u.first_name, u.last_name].map(value => (value ?? "").trim()).filter(Boolean).join(" ") || u.username || "Unnamed account";
             const team = u.team_id ? allTeams.find(t=>t.id===u.team_id) : null;
@@ -5432,8 +5433,8 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                     </button>
                     <div className="list-row__actions user-account-row__actions">
                       {!isMe && <>
-                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={(event) => { event.preventDefault(); event.stopPropagation(); void startMimic(u, "read_only"); }} disabled={isMimicking} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`} aria-label={`View ${displayName} in read-only mode`}><Eye size={13}/> View only</button>
-                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={(event) => { event.preventDefault(); event.stopPropagation(); void startMimic(u, "update"); }} disabled={isMimicking || isMe || !u.is_active} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View and make changes as ${displayName}`} aria-label={`View and update as ${displayName}`}><Edit2 size={13}/> View & update</button>
+                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={(event) => { event.preventDefault(); event.stopPropagation(); void handleImpersonationClick(u, "read_only"); }} disabled={isMimicking} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View ${displayName} without allowing data changes`} aria-label={`View ${displayName} in read-only mode`}><Eye size={13}/> View only</button>
+                        <button type="button" className="btn-sm user-account-row__mode-btn" onClick={(event) => { event.preventDefault(); event.stopPropagation(); void handleImpersonationClick(u, "update"); }} disabled={isMimicking || isMe || !u.is_active} title={isMe ? "You are already signed in as yourself" : !u.is_active ? "Reactivate this account before previewing it" : `View and make changes as ${displayName}`} aria-label={`View and update as ${displayName}`}><Edit2 size={13}/> View & update</button>
                       </>}
                       <div className="user-account-row__management-actions">
                         <button type="button" className="btn-icon" onClick={()=>!isMe && startEditRole(u)} disabled={isMe} title={isMe ? "You can't change your own role" : "Change role"} aria-label={isMe ? "Change role unavailable for your own account" : `Change role for ${u.username}`}><Edit2 size={13}/></button>
