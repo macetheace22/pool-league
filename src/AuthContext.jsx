@@ -214,6 +214,15 @@ export function AuthProvider({ children }) {
         typeof claims.manager_impersonation_session_id === "string" &&
         ["read_only", "update"].includes(claims.manager_impersonation_mode);
 
+      // Clear impersonation state immediately when the new auth session is the
+      // manager session. Do not leave stale previewProfile/managerProfile state
+      // in place while the asynchronous profile lookup is pending.
+      if (!isImpersonation) {
+        setPreviewProfile(null);
+        setManagerProfile(null);
+        setImpersonationMode(null);
+      }
+
       setTimeout(async () => {
         try {
           const p = await db.getProfile(sess.user.id);
