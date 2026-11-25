@@ -1091,6 +1091,14 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(auth).not.toContain("onAuthStateChange(async");
   });
 
+  it("loads the impersonation exit-banner styles while previewing an account", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).toContain("const impersonationBannerCss = `");
+    const bannerRender = auth.slice(auth.indexOf("{previewProfile && ("), auth.indexOf("</AuthContext.Provider>"));
+    expect(bannerRender).toContain("<style>{impersonationBannerCss}</style>");
+    expect(auth).toContain(".impersonation-banner{position:fixed;z-index:2000;");
+  });
+
   it("loads confirmation dialog styles in the authenticated app render", () => {
     const auth = read("src/AuthContext.jsx");
     expect(auth).toContain("const impersonationDialogCss = `");

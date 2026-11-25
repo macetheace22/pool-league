@@ -25,6 +25,15 @@ const impersonationDialogCss = `
 .impersonation-dialog__actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:18px;}
 `;
 
+const impersonationBannerCss = `
+.impersonation-banner{position:fixed;z-index:2000;top:calc(66px + env(safe-area-inset-top, 0px));left:10px;right:10px;max-width:460px;margin:0 auto;padding:8px 10px;border:1px solid #2E2E2E;border-left:3px solid #5FCF9E;border-radius:10px;background:#141414;box-shadow:0 5px 20px rgba(0,0,0,.35);display:flex;align-items:center;gap:9px;color:#FFF;font-family:'Archivo',sans-serif;}
+.impersonation-banner--readonly{border-left-color:#6FA8DC;}
+.impersonation-banner--update{border-left-color:#F2C14E;}
+.impersonation-banner__copy{flex:1;min-width:0;font-size:11px;line-height:1.4;font-weight:700;color:#E0E0E0;}
+.impersonation-banner__exit{flex:0 0 auto;min-width:54px;justify-content:center;}
+@media(max-width:380px){.impersonation-banner{left:7px;right:7px;padding:7px 8px;gap:6px}.impersonation-banner__copy{font-size:10px}}
+`;
+
 function decodeJwtClaims(token) {
   try {
     const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -326,12 +335,15 @@ export function AuthProvider({ children }) {
       )}
 
       {previewProfile && (
-        <div className={`impersonation-banner impersonation-banner--${impersonationMode === "read_only" ? "readonly" : "update"}`}>
+        <>
+          <style>{impersonationBannerCss}</style>
+          <div className={`impersonation-banner impersonation-banner--${impersonationMode === "read_only" ? "readonly" : "update"}`}>
           <span className="impersonation-banner__copy">
             {impersonationMode === "read_only" ? "READ ONLY" : "VIEW & UPDATE"} · {previewProfile.first_name || previewProfile.username} · {impersonationMode === "read_only" ? "Database writes are blocked" : "Changes affect this account"}
           </span>
-          <button type="button" className="btn-sm impersonation-banner__exit" onClick={stopMimic}>Exit</button>
-        </div>
+            <button type="button" className="btn-sm impersonation-banner__exit" onClick={stopMimic}>Exit</button>
+          </div>
+        </>
       )}
     </AuthContext.Provider>
   );
