@@ -35,6 +35,11 @@ const impersonationDialogCss = `
 .impersonation-dialog__title{font-family:'Archivo Black',sans-serif;font-size:16px;line-height:1.25;margin-bottom:10px;color:#FFF;}
 .impersonation-dialog__message{font-size:12.5px;line-height:1.55;color:#B8B8B8;white-space:pre-wrap;}
 .impersonation-dialog__actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:18px;}
+.impersonation-dialog__button{height:40px;min-width:96px;padding:0 16px;border-radius:9px;font-family:'Archivo',sans-serif;font-size:13px;font-weight:700;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+.impersonation-dialog__button--secondary{background:#1C1C1C;color:#E0E0E0;border:1.5px solid #3A3A3A;}
+.impersonation-dialog__button--primary{background:#5FCF9E;color:#0B1F16;border:1px solid #5FCF9E;}
+.impersonation-dialog__button:focus-visible{outline:2px solid #A7F3D0;outline-offset:2px;}
+@media(max-width:380px){.impersonation-dialog{max-width:360px;padding:16px}.impersonation-dialog__button{min-width:90px;}}
 `;
 
 const impersonationBannerCss = `
@@ -101,12 +106,12 @@ export function AuthProvider({ children }) {
       refresh_token: backupSession.refresh_token,
     });
     if (error) {
-      showImpersonationAlert("Could not restore the manager session. " + error.message);
+      showImpersonationAlert("We couldn’t restore your manager account. Please sign out and sign back in before trying again.");
       return false;
     }
     const { data: restoredData, error: restoredError } = await supabase.auth.getSession();
     if (restoredError || restoredData.session?.user?.id !== backupSession.user.id) {
-      showImpersonationAlert("The manager session could not be verified after restoration. The backup has been retained; please try Exit again.");
+      showImpersonationAlert("We couldn’t confirm your manager account was restored. Please try Exit again.");
       return false;
     }
     await clearManagerBackup();
@@ -129,8 +134,8 @@ export function AuthProvider({ children }) {
         targetProfile.username || "this user";
       const confirmed = await showImpersonationConfirm(
         mode === "read_only"
-          ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
-          : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
+          ? `You’re about to view ${targetName}’s account. You can look around, but you won’t be able to make changes.`
+          : `You’re about to view ${targetName}’s account as them. Any changes you save will affect their account.`
       );
       if (!confirmed) return false;
 
@@ -190,7 +195,11 @@ export function AuthProvider({ children }) {
         restoreNote = "\\nManager-session restore also failed: " + (restoreError?.message || "Unknown restore error.");
       }
       console.error("Unable to start manager impersonation:", { stage, error, restoreNote });
-      showImpersonationAlert(`Impersonation failed during: ${stage}\\n${error?.message || "Unknown error."}${restoreNote}`);
+      showImpersonationAlert(
+        restored
+          ? "We couldn’t start the player view. Your manager account is still active. Please try again."
+          : "We couldn’t start the player view, and we couldn’t confirm your manager account was restored. Please sign out and sign back in before trying again."
+      );
       return false;
     } finally {
       impersonationTransitionRef.current = false;
@@ -206,7 +215,7 @@ export function AuthProvider({ children }) {
       });
       const restored = await restoreManagerSession();
       if (restored && auditError) {
-        showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+        showImpersonationAlert("You’re back in your manager account, but we couldn’t record the exit from player view.");
       }
       return restored;
     } finally {
@@ -373,8 +382,8 @@ export function AuthProvider({ children }) {
             <div id="impersonation-dialog-title" className="impersonation-dialog__title">{impersonationDialog.type === "confirm" ? "Confirm impersonation" : "Impersonation notice"}</div>
             <div className="impersonation-dialog__message">{impersonationDialog.message}</div>
             <div className="impersonation-dialog__actions">
-              {impersonationDialog.type === "confirm" && <button type="button" onClick={() => closeImpersonationDialog(false)} className="btn-sm">Cancel</button>}
-              <button type="button" onClick={() => closeImpersonationDialog(impersonationDialog.type === "confirm")} className="btn-primary">{impersonationDialog.type === "confirm" ? "Continue" : "OK"}</button>
+              {impersonationDialog.type === "confirm" && <button type="button" onClick={() => closeImpersonationDialog(false)} className="impersonation-dialog__button impersonation-dialog__button--secondary">Cancel</button>}
+              <button type="button" onClick={() => closeImpersonationDialog(impersonationDialog.type === "confirm")} className="impersonation-dialog__button impersonation-dialog__button--primary">{impersonationDialog.type === "confirm" ? "Continue" : "OK"}</button>
             </div>
           </div>
           </div>
@@ -386,9 +395,9 @@ export function AuthProvider({ children }) {
           <style>{impersonationBannerCss}</style>
           <div className={`impersonation-banner impersonation-banner--${impersonationMode === "read_only" ? "readonly" : "update"}`}>
           <span className="impersonation-banner__copy">
-            {impersonationMode === "read_only" ? "READ ONLY" : "VIEW & UPDATE"} · {previewProfile.first_name || previewProfile.username} · {impersonationMode === "read_only" ? "Database writes are blocked" : "Changes affect this account"}
+            Viewing as {previewProfile.first_name || previewProfile.username} — {impersonationMode === "read_only" ? "changes are disabled" : "changes you save will affect their account"}
           </span>
-            <button type="button" className="btn-sm impersonation-banner__exit" onClick={stopMimic}>Exit</button>
+            <button type="button" className="impersonation-dialog__button impersonation-dialog__button--secondary impersonation-banner__exit" onClick={stopMimic}>Exit</button>
           </div>
         </>
       )}
