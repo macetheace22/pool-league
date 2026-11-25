@@ -997,8 +997,8 @@ describe("Section 108 shared Practice sessions", () => {
     expect(auth).toContain('claims.manager_impersonation_mode !== mode');
     expect(auth).toContain('body: { action: "end" }');
     expect(client).toContain('storageKey: \'iba-manager-impersonation-auth\'');
-    expect(admin).toContain('startMimic(u, "read_only")');
-    expect(admin).toContain('startMimic(u, "update")');
+    expect(admin).toContain('handleImpersonationClick(u, "read_only")');
+    expect(admin).toContain('handleImpersonationClick(u, "update")');
     expect(admin).toContain('disabled={isMimicking || isMe || !u.is_active}');
     expect(fn).toContain('manager.role !== "manager"');
     expect(fn).toContain('target.is_active');
