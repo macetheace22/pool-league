@@ -53,6 +53,7 @@ export function AuthProvider({ children }) {
   const [impersonationMode, setImpersonationMode] = useState(null);
   const [impersonationDialog, setImpersonationDialog] = useState(null);
   const dialogResolver = useRef(null);
+  const impersonationTransitionRef = useRef(false);
   const authEventVersionRef = useRef(0);
 
   const showImpersonationAlert = (message) => {
@@ -90,6 +91,11 @@ export function AuthProvider({ children }) {
       showImpersonationAlert("Could not restore the manager session. " + error.message);
       return false;
     }
+    const { data: restoredData, error: restoredError } = await supabase.auth.getSession();
+    if (restoredError || restoredData.session?.user?.id !== backupData.session.user.id) {
+      showImpersonationAlert("The manager session could not be verified after restoration. The backup has been retained; please try Exit again.");
+      return false;
+    }
     await clearManagerBackup();
     setPreviewProfile(null);
     setManagerProfile(null);
@@ -99,23 +105,28 @@ export function AuthProvider({ children }) {
   };
 
   const startMimic = async (targetProfile, mode = "read_only") => {
-    if (previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
+    if (impersonationTransitionRef.current || previewProfile || managerProfile || profile?.role !== "manager" || !targetProfile?.id ||
         targetProfile.id === profile.id || !targetProfile.is_active ||
         !["read_only", "update"].includes(mode)) return false;
 
-    const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
-      targetProfile.username || "this user";
-    const confirmed = await showImpersonationConfirm(
-      mode === "read_only"
-        ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
-        : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
-    );
-    if (!confirmed) return false;
-
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session) return false;
-
+    impersonationTransitionRef.current = true;
     try {
+      const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
+        targetProfile.username || "this user";
+      const confirmed = await showImpersonationConfirm(
+        mode === "read_only"
+          ? `View ${targetName} in READ-ONLY mode? Database writes and write-capable RPCs will be rejected.`
+          : `View and UPDATE as ${targetName}? Changes you save will affect this user's account and league data.`
+      );
+      if (!confirmed) return false;
+
+      let { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        const refreshed = await supabase.auth.refreshSession();
+        sessionData = refreshed.data;
+        sessionError = refreshed.error;
+      }
+      if (sessionError || !sessionData?.session) throw sessionError || new Error("Your manager session is unavailable. Sign in again and retry.");
       const { error: backupError } = await managerAuthClient.auth.setSession({
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
@@ -151,18 +162,26 @@ export function AuthProvider({ children }) {
       console.error("Unable to start manager impersonation:", error);
       showImpersonationAlert(error?.message || "Unable to start impersonation.");
       return false;
+    } finally {
+      impersonationTransitionRef.current = false;
     }
   };
 
   const stopMimic = async () => {
-    const { error: auditError } = await supabase.functions.invoke("manager-impersonate", {
-      body: { action: "end" },
-    });
-    const restored = await restoreManagerSession();
-    if (restored && auditError) {
-      showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+    if (impersonationTransitionRef.current) return false;
+    impersonationTransitionRef.current = true;
+    try {
+      const { error: auditError } = await supabase.functions.invoke("manager-impersonate", {
+        body: { action: "end" },
+      });
+      const restored = await restoreManagerSession();
+      if (restored && auditError) {
+        showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+      }
+      return restored;
+    } finally {
+      impersonationTransitionRef.current = false;
     }
-    return restored;
   };
 
   useEffect(() => {
