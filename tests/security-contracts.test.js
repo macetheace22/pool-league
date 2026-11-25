@@ -1079,11 +1079,12 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(verifyBlock).not.toContain("window.location.assign");
   });
 
-  it("keeps the auth state callback synchronous and does not use the removed event-version race machinery", () => {
+  it("keeps auth profile updates ordered across rapid auth transitions", () => {
     const auth = read("src/AuthContext.jsx");
-    expect(auth).toContain("onAuthStateChange(async (_event, sess) =>");
-    expect(auth).toContain("onAuthStateChange(async");
-    expect(auth).not.toContain("authEventVersionRef.current");
+    expect(auth).toContain("const authEventVersionRef = useRef(0);");
+    expect(auth).toContain("const eventVersion = ++authEventVersionRef.current;");
+    expect(auth).toContain("eventVersion !== authEventVersionRef.current");
+    expect(auth).not.toContain("onAuthStateChange(async");
   });
 
   it("uses app-styled dialogs and an app-consistent impersonation banner", () => {
