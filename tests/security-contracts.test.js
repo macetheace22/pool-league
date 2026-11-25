@@ -1143,7 +1143,7 @@ describe("manager access account card layout and start feedback", () => {
     expect(admin).toContain('onClick={(event) => { event.preventDefault(); event.stopPropagation(); void handleImpersonationClick(u, "update"); }}');
     expect(admin).not.toContain("Impersonation diagnostic: isMimicking=");
     expect(admin).not.toContain("preview buttons disabled=");
-    expect(admin).toContain("const handleImpersonationClick = async (targetProfile, mode) =>");
+    expect(admin).toContain("const handleImpersonationClick = (targetProfile, mode) =>");
     expect(admin).toContain("user-account-row__management-actions");
     expect(admin).toContain("min-width:116px");
   });
