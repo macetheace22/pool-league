@@ -110,6 +110,7 @@ export function AuthProvider({ children }) {
         !["read_only", "update"].includes(mode)) return false;
 
     impersonationTransitionRef.current = true;
+    let stage = "confirmation";
     try {
       const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") ||
         targetProfile.username || "this user";
@@ -120,31 +121,38 @@ export function AuthProvider({ children }) {
       );
       if (!confirmed) return false;
 
+      stage = "reading the manager session";
       let { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData.session) {
+        stage = "refreshing the manager session";
         const refreshed = await supabase.auth.refreshSession();
         sessionData = refreshed.data;
         sessionError = refreshed.error;
       }
       if (sessionError || !sessionData?.session) throw sessionError || new Error("Your manager session is unavailable. Sign in again and retry.");
+      stage = "saving the manager-session backup";
       const { error: backupError } = await managerAuthClient.auth.setSession({
         access_token: sessionData.session.access_token,
         refresh_token: sessionData.session.refresh_token,
       });
       if (backupError) throw backupError;
+      stage = "saving the manager profile backup";
       localStorage.setItem(managerProfileStorageKey, JSON.stringify(profile));
 
+      stage = "calling the manager-impersonate service";
       const { data, error } = await supabase.functions.invoke("manager-impersonate", {
         body: { targetUserId: targetProfile.id, mode },
       });
       if (error || !data?.token_hash) throw error || new Error("The impersonation service did not return a sign-in token.");
 
+      stage = "verifying the target user's sign-in token";
       const { data: targetSessionData, error: verifyError } = await supabase.auth.verifyOtp({
         token_hash: data.token_hash,
         type: "magiclink",
       });
       if (verifyError) throw verifyError;
 
+      stage = "validating the protected impersonation claims";
       const claims = decodeJwtClaims(targetSessionData?.session?.access_token || "");
       if (claims.manager_impersonator_id !== sessionData.session.user.id ||
           claims.manager_impersonation_mode !== mode ||
@@ -152,15 +160,22 @@ export function AuthProvider({ children }) {
         throw new Error("The protected impersonation claims were not issued. Confirm the Supabase Auth access-token hook is enabled before trying again.");
       }
 
+      stage = "activating the impersonation preview";
       setManagerProfile(profile);
       setPreviewProfile({ ...targetProfile });
       setImpersonationMode(mode);
       navigate("/");
       return true;
     } catch (error) {
-      await restoreManagerSession({ goToAccess: false }).catch(() => {});
-      console.error("Unable to start manager impersonation:", error);
-      showImpersonationAlert(error?.message || "Unable to start impersonation.");
+      let restoreNote = "";
+      try {
+        const restored = await restoreManagerSession({ goToAccess: false });
+        if (!restored) restoreNote = "\\nThe manager-session restore did not complete; the backup was not confirmed as restored.";
+      } catch (restoreError) {
+        restoreNote = "\\nManager-session restore also failed: " + (restoreError?.message || "Unknown restore error.");
+      }
+      console.error("Unable to start manager impersonation:", { stage, error, restoreNote });
+      showImpersonationAlert(`Impersonation failed during: ${stage}\\n${error?.message || "Unknown error."}${restoreNote}`);
       return false;
     } finally {
       impersonationTransitionRef.current = false;
