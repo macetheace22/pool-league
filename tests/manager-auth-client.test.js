@@ -16,7 +16,7 @@ describe("manager impersonation session backup", () => {
     expect(auth).toContain("readManagerSessionBackup()");
     expect(auth).toContain("supabase.auth.setSession({");
     expect(auth).not.toContain("managerAuthClient");
-    expect(client).not.toContain("iba-manager-impersonation-auth");
+    expect(client).not.toContain("managerAuthClient");
   });
 
   it("verifies the restored manager identity before clearing the backup", () => {
