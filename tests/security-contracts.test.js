@@ -1051,6 +1051,15 @@ describe("Section 111 manager impersonation OTP hook", () => {
 
 
 describe("manager impersonation session handoff and presentation", () => {
+  it("ignores stale profile responses from earlier auth transitions", () => {
+    const auth = read("src/AuthContext.jsx");
+    expect(auth).toContain("const authEventVersionRef = useRef(0);");
+    expect(auth).toContain("const eventVersion = ++authEventVersionRef.current;");
+    expect(auth).toContain("eventVersion !== authEventVersionRef.current");
+    expect(auth).not.toContain("onAuthStateChange(async");
+  });
+
+
   it("restores the original manager session without the post-PR297 transition machinery", () => {
     const auth = read("src/AuthContext.jsx");
     expect(auth).not.toContain("impersonationTransitionRef.current");
