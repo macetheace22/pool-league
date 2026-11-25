@@ -996,7 +996,11 @@ describe("Section 108 shared Practice sessions", () => {
     expect(auth).toContain('supabase.auth.verifyOtp({');
     expect(auth).toContain('claims.manager_impersonation_mode !== mode');
     expect(auth).toContain('body: { action: "end" }');
-    expect(client).toContain('storageKey: \'iba-manager-impersonation-auth\'');
+    expect(client).toContain('export const supabase = createClient(supabaseUrl, supabaseAnonKey);');
+    expect(client).not.toContain("managerAuthClient");
+    expect(auth).toContain('const managerSessionStorageKey = "iba-manager-impersonation-session"');
+    expect(auth).toContain("localStorage.setItem(managerSessionStorageKey, JSON.stringify(sessionData.session))");
+    expect(auth).toContain("supabase.auth.setSession({");
     expect(admin).toContain('handleImpersonationClick(u, "read_only")');
     expect(admin).toContain('handleImpersonationClick(u, "update")');
     expect(admin).toContain('disabled={isMimicking || isMe || !u.is_active}');
@@ -1069,7 +1073,7 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(auth).toContain("const impersonationTransitionRef = useRef(false);");
     expect(auth).toContain("impersonationTransitionRef.current = true;");
     expect(auth).toContain("await supabase.auth.refreshSession()");
-    expect(auth).toContain("restoredData.session?.user?.id !== backupData.session.user.id");
+    expect(auth).toContain("restoredData.session?.user?.id !== backupSession.user.id");
     expect(auth).toContain("await clearManagerBackup();");
     expect(auth).toContain("if (impersonationTransitionRef.current) return false;");
   });
