@@ -14,15 +14,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-
-// A separate SDK-managed, separate SDK-managed auth store shared across app tabs preserves the manager session
-// while the primary client temporarily authenticates as the selected account.
+// A separate SDK-managed auth store shared across app tabs preserves the manager
+// session while the primary client temporarily authenticates as the selected account.
+// It must not refresh independently: the backup is a dormant copy of the manager
+// session, and background refresh could rotate its refresh token while the primary
+// client is also transitioning between manager and impersonated sessions.
 export const managerAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storageKey: 'iba-manager-impersonation-auth',
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     persistSession: true,
-    autoRefreshToken: true,
+    autoRefreshToken: false,
     detectSessionInUrl: false,
   },
 });
