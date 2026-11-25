@@ -1056,6 +1056,10 @@ describe("manager impersonation session handoff and presentation", () => {
     expect(auth).toContain("const authEventVersionRef = useRef(0);");
     expect(auth).toContain("const eventVersion = ++authEventVersionRef.current;");
     expect(auth).toContain("eventVersion !== authEventVersionRef.current");
+    expect(auth).toContain("if (!isImpersonation) {");
+    expect(auth).toContain("setPreviewProfile(null);");
+    expect(auth).toContain("setManagerProfile(null);");
+    expect(auth).toContain("setImpersonationMode(null);");
     expect(auth).not.toContain("onAuthStateChange(async");
   });
 
