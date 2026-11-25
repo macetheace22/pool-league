@@ -5403,20 +5403,16 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
                 ) : (
                   <>
                     <button type="button" className="user-account-row__profile-hit" onClick={() => setSelectedProfileId(u.id)} aria-label={"Open profile for " + displayName}>
-                                          <div className="list-row__body" style={{flexDirection:"column",alignItems:"flex-start",gap:3, opacity: u.is_active?1:0.5}}>
                       <div className="user-account-row__identity">
                         <div className="user-account-row__name-line">
                           <span className="list-row__name">{displayName}</span>
-                          
                           {!u.is_active && <span className="you-badge" style={{background:"#1A0E0E",color:"#F87171"}}>deactivated</span>}
                           {u.is_active && u.is_claimed===false && <span className="you-badge" style={{background:"#2A2410",color:"#F2C14E"}}>needs role</span>}
                         </div>
-
                       </div>
                       <div className="user-account-row__role-line">
                         <RolePill role={u.role} small neutralText/>
                         {team && <span className="user-team-label">{team.name}</span>}
-                      </div>
                       </div>
                     </button>
                     <div className="list-row__actions user-account-row__actions">
