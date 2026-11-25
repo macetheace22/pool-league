@@ -106,12 +106,12 @@ export function AuthProvider({ children }) {
       refresh_token: backupSession.refresh_token,
     });
     if (error) {
-      showImpersonationAlert("Could not restore the manager session. " + error.message);
+      showImpersonationAlert("We couldn’t restore your manager account. Please sign out and sign back in before trying again.");
       return false;
     }
     const { data: restoredData, error: restoredError } = await supabase.auth.getSession();
     if (restoredError || restoredData.session?.user?.id !== backupSession.user.id) {
-      showImpersonationAlert("The manager session could not be verified after restoration. The backup has been retained; please try Exit again.");
+      showImpersonationAlert("We couldn’t confirm your manager account was restored. Please try Exit again.");
       return false;
     }
     await clearManagerBackup();
@@ -215,7 +215,7 @@ export function AuthProvider({ children }) {
       });
       const restored = await restoreManagerSession();
       if (restored && auditError) {
-        showImpersonationAlert("Your manager session was restored, but the impersonation exit event could not be recorded.");
+        showImpersonationAlert("You’re back in your manager account, but we couldn’t record the exit from player view.");
       }
       return restored;
     } finally {
@@ -395,9 +395,9 @@ export function AuthProvider({ children }) {
           <style>{impersonationBannerCss}</style>
           <div className={`impersonation-banner impersonation-banner--${impersonationMode === "read_only" ? "readonly" : "update"}`}>
           <span className="impersonation-banner__copy">
-            {impersonationMode === "read_only" ? "READ ONLY" : "VIEW & UPDATE"} · {previewProfile.first_name || previewProfile.username} · {impersonationMode === "read_only" ? "Database writes are blocked" : "Changes affect this account"}
+            Viewing as {previewProfile.first_name || previewProfile.username} — {impersonationMode === "read_only" ? "changes are disabled" : "changes you save will affect their account"}
           </span>
-            <button type="button" className="btn-sm impersonation-banner__exit" onClick={stopMimic}>Exit</button>
+            <button type="button" className="impersonation-dialog__button impersonation-dialog__button--secondary impersonation-banner__exit" onClick={stopMimic}>Exit</button>
           </div>
         </>
       )}
