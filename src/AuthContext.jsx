@@ -218,12 +218,10 @@ export function AuthProvider({ children }) {
             }
           }
         } else {
-          await clearManagerBackup();
           const p = await db.getProfile(currentSession.user.id);
           if (active) setProfile(p);
         }
       } else {
-        await clearManagerBackup();
         if (active) setProfile(null);
       }
       if (active) setAuthLoading(false);
