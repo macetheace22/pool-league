@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, ChevronRight, Check, AlertCircle } from "lucide-react";
-import { supabase, managerAuthClient } from "./supabaseClient";
+import { supabase } from "./supabaseClient";
 import * as db from "./db";
 
 const ROLES = {
@@ -16,6 +16,18 @@ export function useAuth() {
 }
 
 const managerProfileStorageKey = "iba-manager-impersonation-profile";
+const managerSessionStorageKey = "iba-manager-impersonation-session";
+const legacyManagerAuthStorageKey = "iba-manager-impersonation-auth";
+
+function readManagerSessionBackup() {
+  try {
+    const backup = JSON.parse(localStorage.getItem(managerSessionStorageKey) || "null");
+    if (!backup?.access_token || !backup?.refresh_token || !backup?.user?.id) return null;
+    return backup;
+  } catch {
+    return null;
+  }
+}
 
 const impersonationDialogCss = `
 .impersonation-overlay{position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.76);}
@@ -73,26 +85,27 @@ export function AuthProvider({ children }) {
   };
 
   const clearManagerBackup = async () => {
-    await managerAuthClient.auth.signOut({ scope: "local" });
+    localStorage.removeItem(managerSessionStorageKey);
+    localStorage.removeItem(legacyManagerAuthStorageKey);
     localStorage.removeItem(managerProfileStorageKey);
   };
 
   const restoreManagerSession = async ({ goToAccess = true } = {}) => {
-    const { data: backupData, error: backupError } = await managerAuthClient.auth.getSession();
-    if (backupError || !backupData.session) {
+    const backupSession = readManagerSessionBackup();
+    if (!backupSession) {
       showImpersonationAlert("The original manager session is unavailable. Sign out and sign back in to continue.");
       return false;
     }
     const { error } = await supabase.auth.setSession({
-      access_token: backupData.session.access_token,
-      refresh_token: backupData.session.refresh_token,
+      access_token: backupSession.access_token,
+      refresh_token: backupSession.refresh_token,
     });
     if (error) {
       showImpersonationAlert("Could not restore the manager session. " + error.message);
       return false;
     }
     const { data: restoredData, error: restoredError } = await supabase.auth.getSession();
-    if (restoredError || restoredData.session?.user?.id !== backupData.session.user.id) {
+    if (restoredError || restoredData.session?.user?.id !== backupSession.user.id) {
       showImpersonationAlert("The manager session could not be verified after restoration. The backup has been retained; please try Exit again.");
       return false;
     }
@@ -131,18 +144,13 @@ export function AuthProvider({ children }) {
       }
       if (sessionError || !sessionData?.session) throw sessionError || new Error("Your manager session is unavailable. Sign in again and retry.");
       stage = "saving the manager-session backup";
-      const hasManagerAccessToken = Boolean(sessionData.session.access_token);
-      const hasManagerRefreshToken = Boolean(sessionData.session.refresh_token);
-      if (!hasManagerAccessToken || !hasManagerRefreshToken) {
-        throw new Error(
-          `The manager session is incomplete (access token present: ${hasManagerAccessToken}; refresh token present: ${hasManagerRefreshToken}; expires_at: ${sessionData.session.expires_at ?? "not provided"}). Sign out and sign back in before retrying.`
-        );
+      if (!sessionData.session.access_token || !sessionData.session.refresh_token || !sessionData.session.user?.id) {
+        throw new Error("The manager session is incomplete. Sign out and sign back in before retrying.");
       }
-      const { error: backupError } = await managerAuthClient.auth.setSession({
-        access_token: sessionData.session.access_token,
-        refresh_token: sessionData.session.refresh_token,
-      });
-      if (backupError) throw backupError;
+      // Keep an inert copy of the manager session outside Supabase Auth's managed
+      // session lifecycle. A second GoTrueClient can race initialization or token
+      // validation while the primary client is in the middle of an auth transition.
+      localStorage.setItem(managerSessionStorageKey, JSON.stringify(sessionData.session));
       stage = "saving the manager profile backup";
       localStorage.setItem(managerProfileStorageKey, JSON.stringify(profile));
 
@@ -221,8 +229,8 @@ export function AuthProvider({ children }) {
           ["read_only", "update"].includes(claims.manager_impersonation_mode);
 
         if (isImpersonation) {
-          const { data: managerData } = await managerAuthClient.auth.getSession();
-          if (!managerData.session || managerData.session.user.id !== claims.manager_impersonator_id) {
+          const managerBackup = readManagerSessionBackup();
+          if (!managerBackup || managerBackup.user.id !== claims.manager_impersonator_id) {
             await supabase.auth.signOut({ scope: "local" });
             await clearManagerBackup();
             if (active) setSession(null);
@@ -303,11 +311,11 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     if (previewProfile) {
       await supabase.functions.invoke("manager-impersonate", { body: { action: "end" } });
-      const { data: backupData } = await managerAuthClient.auth.getSession();
-      if (backupData.session) {
+      const backupSession = readManagerSessionBackup();
+      if (backupSession) {
         await supabase.auth.setSession({
-          access_token: backupData.session.access_token,
-          refresh_token: backupData.session.refresh_token,
+          access_token: backupSession.access_token,
+          refresh_token: backupSession.refresh_token,
         });
       }
     }
