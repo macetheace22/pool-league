@@ -17,6 +17,14 @@ export function useAuth() {
 
 const managerProfileStorageKey = "iba-manager-impersonation-profile";
 
+const impersonationDialogCss = `
+.impersonation-overlay{position:fixed;inset:0;z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.76);}
+.impersonation-dialog{width:100%;max-width:420px;padding:18px;background:#1C1C1C;border:1.5px solid #2E2E2E;border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.55);color:#FFF;font-family:'Archivo',sans-serif;}
+.impersonation-dialog__title{font-family:'Archivo Black',sans-serif;font-size:16px;line-height:1.25;margin-bottom:10px;color:#FFF;}
+.impersonation-dialog__message{font-size:12.5px;line-height:1.55;color:#B8B8B8;white-space:pre-wrap;}
+.impersonation-dialog__actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:18px;}
+`;
+
 function decodeJwtClaims(token) {
   try {
     const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -302,7 +310,9 @@ export function AuthProvider({ children }) {
       </div>
 
       {impersonationDialog && (
-        <div className="impersonation-overlay" role="presentation" onClick={() => closeImpersonationDialog(false)}>
+        <>
+          <style>{impersonationDialogCss}</style>
+          <div className="impersonation-overlay" role="presentation" onClick={() => closeImpersonationDialog(false)}>
           <div className="impersonation-dialog" role="dialog" aria-modal="true" aria-labelledby="impersonation-dialog-title" onClick={event => event.stopPropagation()}>
             <div id="impersonation-dialog-title" className="impersonation-dialog__title">{impersonationDialog.type === "confirm" ? "Confirm impersonation" : "Impersonation notice"}</div>
             <div className="impersonation-dialog__message">{impersonationDialog.message}</div>
@@ -311,7 +321,8 @@ export function AuthProvider({ children }) {
               <button type="button" onClick={() => closeImpersonationDialog(impersonationDialog.type === "confirm")} className="btn-primary">{impersonationDialog.type === "confirm" ? "Continue" : "OK"}</button>
             </div>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {previewProfile && (
