@@ -5278,6 +5278,7 @@ function PlayerTransferRequestsTab() {
 
 function AccountsTab({ currentUserId, subTab, onCounts }) {
   const { startMimic, isMimicking } = useAuth();
+  const [impersonationClickStatus, setImpersonationClickStatus] = useState("");
   const [users, setUsers]       = useState([]);
   const [codes, setCodes]       = useState([]);
   const [allTeams, setAllTeams] = useState([]);
@@ -5331,6 +5332,17 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
   const reactivateUser = async (id) => { await db.setProfileActive(id, true); await refresh(); };
   const copyCode = (code) => { navigator.clipboard?.writeText(code).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
+  const handleImpersonationClick = async (targetProfile, mode) => {
+    const targetName = [targetProfile.first_name, targetProfile.last_name].filter(Boolean).join(" ") || targetProfile.username || "this user";
+    setImpersonationClickStatus(`Click registered: starting ${mode === "read_only" ? "View only" : "View & update"} for ${targetName}…`);
+    try {
+      const started = await startMimic(targetProfile, mode);
+      if (!started) setImpersonationClickStatus(`Click reached React, but impersonation was blocked before starting for ${targetName}.`);
+    } catch (error) {
+      setImpersonationClickStatus(`Click reached React, but impersonation threw an error: ${error?.message || "unknown error"}`);
+    }
+  };
+
   const startEditRole = (u) => {
     setEditRoleId(u.id); setEditRole(u.role); setRoleErr(""); setEditTeamSearch("");
     const team = u.team_id ? allTeams.find(t=>t.id===u.team_id) : null;
@@ -5366,6 +5378,9 @@ function AccountsTab({ currentUserId, subTab, onCounts }) {
     <>
       {subTab==="users" && (
         <div style={{display:"flex",flexDirection:"column",gap:10,overflow: editRoleId ? "visible" : "visible", background:"transparent", border:"none"}}>
+          {impersonationClickStatus && (
+            <div role="status" aria-live="polite" className="readonly-bar" style={{marginBottom:0}}>{impersonationClickStatus}</div>
+          )}
           {users.map(u => {
             const displayName = [u.first_name, u.last_name].map(value => (value ?? "").trim()).filter(Boolean).join(" ") || u.username || "Unnamed account";
             const team = u.team_id ? allTeams.find(t=>t.id===u.team_id) : null;
