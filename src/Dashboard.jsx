@@ -11,6 +11,7 @@ import * as db from "./db";
 import { getActiveTeamIds, getCaptainTeamIds, isCaptainOfTeam } from "./teamMembership";
 import { listCaptainPendingMakeups } from "./captainMakeups";
 import TeamContextSelector from "./TeamContextSelector";
+import Scoresheet from "./Scoresheet";
 
 // Free-text schedule dates are typically M/D/YYYY (same format used
 // throughout the rest of the app) -- an unparseable value is treated as
@@ -123,6 +124,7 @@ export function Home() {
   const [recentPracticeGames, setRecentPracticeGames] = useState(undefined); // undefined = loading, [] = none
   const [showAllRecentActivity, setShowAllRecentActivity] = useState(false);
   const [expandedRecentActivityType, setExpandedRecentActivityType] = useState(null);
+  const [expandedRecentActivityKey, setExpandedRecentActivityKey] = useState(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -276,17 +278,31 @@ export function Home() {
                                 key={item.key}
                                 type="button"
                                 className="match-row recent-activity-row"
-                                onClick={() => item.type === "practice"
-                                  ? navigate("/practice?home=1&game=" + encodeURIComponent(item.key.split(":")[1]) + "#practice-sessions")
-                                  : navigate("/match-lookup?match=" + encodeURIComponent(item.key.split(":")[1]) + (item.divisionId ? "&division=" + encodeURIComponent(item.divisionId) : ""))}
-                                aria-label={item.type === "practice" ? "Open Practice game details: " + item.title : "Open Match Scorecard: " + item.title}
+                                onClick={() => setExpandedRecentActivityKey(current => current === item.key ? null : item.key)}
+                                aria-expanded={expandedRecentActivityKey === item.key}
+                                aria-label={expandedRecentActivityKey === item.key ? "Collapse details: " + item.title : "Show details: " + item.title}
                               >
                                 <span style={{minWidth:0,flex:1,textAlign:"left"}}>
                                   <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
                                   <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
                                 </span>
-                                <ChevronRight size={14} color="#6A6A6A" />
+                                <ChevronRight size={14} color="#6A6A6A" style={{transform: expandedRecentActivityKey === item.key ? "rotate(90deg)" : "none"}} />
                               </button>
+                              {expandedRecentActivityKey === item.key && (
+                                <div className="recent-activity-detail" onClick={event => event.stopPropagation()}>
+                                  <Scoresheet
+                                    match={item.type === "league"
+                                      ? (teamOverviews ?? []).flatMap(overview => overview.myCompleted ?? []).find(match => String(match.id) === String(item.key.split(":")[1]))
+                                      : null}
+                                    practiceGame={item.type === "practice"
+                                      ? (recentPracticeGames ?? []).find(game => String(game.id) === String(item.key.split(":")[1]))
+                                      : null}
+                                    profile={profile}
+                                    onClose={() => setExpandedRecentActivityKey(null)}
+                                    closeLabel="Collapse details"
+                                  />
+                                </div>
+                              )}
                             ))}
                           </div>
                         )}
