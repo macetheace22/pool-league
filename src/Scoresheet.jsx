@@ -516,7 +516,7 @@ function LeagueScoresheet({ match, onClose, closeLabel }) {
     return (
       <div className="scoresheet-app">
         <style>{css}</style>
-        <button className="scoresheet-close" onClick={onClose}><X size={14}/> {closeLabel}</button>
+        <button className="scoresheet-close" onClick={onClose} aria-label="Close scoresheet" title="Close scoresheet"><X size={14}/>{closeLabel && <> {closeLabel}</>}</button>
         <div className="empty-state-ss">No rack-by-rack detail was recorded for this match.</div>
       </div>
     );
@@ -529,7 +529,7 @@ function LeagueScoresheet({ match, onClose, closeLabel }) {
   return (
     <div className="scoresheet-app">
       <style>{css}</style>
-      <button className="scoresheet-close" onClick={onClose}><X size={14}/> {closeLabel}</button>
+      <button className="scoresheet-close" onClick={onClose} aria-label="Close scoresheet" title="Close scoresheet"><X size={14}/>{closeLabel && <> {closeLabel}</>}</button>
       {makeupBanner}
       <section className="practice-scoresheet league-scoresheet" aria-label="League match scoresheet">
         <div className="practice-scoresheet__header">
