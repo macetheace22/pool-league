@@ -2934,8 +2934,20 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   useEffect(() => {
     if (loading || !requestedMatchId || selectedMatch) return;
     const target = matches.find(match => String(match.id) === String(requestedMatchId));
-    if (target) setSelectedMatch(target);
-  }, [loading, requestedMatchId, matches, selectedMatch]);
+    if (target) {
+      setSelectedMatch(target);
+      return;
+    }
+
+    // The activity link identifies the exact completed match. If the normal
+    // division history query did not include it for any reason, fetch that
+    // saved row directly rather than leaving the user on the history list.
+    db.getCompletedMatch(requestedMatchId).then(match => {
+      if (match && String(match.division_id) === String(divisionId)) {
+        setSelectedMatch(match);
+      }
+    }).catch(() => {});
+  }, [loading, requestedMatchId, matches, selectedMatch, divisionId]);
 
   const closeSelectedMatch = () => {
     setSelectedMatch(null);
