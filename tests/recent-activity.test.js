@@ -5,14 +5,14 @@ describe("Recent Activity feed", () => {
   it("combines league matches and Practice sessions in newest-first order", () => {
     const items = buildRecentActivity([
       { team: { id: "team-a", name: "Team A" }, myCompleted: [
-        { id: "match-1", team_home_id: "team-a", team_home_points: 8, team_away_points: 4, team_away_name: "Team B", confirmed_at: "2026-10-02T20:00:00Z", week_date: "10/2/2026" },
+        { id: "match-1", division_id: "division-a", team_home_id: "team-a", team_home_points: 8, team_away_points: 4, team_away_name: "Team B", confirmed_at: "2026-10-02T20:00:00Z", week_date: "10/2/2026" },
       ] },
     ], [
       { id: "practice-1", opponent_name: "Jordan", played_at: "2026-10-03T20:00:00Z", winner: "me" },
     ]);
     expect(items.map(item => item.key)).toEqual(["practice:practice-1", "league:match-1:team-a"]);
     expect(items[0]).toMatchObject({ title: "Practice vs Jordan", resultLabel: "Won" });
-    expect(items[1]).toMatchObject({ title: "vs Team B", resultLabel: "8 – 4" });
+    expect(items[1]).toMatchObject({ title: "vs Team B", typeLabel: "League", divisionId: "division-a", resultLabel: "8 – 4" });
   });
 
   it("uses the signed-in player's team perspective for away matches", () => {
@@ -22,6 +22,13 @@ describe("Recent Activity feed", () => {
       ] },
     ], []);
     expect(item).toMatchObject({ title: "vs Home Team", resultLabel: "7 – 2" });
+  });
+
+  it("marks Practice activity with its play type", () => {
+    const [item] = buildRecentActivity([], [
+      { id: "practice-3", opponent_name: "Alex", played_at: "2026-10-04T20:00:00Z", winner: "opponent" },
+    ]);
+    expect(item).toMatchObject({ type: "practice", typeLabel: "Practice", title: "Practice vs Alex" });
   });
 
   it("includes completed Skills & Drills sessions without an opponent name", () => {
