@@ -1136,8 +1136,7 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
   const [playTypeFilter, setPlayTypeFilter] = useState("all");
   const [headToHead, setHeadToHead] = useState([]);
   const [matchHistory, setMatchHistory] = useState(undefined);
-  const [selectedHistoryMatch, setSelectedHistoryMatch] = useState(null);
-  const [selectedHistoryPractice, setSelectedHistoryPractice] = useState(null);
+  const [expandedHistoryKey, setExpandedHistoryKey] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1473,42 +1472,50 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
               {rows.map(row => {
                 if (row._source === "league") {
                   const displayRow = toPlayerMatchPerspective(row);
+                  const key = "league:" + row.id;
+                  const expanded = expandedHistoryKey === key;
                   return (
-                    <button key={"league-" + row.id} type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} onClick={() => setSelectedHistoryMatch(row)}>
+                    <div key={key} className="my-stats-history-item">
+                      <button type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} aria-expanded={expanded} onClick={() => setExpandedHistoryKey(current => current === key ? null : key)}>
+                        <div className="list-row__body">
+                          <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
+                            <span className="list-row__name"><span style={{fontSize:9.5,fontWeight:800,color:"#8A8A8A",textTransform:"uppercase",marginRight:6}}>League</span>vs {displayRow.opponentTeamName}</span>
+                            <span className="list-row__sub">{displayRow.week_num ? "Week " + displayRow.week_num + " · " : ""}{displayRow.week_date || new Date(displayRow.confirmed_at || displayRow.created_at).toLocaleDateString()} · {displayRow.playerSetsWon}–{displayRow.playerSetsLost} sets</span>
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+                            {(displayRow.team_home_total != null || displayRow.team_away_total != null) && <span className="player-rating-badge">{displayRow.team_home_total ?? 0}–{displayRow.team_away_total ?? 0}</span>}
+                            <ChevronRight size={14} color="#6A6A6A" style={{transform:expanded ? "rotate(90deg)" : "none"}} />
+                          </div>
+                        </div>
+                      </button>
+                      {expanded && <div className="card" style={{padding:0,margin:"0 8px 8px"}}><Scoresheet match={displayRow} onClose={() => setExpandedHistoryKey(null)} closeLabel="" /></div>}
+                    </div>
+                  );
+                }
+                const key = "practice:" + row.id;
+                const expanded = expandedHistoryKey === key;
+                return (
+                  <div key={key} className="my-stats-history-item">
+                    <button type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} aria-expanded={expanded} onClick={() => setExpandedHistoryKey(current => current === key ? null : key)}>
                       <div className="list-row__body">
                         <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
-                          <span className="list-row__name"><span style={{fontSize:9.5,fontWeight:800,color:"#8A8A8A",textTransform:"uppercase",marginRight:6}}>League</span>vs {displayRow.opponentTeamName}</span>
-                          <span className="list-row__sub">{displayRow.week_num ? "Week " + displayRow.week_num + " · " : ""}{displayRow.week_date || new Date(displayRow.confirmed_at || displayRow.created_at).toLocaleDateString()} · {displayRow.playerSetsWon}–{displayRow.playerSetsLost} sets</span>
+                          <span className="list-row__name"><span style={{fontSize:9.5,fontWeight:800,color:"#8A8A8A",textTransform:"uppercase",marginRight:6}}>Practice</span>vs {row.opponent_name}</span>
+                          <span className="list-row__sub">{({"8ball":"8-Ball","9ball":"9-Ball","10ball":"10-Ball",ultimate:"Ultimate Pool"})[row.game_type] ?? row.game_type ?? "Practice"}{row.scoring_method ? " · " + ({"race_to_points":"Race to Points","race_to_games":"Race to Games","best_of_games":"Best of X Games"})[row.scoring_method] : ""} · {row.my_score}–{row.opponent_score} · {new Date(row.completed_at || row.played_at).toLocaleDateString()}</span>
                         </div>
-                        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
-                          {(displayRow.team_home_total != null || displayRow.team_away_total != null) && <span className="player-rating-badge">{displayRow.team_home_total ?? 0}–{displayRow.team_away_total ?? 0}</span>}
-                          <ChevronRight size={14} color="#6A6A6A" />
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:11,fontWeight:800,color:row.winner === "me" ? "#5FCF9E" : "#F87171"}}>{row.winner === "me" ? "W" : row.winner === "opponent" ? "L" : "—"}</span>
+                          <ChevronRight size={14} color="#6A6A6A" style={{transform:expanded ? "rotate(90deg)" : "none"}} />
                         </div>
                       </div>
                     </button>
-                  );
-                }
-                return (
-                  <button key={"practice-" + row.id} type="button" className="list-row" style={{width:"100%",background:"none",border:"none",textAlign:"left",cursor:"pointer"}} onClick={() => setSelectedHistoryPractice(row)}>
-                    <div className="list-row__body">
-                      <div style={{display:"flex",flexDirection:"column",gap:2,flex:1,minWidth:0}}>
-                        <span className="list-row__name"><span style={{fontSize:9.5,fontWeight:800,color:"#8A8A8A",textTransform:"uppercase",marginRight:6}}>Practice</span>vs {row.opponent_name}</span>
-                        <span className="list-row__sub">{({"8ball":"8-Ball","9ball":"9-Ball","10ball":"10-Ball",ultimate:"Ultimate Pool"})[row.game_type] ?? row.game_type ?? "Practice"}{row.scoring_method ? " · " + ({"race_to_points":"Race to Points","race_to_games":"Race to Games","best_of_games":"Best of X Games"})[row.scoring_method] : ""} · {row.my_score}–{row.opponent_score} · {new Date(row.completed_at || row.played_at).toLocaleDateString()}</span>
-                      </div>
-                      <div style={{display:"flex",alignItems:"center",gap:6}}>
-                        <span style={{fontSize:11,fontWeight:800,color:row.winner === "me" ? "#5FCF9E" : "#F87171"}}>{row.winner === "me" ? "W" : row.winner === "opponent" ? "L" : "—"}</span>
-                        <ChevronRight size={14} color="#6A6A6A" />
-                      </div>
-                    </div>
-                  </button>
+                    {expanded && <div className="card" style={{padding:0,margin:"0 8px 8px"}}><Scoresheet practiceGame={row} profile={practiceProfile} onClose={() => setExpandedHistoryKey(null)} closeLabel="" /></div>}
+                  </div>
                 );
               })}
             </div>;
           })()}
         </div>
       )}
-      {selectedHistoryMatch && <div className="card" style={{padding:0}}><Scoresheet match={toPlayerMatchPerspective(selectedHistoryMatch)} onClose={() => setSelectedHistoryMatch(null)} closeLabel="" /></div>}
-      {selectedHistoryPractice && <div className="card" style={{padding:0}}><Scoresheet practiceGame={selectedHistoryPractice} profile={practiceProfile} onClose={() => setSelectedHistoryPractice(null)} closeLabel="" /></div>}
       {(includeLeague || includePractice) && (
         <div className="card">
           <div className="card__title">Match Head-to-Head</div>
