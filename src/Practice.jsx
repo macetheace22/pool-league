@@ -278,6 +278,7 @@ export default function Practice() {
 
   return wrap(<LandingStep
     profile={profile}
+    requestedGameId={requestedGameId}
     history={history}
     unfinishedGames={unfinishedGames}
     rawOpponents={opponents}
@@ -289,7 +290,7 @@ export default function Practice() {
 }
 
 // ─── Landing ────────────────────────────────────────────────────────────────
-function LandingStep({ profile, history, unfinishedGames, rawOpponents, onStart, onResume, onDiscardUnfinished, onLinked }) {
+function LandingStep({ profile, requestedGameId, history, unfinishedGames, rawOpponents, onStart, onResume, onDiscardUnfinished, onLinked }) {
   const sessionsRef = useRef(null);
   const [filterOpponent, setFilterOpponent] = useState(null);
   const [showAllSessions, setShowAllSessions] = useState(false);
