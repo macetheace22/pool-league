@@ -633,7 +633,7 @@ function PracticeScoresheetView({ game, profile, onClose, closeLabel }) {
   return (
     <div className="scoresheet-app">
       <style>{css}</style>
-      <button className="scoresheet-close" onClick={onClose}><X size={14}/> Back to History</button>
+      <button className="scoresheet-close" onClick={onClose} aria-label="Close scoresheet" title="Close scoresheet"><X size={14}/></button>
       <section className="practice-scoresheet" aria-label="Practice scoresheet">
       <div className="practice-scoresheet__header">
         <div className="practice-scoresheet__eyebrow">Practice scoresheet · Read only</div>
