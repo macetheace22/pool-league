@@ -274,8 +274,8 @@ export function Home() {
                         {expanded && (
                           <div className="recent-activity-group__items">
                             {group.items.map(item => (
+                              <div key={item.key} className="recent-activity-item">
                               <button
-                                key={item.key}
                                 type="button"
                                 className="match-row recent-activity-row"
                                 onClick={() => setExpandedRecentActivityKey(current => current === item.key ? null : item.key)}
@@ -303,6 +303,7 @@ export function Home() {
                                   />
                                 </div>
                               )}
+                              </div>
                             ))}
                           </div>
                         )}
