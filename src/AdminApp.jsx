@@ -1507,8 +1507,8 @@ function PlayerStatsProfile({ playerNum, currentTeamId = null, playCategory = "a
           })()}
         </div>
       )}
-      {selectedHistoryMatch && <div className="card" style={{padding:0}}><Scoresheet match={toPlayerMatchPerspective(selectedHistoryMatch)} onClose={() => setSelectedHistoryMatch(null)} closeLabel="Back to My Stats" /></div>}
-      {selectedHistoryPractice && <div className="card" style={{padding:0}}><Scoresheet practiceGame={selectedHistoryPractice} profile={practiceProfile} onClose={() => setSelectedHistoryPractice(null)} closeLabel="Back to My Stats" /></div>}
+      {selectedHistoryMatch && <div className="card" style={{padding:0}}><Scoresheet match={toPlayerMatchPerspective(selectedHistoryMatch)} onClose={() => setSelectedHistoryMatch(null)} closeLabel="" /></div>}
+      {selectedHistoryPractice && <div className="card" style={{padding:0}}><Scoresheet practiceGame={selectedHistoryPractice} profile={practiceProfile} onClose={() => setSelectedHistoryPractice(null)} closeLabel="" /></div>}
       {(includeLeague || includePractice) && (
         <div className="card">
           <div className="card__title">Match Head-to-Head</div>
