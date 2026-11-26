@@ -133,6 +133,21 @@ export function Home() {
   const showTeamLabels = (teamOverviews ?? []).length > 1;
 
   const recentActivity = buildRecentActivity(teamOverviews ?? [], recentPracticeGames ?? []);
+  const recentActivityGroups = Object.values(recentActivity.reduce((groups, item) => {
+    const existing = groups[item.type] ?? { type: item.type, typeLabel: item.typeLabel, items: [] };
+    existing.items.push(item);
+    groups[item.type] = existing;
+    return groups;
+  }, {}))
+    .map(group => ({
+      ...group,
+      items: group.items.sort((a, b) => (b.timestamp ? new Date(b.timestamp).getTime() : 0) - (a.timestamp ? new Date(a.timestamp).getTime() : 0)),
+    }))
+    .sort((a, b) => {
+      const aLatest = a.items[0]?.timestamp ? new Date(a.items[0].timestamp).getTime() : 0;
+      const bLatest = b.items[0]?.timestamp ? new Date(b.items[0].timestamp).getTime() : 0;
+      return bLatest - aLatest;
+    });
   const visibleRecentActivity = showAllRecentActivity ? recentActivity.slice(0, 10) : recentActivity.slice(0, 4);
   const captainMakeups = listCaptainPendingMakeups(teamOverviews ?? [], getCaptainTeamIds(profile));
   const homeLoading = !!profile && (teamOverviews === undefined || snapshotStats === undefined || recentPracticeGames === undefined);
@@ -218,23 +233,34 @@ export function Home() {
             ) : (
               <>
                 <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                  {visibleRecentActivity.map(item => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className="match-row recent-activity-row"
-                      onClick={() => item.type === "practice"
-                        ? navigate("/practice?home=1#practice-sessions")
-                        : navigate(`/match-lookup?match=${encodeURIComponent(item.key.split(":")[1])}${item.divisionId ? `&division=${encodeURIComponent(item.divisionId)}` : ""}`)}
-                      aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match Scorecard: ${item.title}`}
-                    >
-                      <span style={{minWidth:0,flex:1,textAlign:"left"}}>
-                        <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
-                        <span className="match-row__meta"><span className={`recent-activity-type recent-activity-type--${item.type}`}>{item.typeLabel}</span><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
-                      </span>
-                      <ChevronRight size={14} color="#6A6A6A" />
-                    </button>
-                  ))}
+                  {recentActivityGroups.map(group => {
+                    const groupItems = group.items.filter(item => visibleRecentActivity.some(visible => visible.key === item.key));
+                    if (groupItems.length === 0) return null;
+                    return (
+                      <div key={group.type} className="recent-activity-group">
+                        <div className="recent-activity-group__header">
+                          <span className={`recent-activity-type recent-activity-type--${group.type}`}>{group.typeLabel}</span>
+                        </div>
+                        {groupItems.map(item => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            className="match-row recent-activity-row"
+                            onClick={() => item.type === "practice"
+                              ? navigate("/practice?home=1#practice-sessions")
+                              : navigate(`/match-lookup?match=${encodeURIComponent(item.key.split(":")[1])}${item.divisionId ? `&division=${encodeURIComponent(item.divisionId)}` : ""}`)}
+                            aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match Scorecard: ${item.title}`}
+                          >
+                            <span style={{minWidth:0,flex:1,textAlign:"left"}}>
+                              <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
+                              <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
+                            </span>
+                            <ChevronRight size={14} color="#6A6A6A" />
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
                 {recentActivity.length > 4 && (
                   <button type="button" className="link-btn" style={{marginTop:8}} onClick={() => setShowAllRecentActivity(value => !value)}>
@@ -752,6 +778,9 @@ export const dashboardCss = `
 .recent-activity-type{font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 5px;border-radius:5px;border:1px solid #333;white-space:nowrap;margin-right:2px;}
 .recent-activity-type--league{color:#5FCF9E;background:#16332A;border-color:#1F6B4A;}
 .recent-activity-type--practice{color:#9FC4B4;background:#18231F;border-color:#2E453B;}
+.recent-activity-group{display:flex;flex-direction:column;}
+.recent-activity-group + .recent-activity-group{margin-top:10px;}
+.recent-activity-group__header{display:flex;align-items:center;padding:2px 0 4px;}
 
 .next-match-card{display:block;background:#0F2D1F;border:1.5px solid #1F6B4A;border-radius:14px;padding:16px;text-decoration:none;margin-bottom:4px;}
 .next-match-card__eyebrow{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#5FCF9E;margin-bottom:4px;}
