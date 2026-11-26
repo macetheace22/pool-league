@@ -65,7 +65,7 @@ function practiceGameRow(profile, session) {
 
 export default function Practice() {
   const { profile } = useAuth();
-  const location = useLocation();
+  const location = useLocation();\n  const requestedGameId = new URLSearchParams(location.search).get("game");
   const { activeSession, setActiveSession, clearActiveSession } = useActiveSession();
   const restoredPractice = isResumablePracticeSession(activeSession) ? activeSession.data : null;
   useEffect(() => {
@@ -293,7 +293,7 @@ function LandingStep({ profile, history, unfinishedGames, rawOpponents, onStart,
   const [filterOpponent, setFilterOpponent] = useState(null);
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [linkingKey, setLinkingKey] = useState(null);
-  const [selectedGameId, setSelectedGameId] = useState(null);
+  const [selectedGameId, setSelectedGameId] = useState(null);\n  const requestedGameOpenedRef = useRef(false);
   const [generatedClaimCodes, setGeneratedClaimCodes] = useState({});
   const [generatingClaimCodeFor, setGeneratingClaimCodeFor] = useState(null);
 
@@ -312,7 +312,7 @@ function LandingStep({ profile, history, unfinishedGames, rawOpponents, onStart,
     if (g.winner === "me") byOpponent[key].wins++; else if (g.winner === "opponent") byOpponent[key].losses++;
   });
   const opponents = Object.values(byOpponent).sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses));
-  const visibleGames = filterOpponent ? (history ?? []).filter(g => opponentKey(g) === filterOpponent) : showAllSessions ? (history ?? []) : (history ?? []).slice(0, 10);
+  const visibleGames = filterOpponent ? (history ?? []).filter(g => opponentKey(g) === filterOpponent) : showAllSessions ? (history ?? []) : (history ?? []).slice(0, 10);\n  useEffect(() => {\n    if (requestedGameOpenedRef.current || !requestedGameId || !history) return;\n    if (history.some(g => String(g.id) === String(requestedGameId))) {\n      setShowAllSessions(true);\n      setSelectedGameId(requestedGameId);\n      requestedGameOpenedRef.current = true;\n    }\n  }, [requestedGameId, history]);
   const rawById = Object.fromEntries((rawOpponents ?? []).map(o => [o.id, o]));
 
   return (
