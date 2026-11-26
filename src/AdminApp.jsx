@@ -952,9 +952,9 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
             viewingSeason={viewingSeason} viewingDiv={viewingDiv} onView={handleSeasonView} />
           {!viewingDiv
             ? <div className="empty-state">Select a season and division to view completed matches and scores.</div>
-            : <HistoryTab key={`${viewingDiv.id}-matches`} divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
+            : <HistoryTab key={`${viewingDiv.id}-matches-${searchParams.get("match") ?? ""}`} divisionId={viewingDiv.id} teams={viewTeams} isManager={isManager} playoffsStartDate={viewingDiv?.playoffs_start_date} myProfile={profile}
                 seasonFormat={(viewingDiv?.format || "").toLowerCase()} seasonLabelText={viewingSeason ? seasonLabel(viewingSeason) : null}
-                initialView="matches" showTabs={false} />
+                initialView="matches" showTabs={false} initialMatchId={searchParams.get("match")} />
           }
         </div>
       </>
@@ -2797,7 +2797,7 @@ function ApplyForfeitPanel({ matchRow, onCancel, onDone }) {
   );
 }
 
-function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile, seasonFormat, seasonLabelText, initialView = "standings", showTabs = true }) {
+function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile, seasonFormat, seasonLabelText, initialView = "standings", showTabs = true, initialMatchId = null }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [subTab, setSubTab] = useState(initialView);
@@ -2917,7 +2917,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
   // Recent Activity can deep-link directly to a saved completed match. Once
   // this division's history is loaded, select that exact row so the existing
   // read-only Scoresheet opens instead of sending the user to a generic list.
-  const requestedMatchId = searchParams.get("match");
+  const requestedMatchId = initialMatchId || searchParams.get("match");
   useEffect(() => {
     if (loading || !requestedMatchId || selectedMatch) return;
     const target = matches.find(match => String(match.id) === String(requestedMatchId));
