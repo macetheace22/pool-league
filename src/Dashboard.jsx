@@ -114,6 +114,7 @@ export function buildRecentActivity(teamOverviews, practiceGames) {
 // ─── Home ───────────────────────────────────────────────────────────────────
 export function Home() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   // undefined = loading, [] = not linked to any current team. One entry per
   // Teams the user currently plays on or captains. Captain assignments are
   // independent of player roster membership.
