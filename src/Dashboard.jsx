@@ -37,6 +37,41 @@ function matchOpponentName(m) {
   return isHome ? m.team_away_name : m.team_home_name;
 }
 
+export function groupRecentActivity(items, limit = 4) {
+  const visibleItems = (items ?? []).slice(0, limit);
+  const groups = new Map();
+
+  visibleItems.forEach(item => {
+    const existing = groups.get(item.type) ?? {
+      type: item.type,
+      typeLabel: item.typeLabel ?? item.type,
+      latestTimestamp: item.timestamp ?? null,
+      items: [],
+    };
+    existing.items.push(item);
+    if (
+      existing.latestTimestamp == null ||
+      (item.timestamp != null && new Date(item.timestamp).getTime() > new Date(existing.latestTimestamp).getTime())
+    ) {
+      existing.latestTimestamp = item.timestamp;
+    }
+    groups.set(item.type, existing);
+  });
+
+  return [...groups.values()]
+    .map(group => ({
+      ...group,
+      items: [...group.items].sort((a, b) =>
+        (b.timestamp ? new Date(b.timestamp).getTime() : 0) -
+        (a.timestamp ? new Date(a.timestamp).getTime() : 0)
+      ),
+    }))
+    .sort((a, b) =>
+      (b.latestTimestamp ? new Date(b.latestTimestamp).getTime() : 0) -
+      (a.latestTimestamp ? new Date(a.latestTimestamp).getTime() : 0)
+    );
+}
+
 export function buildRecentActivity(teamOverviews, practiceGames) {
   const leagueItems = (teamOverviews ?? []).flatMap(overview =>
     (overview.myCompleted ?? []).map(match => {
@@ -133,7 +168,7 @@ export function Home() {
   const showTeamLabels = (teamOverviews ?? []).length > 1;
 
   const recentActivity = buildRecentActivity(teamOverviews ?? [], recentPracticeGames ?? []);
-  const visibleRecentActivity = showAllRecentActivity ? recentActivity.slice(0, 10) : recentActivity.slice(0, 4);
+  const recentActivityGroups = groupRecentActivity(recentActivity, showAllRecentActivity ? 10 : 4);
   const captainMakeups = listCaptainPendingMakeups(teamOverviews ?? [], getCaptainTeamIds(profile));
   const homeLoading = !!profile && (teamOverviews === undefined || snapshotStats === undefined || recentPracticeGames === undefined);
 
@@ -217,23 +252,32 @@ export function Home() {
               <div className="dash-empty">No recent league or practice activity yet.</div>
             ) : (
               <>
-                <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                  {visibleRecentActivity.map(item => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className="match-row recent-activity-row"
-                      onClick={() => item.type === "practice"
-                        ? navigate("/practice?home=1#practice-sessions")
-                        : navigate(`/match-lookup?match=${encodeURIComponent(item.key.split(":")[1])}${item.divisionId ? `&division=${encodeURIComponent(item.divisionId)}` : ""}`)}
-                      aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match Scorecard: ${item.title}`}
-                    >
-                      <span style={{minWidth:0,flex:1,textAlign:"left"}}>
-                        <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
-                        <span className="match-row__meta"><span className={`recent-activity-type recent-activity-type--${item.type}`}>{item.typeLabel}</span><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
-                      </span>
-                      <ChevronRight size={14} color="#6A6A6A" />
-                    </button>
+                <div className="recent-activity-groups">
+                  {recentActivityGroups.map(group => (
+                    <section key={group.type} className="recent-activity-group">
+                      <div className="recent-activity-group__header">
+                        <span>{group.typeLabel}</span>
+                      </div>
+                      <div className="recent-activity-group__items">
+                        {group.items.map(item => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            className="match-row recent-activity-row"
+                            onClick={() => item.type === "practice"
+                              ? navigate("/practice?home=1#practice-sessions")
+                              : navigate(`/match-lookup?match=${encodeURIComponent(item.key.split(":")[1])}${item.divisionId ? `&division=${encodeURIComponent(item.divisionId)}` : ""}`)}
+                            aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match Scorecard: ${item.title}`}
+                          >
+                            <span style={{minWidth:0,flex:1,textAlign:"left"}}>
+                              <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
+                              <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
+                            </span>
+                            <ChevronRight size={14} color="#6A6A6A" />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
                 {recentActivity.length > 4 && (
@@ -748,6 +792,10 @@ export function TournamentsPlaceholder() {
 }
 
 export const dashboardCss = `
+.recent-activity-groups{display:flex;flex-direction:column;gap:10px;}
+.recent-activity-group{display:flex;flex-direction:column;gap:2px;}
+.recent-activity-group__header{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#9A9A9A;padding:5px 0 2px;}
+.recent-activity-group__items{display:flex;flex-direction:column;}
 .recent-activity-row{width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #252525;}.recent-activity-row:last-child{border-bottom:0;}.recent-activity-row:focus-visible{outline:2px solid #5FCF9E;outline-offset:2px;border-radius:5px;}
 .recent-activity-type{font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 5px;border-radius:5px;border:1px solid #333;white-space:nowrap;margin-right:2px;}
 .recent-activity-type--league{color:#5FCF9E;background:#16332A;border-color:#1F6B4A;}
