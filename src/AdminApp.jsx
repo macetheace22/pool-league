@@ -62,8 +62,7 @@ function generateCode() { return Math.random().toString(36).slice(2, 8).toUpperC
 // ─── Parsers ──────────────────────────────────────────────────────────────────
 function parseTeams(raw) {
   const teams = [];
-  for (const line of raw.split("
-")) {
+  for (const line of raw.split("\n")) {
     const parts = line.trim().split(/\t+/);
     if (parts.length >= 2) {
       const teamNum = parts[0].trim(), name = parts[1].trim(), venue = parts[2]?.trim() ?? "";
@@ -86,8 +85,7 @@ function nextTeamNumber(teamsList) {
 
 function parseSchedule(raw) {
   const weeks = []; let current = null;
-  for (const line of raw.split("
-")) {
+  for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     const weekMatch = trimmed.match(/^(\d+)\s+([\d/]+)\s*(.*)/);
@@ -138,8 +136,7 @@ function detectPlayoffsStartDate(parsedWeeks) {
 
 function parsePlayers(raw) {
   const players = [];
-  for (const line of raw.split("
-")) {
+  for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     const parts = trimmed.split(/\t+|\s{2,}/);
@@ -5741,9 +5738,7 @@ function SeasonalTournamentReview({ seasonId }) {
     const teamCount = drafts[type]?.length ?? 0;
     const matchCount = saved.matches?.length ?? 0;
     const confirmed = window.confirm(
-      `Approve reconciliation of the Seasonal ${type === "championship" ? "Championship" : "Consolation"} bracket?\
-\
-` +
+      `Approve reconciliation of the Seasonal ${type === "championship" ? "Championship" : "Consolation"} bracket?\\n\\n` +
       `The current qualification snapshot proposes ${teamCount} teams and ${matchCount} bracket slots. ` +
       "Unplayed slots may be updated. Completed and in-progress matches and their results will be preserved. " +
       "If the proposed bracket conflicts with recorded results or changes the bracket layout, the operation will be rejected without changing the saved bracket."
