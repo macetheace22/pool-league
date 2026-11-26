@@ -224,6 +224,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedSeasonId = searchParams.get("season");
+  const requestedDivisionId = searchParams.get("division");
 
   useEffect(() => {
     let cancelled = false;
@@ -339,7 +340,7 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
 
         const requested = requestedSeasonId ? list.find(s => s.id === requestedSeasonId) : null;
         const target = requested ?? list.find(s => s.is_active);
-        const targetDivision = target?.divisions?.[0] ?? null;
+        const targetDivision = target?.divisions?.find(d => d.id === requestedDivisionId) ?? target?.divisions?.[0] ?? null;
 
         if (targetDivision) {
           await loadDivisionData(targetDivision);
@@ -2798,6 +2799,7 @@ function ApplyForfeitPanel({ matchRow, onCancel, onDone }) {
 
 function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile, seasonFormat, seasonLabelText, initialView = "standings", showTabs = true }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [subTab, setSubTab] = useState(initialView);
   const [matches, setMatches] = useState([]);
   const [standingsAdj, setStandingsAdj] = useState([]);
@@ -2911,6 +2913,25 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
     }).finally(() => setLoading(false));
   };
   useEffect(refresh, [divisionId, isManager, teams]);
+
+  // Recent Activity can deep-link directly to a saved completed match. Once
+  // this division's history is loaded, select that exact row so the existing
+  // read-only Scoresheet opens instead of sending the user to a generic list.
+  const requestedMatchId = searchParams.get("match");
+  useEffect(() => {
+    if (loading || !requestedMatchId || selectedMatch) return;
+    const target = matches.find(match => String(match.id) === String(requestedMatchId));
+    if (target) setSelectedMatch(target);
+  }, [loading, requestedMatchId, matches, selectedMatch]);
+
+  const closeSelectedMatch = () => {
+    setSelectedMatch(null);
+    if (searchParams.get("match")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("match");
+      setSearchParams(next);
+    }
+  };
 
   if (manualEntryOpen && !seasonFormat) {
     return (
@@ -3050,7 +3071,7 @@ function HistoryTab({ divisionId, teams, isManager, playoffsStartDate, myProfile
             </div>
           </div>
         )}
-        <Scoresheet match={selectedMatch} onClose={() => setSelectedMatch(null)} />
+        <Scoresheet match={selectedMatch} onClose={closeSelectedMatch} />
       </div>
     );
   }
