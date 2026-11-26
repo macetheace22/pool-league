@@ -7313,6 +7313,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .btn-primary:disabled{opacity:.35;cursor:not-allowed;}
 .btn-secondary{width:100%;background:transparent;color:#E0E0E0;font-family:'Archivo',sans-serif;font-size:13px;font-weight:600;padding:11px;border-radius:10px;border:1.5px solid #3A3A3A;cursor:pointer;}
 .btn-secondary:disabled{opacity:.3;cursor:not-allowed;}
+/* Shared segmented filters: prevent iOS/browser default white button styling. */
+.seg-control{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.seg-btn{-webkit-appearance:none;appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 12px;background:#121212;border:1.5px solid #3A3A3A;border-radius:999px;color:#9A9A9A;font-family:'Archivo',sans-serif;font-size:12px;font-weight:600;line-height:1.2;white-space:nowrap;cursor:pointer;box-shadow:none;}
+.seg-btn--active{background:#16332A;border-color:#1F6B4A;color:#5FCF9E;}
+.seg-btn:focus-visible{outline:2px solid #5FCF9E;outline-offset:2px;}
+.seg-btn:disabled{opacity:.4;cursor:not-allowed;}
+
 .btn-secondary--clear{color:#F87171;border-color:#3A1F1F;background:#1A0E0E;}
 .btn-next{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;background:#16332A;border:1.5px solid #1F6B4A;color:#5FCF9E;font-family:'Archivo',sans-serif;font-size:13px;font-weight:700;padding:12px;border-radius:10px;cursor:pointer;}
 .btn-ghost{background:none;border:none;font-family:'Archivo',sans-serif;font-size:12px;font-weight:600;color:#5FCF9E;cursor:pointer;padding:4px 0;}
