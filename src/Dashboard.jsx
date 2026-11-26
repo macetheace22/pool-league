@@ -120,7 +120,8 @@ export function Home() {
   const [teamOverviews, setTeamOverviews] = useState(undefined);
   const [snapshotStats, setSnapshotStats] = useState(undefined); // undefined = loading/n-a, null = no player_num linked
   const [recentPracticeGames, setRecentPracticeGames] = useState(undefined); // undefined = loading, [] = none
-  const [showAllRecentActivity, setShowAllRecentActivity] = useState(false);\n  const [expandedRecentActivityType, setExpandedRecentActivityType] = useState(null);
+  const [showAllRecentActivity, setShowAllRecentActivity] = useState(false);
+  const [expandedRecentActivityType, setExpandedRecentActivityType] = useState(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -252,7 +253,47 @@ export function Home() {
               <div className="dash-empty">No recent league or practice activity yet.</div>
             ) : (
               <>
-                <div className="recent-activity-groups">\n                  {recentActivityGroups.map(group => {\n                    const expanded = expandedRecentActivityType === group.type;\n                    return (\n                      <section key={group.type} className="recent-activity-group">\n                        <button\n                          type="button"\n                          className="recent-activity-group__header"\n                          aria-expanded={expanded}\n                          onClick={() => setExpandedRecentActivityType(current => current === group.type ? null : group.type)}\n                        >\n                          <span>{group.typeLabel}</span>\n                          <span className="recent-activity-group__count">{group.items.length}</span>\n                          <ChevronRight size={14} color="#6A6A6A" style={{marginLeft:"auto",transform:expanded ? "rotate(90deg)" : "none"}} />\n                        </button>\n                        {expanded && (\n                          <div className="recent-activity-group__items">\n                            {group.items.map(item => (\n                              <button\n                                key={item.key}\n                                type="button"\n                                className="match-row recent-activity-row"\n                                onClick={() => item.type === "practice"\n                                  ? navigate("/practice?home=1&game=" + encodeURIComponent(item.key.split(":")[1]) + "#practice-sessions")\n                                  : navigate("/match-lookup?match=" + encodeURIComponent(item.key.split(":")[1]) + (item.divisionId ? "&division=" + encodeURIComponent(item.divisionId) : ""))}\n                                aria-label={item.type === "practice" ? "Open Practice game details: " + item.title : "Open Match Scorecard: " + item.title}\n                              >\n                                <span style={{minWidth:0,flex:1,textAlign:"left"}}>\n                                  <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>\n                                  <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>\n                                </span>\n                                <ChevronRight size={14} color="#6A6A6A" />\n                              </button>\n                            ))}\n                          </div>\n                        )}\n                      </section>\n                    );\n                  })}\n                </div>\n                {recentActivity.length > 4 && (
+                <div className="recent-activity-groups">
+                  {recentActivityGroups.map(group => {
+                    const expanded = expandedRecentActivityType === group.type;
+                    return (
+                      <section key={group.type} className="recent-activity-group">
+                        <button
+                          type="button"
+                          className="recent-activity-group__header"
+                          aria-expanded={expanded}
+                          onClick={() => setExpandedRecentActivityType(current => current === group.type ? null : group.type)}
+                        >
+                          <span>{group.typeLabel}</span>
+                          <span className="recent-activity-group__count">{group.items.length}</span>
+                          <ChevronRight size={14} color="#6A6A6A" style={{marginLeft:"auto",transform:expanded ? "rotate(90deg)" : "none"}} />
+                        </button>
+                        {expanded && (
+                          <div className="recent-activity-group__items">
+                            {group.items.map(item => (
+                              <button
+                                key={item.key}
+                                type="button"
+                                className="match-row recent-activity-row"
+                                onClick={() => item.type === "practice"
+                                  ? navigate("/practice?home=1&game=" + encodeURIComponent(item.key.split(":")[1]) + "#practice-sessions")
+                                  : navigate("/match-lookup?match=" + encodeURIComponent(item.key.split(":")[1]) + (item.divisionId ? "&division=" + encodeURIComponent(item.divisionId) : ""))}
+                                aria-label={item.type === "practice" ? "Open Practice game details: " + item.title : "Open Match Scorecard: " + item.title}
+                              >
+                                <span style={{minWidth:0,flex:1,textAlign:"left"}}>
+                                  <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
+                                  <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
+                                </span>
+                                <ChevronRight size={14} color="#6A6A6A" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+                {recentActivity.length > 4 && (
                   <button type="button" className="link-btn" style={{marginTop:8}} onClick={() => setShowAllRecentActivity(value => !value)}>
                     {showAllRecentActivity ? "Show less" : `View all activity (${Math.min(recentActivity.length, 10)})`}
                   </button>
