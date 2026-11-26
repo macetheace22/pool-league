@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRecentActivity } from "../src/Dashboard";
+import { buildRecentActivity, groupRecentActivity } from "../src/Dashboard";
 
 describe("Recent Activity feed", () => {
   it("combines league matches and Practice sessions in newest-first order", () => {
@@ -37,4 +37,29 @@ describe("Recent Activity feed", () => {
     ]);
     expect(item).toMatchObject({ title: "Skills & Drills", resultLabel: "Completed" });
   });
+  it("groups activity by play type, newest within each group, with groups ordered by latest activity", () => {
+    const items = [
+      { key: "league:old", type: "league", typeLabel: "League", timestamp: "2026-10-01T20:00:00Z" },
+      { key: "practice:new", type: "practice", typeLabel: "Practice", timestamp: "2026-10-04T20:00:00Z" },
+      { key: "league:new", type: "league", typeLabel: "League", timestamp: "2026-10-03T20:00:00Z" },
+      { key: "practice:old", type: "practice", typeLabel: "Practice", timestamp: "2026-10-02T20:00:00Z" },
+    ];
+
+    const groups = groupRecentActivity(items, 4);
+    expect(groups.map(group => group.type)).toEqual(["practice", "league"]);
+    expect(groups[0].items.map(item => item.key)).toEqual(["practice:new", "practice:old"]);
+    expect(groups[1].items.map(item => item.key)).toEqual(["league:new", "league:old"]);
+  });
+
+  it("limits the grouped activity to the same 4/10 visible-item cap", () => {
+    const items = [
+      { key: "practice:4", type: "practice", typeLabel: "Practice", timestamp: "2026-10-04T20:00:00Z" },
+      { key: "league:3", type: "league", typeLabel: "League", timestamp: "2026-10-03T20:00:00Z" },
+      { key: "practice:2", type: "practice", typeLabel: "Practice", timestamp: "2026-10-02T20:00:00Z" },
+      { key: "league:1", type: "league", typeLabel: "League", timestamp: "2026-10-01T20:00:00Z" },
+      { key: "practice:0", type: "practice", typeLabel: "Practice", timestamp: "2026-09-30T20:00:00Z" },
+    ];
+    expect(groupRecentActivity(items, 4).flatMap(group => group.items)).toHaveLength(4);
+  });
+
 });
