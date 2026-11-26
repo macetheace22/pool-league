@@ -389,6 +389,15 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
   // Keep the manual-import season selection in sync when the URL changes
   // without relying on this route component being remounted.
   useEffect(() => {
+    if (page !== "matchlkp" || !requestedDivisionId || !seasons.length) return;
+    const target = seasons.flatMap(season => (season.divisions ?? []).map(division => ({ season, division })))
+      .find(({ division }) => String(division.id) === String(requestedDivisionId));
+    if (!target || viewingDiv?.id === target.division.id) return;
+    setViewingSeason(target.season);
+    setViewingDiv(target.division);
+  }, [page, requestedDivisionId, seasons, viewingDiv?.id]);
+
+  useEffect(() => {
     if (page !== "manual-import" || !requestedSeasonId || !seasons.length) return;
     const target = seasons.find(season => season.id === requestedSeasonId);
     if (!target || target.id === viewingSeason?.id) return;
