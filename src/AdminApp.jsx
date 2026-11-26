@@ -373,6 +373,19 @@ function WorkspaceApp({ page, profile, onLogout, onProfileRefresh }) {
     };
   }, []);
 
+  // Recent Activity links carry the exact division so Match Lookup can
+  // immediately load that division and let HistoryTab open the requested scorecard.
+  useEffect(() => {
+    if (page !== "matchlkp" || !requestedDivisionId || !seasons.length) return;
+    for (const season of seasons) {
+      const targetDivision = (season.divisions ?? []).find(div => String(div.id) === String(requestedDivisionId));
+      if (!targetDivision) continue;
+      if (viewingSeason?.id !== season.id) setViewingSeason(season);
+      if (viewingDiv?.id !== targetDivision.id) setViewingDiv(targetDivision);
+      break;
+    }
+  }, [page, requestedDivisionId, seasons, viewingSeason?.id, viewingDiv?.id]);
+
   // Keep the manual-import season selection in sync when the URL changes
   // without relying on this route component being remounted.
   useEffect(() => {
