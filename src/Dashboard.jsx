@@ -51,6 +51,8 @@ export function buildRecentActivity(teamOverviews, practiceGames) {
         timestamp,
         title: `${(teamOverviews ?? []).length > 1 ? `${overview.team.name} — ` : ""}vs ${opponent || "Opponent"}`,
         dateLabel: match.week_date || (timestamp ? new Date(timestamp).toLocaleDateString() : "Date unavailable"),
+        divisionId: match.division_id ?? null,
+        typeLabel: "League",
         resultLabel: match.is_makeup_pending ? "Makeup Pending"
           : myPoints != null && opponentPoints != null ? `${myPoints} – ${opponentPoints}` : "Result unavailable",
       };
@@ -62,6 +64,7 @@ export function buildRecentActivity(teamOverviews, practiceGames) {
       key: `practice:${game.id}`,
       type: "practice",
       timestamp,
+      typeLabel: "Practice",
       title: game.practice_type === "skills_drills" ? "Skills & Drills" : `Practice vs ${game.opponent_name || "Opponent"}`,
       dateLabel: timestamp ? new Date(timestamp).toLocaleDateString() : "Date unavailable",
       resultLabel: game.winner === "me" ? "Won" : game.winner === "opponent" ? "Lost" : "Completed",
@@ -220,12 +223,14 @@ export function Home() {
                       key={item.key}
                       type="button"
                       className="match-row recent-activity-row"
-                      onClick={() => navigate(item.type === "practice" ? "/practice?home=1#practice-sessions" : "/match-lookup")}
-                      aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match History: ${item.title}`}
+                      onClick={() => item.type === "practice"
+                        ? navigate("/practice?home=1#practice-sessions")
+                        : navigate(`/match-lookup?match=${encodeURIComponent(item.key.split(":")[1])}${item.divisionId ? `&division=${encodeURIComponent(item.divisionId)}` : ""}`)}
+                      aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match Scorecard: ${item.title}`}
                     >
                       <span style={{minWidth:0,flex:1,textAlign:"left"}}>
                         <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
-                        <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
+                        <span className="match-row__meta"><span className={`recent-activity-type recent-activity-type--${item.type}`}>{item.typeLabel}</span><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
                       </span>
                       <ChevronRight size={14} color="#6A6A6A" />
                     </button>
@@ -744,6 +749,9 @@ export function TournamentsPlaceholder() {
 
 export const dashboardCss = `
 .recent-activity-row{width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #252525;}.recent-activity-row:last-child{border-bottom:0;}.recent-activity-row:focus-visible{outline:2px solid #5FCF9E;outline-offset:2px;border-radius:5px;}
+.recent-activity-type{font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 5px;border-radius:5px;border:1px solid #333;white-space:nowrap;margin-right:2px;}
+.recent-activity-type--league{color:#5FCF9E;background:#16332A;border-color:#1F6B4A;}
+.recent-activity-type--practice{color:#9FC4B4;background:#18231F;border-color:#2E453B;}
 
 .next-match-card{display:block;background:#0F2D1F;border:1.5px solid #1F6B4A;border-radius:14px;padding:16px;text-decoration:none;margin-bottom:4px;}
 .next-match-card__eyebrow{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#5FCF9E;margin-bottom:4px;}
