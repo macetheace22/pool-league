@@ -51,6 +51,14 @@ describe("Recent Activity feed", () => {
     expect(groups[1].items.map(item => item.key)).toEqual(["league:new", "league:old"]);
   });
 
+  it("keeps group order driven by the newest event in each type", () => {
+    const groups = groupRecentActivity([
+      { key: "league:new", type: "league", typeLabel: "League", timestamp: "2026-10-03T20:00:00Z" },
+      { key: "practice:new", type: "practice", typeLabel: "Practice", timestamp: "2026-10-04T20:00:00Z" },
+    ], 4);
+    expect(groups.map(group => group.type)).toEqual(["practice", "league"]);
+  });
+
   it("limits the grouped activity to the same 4/10 visible-item cap", () => {
     const items = [
       { key: "practice:4", type: "practice", typeLabel: "Practice", timestamp: "2026-10-04T20:00:00Z" },

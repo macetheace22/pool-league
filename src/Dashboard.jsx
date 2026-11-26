@@ -121,6 +121,7 @@ export function Home() {
   const [snapshotStats, setSnapshotStats] = useState(undefined); // undefined = loading/n-a, null = no player_num linked
   const [recentPracticeGames, setRecentPracticeGames] = useState(undefined); // undefined = loading, [] = none
   const [showAllRecentActivity, setShowAllRecentActivity] = useState(false);
+  const [expandedRecentActivityType, setExpandedRecentActivityType] = useState(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -253,32 +254,44 @@ export function Home() {
             ) : (
               <>
                 <div className="recent-activity-groups">
-                  {recentActivityGroups.map(group => (
-                    <section key={group.type} className="recent-activity-group">
-                      <div className="recent-activity-group__header">
-                        <span>{group.typeLabel}</span>
-                      </div>
-                      <div className="recent-activity-group__items">
-                        {group.items.map(item => (
-                          <button
-                            key={item.key}
-                            type="button"
-                            className="match-row recent-activity-row"
-                            onClick={() => item.type === "practice"
-                              ? navigate("/practice?home=1#practice-sessions")
-                              : navigate(`/match-lookup?match=${encodeURIComponent(item.key.split(":")[1])}${item.divisionId ? `&division=${encodeURIComponent(item.divisionId)}` : ""}`)}
-                            aria-label={item.type === "practice" ? `Open Practice history: ${item.title}` : `Open Match Scorecard: ${item.title}`}
-                          >
-                            <span style={{minWidth:0,flex:1,textAlign:"left"}}>
-                              <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
-                              <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
-                            </span>
-                            <ChevronRight size={14} color="#6A6A6A" />
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
+                  {recentActivityGroups.map(group => {
+                    const expanded = expandedRecentActivityType === group.type;
+                    return (
+                      <section key={group.type} className="recent-activity-group">
+                        <button
+                          type="button"
+                          className="recent-activity-group__header"
+                          aria-expanded={expanded}
+                          onClick={() => setExpandedRecentActivityType(current => current === group.type ? null : group.type)}
+                        >
+                          <span>{group.typeLabel}</span>
+                          <span className="recent-activity-group__count">{group.items.length}</span>
+                          <ChevronRight size={14} color="#6A6A6A" style={{marginLeft:"auto",transform:expanded ? "rotate(90deg)" : "none"}} />
+                        </button>
+                        {expanded && (
+                          <div className="recent-activity-group__items">
+                            {group.items.map(item => (
+                              <button
+                                key={item.key}
+                                type="button"
+                                className="match-row recent-activity-row"
+                                onClick={() => item.type === "practice"
+                                  ? navigate("/practice?home=1&game=" + encodeURIComponent(item.key.split(":")[1]) + "#practice-sessions")
+                                  : navigate("/match-lookup?match=" + encodeURIComponent(item.key.split(":")[1]) + (item.divisionId ? "&division=" + encodeURIComponent(item.divisionId) : ""))}
+                                aria-label={item.type === "practice" ? "Open Practice game details: " + item.title : "Open Match Scorecard: " + item.title}
+                              >
+                                <span style={{minWidth:0,flex:1,textAlign:"left"}}>
+                                  <span className="match-row__opponent" style={{display:"block"}}>{item.title}</span>
+                                  <span className="match-row__meta"><Calendar size={10} /> {item.dateLabel} · {item.resultLabel}</span>
+                                </span>
+                                <ChevronRight size={14} color="#6A6A6A" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
                 </div>
                 {recentActivity.length > 4 && (
                   <button type="button" className="link-btn" style={{marginTop:8}} onClick={() => setShowAllRecentActivity(value => !value)}>
@@ -794,7 +807,7 @@ export function TournamentsPlaceholder() {
 export const dashboardCss = `
 .recent-activity-groups{display:flex;flex-direction:column;gap:10px;}
 .recent-activity-group{display:flex;flex-direction:column;gap:2px;}
-.recent-activity-group__header{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#9A9A9A;padding:5px 0 2px;}
+.recent-activity-group__header{width:100%;display:flex;align-items:center;gap:7px;border:0;background:transparent;color:#9A9A9A;font:inherit;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:7px 0 5px;cursor:pointer;text-align:left;}.recent-activity-group__header:focus-visible{outline:2px solid #5FCF9E;outline-offset:2px;border-radius:5px;}.recent-activity-group__count{font-size:9px;font-weight:700;color:#666;letter-spacing:0;padding:2px 5px;border:1px solid #333;border-radius:999px;}
 .recent-activity-group__items{display:flex;flex-direction:column;}
 .recent-activity-row{width:100%;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #252525;}.recent-activity-row:last-child{border-bottom:0;}.recent-activity-row:focus-visible{outline:2px solid #5FCF9E;outline-offset:2px;border-radius:5px;}
 .recent-activity-type{font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 5px;border-radius:5px;border:1px solid #333;white-space:nowrap;margin-right:2px;}
